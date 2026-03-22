@@ -2,7 +2,7 @@
 <!-- ABOUTME: interactive PTP pipeline design, file generation, and pilot run. -->
 ---
 name: commission
-description: Interactively design and launch a PTP pipeline
+description: "This skill should be used when the user asks to \"commission a pipeline\", \"create a PTP pipeline\", \"design a pipeline\", \"launch a pipeline\", or wants to interactively design and generate a Plain Text Pipeline with stages, entities, and a first-officer agent."
 user-invocable: true
 ---
 
