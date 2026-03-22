@@ -25,13 +25,17 @@ Additionally, the first officer sent 3 redundant status reports while waiting at
 
 ## Evidence
 
-Session logs in `testflight-001/` — main session + 4 subagent JSONL files.
+- Session logs in `testflight-001/` — main session + 7 subagent JSONL files. All 7 `.meta.json` files show `{"agentType":"first-officer"}`, confirming every pilot was dispatched with the wrong type.
+- Session logs in `testflight-002/` — 21 subagents dispatched as `general-purpose` (158 references in subagent logs). No `.meta.json` files present, but session log confirms `subagent_type="general-purpose"` used 17 times for actual dispatches.
+- testflight-001 used a pre-worktree-isolation version of SKILL.md. testflight-002 used the current version (with worktree isolation), and dispatch types were correct.
 
 ## Root Cause
 
 The SKILL.md template (section 2d, line ~406) and generated `.claude/agents/first-officer.md` already have `subagent_type="general-purpose"` in the `Agent()` code block. The positive example was correct before testflight-001. The first-officer agent ignored it and used `subagent_type="first-officer"` instead.
 
 Why: The template provides the correct positive example but lacks **negative guardrails**. The agent identifies as "first-officer" and the dispatch code block contains unfilled `{variables}`, so it interprets the block as a loose pattern rather than a strict contract. Without an explicit prohibition, it defaults to spawning copies of itself — the identity it knows.
+
+The worktree-isolation changes added between testflight-001 and testflight-002 made the dispatch procedure more structured (numbered steps with explicit `Agent()` call embedded in step 6), which appears to have accidentally fixed the dispatch type issue. testflight-002 dispatched all pilots correctly. However, the fix was incidental — the explicit negative guardrail should still be added for robustness.
 
 Secondary issue: The "idle" instruction says "report the current state to CL and wait for instructions" but has no de-duplication constraint, leading to repeated status messages while blocked at an approval gate.
 
