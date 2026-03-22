@@ -1,8 +1,8 @@
 ---
 title: Pilot Worktree Isolation
-status: ideation
+status: implementation
 source: commission seed
-started:
+started: 2026-03-22T20:24:00Z
 completed:
 verdict:
 score: 16
@@ -10,27 +10,117 @@ score: 16
 
 ## Problem
 
-In v0 shuttle mode, only one pilot runs at a time, so there are no git conflicts. But in v1 starship mode, multiple pilots will work on different entities in parallel. If they all operate on the same working tree, they'll step on each other's files — merge conflicts, dirty state, lost work. Worktree isolation is the foundation for safe parallel execution.
+In v0 shuttle mode, only one pilot runs at a time, so there are no git conflicts. But in v1 starship mode, multiple pilots will work on different entities in parallel. If they all operate on the same working tree, they'll step on each other's files — merge conflicts, dirty state, lost work.
+
+Specific conflict scenarios in parallel execution:
+
+1. **File write collisions.** Two pilots editing different source files in the same directory. Even if the files are distinct, git operations (staging, committing) are per-worktree and would interleave.
+2. **Build/test interference.** One pilot runs tests while another is mid-edit, causing spurious failures.
+3. **Entity frontmatter races.** Two pilots completing at the same time both try to update their entity's `status:` field. Since entity files are in the pipeline directory (shared state), these writes go to the same filesystem location regardless of worktree.
+4. **Partial state on crash.** A pilot crashes mid-implementation, leaving uncommitted changes in the working tree that block the next pilot dispatched for that entity.
+
+Worktree isolation is the foundation for safe parallel execution.
 
 ## Proposed Approach
 
-1. **Each pilot gets its own git worktree.** When the first officer dispatches a pilot, it creates a worktree: `git worktree add .worktrees/pilot-{slug} -b pilot/{slug}` based on the current branch. The pilot operates entirely within that worktree.
+### State ownership: main tree owns lifecycle, worktree owns work
 
-2. **First officer manages worktree lifecycle.** Create on dispatch, merge or clean up on completion. If a pilot fails, the worktree stays for inspection.
+The first officer owns all entity state transitions on main. The pilot owns work artifacts in its worktree. This separation means:
 
-3. **Pipeline directory is shared state.** The entity .md files are the pipeline's state machine. Pilots read the entity file from the main tree, do their work in the worktree, then update the entity frontmatter in the main tree. This avoids merge conflicts on the pipeline metadata itself.
+- **Before dispatch**: First officer commits state change on main (`status: {stage}`, `worktree: .worktrees/pilot-{slug}`). This is the "started" signal.
+- **During work**: Pilot operates exclusively in its worktree. It writes code, entity body content, and commits to its branch. It does NOT touch frontmatter.
+- **On completion**: First officer does `git merge --no-commit pilot/{slug}`, updates frontmatter (status to next stage, clears `worktree:` field), and commits. Single atomic commit = state transition + work merge.
+- **Orphan detection**: Entity has `status: implementation` + `worktree:` field set, but worktree has no changes beyond the branch point → pilot is gone.
 
-4. **Worktree directory convention:** `.worktrees/` at the repo root, gitignored. Branch naming: `pilot/{entity-slug}`.
+### Dispatch lifecycle
 
-5. **v0 impact: minimal.** This is a design-only entity for now. Implementation is deferred to v1. The design should be solid enough that v1 can implement it without redesign.
+**1. State change on main** — First officer updates entity frontmatter and commits:
+```yaml
+status: {next_stage}
+worktree: .worktrees/pilot-{slug}
+```
+
+**2. Create worktree** — Branch from current HEAD:
+```bash
+git worktree add .worktrees/pilot-{slug} -b pilot/{slug}
+```
+If stale worktree/branch exists from a prior crash:
+```bash
+git worktree remove .worktrees/pilot-{slug} --force 2>/dev/null
+git branch -D pilot/{slug} 2>/dev/null
+git worktree add .worktrees/pilot-{slug} -b pilot/{slug}
+```
+
+**3. Dispatch pilot** — Agent prompt includes the worktree path:
+```
+Your working directory is {worktree_path}.
+All file reads and writes MUST use paths under {worktree_path}.
+Do NOT modify YAML frontmatter in entity files.
+Commit your work to your branch before sending completion message.
+```
+
+**4. Merge + state finalize** — On pilot completion:
+```bash
+git merge --no-commit pilot/{slug}
+```
+Then update frontmatter (status to next stage, clear `worktree:` field), and commit:
+```bash
+git commit -m "pilot: {slug} completed {stage}"
+```
+Then cleanup:
+```bash
+git worktree remove .worktrees/pilot-{slug}
+git branch -d pilot/{slug}
+```
+
+**5. Abandon** — If pilot fails or crashes:
+- Worktree stays on disk for inspection
+- Entity frontmatter on main still shows `worktree:` field — this IS the orphan signal
+- Next dispatch for same entity does stale-cleanup from step 2
+
+### Schema addition
+
+Add `worktree:` to the entity frontmatter schema. While a pilot is active, this field contains the worktree path. When work is merged, it's cleared. Empty = no active worktree.
+
+### Directory and branch conventions
+
+- **Worktree root:** `.worktrees/` at the repo root
+- **Worktree path:** `.worktrees/pilot-{entity-slug}`
+- **Branch naming:** `pilot/{entity-slug}`
+- **`.gitignore` entry:** `.worktrees/` (worktrees should never be committed)
+- **Merge commit format:** `pilot: {entity-slug} completed {stage-name}`
+
+### Merge conflict resolution
+
+- **Detection:** `git merge --no-commit` exits non-zero if conflicts exist. First officer reports to CL rather than auto-resolving.
+- **Prevention:** Avoid dispatching two pilots likely to touch the same files.
+- **Fallback:** Sequential dispatch (v0 behavior) for high-conflict-risk pipelines.
+
+### Failure modes
+
+| Failure | Detection | Recovery |
+|---------|-----------|----------|
+| Pilot crashes mid-work | Entity has `worktree:` set, worktree has no new commits | Stale-cleanup on next dispatch |
+| Merge conflict | `git merge --no-commit` exits non-zero | Report to CL; worktree stays for manual resolution |
+| Branch name collision | `git worktree add` fails | Stale-cleanup handles it |
+| Two pilots for same entity | `worktree:` field is already set | First officer checks before dispatch |
+
+### Open questions (resolved)
+
+**Q: Should entity state changes happen on main or in the worktree?**
+A: Main. The first officer commits state changes on main before and after pilot work. This makes main the single source of truth for lifecycle state, enables orphan detection, and keeps the merge atomic (work + final state in one commit).
+
+**Q: What about non-git pipelines?**
+A: Worktree isolation requires git. Non-git directories fall back to sequential dispatch.
 
 ## Acceptance Criteria
 
-- [ ] Design document covers: worktree creation, branch naming, lifecycle management, shared state handling
-- [ ] Addresses the merge conflict problem for parallel pilots
-- [ ] Defines how pilots interact with pipeline state (entity files) vs working files
-- [ ] Considers failure modes: pilot crashes mid-work, worktree left dirty
-- [ ] Does not require v0 code changes — this is design prep for v1
+- [ ] `worktree:` field added to entity schema in pipeline README
+- [ ] `.worktrees/` added to `.gitignore`
+- [ ] First-officer template in SKILL.md updated: dispatch creates worktree, state change on main before dispatch, atomic merge + state finalize on completion
+- [ ] First-officer reference doc (`agents/first-officer.md`) updated with worktree dispatch pattern
+- [ ] Pilot prompt template instructs pilot to work in worktree path and not touch frontmatter
+- [ ] Validated: dispatch a real entity through one stage using the worktree flow — worktree created, pilot works there, main stays clean during work, merge is atomic
 
 ## Scoring Breakdown
 
