@@ -13,6 +13,17 @@ This is a v0 shuttle-mode pipeline: one general-purpose pilot agent handles all 
 
 Follow these three phases in order. Do not skip or combine phases.
 
+## Batch Mode
+
+If the user provides design inputs in their message (some or all of: mission, entity type, stages, approval gates, seed entities, location):
+
+1. Extract all provided inputs
+2. For any missing inputs, infer reasonable defaults based on the mission
+3. Skip directly to **Confirm Design** with the assembled inputs
+4. If the user says to skip confirmation or auto-approve gates, proceed without asking
+
+This allows non-interactive use: all inputs in one message, straight to generation.
+
 ---
 
 ## Phase 1: Interactive Design
