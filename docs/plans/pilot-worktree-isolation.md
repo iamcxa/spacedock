@@ -131,3 +131,23 @@ A: Worktree isolation requires git. Non-git directories fall back to sequential 
 | Parsimony | 3 | Git worktrees are the right primitive but lifecycle is complex |
 | Testability | 3 | Can test worktree creation, harder to test full parallel scenario |
 | Novelty | 3 | Git worktrees are well-known but applying them to agent isolation is less explored |
+
+## Implementation Summary
+
+Five files changed:
+
+1. **`.gitignore`** (created) — Added `.worktrees/` entry so worktree directories are never committed.
+
+2. **`docs/plans/README.md`** — Added `worktree:` field to the schema YAML block, field reference table, and entity template.
+
+3. **`agents/first-officer.md`** — Added "Worktree Isolation" section documenting the dispatch lifecycle (state change on main, create worktree, dispatch pilot, merge+finalize, cleanup) and orphan detection.
+
+4. **`skills/commission/SKILL.md`** — Updated the first-officer agent template (section 2d) with the full worktree dispatch pattern:
+   - Dispatching steps now include: state change on main (status + worktree field commit), worktree creation with stale-cleanup, pilot prompt with worktree path and no-frontmatter-edit instruction, merge --no-commit + atomic state finalize, worktree/branch cleanup.
+   - Event loop updated to merge-then-verify flow.
+   - State management section updated: first officer owns frontmatter, commit at dispatch/merge boundaries.
+   - Orphan detection section added for crash recovery.
+   - `.gitignore` generation step added to Phase 2.
+   - `worktree:` field added to all schema templates (README, entity template, seed entity template).
+
+5. **`docs/plans/pilot-worktree-isolation.md`** — This implementation summary.
