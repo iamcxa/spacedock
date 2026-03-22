@@ -198,7 +198,7 @@ score:
 - **Outputs:** {What the worker produces — be specific to the mission}
 - **Good:** {Quality criteria for work done in this stage}
 - **Bad:** {Anti-patterns to avoid in this stage}
-- **Human approval:** {If this stage's exit transition is in approval_gates: "Yes — {reason}." Otherwise: "No"}
+- **Human approval:** {If the transition INTO this stage is in approval_gates: "Yes — {reason} before entering this stage." Otherwise: "No"}
 
 {End of per-stage sections.}
 
@@ -258,6 +258,8 @@ Write the status script and make it executable. This must be real, working bash 
 
 Fill in the stage names and sort order values from the design phase. The `STAGE_ORDER` associative array maps each stage name to its position (1, 2, 3, ...).
 
+The script header MUST use the self-describing pattern shown below (# goal: / # instruction: / # constraints: / # valid status values:). Do NOT use ABOUTME comments — the self-describing header IS the PTP convention for view scripts.
+
 ````bash
 #!/bin/bash
 # The actual program generated below is a version of the description:
@@ -312,13 +314,15 @@ chmod +x {dir}/status
 
 For each seed entity, create `{dir}/{slug}.md` where `{slug}` is the title converted to lowercase with spaces replaced by hyphens, non-alphanumeric characters (except hyphens) removed.
 
+The `title` field is the human-readable name (e.g., "Full Cycle Test"). The filename `{slug}.md` is derived from it (lowercase, hyphens).
+
 Each entity file:
 
 ```markdown
 ---
-title: {entity title}
+title: {entity title — human-readable, not the slug}
 status: {first_stage}
-source: {source, or leave empty}
+source: {source if provided, otherwise "commission seed"}
 started:
 completed:
 verdict:
@@ -332,6 +336,8 @@ score: {score, or leave empty}
 
 Write the first-officer agent to `{dir}/.claude/agents/first-officer.md`.
 
+IMPORTANT: All paths in the first-officer template must be absolute. Resolve `{dir}` to its absolute path before filling the template. For example, if `{dir}` is `./v0-test-1/`, resolve it to `/Users/clkao/git/spacedock/v0-test-1/` (or whatever the absolute path is).
+
 This is the most critical generated file. The prompt must be complete enough that the agent runs the pipeline without manual intervention.
 
 Use the following template, filling ALL `{variables}` from the design phase:
@@ -342,12 +348,12 @@ Use the following template, filling ALL `{variables}` from the design phase:
 ---
 name: first-officer
 description: Orchestrates the {mission} pipeline
-tools: Agent, SendMessage, Read, Write, Edit, Bash, Glob, Grep
+tools: Agent, TeamCreate, SendMessage, Read, Write, Edit, Bash, Glob, Grep
 ---
 
 # First Officer — {mission}
 
-You are the first officer for the {mission} pipeline at `{dir}/`.
+You are the first officer for the {mission} pipeline at `{dir_absolute}/`.
 
 You are a DISPATCHER. You read state and dispatch crew. You NEVER do stage work yourself. Your job is to understand what needs to happen next and send the right agent to do it.
 
@@ -404,7 +410,7 @@ When the pipeline is idle (nothing to dispatch), report the current state to CL 
 
 ## Pipeline Path
 
-All paths are relative to: `{dir}/`
+All paths are absolute: `{dir_absolute}/`
 
 The README at `{dir}/README.md` is the single source of truth for schema, stages, and quality criteria.
 
