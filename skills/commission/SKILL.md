@@ -127,13 +127,13 @@ Create the pipeline directory and generate four kinds of files. Use the design a
 mkdir -p {dir}
 ```
 
-Also ensure the agents directory exists:
+Also ensure the agents directory exists inside the pipeline:
 
 ```
-mkdir -p {project_root}/.claude/agents
+mkdir -p {dir}/.claude/agents
 ```
 
-Where `{project_root}` is the root of the project where Claude Code is running (the git root, or cwd if not in a git repo).
+This keeps the pipeline self-contained — when Claude is invoked from `{dir}`, the agent is discoverable.
 
 ### 2a. Generate `{dir}/README.md`
 
@@ -330,7 +330,7 @@ score: {score, or leave empty}
 
 ### 2d. Generate First-Officer Agent
 
-Write the first-officer agent to `{project_root}/.claude/agents/first-officer.md`.
+Write the first-officer agent to `{dir}/.claude/agents/first-officer.md`.
 
 This is the most critical generated file. The prompt must be complete enough that the agent runs the pipeline without manual intervention.
 
@@ -420,7 +420,7 @@ After generating all files, verify before proceeding:
 - [ ] `{dir}/README.md` exists with mission, schema, all stage definitions, and entity template
 - [ ] `{dir}/status` exists and is executable
 - [ ] Each seed entity file exists at `{dir}/{slug}.md` with valid YAML frontmatter
-- [ ] `{project_root}/.claude/agents/first-officer.md` exists with all sections
+- [ ] `{dir}/.claude/agents/first-officer.md` exists with all sections
 
 ---
 
@@ -437,7 +437,7 @@ Tell CL what was generated:
 > - `{dir}/README.md` — pipeline schema and stage definitions
 > - `{dir}/status` — pipeline status viewer
 > - {for each seed entity: "`{dir}/{slug}.md` — {title}"}
-> - `{project_root}/.claude/agents/first-officer.md` — pipeline orchestrator
+> - `{dir}/.claude/agents/first-officer.md` — pipeline orchestrator
 >
 > Launching the first officer to run the pipeline...
 
