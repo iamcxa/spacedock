@@ -3,7 +3,7 @@ title: Refit Command
 status: validation
 source: commission seed
 started: 2026-03-22T00:00:00Z
-worktree:
+worktree: .worktrees/pilot-refit-command
 completed:
 verdict:
 score: 15
