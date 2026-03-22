@@ -1,6 +1,6 @@
 ---
 title: First Officer Dispatch Bug
-status: ideation
+status: backlog
 source: testflight-001
 started:
 completed:

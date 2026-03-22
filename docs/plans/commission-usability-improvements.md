@@ -1,6 +1,6 @@
 ---
 title: Commission Usability Improvements
-status: ideation
+status: backlog
 source: testflight-001 feedback
 started:
 completed:

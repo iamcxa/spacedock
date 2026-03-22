@@ -17,12 +17,13 @@ Every entity file has YAML frontmatter with these fields:
 ```yaml
 ---
 title: Human-readable name
-status: ideation
+status: backlog
 source:
 started:
 completed:
 verdict:
 score:
+worktree:
 ---
 ```
 
@@ -31,18 +32,29 @@ score:
 | Field | Type | Description |
 |-------|------|-------------|
 | `title` | string | Human-readable entity name |
-| `status` | enum | One of: ideation, implementation, validation, done |
+| `status` | enum | One of: backlog, ideation, implementation, validation, done |
 | `source` | string | Where this entity came from |
 | `started` | ISO 8601 | When active work began |
 | `completed` | ISO 8601 | When the entity reached terminal status |
 | `verdict` | enum | PASSED or REJECTED — set at final stage |
 | `score` | number | Priority score out of 25 (optional) |
+| `worktree` | string | Worktree path while a pilot is active, empty otherwise |
 
 ## Stages
 
+### `backlog`
+
+An entity enters backlog when it is first proposed. It has a seed description but no design work has been done yet.
+
+- **Inputs:** None — this is the initial state
+- **Outputs:** A seed entity file with title, source, and brief description
+- **Good:** Clear enough to understand what the entity is about
+- **Bad:** N/A — backlog is a holding state, not an action
+- **Human approval:** No
+
 ### `ideation`
 
-A task enters ideation when it is first proposed. The work here is to flesh out the idea: clarify the problem, explore approaches, and produce a concrete description of what "done" looks like.
+A task moves to ideation when a pilot starts fleshing out the idea: clarify the problem, explore approaches, and produce a concrete description of what "done" looks like. clarify the problem, explore approaches, and produce a concrete description of what "done" looks like.
 
 - **Inputs:** The seed description and any relevant context (existing code, user feedback, related tasks)
 - **Outputs:** A fleshed-out entity body with problem statement, proposed approach, acceptance criteria, and any open questions resolved
@@ -111,12 +123,13 @@ grep -l "status: ideation" docs/plans/*.md
 ```yaml
 ---
 title: Entity name here
-status: ideation
+status: backlog
 source:
 started:
 completed:
 verdict:
 score:
+worktree:
 ---
 
 Description of this entity and what it aims to achieve.

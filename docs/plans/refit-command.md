@@ -1,6 +1,6 @@
 ---
 title: Refit Command
-status: ideation
+status: backlog
 source: commission seed
 started:
 completed:
