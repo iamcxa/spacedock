@@ -1,11 +1,12 @@
 ---
 title: Pilot Worktree Isolation
-status: implementation
+status: validation
 source: commission seed
 started: 2026-03-22T20:24:00Z
 completed:
 verdict:
 score: 16
+worktree: .worktrees/pilot-worktree-isolation
 ---
 
 ## Problem
