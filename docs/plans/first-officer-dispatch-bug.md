@@ -1,9 +1,9 @@
 ---
 title: First Officer Dispatch Bug
-status: ideation
+status: backlog
 source: testflight-001
-started: 2026-03-22T21:17:00Z
-worktree: .worktrees/pilot-first-officer-dispatch-bug
+started:
+worktree:
 completed:
 verdict:
 score:
