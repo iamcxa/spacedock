@@ -43,3 +43,22 @@ The scoring system has two issues:
 
 - **Q: Should scoring be mandatory?** A: No. The schema already marks score as optional.
 - **Q: What about existing entities with 1-5 dimension scores?** A: They keep their scores. The 5-dimension rubric is this pipeline's chosen upgrade. The change only affects the default for NEW commissions.
+
+## Implementation Summary
+
+Changed two files to standardize score format from N/25 to 0.0–1.0 float:
+
+### `v0/spec.md`
+- Schema comment: `N/25` → `0.0–1.0`
+- Scoring rubric bullet: replaced the 5-dimension default with a note that scoring uses 0.0–1.0 by default and pipelines can upgrade to a multi-dimension rubric in their README
+- Dogfood seed entity scores: `22/25` → `0.9`, `18/25` → `0.7`, `16/25` → `0.6`
+
+### `skills/commission/SKILL.md`
+- Question 5 (seed entities): "priority score out of 25" → "priority from 0.0 to 1.0"
+- Confirm Design summary: removed `/25` suffix from score display
+- Field Reference table: "Priority score out of 25" → "Priority score, 0.0–1.0" with upgrade note
+- README template: changed conditional from "if seed entities have scores, include Scoring Rubric" to "do NOT include by default; only if CL explicitly requests a multi-dimension rubric"
+- Scoring Rubric section in template: replaced 5-dimension table with a single conditional note; renamed section header from "Scoring Rubric" to "Scoring"
+
+### Not modified
+- `docs/plans/README.md` — this pipeline's 5-dimension rubric is its own upgrade and is unaffected

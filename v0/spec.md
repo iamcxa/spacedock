@@ -65,7 +65,7 @@ Single source of truth. Contains:
   started:                        # ISO 8601
   completed:                      # ISO 8601
   verdict:                        # PASSED | REJECTED — set by validation stage
-  score:                          # N/25 (optional, for prioritization)
+  score:                          # 0.0–1.0 (optional, for prioritization)
   ---
   ```
   Domain-specific fields added based on CL's answers.
@@ -83,7 +83,7 @@ Single source of truth. Contains:
   - **Human approval:** {yes: reason / no}
   ```
 
-- **Scoring rubric** — if CL wants prioritization, include Edge/Fitness/Parsimony/Testability/Novelty (each 1-5, sum/25). Otherwise omit.
+- **Scoring rubric** — omitted by default. Scoring uses a simple 0.0–1.0 float for prioritization. Pipelines that need more rigorous prioritization can upgrade to a multi-dimension rubric (e.g., 5 dimensions, each 1–5, sum/25) by documenting it in their README.
 
 - **Pipeline state query:**
   ```bash
@@ -215,9 +215,9 @@ If the pilot fails (agent misparses, YAML gets mangled, dispatch doesn't work):
 - **Stages:** ideation → implementation → validation → done
 - **Approval gates:** ideation → implementation (new features), validation → done (merging)
 - **Seed entities:**
-  1. `full-cycle-test.md` — "Prove the full ideation → implementation → validation → done cycle works end-to-end" (score: 22/25)
-  2. `refit-command.md` — "Add /spacedock refit for examining and upgrading existing pipelines" (score: 18/25)
-  3. `multi-pipeline.md` — "Support multiple interconnected pipelines (shuttle feeding starship)" (score: 16/25)
+  1. `full-cycle-test.md` — "Prove the full ideation → implementation → validation → done cycle works end-to-end" (score: 0.9)
+  2. `refit-command.md` — "Add /spacedock refit for examining and upgrading existing pipelines" (score: 0.7)
+  3. `multi-pipeline.md` — "Support multiple interconnected pipelines (shuttle feeding starship)" (score: 0.6)
 - **Location:** `~/git/spacedock/pipeline/`
 
 ### Success Criteria

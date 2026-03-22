@@ -81,7 +81,7 @@ Ask:
 > - **Title** — short name
 > - **Description** — a sentence or two about what this entity is
 > - **Source** (optional) — where the idea came from
-> - **Score** (optional) — priority score out of 25
+> - **Score** (optional) — priority from 0.0 to 1.0
 
 Store as `{seed_entities}` — a list of objects with title, description, source, and score.
 
@@ -110,7 +110,7 @@ After all six questions, present a summary:
 > - **Stages:** {stages joined with " → "}
 > - **Approval gates:** {approval_gates, or "none"}
 > - **Seed entities:** {count} items
->   {for each: "- {title} (score: {score}/25)" or "- {title}" if no score}
+>   {for each: "- {title} (score: {score})" or "- {title}" if no score}
 > - **Location:** `{dir}`
 >
 > Ready to generate? (y/n)
@@ -159,7 +159,7 @@ Write the README with ALL of the following sections. Every section is required �
 
 Craft thoughtful, mission-specific content for each stage definition. The inputs, outputs, quality criteria, and anti-patterns should be specific to what this pipeline actually does — not generic placeholders.
 
-If any seed entities include a score, include the Scoring Rubric section. Otherwise omit it.
+Do NOT include a Scoring Rubric section by default. Scoring uses a simple 0.0–1.0 float — no rubric needed. If CL explicitly asks for a multi-dimension rubric, include a Scoring Rubric section documenting their chosen dimensions.
 
 Use this template structure, filling in all `{variables}` from the design phase:
 
@@ -202,7 +202,7 @@ worktree:
 | `started` | ISO 8601 | When active work began |
 | `completed` | ISO 8601 | When the entity reached terminal status |
 | `verdict` | enum | PASSED or REJECTED — set at final stage |
-| `score` | number | Priority score out of 25 (optional) |
+| `score` | number | Priority score, 0.0–1.0 (optional). Pipelines can upgrade to a multi-dimension rubric in their README. |
 | `worktree` | string | Worktree path while a pilot is active, empty otherwise |
 
 ## Stages
@@ -221,19 +221,9 @@ worktree:
 
 {End of per-stage sections.}
 
-## Scoring Rubric
+## Scoring
 
-{ONLY include this section if seed entities have scores. Otherwise omit entirely.}
-
-Each dimension is scored 1–5. Total is the sum, out of 25.
-
-| Dimension | What it measures |
-|-----------|-----------------|
-| **Edge** | How much competitive advantage or unique insight this provides |
-| **Fitness** | How well this fits the pipeline's mission and current priorities |
-| **Parsimony** | How simple and focused the approach is |
-| **Testability** | How easily the result can be validated |
-| **Novelty** | How original or non-obvious the idea is |
+{ONLY include this section if CL explicitly requests a multi-dimension rubric. Otherwise omit entirely — the 0.0–1.0 float is self-explanatory from the schema.}
 
 ## Pipeline State
 
