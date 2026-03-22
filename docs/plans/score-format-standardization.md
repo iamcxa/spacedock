@@ -1,11 +1,11 @@
 ---
 title: Score Format Standardization
-status: validation
+status: done
 source: commission seed
 started: 2026-03-22T00:00:00Z
 worktree:
-completed:
-verdict:
+completed: 2026-03-22T21:16:00Z
+verdict: PASSED
 score: 19
 ---
 
