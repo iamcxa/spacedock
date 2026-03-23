@@ -151,6 +151,7 @@ Two files changed:
 
 **`skills/commission/SKILL.md`** — The embedded first-officer template (section 2d) received the substantive rewrite:
 
+- **Dispatching steps 4-5** made worktree-aware: step 4 sets the `worktree` field only if not already set; step 5 creates the worktree only on first dispatch, skips if the entity already has an active worktree from a prior stage.
 - **Dispatching step 8** replaced the unconditional merge with a gate-aware decision point. After pilot completion, it checks the outbound transition. If gated: hold, report, wait for CL. If not gated and more stages remain: dispatch next pilot in same worktree (back to step 6). Only proceeds to merge (step 9) when the entity reaches its terminal stage.
 - **Dispatching step 9** is now "Merge to main" — only reachable at the terminal stage. Merges atomically, updates frontmatter (terminal status, clear worktree, set completed/verdict).
 - **Dispatching step 10** is cleanup (worktree remove, branch delete) — unchanged logic, renumbered.
