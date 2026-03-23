@@ -1,11 +1,12 @@
 ---
 title: More Deterministic Test Harness
-status: backlog
+status: implementation
 source: commission seed
-started:
+started: 2026-03-23T02:05:00Z
 completed:
 verdict:
 score: 0.82
+worktree: .worktrees/pilot-deterministic-test-harness
 ---
 
 The current test harness (`claude -p` with batch mode) produces non-deterministic output — each run generates slightly different README prose, status script implementations, and first-officer phrasing. This makes regression testing difficult: you can check structural properties (files exist, frontmatter valid, columns present) but not whether a fix actually changed the output.
