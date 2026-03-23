@@ -31,9 +31,9 @@ For each entity that is ready for its next stage:
    If approval is needed, ask CL before dispatching. Do not proceed without their go-ahead.
 4. **Update state on main** — Edit the entity frontmatter on the main branch:
    - Set `status: {next_stage}`
-   - Set `worktree: .worktrees/pilot-{entity-slug}` (if not already set)
+   - If entering `implementation`: also set `worktree: .worktrees/pilot-{entity-slug}`
    - Commit this change: `git commit -m "dispatch: {entity-slug} entering {next_stage}"`
-5. **Create worktree** (first dispatch only) — If the entity doesn't already have an active worktree, create one:
+5. **Create worktree** (implementation only) — Create a worktree when the entity enters `implementation`. Ideation works directly on main — no worktree needed.
    ```bash
    git worktree add .worktrees/pilot-{entity-slug} -b pilot/{entity-slug}
    ```
@@ -43,8 +43,21 @@ For each entity that is ready for its next stage:
    git branch -D pilot/{entity-slug} 2>/dev/null
    git worktree add .worktrees/pilot-{entity-slug} -b pilot/{entity-slug}
    ```
-   If the entity already has an active worktree (continuing from a prior stage), skip this step.
-6. **Dispatch pilot** in the worktree:
+   If the entity already has an active worktree (continuing to validation), skip this step.
+6. **Dispatch pilot** — For ideation, the pilot works on main. For implementation and validation, the pilot works in the worktree:
+
+For **ideation** (pilot works on main):
+
+```
+Agent(
+    subagent_type="general-purpose",
+    name="pilot-{entity-slug}",
+    team_name="plans",
+    prompt="You are working on: {entity title}\n\nStage: ideation\n\n{Copy the full stage definition from the README here: inputs, outputs, good, bad}\n\nYour working directory is {repo_root} (the main branch).\nAll file reads and writes MUST use paths under {repo_root}.\nDo NOT modify YAML frontmatter in entity files.\n\nRead the entity file at {repo_root}/docs/plans/{slug}.md for full context.\n\nDo the work described in the stage definition. Update the entity file body (not frontmatter) with your findings or outputs.\nCommit your work to main before sending completion message.\n\nThen send a completion message:\nSendMessage(to=\"team-lead\", message=\"Done: {entity title} completed ideation. Summary: {brief description of what was accomplished}.\")\n\nPlain text only. Never send JSON."
+)
+```
+
+For **implementation** and **validation** (pilot works in worktree):
 
 ```
 Agent(
@@ -99,7 +112,7 @@ When the pipeline is idle (nothing to dispatch), report the current state to CL 
 - The first officer owns all entity frontmatter on the main branch. Pilots do NOT modify frontmatter.
 - Update entity frontmatter fields using the Edit tool — never rewrite the whole file.
 - `status:` — always matches one of the defined stages: backlog, ideation, implementation, validation, done.
-- `worktree:` — set to the worktree path when the entity first leaves backlog. Cleared only after the final merge to main (terminal stage).
+- `worktree:` — set to the worktree path when the entity enters `implementation`. Empty during `backlog` and `ideation` (those work on main). Cleared after the final merge to main (terminal stage).
 - `started:` — set to ISO 8601 datetime when entity first moves beyond `backlog`.
 - `completed:` — set to ISO 8601 datetime when entity reaches `done`.
 - `verdict:` — set to PASSED or REJECTED when entity reaches `done`.
