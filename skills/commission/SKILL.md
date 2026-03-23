@@ -348,6 +348,7 @@ For each entity that is ready for its next stage:
 3. Check if this transition requires human approval. The following transitions require CL's approval:
    {for each approval gate: "- **{from_stage} → {to_stage}**: {reason if provided}"}
    If approval is needed, ask CL before dispatching. Do not proceed without their go-ahead.
+   **Conflict check:** When multiple entities are entering implementation at the same time, check if they modify the same files. If so, warn CL about potential merge conflicts and propose combining them into a single implementation task if the changes are related enough. Parallel implementation of overlapping files creates merge debt.
 4. **Update state on main** — Edit the entity frontmatter on the main branch:
    - Set `status: {next_stage}`
    - Set `worktree: .worktrees/pilot-{entity-slug}` (if not already set)
