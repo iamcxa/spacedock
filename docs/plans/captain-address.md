@@ -115,3 +115,17 @@ If the user says "just say 'you'", store `{captain}` as "you" and substitute nor
 5. The generated first-officer template uses `{captain}` throughout — no "CL" in generated output
 6. The reference doc `agents/first-officer.md` uses "the captain" instead of "CL"
 7. Existing pipelines are not affected (this only changes future commissions)
+
+## Implementation Summary
+
+Changed two files:
+
+**`skills/commission/SKILL.md`:**
+- Replaced all 22 hardcoded "CL" references with `{captain}` variable
+- Added Question 7 (Captain Title) after Question 6, with "captain" as default
+- Updated question count from "six" to "seven"
+- Added `**Address:** {captain}` to the Confirm Design summary
+- Both skill-time (Phase 1/3) and template-time (Phase 2d first-officer template) references use `{captain}`
+
+**`agents/first-officer.md`:**
+- Replaced 3 "CL" references with "the captain" (this is a static reference doc, not a template)

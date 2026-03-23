@@ -10,7 +10,7 @@ user-invocable: true
 
 You are commissioning a Plain Text Pipeline (PTP). A PTP is a directory of markdown files with YAML frontmatter, where each file is a work entity that moves through stages. The directory's README is the single source of truth for schema and stages, and a self-describing bash script provides pipeline status views.
 
-This is a v0 shuttle-mode pipeline: one general-purpose pilot agent handles all stages. You will walk CL through interactive design, generate all pipeline files, then launch a pilot run.
+This is a v0 shuttle-mode pipeline: one general-purpose pilot agent handles all stages. You will walk {captain} through interactive design, generate all pipeline files, then launch a pilot run.
 
 Follow these three phases in order. Do not skip or combine phases.
 
@@ -29,7 +29,7 @@ This allows non-interactive use: all inputs in one message, straight to generati
 
 ## Phase 1: Interactive Design
 
-Before asking Question 1, greet CL with the following (skip this greeting entirely in batch mode):
+Before asking Question 1, greet {captain} with the following (skip this greeting entirely in batch mode):
 
 > Welcome to Spacedock! We're going to design a Plain Text Pipeline (PTP) together.
 >
@@ -40,7 +40,7 @@ Before asking Question 1, greet CL with the following (skip this greeting entire
 >
 > Let's start designing.
 
-Ask CL these six questions **one at a time**. Wait for each answer before asking the next question. Do not batch questions.
+Ask {captain} these seven questions **one at a time**. Wait for each answer before asking the next question. Do not batch questions.
 
 ### Question 1 — Mission
 
@@ -110,9 +110,17 @@ Ask:
 
 Store the confirmed path as `{dir}` — a repo-root-relative path (e.g., `docs/plans/`). Also derive `{dir_basename}` (the last path component) for use as the team name.
 
+### Question 7 — Captain Title
+
+Ask:
+
+> The first officer will address you as **captain** (fitting the nautical theme). If you'd prefer a different title, just say so — otherwise we'll go with "captain".
+
+Store the response as `{captain}`. If the user accepts the default or doesn't specify, use `captain`.
+
 ### Confirm Design
 
-After all six questions, present a summary:
+After all seven questions, present a summary:
 
 > **Pipeline Design Summary**
 >
@@ -123,10 +131,11 @@ After all six questions, present a summary:
 > - **Seed entities:** {count} items
 >   {for each: "- {title} (score: {score})" or "- {title}" if no score}
 > - **Location:** `{dir}`
+> - **Address:** {captain}
 >
 > Ready to generate? (y/n)
 
-Wait for CL to confirm before proceeding to Phase 2. If CL wants changes, revisit the relevant questions.
+Wait for {captain} to confirm before proceeding to Phase 2. If {captain} wants changes, revisit the relevant questions.
 
 ---
 
@@ -170,7 +179,7 @@ Write the README with ALL of the following sections. Every section is required �
 
 Craft thoughtful, mission-specific content for each stage definition. The inputs, outputs, quality criteria, and anti-patterns should be specific to what this pipeline actually does — not generic placeholders.
 
-Do NOT include a Scoring Rubric section by default. Scoring uses a simple 0.0–1.0 float — no rubric needed. If CL explicitly asks for a multi-dimension rubric, include a Scoring Rubric section documenting their chosen dimensions.
+Do NOT include a Scoring Rubric section by default. Scoring uses a simple 0.0–1.0 float — no rubric needed. If {captain} explicitly asks for a multi-dimension rubric, include a Scoring Rubric section documenting their chosen dimensions.
 
 Use this template structure, filling in all `{variables}` from the design phase:
 
@@ -199,7 +208,7 @@ completed:
 verdict:
 score:
 worktree:
-{any domain-specific fields from CL's answers}
+{any domain-specific fields from {captain}'s answers}
 ---
 ```
 
@@ -234,7 +243,7 @@ worktree:
 
 ## Scoring
 
-{ONLY include this section if CL explicitly requests a multi-dimension rubric. Otherwise omit entirely — the 0.0–1.0 float is self-explanatory from the schema.}
+{ONLY include this section if {captain} explicitly requests a multi-dimension rubric. Otherwise omit entirely — the 0.0–1.0 float is self-explanatory from the schema.}
 
 ## Pipeline State
 
@@ -305,7 +314,7 @@ score: {score, or leave empty}
 worktree:
 ---
 
-{Description/thesis from CL's seed input.}
+{Description/thesis from {captain}'s seed input.}
 ```
 
 ### 2d. Generate First-Officer Agent
@@ -345,9 +354,9 @@ For each entity that is ready for its next stage:
 
 1. Identify the entity's current stage and what the next stage is.
 2. Read the next stage's definition from the README (inputs, outputs, good, bad criteria).
-3. Check if this transition requires human approval. The following transitions require CL's approval:
+3. Check if this transition requires human approval. The following transitions require {captain}'s approval:
    {for each approval gate: "- **{from_stage} → {to_stage}**: {reason if provided}"}
-   If approval is needed, ask CL before dispatching. Do not proceed without their go-ahead.
+   If approval is needed, ask {captain} before dispatching. Do not proceed without their go-ahead.
 4. **Update state on main** — Edit the entity frontmatter on the main branch:
    - Set `status: {next_stage}`
    - Set `worktree: .worktrees/pilot-{entity-slug}` (if not already set)
@@ -380,11 +389,11 @@ Agent(
 
 7. Wait for the pilot to complete and send its message.
 8. **Check approval gate** — Determine the outbound transition from the stage the pilot just completed. If this transition requires human approval:
-   - Do NOT merge. Keep the worktree and branch alive — the branch is the evidence CL reviews.
-   - Report the pilot's findings and recommendation to CL.
-   - Wait for CL's decision.
+   - Do NOT merge. Keep the worktree and branch alive — the branch is the evidence {captain} reviews.
+   - Report the pilot's findings and recommendation to {captain}.
+   - Wait for {captain}'s decision.
    - **On approval:** if more stages remain, dispatch the next pilot in the same worktree (go back to step 6 — no merge, no new branch). If this is the terminal stage, proceed to step 9 (merge).
-   - **On rejection:** ask CL whether to discard the branch or re-dispatch with feedback. If discarding, clean up (step 10). If re-dispatching, go back to step 6 with CL's feedback appended to the pilot prompt.
+   - **On rejection:** ask {captain} whether to discard the branch or re-dispatch with feedback. If discarding, clean up (step 10). If re-dispatching, go back to step 6 with {captain}'s feedback appended to the pilot prompt.
 
    If no approval gate applies and more stages remain, dispatch the next pilot in the same worktree (go back to step 6 — no merge, no new branch).
 
@@ -397,7 +406,7 @@ Agent(
    ```bash
    git commit -m "done: {entity-slug} completed pipeline"
    ```
-   If `git merge --no-commit` exits non-zero (conflict), do NOT auto-resolve. Report the conflict to CL and leave the worktree intact for manual resolution.
+   If `git merge --no-commit` exits non-zero (conflict), do NOT auto-resolve. Report the conflict to {captain} and leave the worktree intact for manual resolution.
 10. **Cleanup** — Remove the worktree and branch:
    ```bash
    git worktree remove .worktrees/pilot-{entity-slug}
@@ -409,13 +418,13 @@ Agent(
 After your initial dispatch, process events as they arrive:
 
 1. **Receive worker message** — Read what the pilot accomplished.
-2. **Check gate and advance** — Follow the procedure from Dispatching steps 8-10: check if the completed stage's outbound transition is approval-gated. If gated, hold the worktree and ask CL. If not gated and more stages remain, dispatch the next pilot in the same worktree. If the entity reached its terminal stage, merge to main, update frontmatter, and clean up.
+2. **Check gate and advance** — Follow the procedure from Dispatching steps 8-10: check if the completed stage's outbound transition is approval-gated. If gated, hold the worktree and ask {captain}. If not gated and more stages remain, dispatch the next pilot in the same worktree. If the entity reached its terminal stage, merge to main, update frontmatter, and clean up.
 3. **Update timestamps** — When dispatching within the worktree or during the final merge commit: if the entity just entered its first active (non-initial) stage, set `started:` to the current ISO 8601 datetime. If the entity reached the terminal stage, set `completed:` to the current datetime and `verdict:` to PASSED or REJECTED based on the pilot's assessment.
 4. **Verify state** — Run `bash {dir}/status` to confirm the entity's status on disk.
 5. **Dispatch next** — Look at the updated pipeline state. If any other entity is ready for its next stage, dispatch a pilot for it (following the full dispatch procedure: state change on main, create worktree, dispatch pilot). Prioritize by score (highest first) when multiple entities are ready.
 6. **Repeat** — Continue until no entities are ready for dispatch (all are in the terminal stage, blocked by approval gates, or the pipeline is empty).
 
-When the pipeline is idle (nothing to dispatch), report the current state to CL and wait for instructions. Report pipeline state ONCE when you reach an approval gate or idle state. Do NOT send additional status messages while waiting — CL will respond when ready.
+When the pipeline is idle (nothing to dispatch), report the current state to {captain} and wait for instructions. Report pipeline state ONCE when you reach an approval gate or idle state. Do NOT send additional status messages while waiting — {captain} will respond when ready.
 
 ## State Management
 
@@ -434,7 +443,7 @@ On startup, check for entities with an active (non-terminal) `status` and a non-
 
 1. Check if the worktree directory exists and has commits beyond the branch point.
 2. If no new commits: the pilot never started or produced nothing useful. Clean up the stale worktree/branch and re-dispatch.
-3. If there are commits: the pilot did partial work. Report to CL for a decision (merge partial work or discard and re-dispatch).
+3. If there are commits: the pilot did partial work. Report to {captain} for a decision (merge partial work or discard and re-dispatch).
 
 ## Pipeline Path
 
@@ -465,7 +474,7 @@ After all files are generated and verified, launch the pilot run.
 
 ### Step 1 — Announce
 
-Tell CL what was generated:
+Tell {captain} what was generated:
 
 > Pipeline generated! Here's what I created:
 >
@@ -492,7 +501,7 @@ Agent(subagent_type="first-officer", name="first-officer", prompt="Run the pipel
 
 ### Step 3 — Monitor and Report
 
-Wait for the first officer to process entities. When it completes or pauses at an approval gate, report the results to CL:
+Wait for the first officer to process entities. When it completes or pauses at an approval gate, report the results to {captain}:
 
 > **Pilot Run Results**
 >
@@ -504,7 +513,7 @@ If the pilot run fails (agent errors, YAML gets mangled, dispatch issues):
 
 - Report exactly what happened, including any error messages
 - Show the current state of the pipeline (`bash {dir}/status`)
-- Do not retry automatically — let CL decide next steps
+- Do not retry automatically — let {captain} decide next steps
 
 This is v0. Either it works or we learn why it didn't.
 
