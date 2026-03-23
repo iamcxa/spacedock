@@ -25,86 +25,62 @@ Additionally, the first officer sent 3 redundant status reports while waiting at
 
 ## Evidence
 
-Session logs in `testflight-001/` — main session + 4 subagent JSONL files.
+- Session logs in `testflight-001/` — main session + 7 subagent JSONL files. All 7 `.meta.json` files show `{"agentType":"first-officer"}`, confirming every pilot was dispatched with the wrong type.
+- Session logs in `testflight-002/` — 21 subagents dispatched as `general-purpose` (158 references in subagent logs). No `.meta.json` files present, but session log confirms `subagent_type="general-purpose"` used 17 times for actual dispatches.
+- testflight-001 used a pre-worktree-isolation version of SKILL.md. testflight-002 used the current version (with worktree isolation), and dispatch types were correct.
+
+## Root Cause
+
+The SKILL.md template (section 2d, line ~406) and generated `.claude/agents/first-officer.md` already have `subagent_type="general-purpose"` in the `Agent()` code block. The positive example was correct before testflight-001. The first-officer agent ignored it and used `subagent_type="first-officer"` instead.
+
+Why: The template provides the correct positive example but lacks **negative guardrails**. The agent identifies as "first-officer" and the dispatch code block contains unfilled `{variables}`, so it interprets the block as a loose pattern rather than a strict contract. Without an explicit prohibition, it defaults to spawning copies of itself — the identity it knows.
+
+The worktree-isolation changes added between testflight-001 and testflight-002 made the dispatch procedure more structured (numbered steps with explicit `Agent()` call embedded in step 6), which appears to have accidentally fixed the dispatch type issue. testflight-002 dispatched all pilots correctly. However, the fix was incidental — the explicit negative guardrail should still be added for robustness.
+
+Secondary issue: The "idle" instruction says "report the current state to CL and wait for instructions" but has no de-duplication constraint, leading to repeated status messages while blocked at an approval gate.
 
 ## Analysis
 
-### Root cause
+### What is already correct
 
-The SKILL.md template (section 2d, line ~406) and the generated `.claude/agents/first-officer.md` both already specify `subagent_type="general-purpose"` in the `Agent()` code block. The template was correct before testflight-001. The first-officer agent ignored its own template and used `subagent_type="first-officer"` instead.
+- SKILL.md template section 2d, Dispatching step 6: `Agent()` call uses `subagent_type="general-purpose"` (line 406)
+- agents/first-officer.md: describes the first officer as "a dispatcher" that "never performs stage work itself" (lines 14-15)
+- The dispatch example is a fenced code block, not pseudocode — formatting is fine
 
-Two contributing factors:
+### What is missing
 
-1. **No negative guardrail.** The template provides the correct example but never explicitly prohibits `subagent_type="first-officer"`. The agent sees itself as a "first-officer," the dispatch code block contains unfilled `{variables}` making it look like a loose pattern rather than a strict contract, and without an explicit prohibition the agent defaulted to spawning copies of itself.
+**Fix 1 — Negative guardrail for dispatch type.** Neither file explicitly prohibits `subagent_type="first-officer"`. The agent needs a direct "NEVER do X" instruction, not just a positive example of "do Y".
 
-2. **Possible pattern contamination from commission context.** The commission skill's Phase 3 (SKILL.md line 506) correctly uses `Agent(subagent_type="first-officer", ...)` to launch the first-officer itself. If any of this context leaks into the first-officer's conversation window (e.g., through system prompt history or agent memory), the agent may have mimicked this `subagent_type="first-officer"` pattern for its own dispatch calls. The negative guardrail addresses this regardless of contamination path.
+- In SKILL.md template: add a bold warning immediately before the `Agent()` code block in section 2d, Dispatching step 6.
+- In agents/first-officer.md: add a note in the Dispatch Lifecycle, step 3.
+- Text: `"You MUST use subagent_type='general-purpose' when dispatching pilots. NEVER use subagent_type='first-officer' — that clones yourself instead of dispatching a worker."`
 
-The redundant status reporting has a simpler cause: the "idle" instruction (SKILL.md Event Loop, line 440) says "report the current state to CL and wait for instructions" but never says "only once." The agent interpreted "wait" as a loop and kept re-reporting.
+**Fix 2 — Report-once constraint for idle/approval-gate states.** The Event Loop section's idle paragraph (SKILL.md line 440, agents/first-officer.md equivalent) lacks a de-dup instruction.
 
-### Audit of current code
+- In SKILL.md template: append to the "pipeline is idle" sentence in the Event Loop section.
+- In agents/first-officer.md: add a note under the Role section or Dispatch Lifecycle.
+- Text: `"Report pipeline state ONCE when you reach an approval gate or idle state. Do NOT send additional status messages while waiting — CL will respond when ready."`
 
-**Fix 1 — Negative guardrail for `subagent_type`**
-
-| Location | Current state | Needed? |
-|----------|---------------|---------|
-| `skills/commission/SKILL.md` section 2d, step 6 (line 402-411) | `Agent()` block uses `subagent_type="general-purpose"` but has no warning text prohibiting `subagent_type="first-officer"` | YES |
-| `agents/first-officer.md` Dispatch Lifecycle step 3 (line 32-33) | Says "Dispatch pilot" with worktree path; no mention of `subagent_type` at all | YES |
-
-**Fix 2 — Report-once instruction**
-
-| Location | Current state | Needed? |
-|----------|---------------|---------|
-| `skills/commission/SKILL.md` section 2d, Event Loop (line 440) | "report the current state to CL and wait for instructions" — no "once" or "do not re-report" language | YES |
-| `agents/first-officer.md` | No report-once guidance anywhere | YES |
-
-**Fix 3 — Code block formatting**
-
-The dispatch example in SKILL.md is already a fenced code block. No change needed. Already correct.
-
-### Scope note
-
-The commission skill's Phase 3 (SKILL.md line 506) uses `subagent_type="first-officer"` to launch the first-officer agent from the commission conversation. This is correct and MUST NOT be changed — the fix only applies to the first-officer template's dispatch of pilot workers.
+**Fix 3 — No change needed.** Code block formatting is already correct. The issue was not formatting but the absence of negative guardrails (addressed by Fix 1).
 
 ## Proposed Fix
 
-### Fix 1 — Explicit negative guardrail in the dispatch section
+| # | Change | File | Location |
+|---|--------|------|----------|
+| 1a | Add negative guardrail warning before `Agent()` call | `skills/commission/SKILL.md` | Section 2d, Dispatching step 6 |
+| 1b | Add negative guardrail note | `agents/first-officer.md` | Dispatch Lifecycle step 3 |
+| 2a | Add report-once instruction to idle paragraph | `skills/commission/SKILL.md` | Section 2d, Event Loop final paragraph |
+| 2b | Add report-once note | `agents/first-officer.md` | Role section or Dispatch Lifecycle |
 
-Add a bold warning immediately before the `Agent()` code block:
-
-> **You MUST use `subagent_type="general-purpose"` when dispatching pilots. NEVER use `subagent_type="first-officer"` — that would clone yourself instead of dispatching a worker.**
-
-Insertion points:
-- `skills/commission/SKILL.md` line ~403, between step 6 text ("Dispatch pilot in the worktree:") and the `Agent()` code block
-- `agents/first-officer.md` Dispatch Lifecycle step 3 — append to the existing step text, specifying that pilots use `subagent_type="general-purpose"`
-
-### Fix 2 — Report-once instruction for approval gates and idle state
-
-Replace the bare "report and wait" sentence with explicit once-only language:
-
-> Report pipeline state ONCE when you reach an approval gate or idle state. Do NOT send additional status messages while waiting — CL will respond when ready.
-
-Insertion points:
-- `skills/commission/SKILL.md` section 2d, Event Loop final paragraph (line 440) — replace "report the current state to CL and wait for instructions"
-- `agents/first-officer.md` — add an "Idle Behavior" subsection after Dispatch Lifecycle
-
-### Fix 3 — No change needed
-
-Code block formatting is already correct.
-
-### Files to change
-
-| File | Section | Change |
-|------|---------|--------|
-| `skills/commission/SKILL.md` | Section 2d, Dispatching step 6 (before `Agent()` block) | Add negative guardrail warning |
-| `skills/commission/SKILL.md` | Section 2d, Event Loop final paragraph (line 440) | Replace "report...wait" with report-once instruction |
-| `agents/first-officer.md` | Dispatch Lifecycle step 3 (line 32-33) | Add `subagent_type="general-purpose"` requirement and negative guardrail |
-| `agents/first-officer.md` | After Dispatch Lifecycle section | Add "Idle Behavior" subsection with report-once note |
+Total: 4 surgical edits across 2 files. No structural changes.
 
 ## Acceptance Criteria
 
-- [ ] SKILL.md template includes explicit `NEVER use subagent_type="first-officer"` warning before the `Agent()` code block in section 2d
-- [ ] SKILL.md template Event Loop section says "Report pipeline state ONCE" with "Do NOT re-report" language
-- [ ] `agents/first-officer.md` Dispatch Lifecycle step 3 specifies `subagent_type="general-purpose"` and prohibits `subagent_type="first-officer"`
-- [ ] `agents/first-officer.md` includes idle behavior / report-once guidance
-- [ ] Commission skill Phase 3 (`subagent_type="first-officer"`) is left unchanged
-- [ ] Validated in a future testflight: only one first-officer in the team UI, pilots dispatched as `general-purpose`, status reported once at gates
+- [ ] SKILL.md template includes explicit `NEVER use subagent_type='first-officer'` warning before the `Agent()` code block in Dispatching step 6
+- [ ] SKILL.md template includes report-once instruction in the Event Loop idle paragraph
+- [ ] agents/first-officer.md includes the same negative guardrail in Dispatch Lifecycle step 3
+- [ ] agents/first-officer.md includes report-once note
+- [ ] First officer dispatches pilots as `subagent_type="general-purpose"` with distinct names like `pilot-{slug}`
+- [ ] Only one first-officer agent appears in the team UI
+- [ ] First officer reports pipeline state once at an approval gate, then waits without re-reporting
+- [ ] Validated in a future testflight
