@@ -121,6 +121,16 @@ worktree:
 Description of this entity and what it aims to achieve.
 ```
 
+## Testing Resources
+
+Validation pilots should use these when verifying implementation work:
+
+| Resource | Path | Covers |
+|----------|------|--------|
+| Commission test harness | `v0/test-harness.md` | Batch-mode commission invocation, generated file validation, guardrail checks |
+
+The test harness documents how to run `claude -p` with `--plugin-dir` for non-interactive commission testing, plus structural and guardrail assertions against the generated output. Use it for any entity that changes `skills/commission/SKILL.md` or the first-officer template.
+
 ## Commit Discipline
 
 - Commit status changes at session end, not on every transition
