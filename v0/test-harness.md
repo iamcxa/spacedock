@@ -119,12 +119,28 @@ Open the file and verify these sections are present:
 
 - YAML frontmatter with `name: first-officer`, `description:`, and `tools:` including `Agent`
 - Identity statement establishing the first officer as a DISPATCHER
-- Startup sequence (Read README → run status → check orphans)
+- Startup sequence: TeamCreate → Read README → run status → check orphans (4 steps)
 - Dispatching section with an `Agent()` call block that includes `subagent_type`, `name`, `team_name`, and `prompt`
 - Event Loop
 - State Management
-- Pipeline Path (with the actual resolved path to `v0-test-1/`, not a template variable)
+- Pipeline Path (with a repo-root-relative path, not an absolute path or template variable)
 - AUTO-START instruction
+
+### First-officer guardrails
+
+```bash
+grep -c "MUST use the Agent tool" v0-test-1/.claude/agents/first-officer.md
+grep -c "NEVER use.*subagent_type.*first-officer" v0-test-1/.claude/agents/first-officer.md
+grep -c "TeamCreate" v0-test-1/.claude/agents/first-officer.md
+grep -c "Report pipeline state ONCE\|Report.*ONCE" v0-test-1/.claude/agents/first-officer.md
+```
+
+All four must return at least 1. These guardrails prevent known dispatch bugs:
+
+- **Agent tool required**: first officer must use Agent (not SendMessage) to spawn pilots
+- **subagent_type guardrail**: first officer must not clone itself as `first-officer`
+- **TeamCreate in Startup**: first officer must create its own team before dispatching
+- **Report-once**: first officer must not spam status messages at approval gates
 
 ### No leaked template variables
 
@@ -156,6 +172,8 @@ From the spec:
 - YAML frontmatter is malformed (missing delimiters, broken indentation, unquoted colons)
 - Pilot agents require manual fix-up before they can run
 - Hardcoded paths from the skill templates appear in generated files (e.g., `{dir}/` instead of `v0-test-1/`)
+- Generated first-officer is missing dispatch guardrails (Agent-tool-required, subagent_type prohibition, TeamCreate, report-once)
+- Absolute paths appear in the generated first-officer or README (e.g., `/Users/...`)
 
 ---
 
