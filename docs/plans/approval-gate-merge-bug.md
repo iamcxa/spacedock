@@ -11,11 +11,17 @@ worktree:
 
 ## Problem
 
-The first-officer event loop merges pilot work to main unconditionally when a pilot completes, then checks approval gates when dispatching the next stage. This is wrong — when the next transition is approval-gated, the merge itself should wait for CL's approval.
+The first-officer merges pilot work to main after each stage completes. This is wrong on two levels:
+
+1. **Approval gates bypassed.** When the next transition is approval-gated, the merge happens before CL can review or reject.
+2. **Intermediate stages pollute main.** Even for non-gated transitions (e.g., implementation → validation), merging implementation to main before validation is done means bad code lands on main if validation fails. There's no clean rollback.
+
+The correct model: **one branch per entity, one merge to main at the end.** The worktree stays alive from first dispatch through final approval. All stages (ideation, implementation, validation) happen on the same branch. Main only gets touched when the entity is fully validated and CL approves.
 
 Observed during testflight-003:
 - **score-format-standardization** (validation → done gate): validation pilot completed with PASSED recommendation. First officer merged the branch, cleared the worktree, then asked CL for approval. The work was already on main before CL could review or reject.
 - **refit-command** (ideation → implementation gate): ideation pilot completed. First officer merged the branch, advanced status to `implementation`, cleared the worktree, then asked CL for approval. Status was advanced past the gate without approval.
+- **refit-command** (implementation → validation): implementation was merged to main before validation. If validation had failed, bad code would already be on main.
 
 ## Root Cause
 
@@ -23,15 +29,25 @@ The first-officer agent template (`agents/first-officer.md`) has the approval ch
 
 ## Correct Behavior
 
-When a pilot completes a stage and the next transition requires human approval:
+One branch per entity. One merge to main. The full lifecycle on a single worktree:
 
-1. Do NOT merge. Keep the worktree and branch alive.
-2. Report the pilot's findings to CL.
-3. Wait for CL's approval.
-4. On approval: merge the branch, update frontmatter (advance status, set timestamps/verdict), commit atomically, clean up worktree.
-5. On rejection: either discard the branch or re-dispatch the pilot with feedback, depending on CL's instructions.
+```
+backlog → create worktree, dispatch ideation pilot
+  → ideation complete → [approval gate: ideation → implementation] → hold, ask CL
+  → CL approves → dispatch implementation pilot in SAME worktree
+  → implementation complete → dispatch validation pilot in SAME worktree (no gate, no merge)
+  → validation complete → [approval gate: validation → done] → hold, ask CL
+  → CL approves → merge to main, set done/verdict/completed, clean up worktree
+```
 
-The worktree is the isolation boundary. The merge IS the transition. Approval must come before the merge, not after.
+Rules:
+1. **Never merge intermediate stages to main.** Main only gets the final atomic merge.
+2. **At approval gates:** hold the worktree, report to CL, wait.
+3. **At non-gated transitions:** dispatch the next pilot in the same worktree. No merge, no new branch.
+4. **On approval:** if more stages remain, continue on the same branch. If terminal (done), merge to main.
+5. **On rejection:** ask CL whether to discard the branch or re-dispatch with feedback.
+
+The worktree is the isolation boundary for the entity's entire lifecycle, not per-stage.
 
 ## Files to Fix
 
@@ -123,6 +139,6 @@ The embedded first-officer template in `skills/commission/SKILL.md` (lines 357-4
 2. **Worktree preserved during gate wait**: The worktree and branch remain alive while waiting for CL's approval decision. The branch is the evidence CL reviews.
 3. **Rejection handling**: On rejection, the first officer asks CL whether to discard or re-dispatch. It does not auto-decide.
 4. **Approval triggers merge**: On approval, the first officer proceeds with the normal merge/finalize/cleanup flow.
-5. **Non-gated transitions unchanged**: Transitions without approval gates still merge immediately after pilot completion. No behavioral change for the happy path.
+5. **Non-gated transitions stay on branch**: Transitions without approval gates dispatch the next pilot in the same worktree. No merge to main.
 6. **Both files updated**: Both `agents/first-officer.md` (reference doc) and `skills/commission/SKILL.md` (template that generates per-pipeline agents) reflect the fix.
 7. **Dispatching step 3 preserved**: The initial-dispatch gate check remains for the startup case where the first officer encounters entities that need gated transitions on first run.
