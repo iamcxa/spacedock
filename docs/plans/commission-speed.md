@@ -1,8 +1,8 @@
 ---
 title: Commission Speed — Reduce Time to Value
-status: backlog
+status: ideation
 source: CL feedback
-started:
+started: 2026-03-23T00:00:00Z
 completed:
 verdict:
 score: 0.80
