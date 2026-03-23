@@ -1,8 +1,8 @@
 ---
 title: Dist building and release process
-status: backlog
+status: ideation
 source: refit testflight
-started:
+started: 2026-03-23T00:00:00Z
 completed:
 verdict:
 score:

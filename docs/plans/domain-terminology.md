@@ -2,7 +2,7 @@
 title: Use Domain Terminology Instead of "Entity" in Generated Output
 status: ideation
 source: commission seed
-started:
+started: 2026-03-23T00:00:00Z
 completed:
 verdict:
 score: 0.76
