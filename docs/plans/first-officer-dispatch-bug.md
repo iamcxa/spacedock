@@ -1,11 +1,11 @@
 ---
 title: First Officer Dispatch Bug
-status: implementation
+status: done
 source: testflight-001
 started: 2026-03-22T21:47:00Z
 worktree:
-completed:
-verdict:
+completed: 2026-03-23T02:00:00Z
+verdict: PASSED
 score:
 ---
 
