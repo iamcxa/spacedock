@@ -71,3 +71,19 @@ Two prompt directive changes in `skills/commission/SKILL.md`:
 1. **Greeting block** (line 32): Added a directive at the top of Phase 1 that instructs the agent to greet CL with a welcome message explaining PTP and the three-phase process before asking Question 1. The directive explicitly says to skip the greeting in batch mode.
 
 2. **Post-completion guidance** (Step 5, line 502): Added a new Step 5 to Phase 3 that always runs after Step 3 or Step 4, telling the user how to continue working the pipeline with `claude --agent first-officer`. Includes a copy-pasteable command and a brief explanation of what the first officer does.
+
+## Validation Report
+
+**Recommendation: PASSED**
+
+All five acceptance criteria validated against `skills/commission/SKILL.md`:
+
+| # | Criterion | Verdict | Evidence |
+|---|-----------|---------|----------|
+| 1 | Interactive greeting before Question 1 | PASS | SKILL.md line 32: `Before asking Question 1, greet CL with the following (skip this greeting entirely in batch mode):` followed by the welcome block (lines 34-41) explaining PTP and the 3 phases (Design, Generate, Pilot run). |
+| 2 | Batch mode skips greeting | PASS | Line 32 includes explicit parenthetical: `(skip this greeting entirely in batch mode)`. |
+| 3 | Post-completion guidance after Phase 3 | PASS | Lines 502-512: Step 5 titled "Post-Completion Guidance" with directive `After Step 3 or Step 4 (whether the pilot run succeeded or failed), always conclude with:` — covers both success and failure paths. |
+| 4 | Exact CLI command `claude --agent first-officer` | PASS | Lines 508-510 contain the command in a fenced code block: `` `claude --agent first-officer` ``. |
+| 5 | Changes are prompt directives only in SKILL.md | PASS | `git diff --name-only main...HEAD` shows only two changed files: the entity file and `skills/commission/SKILL.md`. No code changes outside the skill file. |
+
+No issues found. Both changes are minimal, well-placed prompt directives that match the proposed approach and wording from the entity spec.
