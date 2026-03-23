@@ -1,11 +1,12 @@
 ---
 title: Use Domain Terminology Instead of "Entity" in Generated Output
-status: ideation
+status: implementation
 source: commission seed
 started: 2026-03-23T00:00:00Z
 completed:
 verdict:
 score: 0.76
+worktree: .worktrees/ensign-domain-terminology
 ---
 
 The PTP framework term "entity" leaks into all generated output — status script column headers, first-officer instructions, README prose. The user already tells us what to call their work items in Question 2 ("a design idea", "a bug report", etc.). We should use that.
