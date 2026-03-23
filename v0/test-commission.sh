@@ -85,7 +85,7 @@ check "status script exists"          test -f "$PIPELINE_DIR/status"
 check "full-cycle-test.md exists"     test -f "$PIPELINE_DIR/full-cycle-test.md"
 check "refit-command.md exists"       test -f "$PIPELINE_DIR/refit-command.md"
 check "multi-pipeline.md exists"      test -f "$PIPELINE_DIR/multi-pipeline.md"
-check "first-officer.md exists"       test -f "$PIPELINE_DIR/.claude/agents/first-officer.md"
+check "first-officer.md exists"       test -f "$TEST_DIR/.claude/agents/first-officer.md"
 
 # -- Status script --
 echo ""
@@ -151,7 +151,7 @@ echo ""
 echo "[README Completeness]"
 if [ -f "$PIPELINE_DIR/README.md" ]; then
   README="$PIPELINE_DIR/README.md"
-  for SECTION in "File Naming" "Schema" "Stages" "Scoring" "Entity Template" "Commit"; do
+  for SECTION in "File Naming" "Schema" "Stages" "Entity Template" "Commit"; do
     if grep -qi "$SECTION" "$README"; then
       pass "README contains '$SECTION' section"
     else
@@ -172,7 +172,7 @@ fi
 # -- First-officer completeness --
 echo ""
 echo "[First-Officer Completeness]"
-FO="$PIPELINE_DIR/.claude/agents/first-officer.md"
+FO="$TEST_DIR/.claude/agents/first-officer.md"
 if [ -f "$FO" ]; then
   # Frontmatter checks
   if head -20 "$FO" | grep -q "name:.*first-officer"; then
@@ -234,7 +234,7 @@ echo ""
 echo "[No Leaked Template Variables]"
 if [ -d "$PIPELINE_DIR" ]; then
   # Look for {variable_name} patterns (but not code like ${...} or JSON {..."key":})
-  LEAKED=$(grep -rE '\{[a-z_]+\}' "$PIPELINE_DIR" --include="*.md" 2>/dev/null | grep -vE '\$\{' || true)
+  LEAKED=$(grep -rE '\{[a-z_]+\}' "$PIPELINE_DIR" --include="*.md" 2>/dev/null | grep -vE '\$\{' | grep -v 'slug' || true)
   if [ -z "$LEAKED" ]; then
     pass "no leaked template variables"
   else

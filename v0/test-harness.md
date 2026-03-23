@@ -80,7 +80,7 @@ ls v0-test-1/README.md \
    v0-test-1/full-cycle-test.md \
    v0-test-1/refit-command.md \
    v0-test-1/multi-pipeline.md \
-   v0-test-1/.claude/agents/first-officer.md
+   .claude/agents/first-officer.md
 ```
 
 All six files must exist.
@@ -114,7 +114,7 @@ Open the file and verify these sections are present (not placeholder text):
 - Schema
 - Stages — with one subsection each for `ideation`, `implementation`, `validation`, `done`
 - Approval Gates (or gates noted inside each stage definition)
-- Scoring Rubric
+- Scoring (only if captain requested a multi-dimension rubric)
 - Pipeline State
 - Entity Template
 - Commit Discipline
@@ -124,7 +124,7 @@ Each stage section must have specific, mission-relevant content in its Inputs, O
 ### First-officer agent completeness
 
 ```bash
-grep -c "^##\|^###" v0-test-1/.claude/agents/first-officer.md
+grep -c "^##\|^###" .claude/agents/first-officer.md
 ```
 
 Open the file and verify these sections are present:
@@ -141,10 +141,10 @@ Open the file and verify these sections are present:
 ### First-officer guardrails
 
 ```bash
-grep -c "MUST use the Agent tool" v0-test-1/.claude/agents/first-officer.md
-grep -c "NEVER use.*subagent_type.*first-officer" v0-test-1/.claude/agents/first-officer.md
-grep -c "TeamCreate" v0-test-1/.claude/agents/first-officer.md
-grep -c "Report pipeline state ONCE\|Report.*ONCE" v0-test-1/.claude/agents/first-officer.md
+grep -c "MUST use the Agent tool" .claude/agents/first-officer.md
+grep -c "NEVER use.*subagent_type.*first-officer" .claude/agents/first-officer.md
+grep -c "TeamCreate" .claude/agents/first-officer.md
+grep -c "Report pipeline state ONCE\|Report.*ONCE" .claude/agents/first-officer.md
 ```
 
 All four must return at least 1. These guardrails prevent known dispatch bugs:
