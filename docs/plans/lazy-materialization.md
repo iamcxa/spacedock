@@ -1,10 +1,10 @@
 ---
 title: Lazy Materialization for View Scripts
-status: ideation
+status: done
 source: commission seed
 started:
-completed:
-verdict:
+completed: 2026-03-23T20:45:00Z
+verdict: REJECTED
 score: 0.88
 ---
 
