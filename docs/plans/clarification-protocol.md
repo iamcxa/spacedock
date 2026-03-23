@@ -1,12 +1,12 @@
 ---
 title: Clarification Protocol
-status: implementation
+status: done
 source: CL feedback
 started: 2026-03-22T21:17:00Z
-completed:
-verdict:
+completed: 2026-03-23T20:00:00Z
+verdict: PASSED
 score:
-worktree: .worktrees/pilot-clarification-protocol
+worktree:
 ---
 
 When a backlog entity's description is unclear or ambiguous, there's no defined protocol for how the first officer or a pilot should request clarification before proceeding. This can lead to wasted work on misunderstood requirements, or agents making assumptions that diverge from intent. Define how and when agents should stop and ask for clarification.
@@ -99,6 +99,18 @@ No changes to the pipeline README schema are needed — clarification is an agen
 - No clarification history tracking in entity frontmatter. The clarification and its resolution are captured in the entity body as part of the normal stage work.
 - No structured message format. Agents ask naturally with enough context for CL to answer quickly.
 
+## Implementation Summary
+
+Three changes made:
+
+1. **`skills/commission/SKILL.md` — first-officer template**: Added a "Clarification" section between Dispatching and Event Loop. Covers when the first officer should ask CL directly (ambiguous descriptions before dispatch), how to relay pilot clarification requests (include pilot name), and follow-up/inconsistency handling. Includes explicit instruction not to block the pipeline while waiting.
+
+2. **`skills/commission/SKILL.md` — pilot prompt template**: Added a line in dispatch step 6's pilot prompt instructing pilots to ask for clarification via `SendMessage(to="team-lead")` rather than guessing, with guidance to describe what they understand and what's ambiguous.
+
+3. **`agents/first-officer.md`**: Added a "Clarification Protocol" section covering the first officer's own questions, relaying pilot questions, and follow-up/inconsistency handling.
+
+No new entity statuses, frontmatter fields, or structured message formats were introduced.
+
 ## Acceptance Criteria
 
 - [ ] First-officer template in SKILL.md includes instructions to evaluate entity clarity before dispatch and message CL when the description is too ambiguous
@@ -109,3 +121,33 @@ No changes to the pipeline README schema are needed — clarification is an agen
 - [ ] Agents are instructed to flag inconsistencies between CL's clarification and existing docs/code
 - [ ] Protocol does not introduce new entity statuses or frontmatter fields
 - [ ] Protocol does not block the pipeline — first officer can dispatch other entities while waiting for clarification
+
+## Validation Report
+
+**Recommendation: PASSED**
+
+All 8 acceptance criteria verified against the implementation.
+
+### Criterion 1 — First-officer template: evaluate clarity before dispatch
+**PASS.** `skills/commission/SKILL.md` lines 407-420: "Clarification" section placed between Dispatching and Event Loop. Lists four triggers (ambiguous scope, undocumented decisions, nonexistent references, unclear scope) and instructs the first officer to ask CL directly.
+
+### Criterion 2 — First-officer template: relay pilot clarification with pilot name
+**PASS.** `skills/commission/SKILL.md` lines 424-427: "Relay the question to CL, including the pilot's name so CL can respond directly if they prefer. Pass CL's answer back to the pilot."
+
+### Criterion 3 — Pilot prompt template: ask via SendMessage rather than guessing
+**PASS.** `skills/commission/SKILL.md` line 377, in the pilot prompt string: "If requirements are unclear or ambiguous, ask for clarification via SendMessage(to=\"team-lead\") rather than guessing. Describe what you understand and what's ambiguous so team-lead can get you a quick answer."
+
+### Criterion 4 — First-officer reference doc updated
+**PASS.** `agents/first-officer.md` lines 55-75: "Clarification Protocol" section with three subsections covering first officer questions, relaying pilot questions, and follow-up/inconsistencies.
+
+### Criterion 5 — Follow-up clarification not capped
+**PASS.** Both `skills/commission/SKILL.md` line 429 and `agents/first-officer.md` line 73 state: "Clarification is not capped at one round."
+
+### Criterion 6 — Flag inconsistencies
+**PASS.** Both `skills/commission/SKILL.md` lines 429-431 and `agents/first-officer.md` lines 73-75 instruct agents to flag contradictions between CL's clarification and existing README, entities, or codebase.
+
+### Criterion 7 — No new entity statuses or frontmatter fields
+**PASS.** No schema changes in any file. Clarification is purely behavioral.
+
+### Criterion 8 — Pipeline not blocked
+**PASS.** `skills/commission/SKILL.md` line 420: "Do NOT block the pipeline — if one entity needs clarification, move on to other dispatchable entities while waiting." Also `agents/first-officer.md` line 64: "Do not block the pipeline — dispatch other ready entities while waiting."
