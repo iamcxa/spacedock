@@ -28,3 +28,13 @@ Do NOT rename:
 - "first officer" — stays as-is
 - "captain" — stays as-is
 - "pilot run" in Phase 3 of commission — this is the initial test run, not an agent role. Evaluate whether this should change too.
+
+## Implementation
+
+Renamed all agent-role "pilot" references to "ensign" in three files:
+
+- `skills/commission/SKILL.md` — template text, first-officer template section, dispatch instructions, clarification protocol, event loop, orphan detection, state management. Agent names `pilot-{slug}` → `ensign-{slug}`, worktree paths `.worktrees/pilot-{slug}` → `.worktrees/ensign-{slug}`, branch names `pilot/{slug}` → `ensign/{slug}`.
+- `agents/first-officer.md` — reference doc: role description, dispatch lifecycle, orphan detection, clarification protocol.
+- `v0/test-harness.md` — guardrail descriptions and "what good/bad looks like" sections.
+
+"Pilot run" (Phase 3) was preserved throughout — it refers to the trial run concept, not the agent role. The `.claude/agents/first-officer.md` local agent was left unchanged (will be updated via refit).
