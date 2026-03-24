@@ -408,12 +408,14 @@ b. **Dispatch ensign** on main (working directory = repo root):
 
 **You MUST use `subagent_type="general-purpose"` when dispatching ensigns. NEVER use `subagent_type="first-officer"` — that clones yourself instead of dispatching a worker.**
 
+**Copy the ensign prompt template exactly as written. Only fill `{named_variables}` — do not expand, rewrite, or customize any other text (including bracketed placeholders).**
+
 ```
 Agent(
     subagent_type="general-purpose",
     name="ensign-{slug}",
     team_name="{project_name}-{dir_basename}",
-    prompt="You are working on: {entity title}\n\nStage: {next_stage_name}\n\n### Stage definition:\n\n{Copy the full stage definition from the README here: inputs, outputs, good, bad}\n\nYour working directory is {repo_root}\nAll file reads and writes MUST use paths under {repo_root}.\nDo NOT modify YAML frontmatter in {entity_label} files.\n\nRead the {entity_label} file at {dir}/{slug}.md for full context.\n\nIf requirements are unclear or ambiguous, ask for clarification via SendMessage(to=\"team-lead\") rather than guessing. Describe what you understand and what's ambiguous so team-lead can get you a quick answer.\n\nDo the work described in the stage definition. Update the {entity_label} file body (not frontmatter) with your findings or outputs.\nCommit your work before sending completion message.\n\nThen send a completion message:\nSendMessage(to=\"team-lead\", message=\"Done: {entity title} completed {next_stage}. Summary: {brief description of what was accomplished}.\")\n\nPlain text only. Never send JSON."
+    prompt="You are working on: {entity title}\n\nStage: {next_stage_name}\n\n### Stage definition:\n\n[STAGE_DEFINITION — at dispatch time, copy the full stage definition from the README: inputs, outputs, good, bad]\n\nYour working directory is {repo_root}\nAll file reads and writes MUST use paths under {repo_root}.\nDo NOT modify YAML frontmatter in {entity_label} files.\nDo NOT modify files under .claude/agents/ — agent files are updated via refit, not direct editing.\n\nRead the {entity_label} file at {dir}/{slug}.md for full context.\n\nIf requirements are unclear or ambiguous, ask for clarification via SendMessage(to=\"team-lead\") rather than guessing. Describe what you understand and what's ambiguous so team-lead can get you a quick answer.\n\nDo the work described in the stage definition. Update the {entity_label} file body (not frontmatter) with your findings or outputs.\nCommit your work before sending completion message.\n\nThen send a completion message:\nSendMessage(to=\"team-lead\", message=\"Done: {entity title} completed {next_stage}. Summary: {brief description of what was accomplished}.\")\n\nPlain text only. Never send JSON."
 )
 ```
 
@@ -440,12 +442,14 @@ b. **Create worktree** (first worktree dispatch only) — If the {entity_label} 
    If the {entity_label} already has an active worktree (continuing from a prior stage), skip this step.
 c. **Dispatch ensign** in the worktree:
 
+**Copy the ensign prompt template exactly as written. Only fill `{named_variables}` — do not expand, rewrite, or customize any other text (including bracketed placeholders).**
+
 ```
 Agent(
     subagent_type="general-purpose",
     name="ensign-{slug}",
     team_name="{project_name}-{dir_basename}",
-    prompt="You are working on: {entity title}\n\nStage: {next_stage_name}\n\n### Stage definition:\n\n{Copy the full stage definition from the README here: inputs, outputs, good, bad}\n\nYour working directory is {worktree_path}\nAll file reads and writes MUST use paths under {worktree_path}.\nDo NOT modify YAML frontmatter in {entity_label} files.\n\nRead the {entity_label} file at {worktree_path}/{relative_pipeline_dir}/{slug}.md for full context.\n\nIf requirements are unclear or ambiguous, ask for clarification via SendMessage(to=\"team-lead\") rather than guessing. Describe what you understand and what's ambiguous so team-lead can get you a quick answer.\n\nDo the work described in the stage definition. Update the {entity_label} file body (not frontmatter) with your findings or outputs.\nCommit your work to your branch before sending completion message.\n\nThen send a completion message:\nSendMessage(to=\"team-lead\", message=\"Done: {entity title} completed {next_stage}. Summary: {brief description of what was accomplished}.\")\n\nPlain text only. Never send JSON."
+    prompt="You are working on: {entity title}\n\nStage: {next_stage_name}\n\n### Stage definition:\n\n[STAGE_DEFINITION — at dispatch time, copy the full stage definition from the README: inputs, outputs, good, bad]\n\nYour working directory is {worktree_path}\nAll file reads and writes MUST use paths under {worktree_path}.\nDo NOT modify YAML frontmatter in {entity_label} files.\nDo NOT modify files under .claude/agents/ — agent files are updated via refit, not direct editing.\n\nRead the {entity_label} file at {worktree_path}/{relative_pipeline_dir}/{slug}.md for full context.\n\nIf requirements are unclear or ambiguous, ask for clarification via SendMessage(to=\"team-lead\") rather than guessing. Describe what you understand and what's ambiguous so team-lead can get you a quick answer.\n\nDo the work described in the stage definition. Update the {entity_label} file body (not frontmatter) with your findings or outputs.\nCommit your work to your branch before sending completion message.\n\nThen send a completion message:\nSendMessage(to=\"team-lead\", message=\"Done: {entity title} completed {next_stage}. Summary: {brief description of what was accomplished}.\")\n\nPlain text only. Never send JSON."
 )
 ```
 
