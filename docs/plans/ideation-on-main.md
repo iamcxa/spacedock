@@ -13,6 +13,8 @@ Stages have properties beyond just ordering — human-approval gates on certain 
 
 Both of these are stage-level properties that should be declarable in the README schema, so the commission skill can generate correct first-officer behavior for any pipeline configuration.
 
+**Subsumed by `commission-ux-round2`.** The Worktree field and generic first-officer template are implemented there.
+
 Discovered when ideation was unnecessarily running in worktrees. A crashed session left an orphaned worktree requiring manual cleanup — work that would have been safely on main if the stage declared `worktree: false`.
 
 ## Stage properties to formalize

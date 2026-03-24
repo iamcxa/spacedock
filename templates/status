@@ -4,8 +4,9 @@
 #
 # goal: Show one-line-per-{entity_label} pipeline overview from YAML frontmatter.
 # instruction: For every .md file in this directory (excluding README.md),
-#   extract status, verdict, score, source from YAML frontmatter.
-#   Print table sorted by stage order then score descending.
+#   extract slug (filename without .md), status, verdict, score, source from YAML frontmatter.
+#   Print table with columns: SLUG, STATUS, TITLE, SCORE, SOURCE.
+#   Sorted by stage order then score descending.
 # constraints: bash 3.2+ (no associative arrays), resolves paths relative to this script, skips README.md.
 # valid status values: {stage1}, {stage2}, ..., {last_stage}.
 
