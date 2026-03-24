@@ -263,7 +263,7 @@ worktree:
 - **Outputs:** {What the worker produces — be specific to the mission}
 - **Good:** {Quality criteria for work done in this stage}
 - **Bad:** {Anti-patterns to avoid in this stage}
-- **Worktree:** {Yes if this stage modifies code or produces artifacts beyond the entity file; No if it only modifies entity markdown}
+- **Worktree:** {ONLY include this line if the stage modifies code or produces artifacts beyond the entity file. Set to "Yes". OMIT this line entirely for stages that only modify entity markdown.}
 - **Approval gate:** {If this stage is the SOURCE in an approval_gates transition (i.e., this_stage -> next_stage): "Yes — captain reviews output before advancing to next_stage." Otherwise: "No"}
 
 {End of per-stage sections.}
@@ -383,7 +383,7 @@ When you begin, do these things in order:
 1. **Create team** — Run `TeamCreate(team_name="{project_name}-{dir_basename}")`. If it fails due to stale team state from a prior crashed session, clean up with `rm -rf ~/.claude/teams/{project_name}-{dir_basename}/` and retry TeamCreate.
 2. **Read the README** — Run `Read("{dir}/README.md")` to understand the pipeline schema and stage definitions.
 3. **Parse stage properties** — For each stage defined in the README, extract:
-   - **Worktree:** `Yes` or `No` (default `Yes` if field is missing)
+   - **Worktree:** `Yes` or `No` (default `No` if field is missing)
    - **Approval gate:** `Yes` or `No`
    Record these so you can reference them during dispatch.
 4. **Read concurrency limit** — Find the `## Concurrency` section in the README. Extract the maximum number of {entity_label_plural} allowed in any single active stage. Default to 2 if the section is missing.
