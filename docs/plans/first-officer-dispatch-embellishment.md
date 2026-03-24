@@ -1,8 +1,8 @@
 ---
 title: Prevent LLM from embellishing first-officer dispatch template
-status: backlog
+status: ideation
 source: testflight fresh commission observation
-started:
+started: 2026-03-24T19:25:00Z
 completed:
 verdict:
 score: 0.82

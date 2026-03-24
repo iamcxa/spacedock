@@ -1,8 +1,8 @@
 ---
 title: Use YAML frontmatter in generated README instead of HTML comments
-status: backlog
+status: ideation
 source: CL feedback
-started:
+started: 2026-03-24T19:25:00Z
 completed:
 verdict:
 score: 0.70
