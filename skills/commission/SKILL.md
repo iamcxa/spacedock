@@ -203,10 +203,12 @@ Do NOT include a Scoring Rubric section by default. Scoring uses a simple 0.0–
 Use this template structure, filling in all `{variables}` from the design phase:
 
 ````markdown
-<!-- commissioned-by: spacedock@{spacedock_version} -->
-<!-- entity-type: {entity_type} -->
-<!-- entity-label: {entity_label} -->
-<!-- entity-label-plural: {entity_label_plural} -->
+---
+commissioned-by: spacedock@{spacedock_version}
+entity-type: {entity_type}
+entity-label: {entity_label}
+entity-label-plural: {entity_label_plural}
+---
 
 # {mission}
 

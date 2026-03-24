@@ -28,7 +28,7 @@ Store the confirmed path as `{dir}`. Resolve it to an absolute path. Also derive
 
 Read each scaffolding file and extract its version stamp:
 
-1. **README** — Read `{dir}/README.md`. Extract version from `<!-- commissioned-by: spacedock@X.Y.Z -->`. Store as `{readme_version}`.
+1. **README** — Read `{dir}/README.md`. Extract version from YAML frontmatter `commissioned-by: spacedock@X.Y.Z`. Store as `{readme_version}`.
 2. **Status script** — Read `{dir}/status`. Extract version from `# commissioned-by: spacedock@X.Y.Z`. Store as `{status_version}`.
 3. **First-officer agent** — Read `{project_root}/.claude/agents/first-officer.md`. Extract version from YAML frontmatter `commissioned-by: spacedock@X.Y.Z`. Store as `{agent_version}`.
 
@@ -194,7 +194,7 @@ Show a summary of what was migrated:
 ## Phase 5: Finalize
 
 1. Update all version stamps to `{current_version}` in files that were replaced or regenerated.
-2. For the README (if CL didn't request changes), update only the version stamp comment: `<!-- commissioned-by: spacedock@{current_version} -->`.
+2. For the README (if CL didn't request changes), update only the version stamp in YAML frontmatter: `commissioned-by: spacedock@{current_version}`.
 3. Show a summary:
 
 > **Refit complete:**
@@ -229,7 +229,7 @@ When no version stamps are found on any scaffolding file, the original baseline 
 
 Add version stamps to each file without modifying anything else:
 
-- **README.md** — Insert `<!-- commissioned-by: spacedock@{current_version} -->` as the first line.
+- **README.md** — Add YAML frontmatter with `commissioned-by: spacedock@{current_version}` (wrap in `---` delimiters if frontmatter doesn't exist).
 - **status** — Insert `# commissioned-by: spacedock@{current_version}` as the second line (after `#!/bin/bash`).
 - **first-officer.md** — Add `commissioned-by: spacedock@{current_version}` to the YAML frontmatter.
 
