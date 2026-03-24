@@ -1,12 +1,12 @@
 ---
 title: Dist building and release process
-status: implementation
+status: done
 source: refit testflight
 started: 2026-03-23T00:00:00Z
-completed:
-verdict:
+completed: 2026-03-24T15:25:00Z
+verdict: PASSED
 score:
-worktree: .worktrees/ensign-precompiled-dist
+worktree:
 ---
 
 ## Problem
