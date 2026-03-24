@@ -119,7 +119,8 @@ Do NOT spawn an Agent for this — a direct file read is sufficient. Look for:
 After collecting answers, derive all remaining values from the mission context:
 
 - `{approval_gates}` — default: gate before the terminal stage (e.g., `validation → done`).
-- `{dir}` — `docs/{mission-slug}/` where `{mission-slug}` is the mission condensed to a short lowercase hyphenated directory name. Also derive `{dir_basename}` (the last path component) for use as the team name.
+- `{dir}` — `docs/{mission-slug}/` where `{mission-slug}` is the mission condensed to a short lowercase hyphenated directory name. Also derive `{dir_basename}` (the last path component).
+- `{project_name}` — the basename of the git repo root directory (from `git rev-parse --show-toplevel`), or the current working directory basename if not in a git repo. Used to scope the team name.
 - `{captain}` — "captain".
 
 Present the full summary with all derived values:
@@ -373,7 +374,7 @@ You are a DISPATCHER. You read state and dispatch crew. You NEVER do stage work 
 
 When you begin, do these things in order:
 
-1. **Create team** — Run `TeamCreate(team_name="{dir_basename}")` to set up the team for ensign coordination.
+1. **Create team** — Run `TeamCreate(team_name="{project_name}-{dir_basename}")`. If it fails due to stale team state from a prior crashed session, clean up with `rm -rf ~/.claude/teams/{project_name}-{dir_basename}/` and retry TeamCreate.
 2. **Read the README** — Run `Read("{dir}/README.md")` to understand the pipeline schema and stage definitions.
 3. **Parse stage properties** — For each stage defined in the README, extract:
    - **Worktree:** `Yes` or `No` (default `Yes` if field is missing)
@@ -411,7 +412,7 @@ b. **Dispatch ensign** on main (working directory = repo root):
 Agent(
     subagent_type="general-purpose",
     name="ensign-{slug}",
-    team_name="{dir_basename}",
+    team_name="{project_name}-{dir_basename}",
     prompt="You are working on: {entity title}\n\nStage: {next_stage_name}\n\n### Stage definition:\n\n{Copy the full stage definition from the README here: inputs, outputs, good, bad}\n\nYour working directory is {repo_root}\nAll file reads and writes MUST use paths under {repo_root}.\nDo NOT modify YAML frontmatter in {entity_label} files.\n\nRead the {entity_label} file at {dir}/{slug}.md for full context.\n\nIf requirements are unclear or ambiguous, ask for clarification via SendMessage(to=\"team-lead\") rather than guessing. Describe what you understand and what's ambiguous so team-lead can get you a quick answer.\n\nDo the work described in the stage definition. Update the {entity_label} file body (not frontmatter) with your findings or outputs.\nCommit your work before sending completion message.\n\nThen send a completion message:\nSendMessage(to=\"team-lead\", message=\"Done: {entity title} completed {next_stage}. Summary: {brief description of what was accomplished}.\")\n\nPlain text only. Never send JSON."
 )
 ```
@@ -443,7 +444,7 @@ c. **Dispatch ensign** in the worktree:
 Agent(
     subagent_type="general-purpose",
     name="ensign-{slug}",
-    team_name="{dir_basename}",
+    team_name="{project_name}-{dir_basename}",
     prompt="You are working on: {entity title}\n\nStage: {next_stage_name}\n\n### Stage definition:\n\n{Copy the full stage definition from the README here: inputs, outputs, good, bad}\n\nYour working directory is {worktree_path}\nAll file reads and writes MUST use paths under {worktree_path}.\nDo NOT modify YAML frontmatter in {entity_label} files.\n\nRead the {entity_label} file at {worktree_path}/{relative_pipeline_dir}/{slug}.md for full context.\n\nIf requirements are unclear or ambiguous, ask for clarification via SendMessage(to=\"team-lead\") rather than guessing. Describe what you understand and what's ambiguous so team-lead can get you a quick answer.\n\nDo the work described in the stage definition. Update the {entity_label} file body (not frontmatter) with your findings or outputs.\nCommit your work to your branch before sending completion message.\n\nThen send a completion message:\nSendMessage(to=\"team-lead\", message=\"Done: {entity title} completed {next_stage}. Summary: {brief description of what was accomplished}.\")\n\nPlain text only. Never send JSON."
 )
 ```
