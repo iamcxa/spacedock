@@ -1,12 +1,12 @@
 ---
 title: Prevent LLM from embellishing first-officer dispatch template
-status: ideation
+status: implementation
 source: testflight fresh commission observation
 started: 2026-03-24T19:25:00Z
 completed:
 verdict:
 score: 0.82
-worktree:
+worktree: .worktrees/ensign-ux-fixes
 ---
 
 The first-officer template in SKILL.md section 2d contains an ensign dispatch prompt with `{Copy the full stage definition from the README here: inputs, outputs, good, bad}`. This is a runtime instruction to the first-officer (copy at dispatch time), but the LLM generating the first-officer reads it as a generation-time variable and expands it into pipeline-specific dispatch logic.

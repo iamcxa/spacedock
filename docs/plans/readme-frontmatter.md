@@ -1,12 +1,12 @@
 ---
 title: Use YAML frontmatter in generated README instead of HTML comments
-status: ideation
+status: implementation
 source: CL feedback
 started: 2026-03-24T19:25:00Z
 completed:
 verdict:
 score: 0.70
-worktree:
+worktree: .worktrees/ensign-ux-fixes
 ---
 
 The generated pipeline README stores metadata as HTML comments:
