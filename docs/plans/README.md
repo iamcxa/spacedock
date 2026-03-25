@@ -2,6 +2,7 @@
 <!-- entity-type: entity -->
 <!-- entity-label: entity -->
 <!-- entity-label-plural: entities -->
+<!-- id-style: sequential -->
 
 # Design and Build Spacedock - Plain Text Pipeline for Agents
 
@@ -11,12 +12,15 @@ Spacedock is a Claude Code plugin that turns directories of markdown files into 
 
 Each entity is a markdown file named `{slug}.md` — lowercase, hyphens, no spaces. Example: `pilot-worktree-isolation.md`.
 
+The `_archive/` subdirectory holds entities removed from the active view. Archived entities keep their original status in frontmatter — the directory is a noise reduction mechanism, not a status. Use `git mv {slug}.md _archive/{slug}.md` to archive and `git mv _archive/{slug}.md {slug}.md` to restore.
+
 ## Schema
 
 Every entity file has YAML frontmatter with these fields:
 
 ```yaml
 ---
+id:
 title: Human-readable name
 status: backlog
 source:
@@ -32,6 +36,7 @@ worktree:
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `id` | string | Unique identifier, format determined by id-style in README frontmatter |
 | `title` | string | Human-readable entity name |
 | `status` | enum | One of: backlog, ideation, implementation, validation, done |
 | `source` | string | Where this entity came from |
@@ -106,7 +111,13 @@ View the pipeline overview:
 bash docs/plans/status
 ```
 
-Output columns: SLUG, STATUS, TITLE, SCORE, SOURCE.
+Output columns: ID, SLUG, STATUS, TITLE, SCORE, SOURCE.
+
+Include archived entities with `--archived`:
+
+```bash
+bash docs/plans/status --archived
+```
 
 Find entities in a specific stage:
 
@@ -118,6 +129,7 @@ grep -l "status: ideation" docs/plans/*.md
 
 ```yaml
 ---
+id:
 title: Entity name here
 status: backlog
 source:
