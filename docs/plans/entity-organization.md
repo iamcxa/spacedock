@@ -106,9 +106,7 @@ A short stable identifier per entity, assigned at creation, never changes. Not n
 - Cross-system references (e.g., Linear: `SD-a3f`)
 - Dependency tracking between entities (`depends: [a3f, b72]`)
 - Future in-place DB for state search and reference
-- Beads-style variable-length truncation: starts short, grows as entity count increases
-
-This is lower priority than `_archive/` but should be designed together so the archive mechanism works with identifiers.
+CL decision: **sequential numeric** (`001`, `002`, `003`) for now. Style is configurable per pipeline via README frontmatter.
 
 ## Revised Specification
 
@@ -121,4 +119,6 @@ This is lower priority than `_archive/` but should be designed together so the a
 7. **Slug uniqueness enforced** across both directories
 8. **Commission template updated** with `_archive/` convention and the `git mv` step
 9. **README "File Naming" section** documents the convention
-10. **(Stretch) Entity identifier** — `id:` field in frontmatter schema, assigned at creation. Design the format (variable-length truncated UUID or similar) but implementation can be a follow-up.
+10. **Entity identifier** — `id:` field in entity frontmatter schema, sequential numeric (`001`, `002`, ...). Assigned at creation by scanning both `$DIR/*.md` and `$DIR/_archive/*.md` for max existing id, then incrementing.
+11. **README frontmatter** — add `id-style:` parameter (e.g., `sequential`, with room for future styles like `random-hex`, `timestamp`). Commission asks or defaults to `sequential`. The first-officer and status script read this to know how to assign and display IDs.
+12. **Status script** — show ID column in output.
