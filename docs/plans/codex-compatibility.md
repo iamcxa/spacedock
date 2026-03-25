@@ -1,12 +1,12 @@
 ---
 title: Test Spacedock with Codex
-status: ideation
+status: implementation
 source: CL
 started: 2026-03-24T00:00:00Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/ensign-codex-compatibility
 ---
 
 Test Spacedock (the commission skill and generated first-officer pipeline) with OpenAI Codex CLI to verify cross-platform compatibility.
