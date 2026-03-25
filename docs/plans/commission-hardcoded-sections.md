@@ -1,8 +1,8 @@
 ---
 title: Commission hardcodes pipeline-specific section names in first-officer template
-status: backlog
+status: ideation
 source: email-triage testflight
-started:
+started: 2026-03-25T02:20:00Z
 completed:
 verdict:
 score: 0.55

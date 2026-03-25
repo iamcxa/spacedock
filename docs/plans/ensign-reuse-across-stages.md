@@ -1,8 +1,8 @@
 ---
 title: Ensign reuse across stages
-status: backlog
+status: ideation
 source: email-triage testflight
-started:
+started: 2026-03-25T02:20:00Z
 completed:
 verdict:
 score: 0.65

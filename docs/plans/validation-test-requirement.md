@@ -1,12 +1,12 @@
 ---
 title: Validation pilots must run the test harness
-status: ideation
+status: implementation
 source: testflight-005
 started: 2026-03-24T00:00:00Z
 completed:
 verdict:
 score: 0.72
-worktree:
+worktree: .worktrees/ensign-validation-test-requirement
 ---
 
 ## Problem
