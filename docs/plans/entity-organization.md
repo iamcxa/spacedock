@@ -123,3 +123,49 @@ CL decision: **sequential numeric** (`001`, `002`, `003`) for now. Style is conf
 10. **Entity identifier** — `id:` field in entity frontmatter schema, sequential numeric (`001`, `002`, ...). Assigned at creation by scanning both `$DIR/*.md` and `$DIR/_archive/*.md` for max existing id, then incrementing.
 11. **README frontmatter** — add `id-style:` parameter (e.g., `sequential`, with room for future styles like `random-hex`, `timestamp`). Commission asks or defaults to `sequential`. The first-officer and status script read this to know how to assign and display IDs.
 12. **Status script** — show ID column in output.
+
+## Validation Report
+
+### 1. `_archive/` directory and migration
+
+PASSED. `_archive/` exists with 28 files — all 28 have `status: done`. Every previously-done entity was migrated.
+
+### 2. Main directory has only active entities
+
+PASSED. 4 files in main directory: `entity-organization` (implementation), `interactive-pilot-pattern` (ideation), `pipeline-catalog` (backlog), `session-briefing-testflight-005` (backlog). No done entities remain.
+
+### 3. Status script
+
+PASSED. Default `bash docs/plans/status` shows only the 4 active entities with ID column. `--archived` flag shows all 32 entities. Output columns: ID, SLUG, STATUS, TITLE, SCORE, SOURCE. Sorting by stage order then score works correctly.
+
+### 4. IDs assigned — sequential, no gaps, no duplicates
+
+PASSED. IDs 001 through 032 assigned across all 32 entities. No gaps, no duplicates. Verified by extracting all `id:` values and checking `sort | uniq -d` returns empty.
+
+### 5. README updated
+
+PASSED. README frontmatter contains `<!-- id-style: sequential -->`. Schema includes `id:` field with description "Unique identifier, format determined by id-style in README frontmatter". `_archive/` documented in File Naming section with archive/restore commands. Pipeline State section documents `--archived` flag and ID column.
+
+### 6. Commission template (SKILL.md) updated
+
+PASSED. SKILL.md contains:
+- `id-style: sequential` in generated README frontmatter
+- `id:` field in entity schema and entity template
+- `git mv {dir}/{slug}.md {dir}/_archive/{slug}.md` in done transition (both worktree and non-worktree paths)
+- ID assignment rules in State Management: "scan all `.md` files in `{dir}/` and `{dir}/_archive/` for the highest existing `id:` value, then incrementing. Zero-pad to 3 digits."
+
+### 7. Slug uniqueness
+
+PASSED. All 32 slugs are unique across both directories. Verified by extracting all slugs and checking `sort | uniq -d` returns empty.
+
+### 8. Bash 3.2 compatibility
+
+PASSED. Status script uses no bash 4+ features: no `globstar`, `shopt`, `mapfile`, `readarray`, or `**/` patterns. Two separate globs with `[ -f "$f" ] || continue` guard. Tested on bash 3.2.57 (macOS default).
+
+### 9. Regression testing
+
+PASSED. `bash v0/test-commission.sh` — 42 passed, 0 failed. All file existence, status script, entity frontmatter, README completeness, first-officer completeness, guardrail, and no-leak checks pass.
+
+### Recommendation: PASSED
+
+All 9 acceptance criteria verified. Implementation is complete and correct.
