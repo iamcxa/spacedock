@@ -317,3 +317,31 @@ Example: validation has `gate: true`. If captain approves, the entity follows th
 - Update refit skill (`skills/refit/SKILL.md`) to read from frontmatter
 - Add backward-compatibility fallback for pipelines without `stages` block
 - Test harness updates for the new README format
+
+## Implementation Summary
+
+### Changes made
+
+**`skills/commission/SKILL.md`** (AC1-AC5, AC7):
+- Added `stages` block to the README frontmatter template with `defaults` (worktree, concurrency), `states` list (with per-stage property overrides for worktree, fresh, gate, initial, terminal), and `transitions` block (omitted for linear pipelines)
+- Removed dispatch-property bullets (Worktree, Fresh, Approval gate) from per-stage prose template — prose now has only Inputs, Outputs, Good, Bad
+- Removed the separate `## Concurrency` section from the README template
+- Updated first-officer template startup: merged steps 3+4 into step 3 ("Read stage properties" from frontmatter `stages` block), renumbered subsequent steps
+- Added backward-compatibility fallback in first-officer startup step 3: if no `stages` block in frontmatter, fall back to parsing prose sections and `## Concurrency`
+- Updated dispatching step 2 to read prose for ensign prompt and dispatch properties from frontmatter
+- Updated dispatching step 5 to read `worktree` from frontmatter
+- Updated step 6a to read `gate` from frontmatter instead of `Approval gate` from prose
+- Updated ensign reuse logic references from `Fresh: Yes`/`Worktree` to `fresh: true`/`worktree` frontmatter properties
+- Updated Event Loop step 2 and State Management references
+
+**`docs/plans/README.md`** (AC6):
+- Converted HTML comment frontmatter to YAML frontmatter with `stages` block
+- Updated `commissioned-by` from `spacedock@0.1.4` to `spacedock@0.2.1`
+- Fixed gate semantics: gates now on ideation and validation (the stages whose output needs captain approval before advancing), not on implementation and done
+- Removed Worktree/Human approval bullets from all stage prose sections
+- Removed the `## Concurrency` section
+
+### Not changed (per CL direction)
+
+- `.claude/agents/first-officer.md` deployed instance — belongs to the refit process
+- Refit skill (`skills/refit/SKILL.md`) — does not exist yet, out of scope
