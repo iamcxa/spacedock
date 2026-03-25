@@ -1,9 +1,9 @@
 ---
 title: Structured stage definitions in README frontmatter
 id: 034
-status: backlog
+status: ideation
 source: email-triage feature request + CL
-started:
+started: 2026-03-25T19:00:00Z
 completed:
 verdict:
 score: 0.75
