@@ -1,7 +1,7 @@
 ---
 id: 029
 title: Make pipeline entities more organizable
-status: implementation
+status: validation
 source: CL
 started: 2026-03-25T05:00:00Z
 completed:
