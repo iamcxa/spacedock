@@ -1,4 +1,5 @@
 ---
+id: 026
 title: Use YAML frontmatter in generated README instead of HTML comments
 status: done
 source: CL feedback

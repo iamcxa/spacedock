@@ -1,4 +1,5 @@
 ---
+id: 019
 title: Design a pattern for pilots that interact directly with the captain
 status: ideation
 source: testflight-005

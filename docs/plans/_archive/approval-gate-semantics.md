@@ -1,4 +1,5 @@
 ---
+id: 023
 title: Fix approval gate placement and ensign lifecycle at gates
 status: done
 source: testflight sd6-test observation

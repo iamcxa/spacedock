@@ -1,4 +1,5 @@
 ---
+id: 025
 title: Prevent LLM from embellishing first-officer dispatch template
 status: done
 source: testflight fresh commission observation

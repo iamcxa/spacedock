@@ -1,4 +1,5 @@
 ---
+id: 022
 title: Stage-specific worktree requirements in pipeline schema
 status: done
 source: testflight-004

@@ -1,4 +1,5 @@
 ---
+id: 004
 title: Pilot Worktree Isolation
 status: done
 source: commission seed
