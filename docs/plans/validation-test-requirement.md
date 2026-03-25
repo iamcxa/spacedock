@@ -1,6 +1,6 @@
 ---
 title: Validation pilots must run the test harness
-status: implementation
+status: validation
 source: testflight-005
 started: 2026-03-24T00:00:00Z
 completed:

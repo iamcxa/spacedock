@@ -1,6 +1,6 @@
 ---
 title: Ensign reuse across stages
-status: implementation
+status: validation
 source: email-triage testflight
 started: 2026-03-25T02:20:00Z
 completed:
