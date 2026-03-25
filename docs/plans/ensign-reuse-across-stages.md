@@ -95,3 +95,13 @@ This change and the hardcoded-sections fix both modify the ensign dispatch/lifec
 5. Validation stages are generated with `Fresh: Yes` by default (commission infers this).
 6. The approval gate path uses the same reuse logic when advancing after approval.
 7. Ensign shutdown still happens at: terminal stage, context change (worktree mode differs), fresh-required stages, and rejection+discard.
+
+## Implementation Summary
+
+All changes in `skills/commission/SKILL.md`:
+
+1. **README stage template** (line 267): Added optional `Fresh:` bullet between Worktree and Approval gate, with guidance to include it only for stages needing an independent perspective (e.g., validation).
+2. **First-officer startup step 3** (line 397): Added `Fresh` to the parsed stage properties list with default `No`.
+3. **Step 6b — no approval gate path** (lines 481-489): Replaced the unconditional shutdown+redispatch with reuse-aware logic. Reuses the ensign (via SendMessage with the next stage's definition) when the next stage has the same Worktree mode and no `Fresh: Yes`. Falls back to shutdown+fresh dispatch when context changes or fresh eyes are needed. Terminal stage always shuts down.
+4. **Step 6c — approval gate approve path** (line 496): Added the same reuse-vs-fresh logic after captain approves a gate. Reuses the ensign when conditions are met, otherwise shuts down and dispatches fresh.
+5. **Reuse SendMessage format** (line 487): Defined inline in step 6b — sends the next stage name, full stage definition (using the same `[STAGE_DEFINITION]` placeholder), and continuation instructions. Omits initial setup context since the ensign already has it.

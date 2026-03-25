@@ -92,3 +92,11 @@ The ensign reuse change adds a SendMessage-based reuse path alongside the existi
 3. The guardrail comment explicitly prohibits pipeline-specific dispatch logic and custom section references.
 4. No pipeline-specific section names appear anywhere in the first-officer template.
 5. The changes work with the ensign reuse SendMessage path (same copy instruction applies).
+
+## Implementation Summary
+
+All changes in `skills/commission/SKILL.md`:
+
+1. **Dispatching step 2** (line 409): Replaced "Read the next stage's definition from the README (inputs, outputs, good, bad criteria)" with explicit instruction to copy everything under the `### stage_name` heading until the next `###` heading, including standard bullets and any additional context.
+2. **[STAGE_DEFINITION] placeholder** (lines 435, 469, 487): Changed from "copy the full stage definition from the README: inputs, outputs, good, bad" to "copy the full ### stage subsection from the README verbatim, including all bullets and any additional context under that heading". Updated in all three locations: main dispatch, worktree dispatch, and the ensign reuse SendMessage.
+3. **Guardrail comments** (lines 428, 462): Added sentence prohibiting pipeline-specific dispatch logic: "Do NOT add pipeline-specific dispatch logic, custom section references, or per-stage conditionals — the [STAGE_DEFINITION] placeholder handles all stage-specific context at runtime."
