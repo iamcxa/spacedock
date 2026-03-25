@@ -67,12 +67,11 @@ This stays in the existing completeness check loop structure — just swap the k
 
 ### 4. `initialPrompt` value
 
-The value should be: `"Begin pipeline dispatch."`
+**CL direction:** The initial prompt should trigger a status report, not directly start dispatching. The first officer reads the pipeline and reports state — CL then decides what to dispatch.
 
-Rationale: This is short, imperative, and maps directly to what the agent should do. The agent's `## Startup` section already has the detailed steps. The initialPrompt just needs to kick things off — it doesn't need to repeat instructions that are already in the agent body. Alternatives considered:
-- "Begin immediately." — too vague, doesn't reference the pipeline
-- "Read the pipeline README, run status, and dispatch ensigns." — too detailed; duplicates the Startup section
-- "Start." — too terse to be clear
+The value should be: `"Report pipeline status."`
+
+This triggers the Startup sequence (read README, run status, check orphans) and the first officer reports the current state to CL before dispatching anything. CL retains control over what moves next.
 
 ### 5. Backward compatibility
 

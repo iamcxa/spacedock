@@ -1,13 +1,13 @@
 ---
 title: Structured stage definitions in README frontmatter
 id: 034
-status: ideation
+status: implementation
 source: email-triage feature request + CL
 started: 2026-03-25T19:00:00Z
 completed:
 verdict:
 score: 0.75
-worktree:
+worktree: .worktrees/ensign-stage-defs
 ---
 
 Move stage properties (worktree, gate, concurrency, fresh, terminal) from prose bullet points in README stage sections into structured YAML in the README frontmatter. The first officer currently parses prose to extract boolean dispatch properties — fragile and mixes concerns.
