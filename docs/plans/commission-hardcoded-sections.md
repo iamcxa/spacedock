@@ -1,12 +1,12 @@
 ---
 title: Commission hardcodes pipeline-specific section names in first-officer template
-status: ideation
+status: implementation
 source: email-triage testflight
 started: 2026-03-25T02:20:00Z
 completed:
 verdict:
 score: 0.55
-worktree:
+worktree: .worktrees/ensign-commission-fixes
 ---
 
 ## Problem Statement

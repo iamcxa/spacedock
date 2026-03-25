@@ -1,12 +1,12 @@
 ---
 title: Ensign reuse across stages
-status: ideation
+status: implementation
 source: email-triage testflight
 started: 2026-03-25T02:20:00Z
 completed:
 verdict:
 score: 0.65
-worktree:
+worktree: .worktrees/ensign-commission-fixes
 ---
 
 ## Problem Statement
