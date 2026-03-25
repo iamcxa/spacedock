@@ -1,6 +1,6 @@
 ---
 title: Test Spacedock with Codex
-status: implementation
+status: validation
 source: CL
 started: 2026-03-24T00:00:00Z
 completed:
