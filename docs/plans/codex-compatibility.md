@@ -121,8 +121,58 @@ Given the analysis, the realistic scope for this entity is **Scope A + partial S
 - Concrete evidence from testing (if CL has Codex available) or detailed analysis of Codex's documented capabilities.
 - Honest conclusion: is cross-platform PTP operation worth pursuing in v0, or should it wait for a later version?
 
+### Solo Operator Prompt Sketch
+
+The key adaptation for Codex is collapsing the first-officer/ensign split into a single "solo operator" that does everything sequentially. Here's what the core loop would look like as a Codex instructions file:
+
+```
+You are operating a PTP pipeline at `{dir}/`.
+
+## Startup
+1. Read `{dir}/README.md` to understand the pipeline schema and stages.
+2. Run `bash {dir}/status` to see the current state of all entities.
+
+## Work Loop
+For each entity ready for its next stage (prioritize by score, highest first):
+1. Identify the entity's current stage and the next stage definition from the README.
+2. Read the entity file for full context.
+3. Do the work described in the stage definition (inputs -> outputs).
+4. Update the entity body (not frontmatter) with your findings.
+5. Update the entity frontmatter: set `status` to the next stage, set `started` if first active stage.
+6. Commit: `git commit -am "advance: {slug} to {next_stage}"`
+7. Run `bash {dir}/status` to verify.
+8. If the next stage has an approval gate, stop and ask the user before continuing.
+9. Repeat for the next entity.
+
+## Key Rules
+- Follow the quality criteria (Good/Bad) from the README for each stage.
+- When an entity reaches the terminal stage, set `completed` and `verdict` in frontmatter.
+- If anything is unclear, ask the user rather than guessing.
+```
+
+Note the differences from the Claude Code first-officer:
+- No `Agent()` dispatch — the solo operator does stage work itself
+- No `TeamCreate`/`SendMessage` — direct user interaction replaces team messaging
+- No worktree isolation — operates on main branch (acceptable for sequential single-agent work)
+- Frontmatter updates by the operator itself (in Claude Code, only the first-officer touches frontmatter)
+
+### What's Lost in Solo Mode
+
+- **Parallelism**: Can't work on multiple entities simultaneously
+- **Separation of concerns**: The dispatcher/worker distinction disappears — one agent both decides what to do and does it
+- **Worktree isolation**: Without sub-agents, there's no need for worktrees, but also no safety net if work on one entity breaks another
+- **Team coordination**: No message passing, no shutdown protocol — simpler but less structured
+
+### What's Preserved in Solo Mode
+
+- **The PTP format**: Entities, stages, README schema, status script — all intact
+- **Stage-driven workflow**: Quality criteria, inputs/outputs, approval gates still apply
+- **Git discipline**: Commits at stage boundaries, status tracking
+- **Human-in-the-loop**: Approval gates still pause for user decision
+
 ### Open Questions
 
 1. **Does CL have Codex CLI installed and available for testing?** If not, this is a document-analysis task rather than a hands-on testing task.
 2. **Is the goal "Codex can use PTP pipelines" or "Spacedock generates pipelines that work with Codex"?** The former is mostly true already; the latter requires significant new work.
 3. **Priority relative to core Spacedock features**: Is this exploratory research, or does it need to drive implementation decisions for v0?
+4. **Codex sandbox restrictions**: Does Codex's file-write sandbox allow editing files in place and running git commands? The solo operator needs both.
