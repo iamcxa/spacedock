@@ -1,9 +1,9 @@
 ---
 id: 031
 title: Pipeline export and release builder
-status: backlog
+status: ideation
 source: CL
-started:
+started: 2026-03-25T20:00:00Z
 completed:
 verdict:
 score:
