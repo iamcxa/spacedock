@@ -113,3 +113,27 @@ Extract the first-officer template from SKILL.md into a standalone file (e.g., `
 The LLM's only job is computing variable VALUES, not touching template CONTENT. The template file is copied verbatim with mechanical substitution — no LLM involvement in the output.
 
 This is architecturally equivalent to treating commission as a compiler: the template is a binary format, the LLM handles the frontend (gathering inputs), and sed/bash handles the backend (emitting output).
+
+## Validation Report
+
+### Test results
+
+Ran `bash v0/test-commission.sh` — all 59 checks passed, 0 failed.
+
+### Acceptance criteria verification
+
+| # | Criterion | Result | Evidence |
+|---|-----------|--------|----------|
+| 1 | Generated first-officer frontmatter includes `initialPrompt: "Report pipeline status."` | PASS | `templates/first-officer.md` line 6 contains the field; test check "first-officer contains 'initialPrompt'" passed |
+| 2 | Generated first-officer body does NOT contain `## AUTO-START` section | PASS | `grep AUTO-START templates/first-officer.md` returns no matches; section fully removed |
+| 3 | `agents/first-officer.md` reference doc reflects `initialPrompt` approach | PASS | Lines 17-18 now mention `initialPrompt` triggers startup; line 85 lists it in frontmatter fields |
+| 4 | Test harness checks for `initialPrompt` instead of `AUTO-START` | PASS | `test-commission.sh` line 189 keyword changed from `AUTO-START\|auto-start` to `initialPrompt` |
+| 5 | All existing test checks still pass | PASS | 59/59 checks passed including all guardrails, frontmatter, leaked variable, and absolute path checks |
+| 6 | First-officer file is generated deterministically (not LLM-generated prose) | PASS | SKILL.md section 2d now uses `sed` substitution on `templates/first-officer.md` with `__VAR__` markers; no LLM prose generation |
+
+### Additional observations
+
+- The implementation went beyond the original acceptance criteria by extracting the first-officer template from SKILL.md into `templates/first-officer.md`. This was necessary because the LLM was rewriting the heredoc template content instead of using it verbatim. The template extraction is a sound architectural improvement that directly addresses criterion 6 (deterministic generation).
+- The test harness documentation (`v0/test-harness.md` line 139) still references "AUTO-START instruction" as a check item, but this is a prose description, not an executable check. The actual test script was correctly updated. This is a minor documentation inconsistency — not a failure.
+
+### Recommendation: PASSED
