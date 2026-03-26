@@ -1,7 +1,7 @@
 ---
 id: 040
 title: Release script with version bumping and changelog
-status: implementation
+status: validation
 source: CL
 started: 2026-03-26T17:35:00Z
 completed:
