@@ -1,7 +1,7 @@
 ---
 title: Use initialPrompt frontmatter for first-officer auto-start
 id: 033
-status: implementation
+status: validation
 source: Claude Code changelog
 started: 2026-03-25T19:00:00Z
 completed:
