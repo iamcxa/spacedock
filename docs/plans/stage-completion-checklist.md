@@ -1,13 +1,13 @@
 ---
 id: 043
 title: Stage completion checklist for ensign reporting
-status: ideation
+status: implementation
 source: CL
 started: 2026-03-26T00:00:00Z
 completed:
 verdict:
 score: 0.80
-worktree:
+worktree: .worktrees/ensign-stage-completion-checklist
 ---
 
 Ensigns currently report completion as free-form text. This lets them rationalize skipping steps without the first officer noticing until it's too late (e.g., skipping the test harness and burying the rationale in a paragraph).
