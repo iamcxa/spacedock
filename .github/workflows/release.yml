@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create release for (e.g., v0.4.1)'
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract release notes from tag annotation
+        id: notes
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          # Get tag annotation body (skip the first line which is "Release X.Y.Z")
+          NOTES=$(git tag -l --format='%(contents:body)' "$TAG")
+          # Write to file for gh release
+          echo "$NOTES" > release-notes.txt
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          gh release create "$TAG" \
+            --title "spacedock $TAG" \
+            --notes-file release-notes.txt
