@@ -200,232 +200,214 @@ The captain asked whether we can write a test that catches an ensign skipping ch
 
 **Recommendation:** Add the three template-level grep checks to `test-commission.sh` to prevent regressions. The runtime compliance test design below covers the deeper question.
 
-### Runtime compliance test design
+### Runtime compliance test design (e2e)
 
-The original failure mode had two layers: (1) the ensign silently skipped work, and (2) the first officer didn't catch it. The checklist protocol addresses both: it forces the ensign to explicitly account for every item, and it gives the first officer a structured review procedure. A runtime compliance test should verify both layers.
+The original failure mode had two layers: (1) the ensign silently skipped work, and (2) the first officer didn't catch it. Rather than testing these layers in isolation with synthetic prompts, this design runs the real first-officer agent end-to-end: commission a test pipeline, put a test entity through a stage, and verify the actual agent communication follows the checklist protocol.
 
-#### Test concept
+#### How agent communication is logged
 
-Use `claude -p` to simulate ensign and first-officer behavior in isolation, the same way `test-commission.sh` uses `claude -p` to simulate commission. No team infrastructure needed — we're testing whether the prompt instructions produce the right output format, not whether SendMessage works.
+When the first officer runs, it creates a team via `TeamCreate` and dispatches ensigns via `Agent()`. All inter-agent messages (including ensign completion reports) are stored as JSON arrays in `~/.claude/teams/{team_name}/inboxes/{agent_name}.json`. Each message has `from`, `text`, `summary`, and `timestamp` fields. The `team-lead.json` inbox contains all messages sent to the first officer, including ensign completion messages.
 
-#### Test 1: Ensign produces structured checklist
+The team name is deterministic: `{project_name}-{dir_basename}`, where `project_name` is derived from the git repo name and `dir_basename` is the pipeline directory name. For a test pipeline at `./checklist-test/`, the team name would be something like `{test_project}-checklist-test`.
 
-Simulate an ensign receiving a checklist prompt. Verify the response accounts for every item.
+#### Test phases
 
-**Setup:** Create a minimal task file in a temp directory with known acceptance criteria.
+The test has three phases, extending the pattern from `test-commission.sh`:
+
+**Phase 1: Commission a test pipeline** (reuse existing commission test approach)
 
 ```bash
-# Create a fake task file
-cat > "$TEST_DIR/test-task.md" << 'TASK'
----
-id: 001
-title: Add widget support
-status: implementation
----
+TEST_DIR="$(mktemp -d)"
+cd "$TEST_DIR"
+git init test-project && cd test-project
 
-Implement widget rendering in the display module.
+PROMPT="/spacedock:commission
+
+All inputs for this workflow:
+- Mission: Track tasks through stages
+- Entity: A task
+- Stages: backlog → work → done
+- Approval gates: none
+- Seed entities:
+  1. test-checklist — Verify checklist protocol works (score: 25/25)
+- Location: ./checklist-test/
+
+Skip interactive questions and confirmation.
+Do NOT run the pilot phase — just generate the files."
+
+claude -p "$PROMPT" \
+  --plugin-dir "$REPO_ROOT" \
+  --permission-mode bypassPermissions \
+  --verbose --output-format stream-json \
+  2>&1 > "$TEST_DIR/commission-log.jsonl"
+```
+
+Key design choices:
+- **No gates.** Stages are `backlog → work → done` with no approval gates. This means the first officer can process the entity all the way through without blocking for captain input, so `claude -p` completes naturally.
+- **One entity.** Minimal scope — one entity goes through one stage (backlog → work).
+- **Fresh git repo.** Isolation from the real spacedock repo. `git init` provides the bare minimum git context the first officer needs.
+
+After commission, add acceptance criteria to the test entity so the checklist has entity-level items to check:
+
+```bash
+cat >> "$TEST_DIR/test-project/checklist-test/test-checklist.md" << 'AC'
 
 ## Acceptance Criteria
 
-1. Widget renders correctly in all supported formats
-2. Error handling for malformed widget data
-3. Unit tests cover widget rendering
-TASK
+1. The output file contains the word "hello"
+2. The output file is valid UTF-8
+AC
 ```
 
-**Prompt:** Construct an ensign-style prompt with a concrete checklist, but strip the SendMessage instruction and replace it with "write your completion report to stdout":
+Then commit so the first officer has a clean working tree:
 
 ```bash
-PROMPT="You are working on: Add widget support
-
-Stage: implementation
-
-### Stage definition:
-
-A task moves to implementation once its design is approved. Write the code or make the changes described in the task.
-
-- **Inputs:** The task description and acceptance criteria
-- **Outputs:** Working code committed to the repo, with a summary of what was built
-- **Good:** Minimal changes that satisfy acceptance criteria, clean code, tests
-- **Bad:** Over-engineering, skipping tests, ignoring edge cases
-
-### Completion checklist
-
-Report the status of each item when you write your completion report.
-Mark each: DONE, SKIPPED (with rationale), or FAILED (with details).
-
-Stage requirements:
-1. Working code committed to the repo
-2. Summary of what was built and where
-
-Acceptance criteria:
-3. Widget renders correctly in all supported formats
-4. Error handling for malformed widget data
-5. Unit tests cover widget rendering
-
-DO NOT actually write any code. This is a test of the reporting format only.
-Write your completion report below. Every checklist item must appear.
-Pretend you completed items 1-4 successfully and item 5 was skipped because the test framework is not set up yet.
-
-### Checklist
-
-{numbered checklist with each item followed by — DONE, SKIPPED: rationale, or FAILED: details}
-
-### Summary
-{brief description}"
-
-claude -p "$PROMPT" --output-format text 2>/dev/null > "$TEST_DIR/ensign-output.txt"
+cd "$TEST_DIR/test-project"
+git add -A && git commit -m "commission: initial pipeline"
 ```
 
-**Validation checks:**
+**Phase 2: Run the first officer**
 
 ```bash
-# Every checklist item number appears in the response
-for N in 1 2 3 4 5; do
-  grep -qE "^${N}\." "$TEST_DIR/ensign-output.txt"
-done
+cd "$TEST_DIR/test-project"
 
-# At least one item is marked DONE
-grep -qiE "DONE" "$TEST_DIR/ensign-output.txt"
-
-# Item 5 is marked SKIPPED (as instructed)
-grep -qiE "5\..*SKIPPED" "$TEST_DIR/ensign-output.txt"
-
-# Response contains ### Checklist and ### Summary sections
-grep -q "### Checklist" "$TEST_DIR/ensign-output.txt"
-grep -q "### Summary" "$TEST_DIR/ensign-output.txt"
-
-# No items are silently omitted — count items with a status marker
-REPORTED=$(grep -cE "^[0-9]+\..*—.*(DONE|SKIPPED|FAILED)" "$TEST_DIR/ensign-output.txt")
-[ "$REPORTED" -ge 5 ]
+claude -p "Process all entities through the pipeline." \
+  --agent first-officer \
+  --permission-mode bypassPermissions \
+  --bare \
+  --verbose --output-format stream-json \
+  --max-budget-usd 2.00 \
+  2>&1 > "$TEST_DIR/fo-log.jsonl"
 ```
 
-This test verifies the prompt format is strong enough that the model produces structured output with every item accounted for. It would catch a regression where the checklist instructions are weakened or dropped.
+Key flags:
+- `--agent first-officer` — loads the generated `.claude/agents/first-officer.md`
+- `--bare` — prevents CLAUDE.md, hooks, and user-level config from interfering with the test
+- `--max-budget-usd 2.00` — safety cap; the test should cost well under $1 but this prevents runaway spending if something goes wrong
+- `--permission-mode bypassPermissions` — the first officer needs to create files, run bash, and use Agent/TeamCreate without interactive prompts
 
-#### Test 2: First-officer catches missing items
+The first officer will:
+1. Create team, read README, run status
+2. Find `test-checklist` in backlog, dispatch an ensign into `work`
+3. The ensign does the work, sends a completion message with checklist
+4. First officer does checklist review (step 7)
+5. No gate on `work`, so it proceeds to the next stage or terminal
+6. Session completes
 
-Simulate a first-officer receiving an incomplete ensign report. Verify it pushes back.
+**Phase 3: Validate the team inbox**
 
-**Prompt:**
+After the first officer finishes, inspect the team inbox files for checklist compliance.
 
 ```bash
-PROMPT="You are a first officer reviewing an ensign's completion report.
+# Find the team directory.
+# The team name is {project_name}-{dir_basename}.
+# project_name comes from the git repo dir name ("test-project"),
+# dir_basename from the pipeline dir ("checklist-test").
+TEAM_DIR=$(ls -d ~/.claude/teams/*checklist-test* 2>/dev/null | head -1)
 
-The ensign was dispatched with this checklist:
-
-1. Working code committed to the repo
-2. Summary of what was built and where
-3. Widget renders correctly in all supported formats
-4. Error handling for malformed widget data
-5. Unit tests cover widget rendering
-
-The ensign sent this completion message:
-
----
-Done: Add widget support completed implementation.
-
-### Checklist
-
-1. Working code committed to the repo — DONE
-2. Summary of what was built and where — DONE
-3. Widget renders correctly in all supported formats — DONE
-
-### Summary
-Implemented widget rendering.
----
-
-Items 4 and 5 are missing from the report. Follow this review procedure:
-
-a. Completeness check — Verify every item from the dispatched checklist appears in the report. If any items are missing, identify them.
-b. Skip review — For each SKIPPED item, evaluate the rationale.
-c. Failure triage — For FAILED items, determine whether the failure blocks progression.
-
-Write your review. If items are missing, state which ones and that the ensign must account for them."
-
-claude -p "$PROMPT" --output-format text 2>/dev/null > "$TEST_DIR/fo-review.txt"
+if [ -z "$TEAM_DIR" ]; then
+  fail "team directory not found"
+else
+  INBOX="$TEAM_DIR/inboxes/team-lead.json"
 ```
 
-**Validation checks:**
+**Check 1: Ensign sent a completion message with a checklist section.**
 
 ```bash
-# First officer identifies the missing items
-grep -qE "4|error handling|malformed" "$TEST_DIR/fo-review.txt"
-grep -qE "5|unit test|test" "$TEST_DIR/fo-review.txt"
+  # Extract ensign messages (from != "team-lead")
+  # The inbox is a JSON array; ensign messages have "from": "ensign-..."
+  ENSIGN_MSGS=$(python3 -c "
+import json, sys
+msgs = json.load(open('$INBOX'))
+for m in msgs:
+    if m.get('from','').startswith('ensign-'):
+        t = m.get('text','')
+        if '\"type\"' not in t:  # skip protocol messages
+            print(t)
+")
 
-# First officer indicates pushback (not approval)
-grep -qiE "missing|incomplete|account for|not included" "$TEST_DIR/fo-review.txt"
+  if echo "$ENSIGN_MSGS" | grep -qi "### Checklist"; then
+    pass "ensign completion message contains ### Checklist section"
+  else
+    fail "ensign completion message contains ### Checklist section"
+  fi
 ```
 
-This test verifies the review instructions are strong enough that the model catches omissions rather than rubber-stamping.
-
-#### Test 3: First-officer catches weak skip rationale
-
-Same structure as Test 2, but the ensign reports all items with a weak SKIPPED rationale for the test harness item.
-
-**Prompt:**
+**Check 2: Every checklist item has a DONE/SKIPPED/FAILED status.**
 
 ```bash
-PROMPT="You are a first officer reviewing an ensign's completion report.
-
-The ensign was dispatched with this checklist:
-
-1. Validation report with what was tested and pass/fail evidence
-2. Run tests from the Testing Resources section (commission test harness)
-3. PASSED/REJECTED recommendation
-
-The ensign sent this completion message:
-
----
-Done: Feature X completed validation.
-
-### Checklist
-
-1. Validation report with what was tested and pass/fail evidence — DONE
-2. Run tests from the Testing Resources section — SKIPPED: seemed unnecessary for this change
-3. PASSED/REJECTED recommendation — DONE: PASSED
-
-### Summary
-Reviewed the implementation and it looks correct.
----
-
-Follow this review procedure:
-
-b. Skip review — For each SKIPPED item, evaluate the rationale. Is the skip genuinely acceptable, or is the ensign rationalizing? Weak rationales include 'seemed unnecessary', 'ran out of time', 'not applicable' without explanation. If the rationale is weak, push back.
-
-Write your review."
-
-claude -p "$PROMPT" --output-format text 2>/dev/null > "$TEST_DIR/fo-skip-review.txt"
+  # Count items with status markers in the ensign's message
+  ITEM_COUNT=$(echo "$ENSIGN_MSGS" | grep -ciE "(DONE|SKIPPED|FAILED)")
+  # We expect at least 2 items: stage requirements + acceptance criteria
+  if [ "$ITEM_COUNT" -ge 2 ]; then
+    pass "ensign reported status for at least 2 checklist items"
+  else
+    fail "ensign reported status for at least 2 checklist items (found $ITEM_COUNT)"
+  fi
 ```
 
-**Validation checks:**
+**Check 3: Completion message has a ### Summary section.**
 
 ```bash
-# First officer identifies item 2 skip as problematic
-grep -qiE "weak|insufficient|not acceptable|rationaliz|push back|seemed unnecessary" "$TEST_DIR/fo-skip-review.txt"
-
-# First officer does NOT simply approve
-! grep -qiE "^all items.*acceptable\|checklist looks good\|approved" "$TEST_DIR/fo-skip-review.txt"
+  if echo "$ENSIGN_MSGS" | grep -qi "### Summary"; then
+    pass "ensign completion message contains ### Summary section"
+  else
+    fail "ensign completion message contains ### Summary section"
+  fi
 ```
 
-This test directly reproduces the original incident: an ensign skipping the test harness with "seemed unnecessary." It verifies the first-officer review instructions are strong enough to catch exactly this failure mode.
+**Check 4: Acceptance criteria items appear in the checklist.**
 
-#### Implementation approach
+```bash
+  # The entity had 2 acceptance criteria items.
+  # Check at least one appears in the ensign's checklist.
+  if echo "$ENSIGN_MSGS" | grep -qiE "hello|UTF-8|output file"; then
+    pass "ensign checklist includes entity acceptance criteria items"
+  else
+    fail "ensign checklist includes entity acceptance criteria items"
+  fi
+```
 
-These three tests can be packaged as a single script (e.g., `scripts/test-checklist-compliance.sh`) following the same pattern as `test-commission.sh`: setup, run `claude -p`, validate output, report PASS/FAIL per check.
+**Check 5 (stream-json log): First officer performed checklist review.**
 
-**Key differences from the commission test harness:**
-- Faster execution: each `claude -p` call is a simple prompt/response with no file generation, so each should take ~10-15 seconds vs. 30-60 for commission.
-- No plugin needed: these tests run plain `claude -p` prompts, not skill invocations.
-- Inherently probabilistic: LLM outputs vary between runs. The checks should be lenient enough to handle formatting variation (e.g., grep for item numbers and status keywords, not exact strings). A check that fails 1 in 20 runs is still useful — it's a smoke test, not a unit test.
+The stream-json log captures the first officer's reasoning. If the first officer did checklist review, its text output should mention reviewing the checklist or evaluating completeness.
 
-**What this proves and what it doesn't:**
-- **Proves:** The checklist prompt format is strong enough to produce structured output. The review instructions are strong enough to catch omissions and weak rationales. These are the two properties the protocol depends on.
-- **Doesn't prove:** That a real ensign in a real dispatch will always follow the format under all conditions. But no test can prove that for an LLM — the best we can do is verify the instructions produce the right behavior in controlled conditions, which is what these tests do.
-- **Doesn't test:** The first officer's completeness check in a live team context (matching dispatched checklist items against reported items). That requires the full Agent/SendMessage infrastructure and is out of scope.
+```bash
+  if grep -qiE "checklist review|completeness check|skip review|all items accounted" \
+     "$TEST_DIR/fo-log.jsonl"; then
+    pass "first officer performed checklist review"
+  else
+    fail "first officer performed checklist review"
+  fi
+fi
+```
 
-#### Minimal viable version
+**Cleanup:**
 
-If cost or time is a concern, Test 3 alone is the highest-value test. It directly reproduces the original incident (ensign skips test harness with weak rationale) and verifies the first-officer review catches it. Tests 1 and 2 add defense in depth but Test 3 is the one that would have caught the actual bug.
+```bash
+# Remove the test team directory
+rm -rf "$TEAM_DIR"
+rm -rf "$TEST_DIR"
+```
+
+#### How this catches the original failure mode
+
+In the original incident, the ensign would have been dispatched with a checklist including "Run tests from the Testing Resources section." Under the old protocol (free-form completion), the ensign just said "PASSED" in prose and omitted mentioning the test harness. Under the checklist protocol:
+
+1. The ensign's completion message must contain `### Checklist` with every item accounted for — Check 1 and Check 2 verify this structure exists.
+2. If the ensign marks the test harness as SKIPPED, the first officer's checklist review (step 7) evaluates the rationale — Check 5 verifies the first officer actually performed the review.
+3. The entity-level acceptance criteria show up in the checklist — Check 4 verifies the first officer assembled items from both sources.
+
+The test doesn't directly verify that the first officer pushes back on a weak skip rationale (that would require a more complex setup where the ensign is primed to skip with a bad excuse, and we verify the first officer sends it back). But it does verify the structural prerequisites: the ensign reports in the right format, and the first officer reviews the report before proceeding.
+
+#### Implementation notes
+
+- **Separate script vs. extending test-commission.sh:** This should be a separate script (e.g., `scripts/test-checklist-e2e.sh`). The commission test validates template generation; this test validates runtime agent behavior. Different concerns, different failure modes, different run times.
+- **Run time:** Phase 1 (commission) takes ~30-60s. Phase 2 (first officer + ensign) takes ~60-120s depending on how much work the ensign does. Total: ~2-3 minutes. Acceptable for a smoke test run occasionally, not for every commit.
+- **Cost:** Two `claude -p` invocations (commission + first officer which spawns an ensign). Estimated $0.50-$1.00 per run. The `--max-budget-usd` cap prevents surprises.
+- **Determinism:** LLM output varies between runs. The checks are deliberately lenient (grep for keywords, not exact strings). A test that passes 19/20 runs is still useful — it's a smoke test that catches structural regressions, not a unit test that catches every edge case.
+- **Team directory cleanup:** The test creates a team directory under `~/.claude/teams/`. The cleanup step removes it. If the test crashes before cleanup, stale team directories accumulate — but the first officer already handles this (it cleans up stale teams on startup).
+- **The `--bare` flag** is important: it prevents the user's CLAUDE.md, hooks, and plugin configurations from affecting the test. The commission phase still needs `--plugin-dir` to load the spacedock plugin, but the first-officer phase runs standalone.
 
 ### Verdict
 
