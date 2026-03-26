@@ -119,3 +119,23 @@ A: No. The consumers are LLM agents (first officer, captain), not scripts. Markd
 
 **Q: What if the entity body has no explicit acceptance criteria?**
 A: The stage-level requirements still apply. The entity-level section of the checklist is simply empty. The first officer should note this when reporting to the captain at gate stages — a task without acceptance criteria is harder to validate.
+
+## Implementation Summary
+
+All changes are in `templates/first-officer.md`. No changes to the README schema, entity format, or commission skill.
+
+### Changes made
+
+**Dispatching step 3 — Assemble completion checklist:** Added between step 2 (read stage definition) and the concurrency check. The first officer builds a numbered checklist from two sources: stage requirements (from README **Outputs** bullets) and entity-level acceptance criteria (from the entity body). Items are numbered sequentially across both sources.
+
+**Ensign prompt templates (both main and worktree paths):** Added a `### Completion checklist` section with the `[CHECKLIST]` placeholder and instructions to report each item as DONE, SKIPPED (with rationale), or FAILED (with details). Updated the completion message format to use `### Checklist` and `### Summary` sections instead of free-form text.
+
+**Step 7 — Checklist review:** Added between ensign completion and the approval gate check. Three sub-steps: (a) completeness check — verify all items present, (b) skip review — evaluate rationale quality, (c) failure triage — assess whether failures block progression.
+
+**Step 8b — SendMessage reuse path:** Updated to assemble a new checklist for the next stage and include the `### Completion checklist` section in the reuse message.
+
+**Step 8c — Gate reporting:** Updated to include the ensign's checklist with the first officer's assessment of skip rationales, failure impact, and overall recommendation when reporting to the captain.
+
+**Event loop:** Added checklist review as step 2 between receiving the worker message and the gate check.
+
+**Step renumbering:** Steps 6-8 became 7-10 to accommodate the new checklist review step.
