@@ -139,3 +139,67 @@ All changes are in `templates/first-officer.md`. No changes to the README schema
 **Event loop:** Added checklist review as step 2 between receiving the worker message and the gate check.
 
 **Step renumbering:** Steps 6-8 became 7-10 to accommodate the new checklist review step.
+
+## Validation Report
+
+### Commission test harness
+
+Ran `bash scripts/test-commission.sh` — 59/59 checks passed. The test harness validates that the generated first-officer template is structurally correct, has all guardrails, has no leaked template variables or absolute paths, and produces a working status script with valid entity frontmatter.
+
+### Acceptance criteria verification
+
+All six acceptance criteria were verified by reading the implementation diff and the final `templates/first-officer.md`:
+
+1. **Checklist extraction instructions** — PASSED. Dispatching step 3 "Assemble completion checklist" instructs the first officer to extract items from both the README stage definition's Outputs bullets and the entity body's acceptance criteria section. Handles the no-acceptance-criteria case explicitly.
+
+2. **Ensign prompt `### Completion checklist` section** — PASSED. Both the main dispatch prompt (line 64) and worktree dispatch prompt (line 102) include the `### Completion checklist` section with `[CHECKLIST]` placeholder, DONE/SKIPPED/FAILED instructions, and the "Every checklist item must appear" constraint.
+
+3. **Structured completion message format** — PASSED. Both prompts specify `### Checklist` and `### Summary` sections in the ensign's SendMessage template, replacing the old free-form `"Summary: {brief description}"` format.
+
+4. **Checklist review procedure** — PASSED. Step 7 includes three sub-steps: (a) completeness check with pushback template, (b) skip rationale review with weak-rationale examples and pushback template, (c) failure triage with gate-stage blocking logic.
+
+5. **SendMessage reuse path includes checklist** — PASSED. Step 8b's reuse path explicitly says "assemble a new checklist for the next stage (following step 3)" and the SendMessage template includes the `### Completion checklist` section with `[CHECKLIST]` placeholder.
+
+6. **Gate reporting includes checklist with assessment** — PASSED. Step 8c's gate reporting now includes five specific items: the ensign's full checklist, first officer's judgment on skip rationales, impact assessment for failures, explicit note if no acceptance criteria, and overall recommendation.
+
+### Internal consistency
+
+All cross-references between steps were verified:
+- Step 7 → step 8, step 8b → step 9 (merge), step 8b reuse → step 3 and step 7, step 8c approve → step 8b/step 9, step 8c redo → step 7, step 8c discard → step 10
+- Event loop steps 2-3 reference dispatching steps 7-8 correctly
+
+### Test harness coverage gap
+
+The current test harness (`scripts/test-commission.sh`) validates template structure but has no checks specific to the checklist feature. The following checklist-related assertions could be added to the test harness for future protection:
+
+1. **Generated first-officer contains checklist assembly instructions** — `grep -q "Assemble completion checklist\|completion checklist" "$FO"` (verifies the checklist protocol survived commission generation)
+2. **Generated first-officer contains checklist review procedure** — `grep -q "Checklist review\|checklist review" "$FO"` (verifies the review step is present)
+3. **Generated first-officer ensign prompt has checklist section** — `grep -q "Completion checklist" "$FO"` (verifies ensign prompt includes the checklist section)
+
+These are straightforward grep checks that fit the existing test pattern. They would catch a regression where the checklist feature is dropped from the template.
+
+### Analysis: Can we test the "ensign skips checklist" failure mode?
+
+The captain asked whether we can write a test that catches an ensign skipping checklist items or rationalizing skips. The original failure pattern was:
+
+1. Ensign dispatched for validation
+2. Ensign skips running the test harness
+3. Ensign reports PASSED without the test evidence
+4. First officer doesn't catch it
+5. Captain catches it
+
+**What the checklist protocol changes:** The checklist forces the ensign to explicitly account for every item (DONE/SKIPPED/FAILED). The first officer now has a structured signal to review, with instructions to push back on weak skip rationales. This converts silent omission into visible SKIPPED entries that trigger review.
+
+**What's testable vs. not:**
+
+- **Testable (template level):** We can verify the generated template contains the checklist protocol, review instructions, and pushback templates. The three grep checks above cover this. This is what the test harness is designed for.
+
+- **Not testable in the current test harness (runtime behavior):** Whether an LLM ensign actually follows the checklist instructions, or whether the first officer actually pushes back on weak rationales, is a runtime behavior question. The test harness runs commission (template generation), not the first-officer workflow. Testing runtime compliance would require a different kind of test — one that runs the first-officer agent with a mock entity through dispatch/completion/review. That's a substantial new test infrastructure beyond the scope of this task.
+
+- **Partially addressable (structural):** The checklist protocol itself is the mitigation. The key design insight is separation of concerns: the ensign must account for every item (execution), and the first officer evaluates skip rationales (judgment). Even if an ensign marks something SKIPPED with a weak rationale, the first officer's review procedure is now explicit, with examples of weak rationales to reject. The structured format makes it much harder for a skip to go unnoticed compared to free-form prose.
+
+**Recommendation:** Add the three template-level grep checks to `test-commission.sh` to prevent regressions. Runtime compliance testing (did the ensign actually follow the protocol?) would require an integration test that runs the full agent dispatch loop, which is a different effort and should be a separate task if the captain wants it.
+
+### Verdict
+
+PASSED — All acceptance criteria met. Implementation is clean, internally consistent, and the commission test harness passes. The template changes are minimal and correctly scoped to `templates/first-officer.md`.
