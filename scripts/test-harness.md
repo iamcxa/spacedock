@@ -9,10 +9,10 @@ How to run the commission skill non-interactively and validate the output.
 
 ## Automated Test Script
 
-All the checks documented below are automated in `v0/test-commission.sh`. Run from the repo root:
+All the checks documented below are automated in `scripts/test-commission.sh`. Run from the repo root:
 
 ```bash
-bash v0/test-commission.sh
+bash scripts/test-commission.sh
 ```
 
 The script runs commission in a temp directory, validates all checks, reports PASS/FAIL per check, and exits 0 on all-pass / non-zero on any failure. Requires `claude` CLI in PATH.
