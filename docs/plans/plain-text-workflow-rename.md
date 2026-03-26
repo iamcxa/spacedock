@@ -1,13 +1,13 @@
 ---
 id: 041
 title: Rename PTP to plain text workflow throughout codebase
-status: backlog
+status: implementation
 source: CL
-started:
+started: 2026-03-26T17:10:00Z
 completed:
 verdict:
 score: 0.85
-worktree:
+worktree: .worktrees/ensign-ptp-rename
 ---
 
 ## Problem
