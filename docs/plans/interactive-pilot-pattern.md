@@ -111,3 +111,20 @@ No code changes. No frontmatter schema changes. No status script changes. This i
 3. The clarification section references the escalation-to-direct-communication path.
 4. No frontmatter schema changes, no new stages, no code changes.
 5. The protocol degrades gracefully when CL messages an ensign without signaling the first officer first.
+
+## Implementation Summary
+
+All changes are in `templates/first-officer.md` (the template used by commission to generate first-officer agents for new pipelines).
+
+**Clarification section** (line 174): Added step 3 to "When an ensign asks for clarification" — if CL decides to handle clarification directly, the first officer recognizes this as entering direct communication.
+
+**Direct Communication section** (lines 180-223): Added after Clarification, before Event Loop. Contains four subsections:
+- **Entering direct communication** — signal patterns CL uses, acknowledgment behavior, clarification escalation link.
+- **Behavior during direct communication** — four rules (no work dispatch, no relay, continue other work, no status nagging) plus the edge case where an ensign completes while in direct communication.
+- **Exiting direct communication** — resume signals, context gathering, re-read entity file, process pending completions, resume coordination.
+- **Detecting unsignaled direct communication** — graceful degradation when CL messages an ensign without telling the first officer first.
+
+**Event Loop section** (lines 229, 233, 234): Three amendments:
+- Step 1: guard on receiving worker messages from ensigns in direct communication.
+- Step 5: skip dispatch for ensigns in direct communication.
+- Step 6: "in direct communication" added to the list of reasons the pipeline can be idle.
