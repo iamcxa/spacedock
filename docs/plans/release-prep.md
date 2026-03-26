@@ -1,13 +1,13 @@
 ---
 id: 039
 title: Release prep — marketplace metadata, license, and history cleanup
-status: backlog
+status: implementation
 source: CL
-started:
+started: 2026-03-26T16:45:00Z
 completed:
 verdict:
 score: 0.9
-worktree:
+worktree: .worktrees/ensign-release-prep
 ---
 
 ## Problem
