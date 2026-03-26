@@ -1,9 +1,17 @@
 {
   "name": "spacedock",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Turn directories of markdown files into structured workflows operated by AI agents",
-  "author": { "name": "CL Kao" },
+  "author": {
+    "name": "CL Kao"
+  },
   "repository": "https://github.com/clkao/spacedock",
   "license": "Apache-2.0",
-  "keywords": ["workflow", "pipeline", "agents", "markdown", "automation"]
+  "keywords": [
+    "workflow",
+    "pipeline",
+    "agents",
+    "markdown",
+    "automation"
+  ]
 }
