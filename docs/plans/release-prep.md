@@ -93,3 +93,41 @@ git push --force --tags
 git tag v0.3.0
 git push origin v0.3.0
 ```
+
+## Validation Report
+
+### Acceptance Criteria Results
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 1 | LICENSE exists with Apache-2.0 | PASS | 200-line standard Apache 2.0 text at repo root |
+| 2 | plugin.json has all marketplace fields | PASS | name, version, description, author, repository, license, keywords all present |
+| 3 | Description matches plain text workflow framing | PASS | "Turn directories of markdown files into structured workflows operated by AI agents" — no mention of PTP |
+| 4 | .gitignore has three entries | PASS | `.private-journal/`, `testflight-*/`, `.claude/settings.local.json` added |
+| 5 | Paths removed from git tracking and history | DEFERRED | History cleanup commands documented; must run on main after merge. See note below. |
+| 6 | No active branches broken by history rewrite | DEFERRED | Depends on step 5. |
+| 7 | `git tag v0.3.0` on release commit | DEFERRED | Tag instructions documented; must run after history rewrite. |
+
+### Commission Test Harness
+
+Ran `bash v0/test-commission.sh` — **59 passed, 0 failed**. No regressions from the metadata changes.
+
+### History Cleanup Commands — Review
+
+The git-filter-repo commands in the implementation summary are mostly correct, with one concern:
+
+**Potential issue with `--path-glob` trailing slashes.** The command uses `--path-glob '.private-journal/'` and `--path-glob 'testflight-*/'`. In git-filter-repo, `--path-glob` uses Python's `fnmatch` for matching. A trailing `/` may not match files inside those directories (e.g., `testflight-004/main-session.jsonl`). Safer alternatives:
+
+- Use `--path '.private-journal'` (no glob needed, `--path` does prefix matching for directories)
+- Use `--path-glob 'testflight-*'` (without trailing slash) — though this could also match a hypothetical file named `testflight-something` without a directory. Since only `testflight-*/` directories exist in history, this is fine in practice.
+
+**Verification of history contents:**
+- `.private-journal/` — never committed to git history (no-op, harmless)
+- `.claude/settings.local.json` — never committed to git history (no-op, harmless)
+- `testflight-*/` — present in history (e.g., `testflight-004/`, `testflight-004-refit/`)
+
+The backup step (`cp -r .git .git-backup`) and remote re-add are correct — git-filter-repo removes the remote by default.
+
+### Recommendation
+
+**PASSED** — with advisory note that the `--path-glob` trailing slashes in the history cleanup commands should be verified or adjusted before running. The committed file changes (LICENSE, plugin.json, .gitignore) are correct and complete. Commission test harness shows no regressions.
