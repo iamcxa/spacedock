@@ -79,7 +79,14 @@ Updated 5 files, 80 line replacements (balanced insertions/deletions):
 - Solo operator prompt: "pipeline schema" -> "workflow schema"
 
 ### Not modified (per scope)
-- `v0/spec.md` — historical spec
+- `_archive/spec.md` — historical spec (moved from v0/)
 - `templates/first-officer.md` — not in scope; still uses "pipeline" in template text
 - `.claude/agents/` — excluded per instructions
 - Archived entities
+
+### File reorganization (additional)
+- `v0/spec.md` moved to `_archive/spec.md` — historical spec archived
+- `v0/test-commission.sh` moved to `scripts/test-commission.sh`
+- `v0/test-harness.md` moved to `scripts/test-harness.md`
+- `v0/` directory removed (empty after moves)
+- Updated path references in `scripts/test-harness.md`, `docs/plans/README.md`, and `agents/first-officer.md`
