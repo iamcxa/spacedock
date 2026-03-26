@@ -1,7 +1,7 @@
 ---
 id: 039
 title: Release prep — marketplace metadata, license, and history cleanup
-status: implementation
+status: validation
 source: CL
 started: 2026-03-26T16:45:00Z
 completed:
