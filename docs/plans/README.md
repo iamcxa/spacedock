@@ -1,5 +1,5 @@
 ---
-commissioned-by: spacedock@0.3.0
+commissioned-by: spacedock@0.4.0
 entity-type: entity
 entity-label: task
 entity-label-plural: tasks
@@ -62,7 +62,7 @@ worktree:
 | `started` | ISO 8601 | When active work began |
 | `completed` | ISO 8601 | When the task reached terminal status |
 | `verdict` | enum | PASSED or REJECTED — set at final stage |
-| `score` | number | Priority score, 0.0–1.0 (optional). Pipelines can upgrade to a multi-dimension rubric in their README. |
+| `score` | number | Priority score, 0.0–1.0 (optional). Workflows can upgrade to a multi-dimension rubric in their README. |
 | `worktree` | string | Worktree path while an ensign is active, empty otherwise |
 
 ## Stages
@@ -112,9 +112,9 @@ A task reaches done when validation is complete and CL approves the result. The 
 - **Good:** Clear resolution, lessons learned captured if relevant
 - **Bad:** Closing without reading the validation report, overriding a REJECTED recommendation without reason
 
-## Pipeline State
+## Workflow State
 
-View the pipeline overview:
+View the workflow overview:
 
 ```bash
 bash docs/plans/status
