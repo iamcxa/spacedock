@@ -64,7 +64,39 @@ with open('$MARKETPLACE_JSON', 'w') as f:
 "
 
 git add "$PLUGIN_JSON" "$MARKETPLACE_JSON"
-git commit -m "release: spacedock@$VERSION"
+git commit -m "release: bump version to spacedock@$VERSION"
+
+# Refit self-hosted pipeline (docs/plans/) with the new version
+SELF_HOSTED_PIPELINE="docs/plans"
+if [ -f "$SELF_HOSTED_PIPELINE/README.md" ]; then
+    echo ""
+    echo "=========================================="
+    echo "REFIT: Self-hosted pipeline ($SELF_HOSTED_PIPELINE)"
+    echo "=========================================="
+    echo ""
+    echo "Run refit manually in a separate terminal:"
+    echo ""
+    echo "  claude /spacedock:refit $SELF_HOSTED_PIPELINE"
+    echo ""
+    echo "The refit will show diffs and ask for confirmation."
+    echo "Come back here when done."
+    echo ""
+
+    read -p "Has refit completed? [y/N] " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Release paused. Version bump commit remains — amend or reset if needed."
+        exit 0
+    fi
+
+    # Commit any refit changes
+    if ! git diff-index --quiet HEAD --; then
+        git add -A
+        git commit -m "refit: upgrade workflow scaffolding to spacedock@$VERSION"
+    else
+        echo "(No refit changes to commit)"
+    fi
+fi
 
 # Generate changelog
 CHANGELOG_FILE=$(mktemp)
