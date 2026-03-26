@@ -1,13 +1,13 @@
 ---
 id: 037
 title: Add _archive/ documentation to README template
-status: ideation
+status: validation
 source: refit gap analysis
 started: 2026-03-26T15:00:00Z
 completed:
 verdict:
 score: 0.6
-worktree:
+worktree: .worktrees/readme-overhaul
 ---
 
 ## Problem
