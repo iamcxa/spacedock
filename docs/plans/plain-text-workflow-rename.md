@@ -90,3 +90,31 @@ Updated 5 files, 80 line replacements (balanced insertions/deletions):
 - `v0/test-harness.md` moved to `scripts/test-harness.md`
 - `v0/` directory removed (empty after moves)
 - Updated path references in `scripts/test-harness.md`, `docs/plans/README.md`, and `agents/first-officer.md`
+
+## Validation Report
+
+### Test Harness: PASSED
+
+Ran `bash scripts/test-commission.sh` — **59 passed, 0 failed** (out of 59 checks). Full batch-mode commission produced all files with correct structure, frontmatter, stage references, guardrails, and no leaked template variables.
+
+### Acceptance Criteria
+
+| # | Criterion | Result | Evidence |
+|---|-----------|--------|----------|
+| 1 | Commission greeting uses "plain text workflow" | **PASS** | `skills/commission/SKILL.md` line 34: "We're going to design a plain text workflow together." No PTP references remain (grep confirms 0 matches). |
+| 2 | Freshly commissioned README uses entity label, not hardcoded "entity" | **PASS** | Test harness generates README with `{entity_label}` template variables resolved to user-specified labels. 59/59 checks pass including template variable leak detection. |
+| 3 | Freshly commissioned README uses "workflow" not "pipeline" in prose | **PASS** | Commission SKILL.md template (section 2a) uses "Workflow State", "workflow" throughout prose. Confirmed by test harness output. |
+| 4 | Refit skill uses "workflow" not "PTP pipeline" | **PASS** | `skills/refit/SKILL.md`: ABOUTME, description, heading, and all prose use "workflow". Grep for PTP in skills/ returns 0 matches. |
+| 5 | Test harness and test script updated | **PASS** | `scripts/test-commission.sh` and `scripts/test-harness.md` use "plain text workflows" throughout. No PTP references in scripts/. |
+| 6 | Commission test harness passes (59 checks) | **PASS** | 59 passed, 0 failed. |
+
+### Additional Validation Points
+
+| Check | Result | Evidence |
+|-------|--------|----------|
+| Test scripts run from scripts/ location | **PASS** | `bash scripts/test-commission.sh` executed successfully from repo root. |
+| No old v0/ path references in non-archived files | **PASS** | Only references to `v0/` paths appear in archived entities, session briefings, the superpowers plan (all historical records), and this entity file's scope/implementation sections. No active files reference old paths. |
+| No PTP in user-facing files (skills/, references/) | **PASS** | Grep for `\bPTP\b` in skills/ and references/ returns 0 matches each. |
+| v0/ directory fully removed | **PASS** | `ls v0/` returns "No such file or directory". Contents moved to `_archive/spec.md` and `scripts/`. |
+
+### Recommendation: PASSED
