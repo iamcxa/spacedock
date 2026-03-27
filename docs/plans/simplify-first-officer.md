@@ -1,7 +1,7 @@
 ---
 id: 048
 title: Simplify first officer prompt — judgment over mechanics
-status: implementation
+status: validation
 source: adoption feedback
 depends: 045, 046
 started: 2026-03-27T00:00:00Z
