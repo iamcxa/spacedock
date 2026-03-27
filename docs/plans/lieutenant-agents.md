@@ -284,3 +284,20 @@ This enforces TDD discipline that a generic ensign wouldn't follow. The stage de
 ### Summary
 
 Updated `templates/first-officer.md` to read an optional `agent` property from each stage's frontmatter entry and dispatch with variable `subagent_type` instead of hardcoded `ensign`. Updated `skills/commission/SKILL.md` to accept `agent:` in stage definitions and warn about missing lieutenant agent files after generation. The ensign template is untouched. All "ensign" references in the first-officer template that meant "the dispatched worker" were updated to be agent-agnostic, preserving the ensign default.
+
+## Stage Report: validation
+
+- [x] Test harness results: run applicable tests from `scripts/test-harness.md` and report pass/fail for each assertion.
+  Ran `scripts/test-commission.sh` — 60/60 checks passed (0 failures). All file existence, status script, entity frontmatter, README completeness, first-officer completeness, guardrails, stages support, template variable, and absolute path checks green.
+- [x] Verify: README stages frontmatter supports optional `agent` property per stage state — check the template produces valid frontmatter with and without `agent`.
+  SKILL.md line 226 includes `agent:` as a conditional property in the stages template ("only if captain specifies"). Test harness generated a pipeline without `agent:` (no lieutenant specified in prompt) — no leaked variables, frontmatter valid. First-officer template step 4 defaults to `ensign` when `agent` absent.
+- [x] Verify: First-officer template dispatches with variable `subagent_type` based on `agent` property, falls back to `ensign` when absent. Worktree/branch naming is consistent.
+  Template step 4: reads `agent` property, defaults to `ensign`. Step 5: worktree `.worktrees/{agent}-{slug}`. Step 6: branch `{agent}/{slug}`. Step 7: `subagent_type="{agent}"`, `name="{agent}-{slug}"`. Merge step 1: derives branch from worktree field. Cleanup step 3: uses `{agent}-{slug}` pattern. All five references are consistent.
+- [x] Verify: Commission skill passes `agent:` through to generated README and warns about missing lieutenant files.
+  SKILL.md line 226 adds conditional `agent:` to stage state template. Lines 452-456 add "Lieutenant Agent Warnings" section that checks for missing `.claude/agents/{agent}.md` files post-generation and warns captain. Warning is non-blocking.
+- [x] PASSED recommendation with rationale.
+  All 9 acceptance criteria met. Test harness passes 60/60. Implementation is minimal and focused — only 3 files changed (first-officer template, commission skill, task file). Ensign template untouched. Backward compatibility preserved: pipelines without `agent:` default to ensign. No regressions in guardrails or structural checks.
+
+### Summary
+
+Validated the lieutenant agents implementation against all acceptance criteria and the commission test harness. The test harness ran 60 checks with 0 failures, confirming the changes to the first-officer template and commission skill don't break existing commission behavior. The `agent` property support is correctly conditional — absent means ensign default, present means dispatch the named agent type. Worktree/branch naming uses a consistent `{agent}-{slug}` pattern across dispatch, merge, and cleanup. Recommendation: PASSED.
