@@ -1,5 +1,5 @@
 ---
-commissioned-by: spacedock@0.5.5
+commissioned-by: spacedock@0.6.0
 entity-type: entity
 entity-label: task
 entity-label-plural: tasks
@@ -108,6 +108,7 @@ A task moves to validation after implementation is complete. The work here is to
   - A PASSED/REJECTED recommendation
 - **Good:** Thorough testing against acceptance criteria, clear evidence of pass/fail, honest assessment
 - **Bad:** Rubber-stamping without actually testing, ignoring failing edge cases, validating against wrong criteria
+- **Spot-check principle:** Before committing to an expensive multi-run experiment or long test suite, do a cheap single-run spot-check (ideally on a smaller/cheaper model) to verify the infrastructure works end-to-end. Fix broken plumbing before burning budget on real runs.
 
 ### `done`
 
@@ -173,6 +174,8 @@ Validation pilots should use these when verifying implementation work:
 | Commission test harness | `scripts/test-harness.md` | Batch-mode commission invocation, generated file validation, guardrail checks |
 
 The test harness documents how to run `claude -p` with `--plugin-dir` for non-interactive commission testing, plus structural and guardrail assertions against the generated output. Use it for any task that changes `skills/commission/SKILL.md` or the first-officer template.
+
+All tests run via `claude -p` in worktrees. E2E tests that invoke `claude -p` (commission harness, gate guardrail, dispatch names, terminology benchmark) work within the standard dispatch environment and should be run as part of validation.
 
 ## Commit Discipline
 
