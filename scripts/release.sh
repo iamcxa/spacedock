@@ -1,6 +1,6 @@
 #!/bin/bash
-# ABOUTME: Interactive release script that bumps versions, generates changelog, tags, and pushes.
-# ABOUTME: Updates plugin.json and marketplace.json, creates annotated git tag with changelog.
+# ABOUTME: Release script that bumps versions, refits, generates changelog, and tags.
+# ABOUTME: Works in a release branch, does not push — gives the user control over final review.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -33,9 +33,15 @@ if ! git diff-index --quiet HEAD --; then
     exit 1
 fi
 
+MAIN_BRANCH=$(git branch --show-current)
+RELEASE_BRANCH="release/$VERSION"
 PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
-# Bump version in plugin.json and marketplace.json
+# --- Step 1: Create release branch and bump version ---
+
+echo "Creating release branch: $RELEASE_BRANCH"
+git checkout -b "$RELEASE_BRANCH"
+
 PLUGIN_JSON=".claude-plugin/plugin.json"
 MARKETPLACE_JSON=".claude-plugin/marketplace.json"
 
@@ -66,7 +72,8 @@ with open('$MARKETPLACE_JSON', 'w') as f:
 git add "$PLUGIN_JSON" "$MARKETPLACE_JSON"
 git commit -m "release: bump version to spacedock@$VERSION"
 
-# Refit self-hosted workflow (docs/plans/) with the new version
+# --- Step 2: Refit self-hosted workflow ---
+
 SELF_HOSTED_WORKFLOW="docs/plans"
 if [ -f "$SELF_HOSTED_WORKFLOW/README.md" ]; then
     echo ""
@@ -74,10 +81,14 @@ if [ -f "$SELF_HOSTED_WORKFLOW/README.md" ]; then
     echo "REFIT: Self-hosted workflow ($SELF_HOSTED_WORKFLOW)"
     echo "=========================================="
     echo ""
-    echo "Running refit..."
+    echo "Running refit (non-interactive)..."
     echo ""
 
-    CLAUDE_ARGS=("/spacedock:refit $SELF_HOSTED_WORKFLOW" --plugin-dir "$REPO_ROOT" --dangerously-skip-permissions)
+    REFIT_PROMPT="/spacedock:refit $SELF_HOSTED_WORKFLOW
+
+Accept all changes from the upstream template. When showing diffs, approve all regenerations (status, first-officer, ensign, lieutenants). Preserve any local customizations in the README — only update the version stamp. Do not ask for confirmation — proceed automatically."
+
+    CLAUDE_ARGS=(-p "$REFIT_PROMPT" --plugin-dir "$REPO_ROOT" --dangerously-skip-permissions)
     if command -v safehouse >/dev/null 2>&1; then
         safehouse claude "${CLAUDE_ARGS[@]}"
     else
@@ -86,13 +97,22 @@ if [ -f "$SELF_HOSTED_WORKFLOW/README.md" ]; then
 
     # Commit any refit changes
     if ! git diff-index --quiet HEAD --; then
-        git commit -m "refit: upgrade workflow scaffolding to spacedock@$VERSION" -a
+        git add -A
+        git commit -m "refit: upgrade workflow scaffolding to spacedock@$VERSION"
+
+        echo ""
+        echo "=========================================="
+        echo "REFIT CHANGES (local customizations diff)"
+        echo "=========================================="
+        git diff HEAD~1 -- .claude/agents/ docs/plans/status
+        echo "=========================================="
     else
         echo "(No refit changes to commit)"
     fi
 fi
 
-# Generate changelog
+# --- Step 3: Generate changelog and tag (no push) ---
+
 CHANGELOG_FILE=$(mktemp)
 trap 'rm -f "$CHANGELOG_FILE"' EXIT
 
@@ -124,29 +144,41 @@ echo "=========================================="
 cat "$CHANGELOG_FILE"
 echo ""
 echo "=========================================="
+
+# Create tag with proposed changelog (no push)
 echo ""
-
-read -p "Accept this changelog and create release $TAG? [y/N] " -n 1 -r
-echo ""
-
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Release cancelled. Version bump commit remains — amend or reset if needed."
-    exit 0
-fi
-
-echo "Creating tag $TAG..."
+echo "Creating tag $TAG (local only, not pushed)..."
 git tag -a "$TAG" -m "Release $VERSION
 
 $(cat "$CHANGELOG_FILE")"
 
-echo "Pushing tag and branch to origin..."
-git push origin HEAD "$TAG"
+# --- Step 4: Show next steps ---
 
 echo ""
-echo "Release $TAG created and pushed successfully!"
+echo "=========================================="
+echo "RELEASE PREPARED: $TAG"
+echo "=========================================="
 echo ""
-echo "GitHub release URL: https://github.com/clkao/spacedock/releases/tag/$TAG"
+echo "The release is ready on branch '$RELEASE_BRANCH' with tag '$TAG'."
+echo "Nothing has been pushed yet."
 echo ""
-echo "To update your local install:"
-echo "  claude plugin marketplace update spacedock"
-echo "  claude plugin update spacedock@spacedock"
+echo "To review:"
+echo "  git log $MAIN_BRANCH..$RELEASE_BRANCH --oneline"
+echo "  git diff $MAIN_BRANCH..$RELEASE_BRANCH"
+echo ""
+echo "To amend the changelog:"
+echo "  git tag -d $TAG"
+echo "  git tag -a $TAG -m 'Release $VERSION"
+echo ""
+echo "your changelog here'"
+echo ""
+echo "To publish:"
+echo "  git checkout $MAIN_BRANCH"
+echo "  git merge $RELEASE_BRANCH"
+echo "  git push origin $MAIN_BRANCH $TAG"
+echo "  git branch -d $RELEASE_BRANCH"
+echo ""
+echo "To abort:"
+echo "  git checkout $MAIN_BRANCH"
+echo "  git branch -D $RELEASE_BRANCH"
+echo "  git tag -d $TAG"
