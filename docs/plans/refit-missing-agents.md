@@ -1,7 +1,7 @@
 ---
 id: 056
 title: Refit skill does not regenerate ensign or lieutenant agents
-status: implementation
+status: validation
 source: CL
 started: 2026-03-27T08:00:00Z
 completed:
