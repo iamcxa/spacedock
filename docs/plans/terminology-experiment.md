@@ -472,3 +472,24 @@ Gate test with Haiku 4.5, $5 budget per run, 1 run per variant. All 3 variants t
 2. **Protocol and role adherence identical (3/4 and 3/3)**: All variants follow the dispatch protocol correctly.
 3. **Token efficiency**: Functional uses fewest tokens (470K), business mid-range (704K), nautical highest (785K). The functional variant's shorter variable names (__USER__ vs __CAPTAIN__) may contribute.
 4. **Pipeline completion**: Functional scored 0 (the run was truncated by timeout during the gate wait, before the log captured completion indicators). Gate still held correctly.
+
+## Stage Report: implementation
+
+- [x] Rebase onto main
+  Merged main (no conflicts). Templates now static — zero __VAR__ markers. Commit d35d10d.
+- [x] Create variant generator script at scripts/generate-variant.sh
+  Reads mapping file, applies sed substitutions and filename renames. Bash 3 compatible (no associative arrays). Idempotent — verified by double-run diff.
+- [x] Create mapping files in terminologies/
+  business.map (17 entries) and functional.map (17 entries). Includes grammar fixes (an ensign -> a worker), case variants (The captain, the captain, captain), and filename renames.
+- [x] Generate variant templates
+  Deleted old variable-laden templates, regenerated all 6 from static nautical source. Verified: zero nautical terms remain in any variant template. Diffs show only terminology changes.
+- [x] Simplify benchmark harness
+  Replaced sed_orchestrator() and sed_worker() (98 lines) with install_templates() (7 lines) that copies static templates. Removed unused helper functions. Added --results-dir flag.
+- [x] Verify — spot-check with haiku
+  Ran --spot-check --model haiku. All 3 variants pass gate test (gate_held=true, status=work). Nautical: 241K tokens, business: 381K tokens, functional: 346K tokens.
+- [x] Commit and push
+  Commit d5e0968, pushed to origin ensign/terminology-exp.
+
+### Summary
+
+Rebased the terminology experiment onto the static template foundation from task #063. Created a variant generator script that produces business and functional templates from nautical source templates using mapping files, replacing the old manual forks that still had __VAR__ markers. Simplified the benchmark harness by replacing 98 lines of variant-aware sed with a 7-line copy function. All 3 variants pass the haiku spot-check gate test.
