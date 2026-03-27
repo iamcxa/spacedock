@@ -1,13 +1,13 @@
 ---
 id: 042
 title: GitHub issue reference and PR workflow integration
-status: validation
+status: done
 source: CL
 started: 2026-03-26T00:00:00Z
-completed:
-verdict:
+completed: 2026-03-27T07:40:00Z
+verdict: PASSED
 score:
-worktree: .worktrees/ensign-github-issue-pr
+worktree:
 depends: 035
 pr: "#2"
 ---
@@ -173,3 +173,41 @@ The `pr-lieutenant` agent file and the `agent` stage property are part of task 0
 1. **`gh` CLI availability** — The first officer's PR state checking requires `gh`. If `gh` is not available and `pr` is set, should it warn and skip, or error? Leaning toward: warn and fall back to asking the captain for manual status.
 
 2. **PR number format** — Should the `pr` field store just the number (`57`), the GitHub shorthand (`#57`), or a full reference (`owner/repo#57`)? The shorthand `#57` is most natural for single-repo use. Full reference is needed for cross-repo. Leaning toward: accept any format, parse as needed when calling `gh`.
+
+## Stage Report: implementation
+
+- [x] Entity schema: `issue` and `pr` optional string fields added to entity template in `skills/commission/SKILL.md`
+  Added to schema section (line 260-261), field reference table (line 277-278), entity template (line 342-343), and seed entity template (line 386-387)
+- [x] First-officer template: PR-aware merge boundary
+  `templates/first-officer.md` Merge and Cleanup section checks `pr` field, uses `gh pr view` for state, falls back to local merge when unset, warns if `gh` unavailable
+- [x] First-officer template: startup detects merged PRs for entities with non-empty `pr` field
+  Added as startup step 3 in `templates/first-officer.md` — scans active entities with `pr` set, checks via `gh pr view`, auto-advances merged ones
+- [x] PR lieutenant template at `templates/pr-lieutenant.md`
+  Agent file with same behavioral contract as ensign (assignment protocol, rules, completion protocol) plus PR Methodology section for branch push, `gh pr create`, and PR number reporting
+- [x] Commission skill generates PR lieutenant from template when a stage references `agent: pr-lieutenant`
+  Added section 2f after ensign generation in `skills/commission/SKILL.md` with conditional check, sed-based template generation, updated generation checklist and lieutenant warnings
+
+### Summary
+
+Implemented all five components of the GitHub issue/PR workflow integration. The `issue` and `pr` fields are passive cross-references in entity frontmatter. The first-officer template gained two PR-aware behaviors: startup merged-PR detection (step 3) and PR-state-aware merge boundary (checks MERGED/OPEN before archiving). The PR lieutenant template follows the same structural pattern as the ensign but adds a PR Methodology section for push and PR creation. The commission skill conditionally generates the PR lieutenant using the same sed-from-template pattern as ensign generation.
+
+## Stage Report: validation
+
+- [x] Test harness passes: `scripts/test-commission.sh` all checks green
+  65 passed, 0 failed (out of 65 checks) — RESULT: PASS. Test prompt updated to use `agent: pr-lieutenant` on implementation stage. 4 new checks added: pr-lieutenant file existence, frontmatter name, ensign reference, no unsubstituted `__VAR__` markers.
+- [x] PR lieutenant template follows ensign behavioral contract (same assignment, rules, completion protocol; methodology section added)
+  Rewritten to eliminate duplication: PR lieutenant now reads `.claude/agents/ensign.md` at runtime for assignment protocol, working process, rules, and completion protocol. Template contains only frontmatter, a directive to read the ensign, PR Methodology (3 steps: push, gh pr create, report number), and a Completion Addendum for PR number reporting. Reduced from 87 lines to 33 lines.
+- [x] First-officer template: PR-aware merge boundary checks `pr` field with correct fallback to local merge
+  Merge and Cleanup step 1 (line 76): if `pr` set, extracts number, calls `gh pr view --json state --jq '.state'`; MERGED skips local merge, OPEN waits, gh unavailable warns captain. If `pr` not set: `git merge --no-commit` as before.
+- [x] First-officer template: startup step detects merged PRs
+  Startup step 3 (line 19): scans entities with non-empty `pr` and non-terminal status, calls `gh pr view {number} --json state --jq '.state'`, auto-advances MERGED entities to terminal stage with verdict PASSED, archives them. Skips if `gh` unavailable.
+- [x] Commission skill: `issue` and `pr` in schema and entity template; conditional PR lieutenant generation
+  Schema (lines 260-261), Field Reference (lines 279-280), Entity Template (lines 342-343), Seed Entity Template (lines 386-387). Section 2f (lines 447-471): conditional generation when stage references `agent: pr-lieutenant`. Generation checklist (line 482) and Lieutenant Warnings (line 487) updated. Phase 3 announcement (line 510) includes pr-lieutenant conditionally.
+- [x] Backward compatibility: no `pr` field = local merge unchanged
+  First-officer Merge step: `pr` not set branch falls through to existing `git merge --no-commit` path. Startup step 3 only scans entities with non-empty `pr`, so entities without it are untouched. Test harness confirms no regression (65/65 pass).
+- [x] PASSED recommendation
+  All acceptance criteria verified with evidence. PR lieutenant duplication eliminated per review feedback.
+
+### Summary
+
+All validation checks pass. The test harness (`scripts/test-commission.sh`) was updated to exercise the pr-lieutenant generation path: the test prompt now specifies `agent: pr-lieutenant` on the implementation stage, and 4 new checks verify the generated agent file (existence, frontmatter name, ensign reference, no unsubstituted template markers). All 65 checks pass. The PR lieutenant template was rewritten per review feedback to read the ensign at runtime, eliminating ~60 lines of duplication. The first-officer template correctly handles both PR and non-PR workflows. Recommendation: PASSED.
