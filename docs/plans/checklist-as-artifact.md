@@ -138,3 +138,24 @@ Proposed answer: This is acceptable. Entity files are the record of what happene
 
 **Q: Does this change the entity file schema in README?**
 Proposed answer: No. The `## Stage Report` section is an operational convention in the entity body, not a schema field. The README doesn't need to document it — the first-officer template handles it. However, the README's stage definitions should note that ensigns write reports to the entity file (this is an "Outputs" convention).
+
+## Stage Report: validation
+
+- [x] Ensign prompt template instructs ensigns to write a `## Stage Report: {stage_name}` section into the entity file body using the markdown checkbox format
+  templates/ensign.md lines 39-62: Completion Protocol has full format spec with `## Stage Report: {stage_name}`, checkbox format, and evidence lines
+- [x] Ensign completion SendMessage is a minimal pointer to the file, not a full report
+  templates/ensign.md lines 64-71: message format is `Done: {entity title} completed {stage}. Report written to {entity_file_path}.` with explicit "do not include the checklist or summary"
+- [x] First officer step 7 (checklist review) is replaced with: read file, check structural completeness, proceed. No back-and-forth rounds for rationale review
+  templates/first-officer.md lines 113-120: step 7 renamed to "Stage report review" with only structural completeness + proceed; old skip review (b) and failure triage (c) removed
+- [x] First officer gate reporting pastes the stage report section from the entity file and adds a one-line assessment
+  templates/first-officer.md lines 139-147: gate format uses verbatim paste of `## Stage Report` section plus `Assessment: {N} items done, {N} skipped, {N} failed` line
+- [x] The format uses `- [x]` / `- [ ] SKIP:` / `- [ ] FAIL:` with one-line evidence/rationale per item
+  templates/ensign.md lines 42-59: exact markdown checkbox format specified with indented one-line follow-ups
+- [x] The reuse dispatch path (SendMessage to existing ensign) uses the same file-based report pattern
+  templates/first-officer.md line 132: reuse SendMessage contains "Write a ## Stage Report section into the __ENTITY_LABEL__ file when done"
+- [x] Redo after rejection overwrites the previous stage report section
+  templates/ensign.md line 62: "overwrite the existing `## Stage Report: {stage_name}` section"; templates/first-officer.md line 155: reject+redo message says "Overwrite the ## Stage Report section"
+
+### Summary
+
+All 7 acceptance criteria pass. The commission test harness (60/60 checks) confirms templates generate correctly. Changes are confined to 3 files: templates/ensign.md (completion protocol rewritten for file-based reporting), templates/first-officer.md (step 7 simplified, gate reporting updated, all 3 dispatch paths updated), and the task file frontmatter. All references in the event loop and cross-references updated consistently with no leftover "checklist review" terminology. Recommend PASSED.
