@@ -254,3 +254,16 @@ All criteria are met. The implementation correctly creates a validator agent wit
 ### Summary
 
 Validated the validation-implementation pairing implementation against all 9 acceptance criteria. Every artifact was verified: validator template has correct tool restrictions and explicit no-fix rules, the first-officer template correctly resolves fresh:true to validator agent type and includes a complete 5-step rejection flow with 3-cycle limit, the commission skill generates the validator agent, and the ensign template is unchanged. All templates are fully static with zero template variable markers.
+
+## Stage Report: implementation (fix cycle 1)
+
+- [x] Test fixture created at `tests/fixtures/rejection-flow/`
+  Pipeline README with 4 stages (backlog gated, implementation worktree, validation worktree+fresh+gated, done). Entity pre-set to `status: implementation` with buggy `math_ops.py` (subtracts instead of adding). Tests at `tests/test_add.py` verify correct addition and fail against the buggy implementation.
+- [x] Test script created at `tests/test-rejection-flow.sh`
+  Three-phase E2E test: fixture setup with agent generation, FO run via `claude -p` with haiku/$5 budget and prompt instructing captain-role approval of REJECTED verdicts, validation of Agent() calls in stream-json log. Checks: (1) FO dispatched a validator for validation stage, (2) REJECTED found in entity file or FO output, (3) ensign implementer dispatched after validator.
+- [x] Testing Resources table updated in `docs/plans/README.md`
+  Added rejection flow test row to the table and added "rejection flow" to the E2E test list paragraph.
+
+### Summary
+
+Added a lightweight E2E test for the validation rejection flow. The test fixture contains a deliberate bug (subtract instead of add) that the validator will detect, and the test script verifies the full relay: validator dispatched for fresh:true stage, REJECTED recommendation produced, implementer dispatched after rejection. The test prompt simulates captain approval of the REJECTED verdict to allow the rejection flow to proceed without interactive input.
