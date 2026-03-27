@@ -1,9 +1,9 @@
 ---
 id: 052
 title: Replace "pipeline" with "workflow" where appropriate
-status: backlog
+status: ideation
 source: CL
-started:
+started: 2026-03-27T06:20:00Z
 completed:
 verdict:
 score:
