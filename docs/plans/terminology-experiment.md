@@ -197,6 +197,142 @@ Report as a table:
 - If nautical terminology performs **statistically better** on gate compliance or role adherence: keep nautical (these are the safety-critical dimensions).
 - If results are mixed: keep nautical (incumbent advantage — switching has a cost, so business English needs to clearly win to justify it).
 
+## Task-Quality Benchmark
+
+The protocol-compliance tests above answer "does the agent follow the workflow?" but not "does the agent do good work?" This section adds a task-quality dimension that measures the actual output of the agent's cognitive work through a full pipeline.
+
+### Benchmark task: CLI utility with test suite
+
+**Task description:** Build a small CLI utility — a Markdown link checker that reads a Markdown file, extracts all `[text](url)` links, checks each URL for HTTP 200, and reports broken links with line numbers. The task is specified as a pipeline with three entities (one per feature: extraction, checking, reporting), each going through `ideation → implementation → validation → done`.
+
+**Why this task:**
+- Small enough to complete in a single pipeline run (~$3-5 per run)
+- Requires real cognitive work: parsing, HTTP, error handling, output formatting
+- Has objectively verifiable acceptance criteria (does the code work? do the tests pass?)
+- Exercises all pipeline stages including ideation (design choices) and validation (writing meaningful tests)
+- No domain-specific knowledge advantage for either terminology variant
+
+**Pipeline structure:**
+
+```
+link-checker-pipeline/
+  README.md          # 4 stages: ideation (gated), implementation, validation, done
+  extract-links.md   # Entity: extract markdown links with line numbers
+  check-urls.md      # Entity: HTTP HEAD/GET each URL, report status
+  format-report.md   # Entity: combine results into human-readable report
+```
+
+**Acceptance criteria per entity (scored by human reviewer or LLM judge):**
+
+| Criterion | Score | Description |
+|-----------|-------|-------------|
+| Functional correctness | 0-3 | 0=doesn't run, 1=runs with errors, 2=works on happy path, 3=handles edge cases |
+| Test quality | 0-3 | 0=no tests, 1=trivial/tautological tests, 2=covers happy path, 3=covers edge cases and failure modes |
+| Ideation quality | 0-2 | 0=no design, 1=vague plan, 2=concrete design with trade-off analysis |
+| Code quality | 0-2 | 0=unreadable/broken structure, 1=works but messy, 2=clean, idiomatic |
+
+**Total task-quality score:** 0-30 (3 entities x 10 points max each).
+
+### Measurement: Dimension 7 — Task quality (graduated, 0-30 scale)
+
+Scored by an LLM judge (Claude Opus, different from the model under test) reviewing the final state of each entity's output files. The judge receives the entity file, any code files produced, and the acceptance criteria rubric above. Each entity is scored independently.
+
+To validate the LLM judge, the first 3 runs are also scored by a human reviewer. If human-LLM agreement is below 80% (within 1 point per criterion), the judge prompt is revised before continuing.
+
+### Integration with existing methodology
+
+- The task-quality benchmark runs as a **fourth test** alongside the three protocol-compliance tests
+- Same run protocol: 10 runs per variant, alternating order
+- Same model (Claude Sonnet 4.6)
+- Budget impact: adds ~$4 per run x 20 runs = ~$80, bringing total estimated cost to ~$170
+- Analysis: Mann-Whitney U test on task-quality scores between variants, same as protocol compliance
+- If total cost exceeds budget, reduce all tests to 5 runs per variant (~$85 total)
+
+## Research: Terminal-Bench 2
+
+### What it is
+
+Terminal-Bench 2.0 (TB2) is a benchmark from the Laude Institute (formerly the Terminal-Bench Team, Stanford-affiliated) for measuring the capabilities of AI agents to perform work in containerized terminal environments. It is the successor to the original Terminal-Bench, with harder tasks designed to keep up with frontier model capabilities. Tasks include assembling proteins for synthesis, debugging async code, and resolving security vulnerabilities.
+
+TB2 is described as being used by "virtually all frontier labs." It runs agents inside Docker containers against a curated set of tasks, each of which has received several hours of human and LM-assisted validation to ensure tasks are solvable, realistic, and well-specified.
+
+**Key characteristics:**
+- Tasks are containerized (Docker-based), each with a defined environment and success criteria
+- Agents interact via terminal commands — the benchmark measures the agent's ability to navigate, debug, and build in a shell
+- Scores are pass/fail per task, aggregated as a percentage (solve rate)
+- Supports multiple agents out of the box: Claude Code, OpenHands, Codex CLI, and custom agents
+- Uses Harbor (see below) as its official evaluation harness
+
+### Applicability to our experiment
+
+**Relevance: Low.** TB2 measures whether an agent can solve hard terminal tasks (security exploits, systems debugging, protein assembly). Our experiment measures whether *terminology in agent prompts* affects workflow compliance and task quality in a multi-agent pipeline. The two are measuring fundamentally different things:
+
+- TB2 tests a single agent's problem-solving ability in isolation. We test multi-agent coordination and role adherence.
+- TB2's tasks don't involve the orchestrator/worker dynamic that our terminology targets.
+- TB2 doesn't have a "protocol compliance" dimension — it's pure task completion.
+- Running TB2 tasks through our pipeline would require wrapping each TB2 task as a PTP entity, which adds a layer of indirection that muddies the measurement.
+
+**Could it serve as a task-quality benchmark?** In theory, yes — TB2 tasks are real cognitive work with verifiable outcomes. But the overhead is high (Docker setup, large task suite, $100+ per full run at Opus-level pricing), and the tasks don't exercise our pipeline's ideation/validation stages. The custom link-checker task above is a better fit: cheaper, exercises all pipeline stages, and directly comparable between variants.
+
+## Research: SWE-bench
+
+### What it is
+
+SWE-bench (Princeton NLP, ICLR 2024 oral) is a benchmark for evaluating LLMs on real-world software engineering tasks. Given a GitHub repository codebase and a real issue, the model generates a patch to resolve the issue. The benchmark uses 2,294 tasks collected from 12 popular Python repositories (Django, Flask, scikit-learn, etc.).
+
+**Key characteristics:**
+- Tasks are real GitHub issues with known gold patches
+- Evaluation is automated: apply the generated patch, run the repo's test suite, check if the relevant tests pass
+- Variants: SWE-bench Lite (300 tasks, more tractable), SWE-bench Verified (500 tasks validated by human engineers), SWE-bench Multimodal (visual software domains)
+- Infrastructure: Docker-based evaluation harness, cloud evaluation via Modal or AWS (sb-cli)
+- Resource-heavy: recommends x86_64 machine with 120GB+ storage, 16GB RAM, 8 CPU cores
+
+### Applicability to our experiment
+
+**Relevance: Low-to-Medium.** SWE-bench measures single-agent patch generation quality on real codebases. Like TB2, it doesn't test multi-agent coordination or protocol compliance.
+
+**Potential as task-quality proxy:** SWE-bench tasks are well-validated with automated grading (test suite pass/fail), which removes the need for an LLM judge. However:
+
+- Each SWE-bench task is a single-shot patch generation — it doesn't go through ideation → implementation → validation stages
+- Running SWE-bench through our pipeline would mean wrapping each issue as a PTP entity, which is doable but adds significant infrastructure work
+- Cost: a full SWE-bench Lite run (300 tasks) at Sonnet pricing would be $300-600+ per variant, far exceeding our budget
+- A subset (e.g., 10 tasks) would be feasible (~$20-40 per variant) but the tasks wouldn't exercise ideation or validation stages
+
+**Verdict:** SWE-bench is the gold standard for "can the agent write correct code?" but it doesn't align with our pipeline-centric question. The custom benchmark task is more appropriate because it exercises the full pipeline lifecycle.
+
+## Research: Harbor (Laude Institute)
+
+### What it is
+
+Harbor (from the Laude Institute, creators of Terminal-Bench) is a framework for evaluating and optimizing agents and language models in containerized environments. It is **not** the same project as `av/harbor` (which is a local LLM stack manager with its own `harbor bench` feature).
+
+**Key characteristics:**
+- Official harness for Terminal-Bench 2.0
+- Supports arbitrary agents: Claude Code, OpenHands, Codex CLI, and custom agents via `BaseAgent` subclass
+- Supports multiple benchmark datasets: Terminal-Bench, SWE-bench, Aider Polyglot, and custom datasets
+- Handles the "run N times, score, aggregate" workflow: `harbor run --dataset X --agent Y --n-concurrent N`
+- Supports cloud providers (Daytona, Modal) for parallel execution
+- Can generate rollouts for RL optimization
+- Installable via `pip install harbor` or `uv tool install harbor`
+
+### Applicability to our experiment
+
+**Relevance: Low for protocol compliance, Medium for task quality.**
+
+Harbor's `harbor run` handles the "run N times in parallel, aggregate results" workflow that our benchmark harness needs. However:
+
+- **Protocol compliance:** Harbor is designed for containerized agent evaluation against defined tasks. Our protocol-compliance tests aren't containerized tasks — they're Claude Code CLI runs with stream-json log analysis. Harbor's agent interface (BaseAgent) expects a Docker environment, not a Claude Code session with custom templates. Fitting our protocol tests into Harbor would require significant adaptation.
+
+- **Task quality:** If we designed our link-checker task as a Harbor-compatible benchmark (Docker container with test suite), we could use Harbor to run it. But this adds infrastructure overhead (Docker containers, Harbor dataset format) for a relatively simple 4-test benchmark.
+
+- **The "run N times" problem:** Harbor solves this well, but our benchmark harness script (`scripts/terminology-benchmark.sh`) already plans to handle this with a simple loop + alternating variants. The value Harbor adds here doesn't justify the dependency.
+
+**Verdict:** Harbor is a capable framework, but it's designed for a different scale and style of evaluation than what we need. Our experiment is small enough (20-40 runs total, 4 test types) that a shell script harness is more appropriate. If we later wanted to run our terminology comparison across many models or at larger scale, Harbor could be worth revisiting.
+
+### Note on av/harbor (different project)
+
+There is a separate project called Harbor (`av/harbor` on GitHub) that is a CLI tool for managing local LLM stacks (Ollama, vLLM, Open WebUI, etc.). It includes a `harbor bench` feature for benchmarking LLMs using custom YAML task definitions with an LLM-as-judge scoring approach. This is architecturally closer to what our task-quality benchmark needs (custom tasks, LLM judge, variant permutations) but it targets OpenAI-compatible API endpoints rather than Claude Code CLI sessions. It's not directly applicable but its task/criteria YAML format is a useful reference for how to structure LLM judge evaluations.
+
 ## Acceptance Criteria
 
 1. Experimental design document (this file) is complete with: benchmark selection, measurement dimensions, methodology, prior art, and decision criteria.
@@ -204,21 +340,23 @@ Report as a table:
 3. The measurement dimensions are concrete enough that two independent evaluators would agree on the score for a given run.
 4. The methodology controls for confounding variables: same model, same tasks, same budget, alternating run order.
 5. The analysis plan specifies appropriate statistical tests for each dimension type.
-6. The cost estimate is reasonable and the experiment is feasible within a ~$50-100 budget.
+6. The cost estimate is reasonable and the experiment is feasible within a ~$100-200 budget.
+7. A task-quality dimension measures actual work output (code correctness, test quality, design quality), not just protocol adherence.
+8. External benchmark research (Terminal-Bench 2, SWE-bench, Harbor) is documented with applicability assessments explaining why each is or isn't suitable for this experiment.
 
 ## Stage Report: ideation
 
-- [x] Benchmark defined -- what tasks to run, why they test the right behaviors
-  Reuse 3 existing E2E tests (gate guardrail, checklist protocol, dispatch names) with log analysis scoring overlay
-- [x] Measurement dimensions defined -- concrete, scoreable criteria
-  6 dimensions: gate compliance (binary), protocol compliance (0-4), role adherence (0-3), pipeline completion (binary), token efficiency (continuous), error rate (count)
-- [x] Methodology -- variant creation, controlled variables, run procedure, analysis plan
-  Fork 3 templates with exhaustive term mapping, 10 runs per variant alternating order, Fisher/Mann-Whitney/t-test analysis
-- [x] Prior art referenced -- what existing research says about persona/terminology effects
-  4 studies cited covering persona prompting, metaphor framing, hierarchy encoding, Claude-specific considerations
-- [x] Acceptance criteria written
-  6 acceptance criteria covering completeness, clarity, confound control, statistical rigor, and budget feasibility
+- [x] Task-quality dimension added to the benchmark design
+  Designed a link-checker CLI utility benchmark with 3 entities, 4 scoring criteria per entity (functional correctness, test quality, ideation quality, code quality), LLM judge with human calibration on first 3 runs
+- [x] Terminal Bench 2 research — what it is, applicability assessment
+  TB2 is a containerized terminal agent benchmark from Laude Institute. Low relevance: tests single-agent problem-solving, not multi-agent pipeline coordination or terminology effects
+- [x] SWE-bench research — what it is, applicability assessment
+  SWE-bench is a GitHub issue patch generation benchmark from Princeton NLP. Low-to-medium relevance: good automated grading but single-shot tasks don't exercise pipeline stages, and cost is prohibitive at full scale
+- [x] Harbor research — what it is, usefulness for our harness
+  Harbor (Laude Institute) is a containerized agent eval framework. Low relevance for our use case: designed for Docker-based agent evals at scale, our experiment is small enough for a shell script harness. Also documented av/harbor (different project) and its bench feature as a reference for LLM judge task format
+- [x] Acceptance criteria updated
+  Added criteria 7 (task-quality dimension) and 8 (external benchmark research), updated budget range to $100-200 to reflect added task-quality test
 
 ### Summary
 
-Designed a rigorous A/B experiment comparing nautical vs business English terminology in Spacedock agent prompts. The benchmark reuses the three existing E2E tests rather than building from scratch, extended with log-based graduated scoring across 6 dimensions. The methodology calls for 10 runs per variant (~$90 total) with alternating execution order and appropriate statistical tests per dimension type. The decision framework is conservative: nautical stays unless business English clearly wins, since switching has inherent cost.
+Expanded the benchmark design with a task-quality dimension: a link-checker CLI utility task that requires real cognitive work through all pipeline stages, scored on a 0-30 rubric by an LLM judge with human calibration. Researched three external tools: Terminal-Bench 2 (containerized terminal agent benchmark, low relevance), SWE-bench (GitHub issue patching benchmark, low-to-medium relevance), and Harbor (agent eval framework, low relevance for our scale). All three are designed for single-agent containerized evaluation at larger scale than our experiment needs. The custom task-quality benchmark is a better fit: cheaper, exercises all pipeline stages, and directly measures whether terminology affects the quality of actual work output.
