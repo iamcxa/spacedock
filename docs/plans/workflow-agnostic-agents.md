@@ -8,7 +8,7 @@ completed:
 verdict:
 score: 0.85
 worktree:
-issue:
+issue: "#3"
 pr:
 ---
 
