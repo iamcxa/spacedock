@@ -228,6 +228,13 @@ if [ -f "$FO" ]; then
   else
     fail "guardrail: gate self-approval prohibition"
   fi
+  # Dispatch name must include stage to avoid name collisions across sequential dispatches
+  # See: https://github.com/clkao/spacedock/issues/1
+  if grep -E 'name=.*\{.*stage' "$FO" | grep -qv "^0$"; then
+    pass "guardrail: dispatch name includes stage for uniqueness"
+  else
+    fail "guardrail: dispatch name includes stage for uniqueness"
+  fi
 else
   fail "guardrail: Agent tool required (file missing)"
   fail "guardrail: subagent_type prohibition (file missing)"
