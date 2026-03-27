@@ -274,3 +274,21 @@ Validated the validation-implementation pairing implementation against all 9 acc
 Added a lightweight E2E test for the validation rejection flow. The test fixture contains a deliberate bug (subtract instead of add) that the validator will detect, and the test script verifies the full relay: validator dispatched for fresh:true stage, REJECTED recommendation produced, implementer dispatched after rejection. The test prompt simulates captain approval of the REJECTED verdict to allow the rejection flow to proceed without interactive input.
 
 Additionally, updated the FO rejection flow from serial to parallel model: validator persists across fix cycles, implementer messages validator directly via SendMessage, FO only re-enters at gate reviews. Updated the task design section (### 3. Communication and Iteration Protocol) and the FO validation instructions to match.
+
+## Stage Report: validation (re-check after fix cycle 1)
+
+- [x] E2E test fixture valid — deliberate bug, test files, pipeline structure
+  `tests/fixtures/rejection-flow/` has: README with 4-stage pipeline (backlog gated, implementation worktree, validation worktree+fresh+gated, done), `buggy-add-task.md` at `status: implementation` with a completed implementation stage report, `math_ops.py` with `return a - b` (deliberate bug), `tests/test_add.py` with 3 test cases that assert correct addition (will fail against the buggy implementation).
+- [x] E2E test script checks the right things — validator dispatch, REJECTED, implementer dispatch
+  `tests/test-rejection-flow.sh` has 3 phases: (1) fixture setup with FO template expansion and agent file generation, (2) FO run via `claude -p` with haiku/$5 budget and stream-json logging, (3) validation parsing agent calls from the log and checking: `subagent_type=validator` present, REJECTED in entity file or FO text output, `subagent_type=ensign` dispatched after the validator.
+- [x] FO rejection flow uses parallel model — validator persists, direct peer messaging
+  `templates/first-officer.md` lines 75-93: Step 2 says "Ensure implementer is alive" (not "shut down and redispatch"), Step 3 says "Ensure validator is alive — Keep the existing validator running", Step 4 says "Implementer commits fixes and messages the validator directly via SendMessage." No "shut down validator" or "dispatch fresh validator" for normal cycles — fresh dispatch only as crash/session-boundary fallback. Validation instructions (line 44) include "If an implementer messages you with fixes, re-run tests and update your stage report."
+- [x] Validator template has Write/Edit tools
+  `templates/validator.md` frontmatter: `tools: Read, Write, Edit, Bash, Glob, Grep, SendMessage`. Write and Edit are present, enabling the validator to create/modify test files and write the entity stage report.
+- [x] All templates static — zero `__VAR__` markers
+  `grep '__[A-Z][A-Z_]*__' templates/` returns zero matches. All templates (first-officer.md, ensign.md, validator.md) are free of double-underscore template variable markers.
+- [x] PASSED recommendation
+
+### Summary
+
+Validated the implementer's fix cycle 1 additions: E2E test fixture at `tests/fixtures/rejection-flow/` correctly sets up a deliberate bug scenario with test coverage, the test script at `tests/test-rejection-flow.sh` verifies the full rejection relay (validator dispatch, REJECTED output, implementer dispatch after rejection), the FO rejection flow in `templates/first-officer.md` uses the parallel model (validator persists, implementer messages validator directly, FO observes), and the validator template has Write/Edit tools. All templates remain fully static with zero template variable markers.
