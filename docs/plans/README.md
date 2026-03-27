@@ -1,5 +1,5 @@
 ---
-commissioned-by: spacedock@0.4.1
+commissioned-by: spacedock@0.5.0
 entity-type: entity
 entity-label: task
 entity-label-plural: tasks
@@ -24,15 +24,13 @@ stages:
       terminal: true
 ---
 
-# Design and Build Spacedock - Plain Text Pipeline for Agents
+# Design and Build Spacedock - Plain Text Workflow for Agents
 
 Spacedock is a Claude Code plugin that turns directories of markdown files into structured workflows operated by AI agents. This workflow tracks the design and implementation tasks for building Spacedock itself — from initial concepts through validated, shippable features.
 
 ## File Naming
 
 Each task is a markdown file named `{slug}.md` — lowercase, hyphens, no spaces. Example: `pilot-worktree-isolation.md`.
-
-The `_archive/` subdirectory holds tasks removed from the active view. Archived tasks keep their original status in frontmatter — the directory is a noise reduction mechanism, not a status. Use `git mv {slug}.md _archive/{slug}.md` to archive and `git mv _archive/{slug}.md {slug}.md` to restore.
 
 ## Schema
 
