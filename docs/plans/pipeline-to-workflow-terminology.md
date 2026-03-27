@@ -1,7 +1,7 @@
 ---
 id: 052
 title: Replace "pipeline" with "workflow" where appropriate
-status: implementation
+status: validation
 source: CL
 started: 2026-03-27T06:20:00Z
 completed:
