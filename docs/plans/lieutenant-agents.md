@@ -1,7 +1,7 @@
 ---
 title: Stage-specialized lieutenant agents
 id: 035
-status: implementation
+status: validation
 source: CL
 started: 2026-03-27T00:00:00Z
 completed:
