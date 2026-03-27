@@ -89,6 +89,6 @@ When a new Spacedock release is available, use `/spacedock refit` to upgrade you
 - **Feature tracking** -- track ideas through ideation, implementation, validation, and approval
 - **Email triage** -- classify and route incoming messages with AI agents, escalate to human at review gates
 - **Content publishing** -- manage drafts through editing, review, and publication stages
-- **Research pipelines** -- process papers or data through analysis, synthesis, and validation
+- **Research workflows** -- process papers or data through analysis, synthesis, and validation
 
 Spacedock is self-hosted and bootstrapped: it manages its own development with a plain text workflow at [`docs/plans/`](docs/plans/). Run `docs/plans/status` to see the current state.

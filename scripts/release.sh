@@ -66,18 +66,18 @@ with open('$MARKETPLACE_JSON', 'w') as f:
 git add "$PLUGIN_JSON" "$MARKETPLACE_JSON"
 git commit -m "release: bump version to spacedock@$VERSION"
 
-# Refit self-hosted pipeline (docs/plans/) with the new version
-SELF_HOSTED_PIPELINE="docs/plans"
-if [ -f "$SELF_HOSTED_PIPELINE/README.md" ]; then
+# Refit self-hosted workflow (docs/plans/) with the new version
+SELF_HOSTED_WORKFLOW="docs/plans"
+if [ -f "$SELF_HOSTED_WORKFLOW/README.md" ]; then
     echo ""
     echo "=========================================="
-    echo "REFIT: Self-hosted pipeline ($SELF_HOSTED_PIPELINE)"
+    echo "REFIT: Self-hosted workflow ($SELF_HOSTED_WORKFLOW)"
     echo "=========================================="
     echo ""
     echo "Running refit..."
     echo ""
 
-    CLAUDE_ARGS=(-p "/spacedock:refit $SELF_HOSTED_PIPELINE" --plugin-dir "$REPO_ROOT" --dangerously-skip-permissions)
+    CLAUDE_ARGS=(-p "/spacedock:refit $SELF_HOSTED_WORKFLOW" --plugin-dir "$REPO_ROOT" --dangerously-skip-permissions)
     if command -v safehouse >/dev/null 2>&1; then
         safehouse claude "${CLAUDE_ARGS[@]}"
     else
@@ -106,7 +106,7 @@ fi
 RAW_LOG=$(git log "$LOG_RANGE" --oneline --no-decorate)
 
 if command -v claude >/dev/null 2>&1; then
-    PROMPT="Summarize these git commits into a concise release changelog for spacedock v$VERSION. Focus on shipped user value — what a user of the spacedock plugin gets from upgrading. Ignore pipeline state changes (dispatch/done/backlog/validation commits, archived task frontmatter updates, entity file changes under docs/plans/). Group by features and fixes. Be brief — one line per item, no markdown headers, just bullet points."
+    PROMPT="Summarize these git commits into a concise release changelog for spacedock v$VERSION. Focus on shipped user value — what a user of the spacedock plugin gets from upgrading. Ignore workflow state changes (dispatch/done/backlog/validation commits, archived task frontmatter updates, entity file changes under docs/plans/). Group by features and fixes. Be brief — one line per item, no markdown headers, just bullet points."
     if [ -n "$EXTRA_INSTRUCTIONS" ]; then
         PROMPT="$PROMPT Additional instructions: $EXTRA_INSTRUCTIONS"
     fi

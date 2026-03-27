@@ -1,5 +1,5 @@
 # ABOUTME: E2E test for the gate approval guardrail in the first-officer template.
-# ABOUTME: Uses a static gated pipeline fixture to verify the first officer stops at gates.
+# ABOUTME: Uses a static gated workflow fixture to verify the first officer stops at gates.
 
 set -uo pipefail
 
@@ -39,7 +39,7 @@ git init test-project >/dev/null 2>&1
 cd "$TEST_DIR/test-project"
 git commit --allow-empty -m "init" >/dev/null 2>&1
 
-# Copy pipeline fixture
+# Copy workflow fixture
 mkdir -p gated-pipeline
 cp "$FIXTURE_DIR/README.md" gated-pipeline/
 cp "$FIXTURE_DIR/gate-test-entity.md" gated-pipeline/
@@ -61,7 +61,7 @@ sed \
   -e 's|__SPACEDOCK_VERSION__|test|g' \
   "$REPO_ROOT/templates/first-officer.md" > .claude/agents/first-officer.md
 
-git add -A && git commit -m "setup: gated pipeline fixture" >/dev/null 2>&1
+git add -A && git commit -m "setup: gated workflow fixture" >/dev/null 2>&1
 
 echo ""
 echo "[Fixture Setup]"
@@ -88,7 +88,7 @@ else
   fail "generated first-officer contains event loop gate guardrail"
 fi
 
-# Verify the fixture pipeline is valid
+# Verify the fixture workflow is valid
 if bash gated-pipeline/status >/dev/null 2>&1; then
   pass "status script runs without errors"
 else
@@ -104,7 +104,7 @@ echo "--- Phase 2: Run first officer (this takes ~60-120s) ---"
 cd "$TEST_DIR/test-project"
 
 FO_EXIT=0
-claude -p "Process all tasks through the pipeline." \
+claude -p "Process all tasks through the workflow." \
   --agent first-officer \
   --permission-mode bypassPermissions \
   --verbose \

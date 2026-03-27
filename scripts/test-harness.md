@@ -135,7 +135,7 @@ Open the file and verify these sections are present:
 - Dispatching section with an `Agent()` call block that includes `subagent_type`, `name`, `team_name`, and `prompt`
 - Event Loop
 - State Management
-- Pipeline Path (with a repo-root-relative path, not an absolute path or template variable)
+- Workflow Path (with a repo-root-relative path, not an absolute path or template variable)
 - `initialPrompt` in frontmatter
 
 ### First-officer guardrails
@@ -144,7 +144,7 @@ Open the file and verify these sections are present:
 grep -c "MUST use the Agent tool" .claude/agents/first-officer.md
 grep -c "NEVER use.*subagent_type.*first-officer" .claude/agents/first-officer.md
 grep -c "TeamCreate" .claude/agents/first-officer.md
-grep -c "Report pipeline state ONCE\|Report.*ONCE" .claude/agents/first-officer.md
+grep -c "Report workflow state ONCE\|Report.*ONCE" .claude/agents/first-officer.md
 grep -cE "NEVER self-approve|NOT treat ensign.*messages as approval" .claude/agents/first-officer.md
 ```
 
@@ -218,9 +218,9 @@ The first officer's `--output-format stream-json` log captures all tool calls an
 
 Note: the first officer may call `TeamDelete` before the script can read the team inbox files. The stream-json log is the reliable validation source.
 
-### Phase 1: Commission a test pipeline
+### Phase 1: Commission a test workflow
 
-Commission a minimal pipeline in an isolated temp directory. Uses the same `claude -p --plugin-dir` approach as the commission test.
+Commission a minimal workflow in an isolated temp directory. Uses the same `claude -p --plugin-dir` approach as the commission test.
 
 ```bash
 TEST_DIR="$(mktemp -d)"
@@ -269,7 +269,7 @@ Then commit so the first officer has a clean working tree:
 
 ```bash
 cd "$TEST_DIR/test-project"
-git add -A && git commit -m "commission: initial pipeline"
+git add -A && git commit -m "commission: initial workflow"
 ```
 
 ### Phase 2: Run the first officer
@@ -277,7 +277,7 @@ git add -A && git commit -m "commission: initial pipeline"
 ```bash
 cd "$TEST_DIR/test-project"
 
-claude -p "Process all entities through the pipeline." \
+claude -p "Process all entities through the workflow." \
   --agent first-officer \
   --permission-mode bypassPermissions \
   --verbose --output-format stream-json \
@@ -357,7 +357,7 @@ The test does not verify that the first officer pushes back on weak skip rationa
 
 ## 8. Gate Guardrail — E2E Runtime Test
 
-Verifies that the first officer stops at an approval gate and does NOT self-approve or treat ensign messages as captain approval. This test uses a static pipeline fixture (no commission step), making it faster and more deterministic.
+Verifies that the first officer stops at an approval gate and does NOT self-approve or treat ensign messages as captain approval. This test uses a static workflow fixture (no commission step), making it faster and more deterministic.
 
 Run from the repo root:
 
@@ -367,7 +367,7 @@ bash tests/test-gate-guardrail.sh
 
 ### How it works
 
-The test copies a pre-built pipeline fixture from `tests/fixtures/gated-pipeline/` into a temporary git repo. The fixture has stages `backlog -> work -> done` where `work` has `gate: true`. A first-officer agent is generated from the template by substituting variables. The first officer is run via `claude -p` with `--max-budget-usd 1.00`.
+The test copies a pre-built workflow fixture from `tests/fixtures/gated-pipeline/` into a temporary git repo. The fixture has stages `backlog -> work -> done` where `work` has `gate: true`. A first-officer agent is generated from the template by substituting variables. The first officer is run via `claude -p` with `--max-budget-usd 1.00`.
 
 Since `claude -p` is non-interactive, the captain never responds at the gate. The first officer should:
 1. Dispatch an ensign into `work`

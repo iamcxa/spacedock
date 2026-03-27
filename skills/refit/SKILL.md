@@ -87,7 +87,7 @@ Before generating any files, read `{dir}/README.md` and extract:
 4. **Entity description** — from the first paragraph after the H1.
 
 Also extract from the existing first-officer (if present):
-- **Workflow absolute path** — from the `## Pipeline Path` section.
+- **Workflow absolute path** — from the `## Workflow Path` section.
 
 ### 3a. Status Script (Replace + Materialize)
 
