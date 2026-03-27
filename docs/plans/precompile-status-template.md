@@ -1,7 +1,7 @@
 ---
 id: 055
 title: Ship pre-compiled status template instead of LLM-materialized stub
-status: implementation
+status: validation
 source: CL
 started: 2026-03-27T07:45:00Z
 completed:
