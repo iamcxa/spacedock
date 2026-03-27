@@ -1,13 +1,13 @@
 ---
 id: 061
 title: Pair implementation and validation agents — validator judges, implementer fixes
-status: ideation
+status: implementation
 source: CL
 started: 2026-03-27T22:45:00Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/ensign-val-pairing
 ---
 
 ## Problem Statement
