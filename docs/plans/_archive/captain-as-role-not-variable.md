@@ -1,11 +1,11 @@
 ---
 id: 062
 title: Use "the captain" as literal role name, not a template variable
-status: backlog
+status: done
 source: CL
 started:
-completed:
-verdict:
+completed: 2026-03-27T22:30:00Z
+verdict: REJECTED
 score: 0.80
 worktree:
 issue: "#3"
