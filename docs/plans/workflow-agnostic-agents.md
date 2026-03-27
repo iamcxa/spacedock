@@ -9,7 +9,7 @@ verdict:
 score: 0.85
 worktree: .worktrees/pr-lieutenant-agnostic-agents
 issue: "#3"
-pr:
+pr: "#6"
 ---
 
 Currently the commission generates per-workflow agent files (first-officer, ensign, pr-lieutenant) with hardcoded workflow-specific values baked in via sed substitution (`__DIR__`, `__MISSION__`, `__CAPTAIN__`, `__ENTITY_LABEL__`, etc.). This means:
