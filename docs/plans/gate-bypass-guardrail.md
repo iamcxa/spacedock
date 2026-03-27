@@ -1,9 +1,9 @@
 ---
 id: 050
 title: First officer bypasses approval gate without captain's explicit approval
-status: backlog
+status: ideation
 source: CL
-started:
+started: 2026-03-27T00:00:00Z
 completed:
 verdict:
 score: 0.90
