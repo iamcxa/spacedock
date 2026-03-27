@@ -1,9 +1,9 @@
 ---
 id: 063
 title: Make agents workflow-agnostic — one agent definition serves multiple workflows
-status: backlog
+status: ideation
 source: CL
-started:
+started: 2026-03-27T22:35:00Z
 completed:
 verdict:
 score: 0.85
