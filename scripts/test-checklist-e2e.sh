@@ -1,5 +1,5 @@
 # ABOUTME: E2E test for the checklist protocol in the first-officer template.
-# ABOUTME: Commissions a pipeline, runs the first officer, validates ensign checklist compliance.
+# ABOUTME: Commissions a workflow, runs the first officer, validates ensign checklist compliance.
 
 set -uo pipefail
 
@@ -28,9 +28,9 @@ echo "Repo root:  $REPO_ROOT"
 echo "Test dir:   $TEST_DIR"
 echo ""
 
-# --- Phase 1: Commission a test pipeline ---
+# --- Phase 1: Commission a test workflow ---
 
-echo "--- Phase 1: Commission test pipeline (this takes ~30-60s) ---"
+echo "--- Phase 1: Commission test workflow (this takes ~30-60s) ---"
 
 cd "$TEST_DIR"
 git init test-project >/dev/null 2>&1
@@ -66,7 +66,7 @@ fi
 echo "[Commission Output]"
 if [ ! -f "$TEST_DIR/test-project/checklist-test/test-checklist.md" ]; then
   fail "commission produced test-checklist.md"
-  echo "  FATAL: Cannot proceed without commissioned pipeline. Aborting."
+  echo "  FATAL: Cannot proceed without commissioned workflow. Aborting."
   exit 1
 else
   pass "commission produced test-checklist.md"
@@ -91,7 +91,7 @@ AC
 
 # Commit so the first officer has a clean working tree
 cd "$TEST_DIR/test-project"
-git add -A && git commit -m "commission: initial pipeline with acceptance criteria" >/dev/null 2>&1
+git add -A && git commit -m "commission: initial workflow with acceptance criteria" >/dev/null 2>&1
 
 echo ""
 
@@ -102,7 +102,7 @@ echo "--- Phase 2: Run first officer (this takes ~60-120s) ---"
 cd "$TEST_DIR/test-project"
 
 FO_EXIT=0
-claude -p "Process all entities through the pipeline. Process one entity through one stage, then stop." \
+claude -p "Process all entities through the workflow. Process one entity through one stage, then stop." \
   --agent first-officer \
   --permission-mode bypassPermissions \
   --verbose \

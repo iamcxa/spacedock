@@ -18,9 +18,9 @@ stages:
       terminal: true
 ---
 
-# Gate Guardrail Test Pipeline
+# Gate Guardrail Test Workflow
 
-A minimal pipeline for testing that the first officer stops at approval gates.
+A minimal workflow for testing that the first officer stops at approval gates.
 
 ## File Naming
 

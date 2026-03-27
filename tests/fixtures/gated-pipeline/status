@@ -1,5 +1,5 @@
 #!/bin/bash
-# ABOUTME: Status viewer for the gated-pipeline test fixture.
+# ABOUTME: Status viewer for the gated-workflow test fixture.
 # ABOUTME: Displays task status from YAML frontmatter in markdown files.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

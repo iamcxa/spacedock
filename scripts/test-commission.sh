@@ -5,7 +5,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TEST_DIR="$(mktemp -d)"
-PIPELINE_DIR="$TEST_DIR/v0-test-1"
+WORKFLOW_DIR="$TEST_DIR/v0-test-1"
 FAILURES=0
 PASSES=0
 
@@ -80,19 +80,19 @@ echo "--- Phase 2: Validation ---"
 # -- File existence --
 echo ""
 echo "[File Existence]"
-check "README.md exists"              test -f "$PIPELINE_DIR/README.md"
-check "status script exists"          test -f "$PIPELINE_DIR/status"
-check "full-cycle-test.md exists"     test -f "$PIPELINE_DIR/full-cycle-test.md"
-check "refit-command.md exists"       test -f "$PIPELINE_DIR/refit-command.md"
-check "multi-pipeline.md exists"      test -f "$PIPELINE_DIR/multi-pipeline.md"
+check "README.md exists"              test -f "$WORKFLOW_DIR/README.md"
+check "status script exists"          test -f "$WORKFLOW_DIR/status"
+check "full-cycle-test.md exists"     test -f "$WORKFLOW_DIR/full-cycle-test.md"
+check "refit-command.md exists"       test -f "$WORKFLOW_DIR/refit-command.md"
+check "multi-pipeline.md exists"      test -f "$WORKFLOW_DIR/multi-pipeline.md"
 check "first-officer.md exists"       test -f "$TEST_DIR/.claude/agents/first-officer.md"
 
 # -- Status script --
 echo ""
 echo "[Status Script]"
-if [ -f "$PIPELINE_DIR/status" ]; then
-  chmod +x "$PIPELINE_DIR/status"
-  STATUS_OUTPUT="$("$PIPELINE_DIR/status" 2>&1)" || true
+if [ -f "$WORKFLOW_DIR/status" ]; then
+  chmod +x "$WORKFLOW_DIR/status"
+  STATUS_OUTPUT="$("$WORKFLOW_DIR/status" 2>&1)" || true
   if [ -n "$STATUS_OUTPUT" ]; then
     pass "status script produces output"
   else
@@ -119,7 +119,7 @@ fi
 echo ""
 echo "[Entity Frontmatter]"
 for ENTITY in full-cycle-test refit-command multi-pipeline; do
-  ENTITY_FILE="$PIPELINE_DIR/$ENTITY.md"
+  ENTITY_FILE="$WORKFLOW_DIR/$ENTITY.md"
   if [ -f "$ENTITY_FILE" ]; then
     # Check YAML delimiters
     FIRST_LINE="$(head -1 "$ENTITY_FILE")"
@@ -150,8 +150,8 @@ done
 # -- README completeness --
 echo ""
 echo "[README Completeness]"
-if [ -f "$PIPELINE_DIR/README.md" ]; then
-  README="$PIPELINE_DIR/README.md"
+if [ -f "$WORKFLOW_DIR/README.md" ]; then
+  README="$WORKFLOW_DIR/README.md"
   for SECTION in "File Naming" "Schema" "Stages" "Template" "Commit"; do
     if grep -qi "$SECTION" "$README"; then
       pass "README contains '$SECTION' section"
@@ -187,7 +187,7 @@ if [ -f "$FO" ]; then
     fail "first-officer has tools in frontmatter"
   fi
   # Content checks
-  for KEYWORD in "DISPATCHER|dispatcher" "TeamCreate" "Agent\(" "Event Loop|event loop" "Pipeline Path|pipeline path|PIPELINE PATH" "initialPrompt"; do
+  for KEYWORD in "DISPATCHER|dispatcher" "TeamCreate" "Agent\(" "Event Loop|event loop" "Workflow Path|workflow path|WORKFLOW PATH" "initialPrompt"; do
     LABEL="$(echo "$KEYWORD" | sed 's/|/ or /g')"
     if grep -qE "$KEYWORD" "$FO"; then
       pass "first-officer contains '$LABEL'"
@@ -246,8 +246,8 @@ fi
 # -- README frontmatter: stages block --
 echo ""
 echo "[README Frontmatter]"
-if [ -f "$PIPELINE_DIR/README.md" ]; then
-  README="$PIPELINE_DIR/README.md"
+if [ -f "$WORKFLOW_DIR/README.md" ]; then
+  README="$WORKFLOW_DIR/README.md"
   # Extract frontmatter (between first and second --- delimiters)
   FM=$(awk 'NR==1{next} /^---$/{exit} {print}' "$README")
   if echo "$FM" | grep -q "^stages:"; then
@@ -306,7 +306,7 @@ fi
 echo ""
 echo "[Entity ID Field]"
 for ENTITY in full-cycle-test refit-command multi-pipeline; do
-  ENTITY_FILE="$PIPELINE_DIR/$ENTITY.md"
+  ENTITY_FILE="$WORKFLOW_DIR/$ENTITY.md"
   if [ -f "$ENTITY_FILE" ]; then
     if head -15 "$ENTITY_FILE" | grep -q "^id:"; then
       pass "$ENTITY.md has id field"
@@ -355,9 +355,9 @@ fi
 # -- No leaked template variables --
 echo ""
 echo "[No Leaked Template Variables]"
-if [ -d "$PIPELINE_DIR" ]; then
+if [ -d "$WORKFLOW_DIR" ]; then
   # Look for {variable_name} patterns (but not code like ${...} or JSON {..."key":})
-  LEAKED=$(grep -rE '\{[a-z_]+\}' "$PIPELINE_DIR" --include="*.md" 2>/dev/null | grep -vE '\$\{' | grep -v 'slug' || true)
+  LEAKED=$(grep -rE '\{[a-z_]+\}' "$WORKFLOW_DIR" --include="*.md" 2>/dev/null | grep -vE '\$\{' | grep -v 'slug' || true)
   if [ -z "$LEAKED" ]; then
     pass "no leaked template variables"
   else
@@ -371,8 +371,8 @@ fi
 # -- No absolute paths --
 echo ""
 echo "[No Absolute Paths]"
-if [ -d "$PIPELINE_DIR" ]; then
-  ABS_PATHS=$(grep -rE '/Users/|/home/|/tmp/' "$PIPELINE_DIR" --include="*.md" 2>/dev/null || true)
+if [ -d "$WORKFLOW_DIR" ]; then
+  ABS_PATHS=$(grep -rE '/Users/|/home/|/tmp/' "$WORKFLOW_DIR" --include="*.md" 2>/dev/null || true)
   if [ -z "$ABS_PATHS" ]; then
     pass "no absolute paths in generated files"
   else
@@ -380,8 +380,8 @@ if [ -d "$PIPELINE_DIR" ]; then
     echo "    Found: $ABS_PATHS" | head -5
   fi
   # Also check the status script
-  if [ -f "$PIPELINE_DIR/status" ]; then
-    ABS_IN_STATUS=$(grep -E '/Users/|/home/|/tmp/' "$PIPELINE_DIR/status" 2>/dev/null || true)
+  if [ -f "$WORKFLOW_DIR/status" ]; then
+    ABS_IN_STATUS=$(grep -E '/Users/|/home/|/tmp/' "$WORKFLOW_DIR/status" 2>/dev/null || true)
     if [ -z "$ABS_IN_STATUS" ]; then
       pass "no absolute paths in status script"
     else
