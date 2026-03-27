@@ -1,9 +1,9 @@
 ---
 id: 064
 title: Replace lieutenant agents with capability modules
-status: backlog
+status: ideation
 source: CL
-started:
+started: 2026-03-27T23:10:00Z
 completed:
 verdict:
 score: 0.90
