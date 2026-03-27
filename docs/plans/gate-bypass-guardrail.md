@@ -120,3 +120,29 @@ A: Inline in step 8c, with reinforcement in the Event Loop. A separate section r
 - Tasks affected: 046 (named ensign agent), 049 (fix captain hardcoding)
 - What happened: first officer asked "approve?" then said "Both approved" without captain response
 - Impact: both tasks advanced past ideation gate without approval. Work was valid but process was violated.
+
+## Implementation summary
+
+### 1. Template guardrail — `templates/first-officer.md`
+
+Added guardrail text at two insertion points:
+
+- **Step 8c** (line 147): "GATE APPROVAL GUARDRAIL — NEVER self-approve" block with four specific prohibitions (ensign messages, silence/quality inference, ensign message handling, only-captain-advances rule). Placed immediately after "Wait for __CAPTAIN__'s decision:" and before the Approve/Reject bullets.
+- **Event Loop step 3** (line 258): "Gate waiting:" reinforcement appended to the gate check instruction.
+
+### 2. Commission test — `scripts/test-commission.sh`
+
+Added a guardrail grep check in the `[First-Officer Guardrails]` section that verifies "NEVER self-approve" or "NOT treat ensign.*messages as approval" appears in the generated first-officer agent.
+
+### 3. Test harness docs — `scripts/test-harness.md`
+
+- Updated the guardrail grep section to include the new check (now five checks, up from four)
+- Added section 8 documenting the gate guardrail e2e test
+
+### 4. E2E test — `tests/test-gate-guardrail.sh`
+
+Used a static pipeline fixture approach (captain's direction) instead of commissioning from scratch:
+
+- **Fixture** at `tests/fixtures/gated-pipeline/`: README with `backlog -> work (gate: true) -> done`, a single entity, and a status script
+- **Agent generation**: The test generates the first-officer by sed-substituting template variables, so it validates that the guardrail survives variable substitution
+- **Validation**: 7 checks covering guardrail presence, gate hold behavior (entity status, no archival), ensign dispatch, gate reporting, and no self-approval language
