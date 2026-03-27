@@ -16,6 +16,8 @@ def parse_log(log_path):
     tool_calls = []
     total_input_tokens = 0
     total_output_tokens = 0
+    total_cache_creation_tokens = 0
+    total_cache_read_tokens = 0
     errors = []
 
     with open(log_path) as f:
@@ -30,11 +32,13 @@ def parse_log(log_path):
 
             msg_type = obj.get("type", "")
 
-            # Collect token usage
+            # Collect token usage (includes cache tokens from Claude API)
             if "usage" in obj:
                 usage = obj["usage"]
                 total_input_tokens += usage.get("input_tokens", 0)
                 total_output_tokens += usage.get("output_tokens", 0)
+                total_cache_creation_tokens += usage.get("cache_creation_input_tokens", 0)
+                total_cache_read_tokens += usage.get("cache_read_input_tokens", 0)
 
             # Collect assistant messages
             if msg_type == "assistant" and "message" in obj:
@@ -61,6 +65,8 @@ def parse_log(log_path):
         "tool_calls": tool_calls,
         "total_input_tokens": total_input_tokens,
         "total_output_tokens": total_output_tokens,
+        "total_cache_creation_tokens": total_cache_creation_tokens,
+        "total_cache_read_tokens": total_cache_read_tokens,
         "errors": errors,
     }
 
@@ -187,9 +193,12 @@ def score_pipeline_completion(data):
 
 def score_token_efficiency(data):
     """Dimension 5: Token efficiency (continuous).
-    Returns total tokens used.
+    Returns total tokens used, including cache creation and read tokens.
     """
-    return data["total_input_tokens"] + data["total_output_tokens"]
+    return (data["total_input_tokens"]
+            + data["total_output_tokens"]
+            + data["total_cache_creation_tokens"]
+            + data["total_cache_read_tokens"])
 
 
 def score_error_rate(data):
@@ -239,6 +248,8 @@ def main():
         "metadata": {
             "total_input_tokens": data["total_input_tokens"],
             "total_output_tokens": data["total_output_tokens"],
+            "total_cache_creation_tokens": data["total_cache_creation_tokens"],
+            "total_cache_read_tokens": data["total_cache_read_tokens"],
             "agent_dispatch_count": len(data["agent_calls"]),
             "tool_call_count": len(data["tool_calls"]),
             "error_count": len(data["errors"]),

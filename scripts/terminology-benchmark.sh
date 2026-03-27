@@ -229,7 +229,19 @@ ENTITY
         --max-budget-usd 2.00 \
         2>&1 > "$run_dir/checklist-log.jsonl" || exit_code=$?
 
-      echo "{\"test\": \"checklist\", \"variant\": \"$variant\", \"run\": $run_num}" > "$run_dir/checklist-result.json"
+      # Check if entity advanced past backlog
+      local entity_file_c="$test_dir/test-project/checklist-pipeline/checklist-test.md"
+      local entity_status_c=""
+      local checklist_pass="false"
+      if [ -f "$entity_file_c" ]; then
+        entity_status_c=$(head -15 "$entity_file_c" | grep "^status:" | head -1)
+        entity_status_c="${entity_status_c#*: }"
+        if [ "$entity_status_c" != "backlog" ] && [ -n "$entity_status_c" ]; then
+          checklist_pass="true"
+        fi
+      fi
+      echo "    advanced=$checklist_pass (status=$entity_status_c)"
+      echo "{\"test\": \"checklist\", \"variant\": \"$variant\", \"run\": $run_num, \"pass\": $checklist_pass, \"entity_status\": \"$entity_status_c\"}" > "$run_dir/checklist-result.json"
       ;;
 
     dispatch)
@@ -351,7 +363,24 @@ ENTITY
         --max-budget-usd 5.00 \
         2>&1 > "$run_dir/task-quality-log.jsonl" || exit_code=$?
 
-      echo "{\"test\": \"task-quality\", \"variant\": \"$variant\", \"run\": $run_num}" > "$run_dir/task-quality-result.json"
+      # Count how many entities reached done
+      local tq_done=0
+      local tq_total=0
+      for ef in "$test_dir/test-project/link-checker/"*.md "$test_dir/test-project/link-checker/_archive/"*.md; do
+        [ "$(basename "$ef")" = "README.md" ] && continue
+        [ ! -f "$ef" ] && continue
+        tq_total=$((tq_total + 1))
+        local es
+        es=$(head -15 "$ef" | grep "^status:" | head -1)
+        es="${es#*: }"
+        if [ "$es" = "done" ]; then
+          tq_done=$((tq_done + 1))
+        fi
+      done
+      local tq_pass="false"
+      if [ "$tq_done" -gt 0 ]; then tq_pass="true"; fi
+      echo "    completed=$tq_done/$tq_total"
+      echo "{\"test\": \"task-quality\", \"variant\": \"$variant\", \"run\": $run_num, \"pass\": $tq_pass, \"entities_done\": $tq_done, \"entities_total\": $tq_total}" > "$run_dir/task-quality-result.json"
       ;;
   esac
 
