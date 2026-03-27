@@ -178,10 +178,12 @@ Scan the README frontmatter `stages.states` for entries with an `agent:` propert
 
 > **Warning:** Stage '{stage_name}' references agent '{agent}' but no template exists at `templates/{agent}.md`. Skipping regeneration — the existing agent file (if any) will not be updated.
 
-2. If the template exists, extract the same workflow-specific values as the ensign (mission, entity label) and generate a new lieutenant using `sed`:
+2. If the template exists, extract the same workflow-specific values as the ensign (mission, entity label, captain, directory) and generate a new lieutenant using `sed`:
    - `__MISSION__` — the mission
    - `__ENTITY_LABEL__` — the entity label
    - `__SPACEDOCK_VERSION__` — `{current_version}`
+   - `__CAPTAIN__` — the captain (extracted from the first-officer agent file or README)
+   - `__DIR__` — the workflow directory path
 
 3. Show the captain a diff of the old vs new lieutenant:
 

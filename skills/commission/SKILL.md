@@ -465,6 +465,8 @@ sed \
   -e 's|__MISSION__|{mission}|g' \
   -e 's|__ENTITY_LABEL__|{entity_label}|g' \
   -e 's|__SPACEDOCK_VERSION__|{spacedock_version}|g' \
+  -e 's|__CAPTAIN__|{captain}|g' \
+  -e 's|__DIR__|{dir}|g' \
   "$TMPL" > {project_root}/.claude/agents/pr-lieutenant.md
 ```
 
