@@ -16,7 +16,6 @@ stages:
       gate: true
     - name: implementation
       worktree: true
-      agent: pr-lieutenant
     - name: validation
       worktree: true
       fresh: true
