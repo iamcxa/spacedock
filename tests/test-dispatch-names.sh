@@ -1,5 +1,5 @@
-# ABOUTME: E2E test for dispatch name uniqueness across stages.
-# ABOUTME: Verifies each Agent() dispatch uses a unique name to prevent shutdown collisions.
+# ABOUTME: E2E test for dispatch name collision fix across consecutive stages.
+# ABOUTME: Verifies an entity completes the full pipeline without agents getting killed by stale shutdowns.
 
 set -uo pipefail
 
@@ -24,7 +24,7 @@ fail() {
   echo "  FAIL: $1"
 }
 
-echo "=== Dispatch Name Uniqueness E2E Test ==="
+echo "=== Dispatch Name Collision E2E Test ==="
 echo "Repo root:    $REPO_ROOT"
 echo "Fixture dir:  $FIXTURE_DIR"
 echo "Test dir:     $TEST_DIR"
@@ -49,7 +49,7 @@ chmod +x dispatch-pipeline/status
 # Generate first-officer agent from template
 mkdir -p .claude/agents
 sed \
-  -e 's|__MISSION__|Dispatch name uniqueness test|g' \
+  -e 's|__MISSION__|Dispatch name collision test|g' \
   -e 's|__DIR__|dispatch-pipeline|g' \
   -e 's|__DIR_BASENAME__|dispatch-pipeline|g' \
   -e 's|__PROJECT_NAME__|dispatch-test|g' \
@@ -76,7 +76,6 @@ else
   exit 1
 fi
 
-# Verify the fixture pipeline is valid
 if bash dispatch-pipeline/status >/dev/null 2>&1; then
   pass "status script runs without errors"
 else
@@ -111,99 +110,86 @@ if [ $FO_EXIT -ne 0 ]; then
   echo "WARNING: first officer exited with code $FO_EXIT"
 fi
 
-# --- Phase 3: Validate dispatch name uniqueness ---
+# --- Phase 3: Validate full pipeline completion ---
 
 echo "--- Phase 3: Validation ---"
 
-# Extract all Agent() dispatch names from the stream-json log
-python3 -c "
-import json, sys
+echo ""
+echo "[Pipeline Completion]"
 
-dispatch_names = []
+# The core test: did the entity make it through the full pipeline?
+# Before the fix, the second dispatch would get killed by a stale shutdown
+# request from the first, leaving the entity stuck mid-pipeline.
 
+# Check entity file — it may have been archived to _archive/
+ENTITY_FILE="$TEST_DIR/test-project/dispatch-pipeline/dispatch-name-test.md"
+ARCHIVE_FILE="$TEST_DIR/test-project/dispatch-pipeline/_archive/dispatch-name-test.md"
+
+if [ -f "$ARCHIVE_FILE" ]; then
+  FINAL_FILE="$ARCHIVE_FILE"
+  pass "entity was archived (reached terminal stage)"
+elif [ -f "$ENTITY_FILE" ]; then
+  FINAL_FILE="$ENTITY_FILE"
+  echo "  INFO: entity still in main directory (not archived)"
+else
+  fail "entity file exists"
+  FINAL_FILE=""
+fi
+
+# Check 1: Entity reached 'done' status
+if [ -n "$FINAL_FILE" ]; then
+  ENTITY_STATUS=$(head -15 "$FINAL_FILE" | grep "^status:" | head -1)
+  ENTITY_STATUS_VAL="${ENTITY_STATUS#*: }"
+  if [ "$ENTITY_STATUS_VAL" = "done" ]; then
+    pass "entity reached done status"
+  else
+    fail "entity reached done status (stuck at: $ENTITY_STATUS_VAL)"
+  fi
+fi
+
+# Check 2: Entity advanced past the first non-initial stage
+# Even if it didn't reach done, it should have gotten past 'work'
+if [ -n "$FINAL_FILE" ]; then
+  if [ "$ENTITY_STATUS_VAL" = "backlog" ]; then
+    fail "entity advanced past backlog"
+  else
+    pass "entity advanced past backlog (status: $ENTITY_STATUS_VAL)"
+  fi
+fi
+
+# Check 3: At least 2 Agent() dispatches occurred (work + review minimum)
+DISPATCH_COUNT=$(python3 -c "
+import json
+count = 0
 with open('$TEST_DIR/fo-log.jsonl') as f:
     for line in f:
         line = line.strip()
-        if not line:
-            continue
+        if not line: continue
         try:
             obj = json.loads(line)
             if obj.get('type') == 'assistant' and 'message' in obj:
                 for block in obj['message'].get('content', []):
                     if block.get('type') == 'tool_use' and block.get('name') == 'Agent':
-                        agent_input = block.get('input', {})
-                        name = agent_input.get('name', '')
-                        if name:
-                            dispatch_names.append(name)
-        except:
-            pass
+                        count += 1
+        except: pass
+print(count)
+" 2>/dev/null)
 
-with open('$TEST_DIR/dispatch-names.txt', 'w') as f:
-    for name in dispatch_names:
-        f.write(name + '\n')
-
-# Write summary
-with open('$TEST_DIR/dispatch-summary.txt', 'w') as f:
-    f.write('total: %d\n' % len(dispatch_names))
-    f.write('unique: %d\n' % len(set(dispatch_names)))
-    if len(dispatch_names) != len(set(dispatch_names)):
-        from collections import Counter
-        dupes = [n for n, c in Counter(dispatch_names).items() if c > 1]
-        f.write('duplicates: %s\n' % ', '.join(dupes))
-" 2>/dev/null
-
-echo ""
-echo "[Dispatch Names]"
-
-# Show all dispatch names found
-if [ -f "$TEST_DIR/dispatch-names.txt" ] && [ -s "$TEST_DIR/dispatch-names.txt" ]; then
-  echo "  Names found:"
-  while IFS= read -r name; do
-    echo "    - $name"
-  done < "$TEST_DIR/dispatch-names.txt"
-else
-  echo "  (no dispatch names found)"
-fi
-
-echo ""
-echo "[Uniqueness Checks]"
-
-# Check 1: At least 2 dispatches occurred (entity should go through work and review)
-DISPATCH_COUNT=$(wc -l < "$TEST_DIR/dispatch-names.txt" 2>/dev/null | tr -d ' ')
 if [ "${DISPATCH_COUNT:-0}" -ge 2 ]; then
-  pass "at least 2 dispatches occurred ($DISPATCH_COUNT total)"
+  pass "multiple dispatches occurred ($DISPATCH_COUNT Agent() calls)"
 else
-  fail "at least 2 dispatches occurred (got ${DISPATCH_COUNT:-0} — need >=2 to test uniqueness)"
+  fail "multiple dispatches occurred (got ${DISPATCH_COUNT:-0} — expected >=2 for work + review)"
 fi
 
-# Check 2: All dispatch names are unique (no duplicates)
-if [ "${DISPATCH_COUNT:-0}" -gt 0 ]; then
-  UNIQUE_COUNT=$(sort -u "$TEST_DIR/dispatch-names.txt" | wc -l | tr -d ' ')
-  if [ "$DISPATCH_COUNT" = "$UNIQUE_COUNT" ]; then
-    pass "all dispatch names are unique ($UNIQUE_COUNT unique out of $DISPATCH_COUNT)"
+# Check 4: Entity has completed timestamp set
+if [ -n "$FINAL_FILE" ]; then
+  COMPLETED_VAL=$(head -15 "$FINAL_FILE" | grep "^completed:" | head -1)
+  COMPLETED_VAL="${COMPLETED_VAL#*: }"
+  if [ -n "$COMPLETED_VAL" ]; then
+    pass "entity has completed timestamp"
   else
-    fail "all dispatch names are unique ($UNIQUE_COUNT unique out of $DISPATCH_COUNT — duplicates found)"
-    if [ -f "$TEST_DIR/dispatch-summary.txt" ]; then
-      grep "^duplicates:" "$TEST_DIR/dispatch-summary.txt" | sed 's/^/    /'
-    fi
+    fail "entity has completed timestamp"
   fi
-else
-  fail "all dispatch names are unique (no dispatches to check)"
-fi
-
-# Check 3: Dispatch names contain stage identifiers
-NAMES_WITH_STAGE=0
-while IFS= read -r name; do
-  # Check if the name contains a known stage name as a suffix component
-  if echo "$name" | grep -qE '-(work|review|implementation|ideation|validation)$'; then
-    NAMES_WITH_STAGE=$((NAMES_WITH_STAGE + 1))
-  fi
-done < "$TEST_DIR/dispatch-names.txt" 2>/dev/null
-
-if [ "${DISPATCH_COUNT:-0}" -gt 0 ] && [ "$NAMES_WITH_STAGE" -eq "${DISPATCH_COUNT:-0}" ]; then
-  pass "all dispatch names include stage suffix ($NAMES_WITH_STAGE of $DISPATCH_COUNT)"
-else
-  fail "all dispatch names include stage suffix ($NAMES_WITH_STAGE of ${DISPATCH_COUNT:-0})"
 fi
 
 # --- Results ---
@@ -218,10 +204,9 @@ if [ $FAILURES -gt 0 ]; then
   echo "RESULT: FAIL"
   echo ""
   echo "Debug info:"
-  echo "  Test dir:         $TEST_DIR"
-  echo "  FO log:           $TEST_DIR/fo-log.jsonl"
-  echo "  Dispatch names:   $TEST_DIR/dispatch-names.txt"
-  echo "  Dispatch summary: $TEST_DIR/dispatch-summary.txt"
+  echo "  Test dir:      $TEST_DIR"
+  echo "  FO log:        $TEST_DIR/fo-log.jsonl"
+  echo "  Entity file:   $FINAL_FILE"
   # Don't clean up on failure so logs can be inspected
   trap - EXIT
   exit 1
