@@ -9,6 +9,7 @@ verdict:
 score:
 worktree: .worktrees/ensign-github-issue-pr
 depends: 035
+pr: "#2"
 ---
 
 How should Spacedock pipelines incorporate GitHub issue references and PR workflows? Tasks in a pipeline often correspond to GitHub issues, and implementation work naturally produces PRs. Currently there's no structured way to link these.
