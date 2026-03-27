@@ -83,3 +83,20 @@ No other files reference `## Workflow Path` in a way that requires changes (arch
 ### Summary
 
 The `## Workflow Path` section is confirmed redundant: every instruction in the first-officer already embeds the resolved `__DIR__` path. The refit skill extracts the path from this section but never uses the extracted value — it relies on `{dir}` from Phase 1 instead. The fix is a clean removal from four files with no need for an alternative extraction mechanism.
+
+## Stage Report: implementation
+
+- [x] `## Workflow Path` section removed from `templates/first-officer.md`
+  Removed lines 94-98 (the section header, path statement, and README reference)
+- [x] Refit skill no longer references `## Workflow Path`
+  Removed the "Also extract from the existing first-officer" block (lines 89-90) from `skills/refit/SKILL.md`
+- [x] `test-commission.sh` keyword check updated (Workflow Path removed)
+  Removed `"Workflow Path|workflow path|WORKFLOW PATH"` from the keyword grep loop at line 190
+- [x] `test-harness.md` checklist updated (Workflow Path removed)
+  Removed the "Workflow Path" bullet from the first-officer verification checklist at line 138
+- [x] All changes committed
+  Commit 7daf633 on branch `ensign/remove-workflow-path`
+
+### Summary
+
+Removed the redundant `## Workflow Path` section from the first-officer template and all references to it across the codebase. Four files changed with a net removal of 10 lines. All other first-officer content (identity, startup, dispatch, state management, clarification) is untouched.
