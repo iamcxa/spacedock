@@ -140,3 +140,53 @@ Extract the PR number (strip `#`, `owner/repo#` prefix). Check PR state with `gh
 ### Summary
 
 Designed a hook mechanism where lieutenants declare lifecycle hooks as `## Hook: {point}` sections in their agent markdown files. The first officer discovers hooks by reading lieutenant agent files referenced in README stage definitions, then executes them at startup and merge points. This moves all PR-specific logic out of the first-officer template into the pr-lieutenant template, keeping the first officer generic. The design requires changes to two template files (first-officer.md and pr-lieutenant.md) with no changes to the commission skill or ensign.
+
+## Stage Report: implementation
+
+- [x] First-officer template: PR-specific logic removed (no `gh pr view`, no `pr` field checks)
+  `grep -c "gh pr view" templates/first-officer.md` returns 0; no `pr` field references remain.
+- [x] First-officer template: hook discovery added to startup
+  New startup step 3 scans `stages.states` for `agent:` values, reads agent files, registers `## Hook:` sections.
+- [x] First-officer template: startup and merge hook execution added with fallback
+  Startup step 4 executes startup hooks; merge step 1 runs merge hooks with fallback to default local merge.
+- [x] First-officer template: hook convention documented for lieutenant authors
+  New "Lieutenant Hook Convention" section documents the `## Hook: {point}` format and available lifecycle points.
+- [x] PR lieutenant template: `## Hook: startup` with PR detection logic
+  Contains the exact merged-PR detection logic previously in first-officer startup step 3.
+- [x] PR lieutenant template: `## Hook: merge` with PR-aware merge logic
+  Contains the exact PR-aware merge logic previously in first-officer merge step 1, with MERGED/OPEN/unavailable handling.
+- [x] All changes committed
+  Commit b03d7a6 on branch ensign/lt-hooks.
+
+### Summary
+
+Moved all PR-specific logic out of the first-officer template into the pr-lieutenant template as hook sections. The first officer now has a generic hook discovery mechanism (startup step 3) that reads lieutenant agent files referenced in README stage definitions and collects `## Hook:` sections. Startup hooks run before `status --next`, merge hooks run before the default local merge with a claim/fallback pattern. The pr-lieutenant gained `## Hook: startup` and `## Hook: merge` sections containing the exact PR detection and merge logic that was removed from the first officer. A "Lieutenant Hook Convention" section documents the mechanism for future lieutenant authors.
+
+## Stage Report: validation
+
+- [x] Test harness passes (no regressions)
+  Full test harness: 64 passed, 0 failed. Commission generates all files correctly, including pr-lieutenant with fully substituted template variables. Initial run caught unsubstituted `__CAPTAIN__`/`__DIR__` in pr-lieutenant hooks; fixed by adding those substitutions to the sed commands in `skills/commission/SKILL.md` and `skills/refit/SKILL.md`.
+- [x] First-officer template: no PR-specific logic, hooks mechanism present
+  `grep -c "gh pr view" templates/first-officer.md` = 0. Broader grep for `gh pr|pr field|pr:` returns no matches. Hook discovery (startup step 3), startup hook execution (step 4), and merge hook execution (merge step 1 with fallback) all present.
+- [x] PR lieutenant template: both hook sections present with correct content
+  `## Hook: startup` at line 32 and `## Hook: merge` at line 40. Startup hook scans entities for `pr` field, checks `gh pr view`, auto-advances MERGED. Merge hook claims entities with `pr` field, handles MERGED/OPEN/unavailable states. Both use `__CAPTAIN__` and `__DIR__` template variables correctly.
+- [x] Backward compatibility: workflows without lieutenants unaffected
+  Discovery step: "Scan... for distinct `agent:` values (excluding `ensign`)" — empty set when no stages have `agent:` property. Step 4: "For each registered startup hook" — zero hooks, nothing runs. Merge step 1: "For each registered merge hook" — zero hooks, falls through to default local merge. Behavior is identical to before.
+- [x] PASSED recommendation
+  All 9 acceptance criteria verified. Bug found during validation (unsubstituted `__CAPTAIN__`/`__DIR__` in pr-lieutenant hooks) was fixed in both `skills/commission/SKILL.md` and `skills/refit/SKILL.md`. Re-run of test harness confirms 64/64 checks pass.
+
+### Acceptance Criteria Verification
+
+1. First-officer template contains no PR-specific logic: **PASS** — no `gh pr view`, no `pr` field checks, no GitHub-specific behavior.
+2. First-officer template has hook discovery step: **PASS** — startup step 3.
+3. First-officer template has startup hook execution between README reading and `status --next`: **PASS** — step 4, between step 2 and step 5.
+4. First-officer template has merge hook execution with fallback: **PASS** — merge step 1 with claim/fallback pattern.
+5. pr-lieutenant template declares `## Hook: startup` and `## Hook: merge`: **PASS** — both present.
+6. PR startup hook contains exact logic from old first-officer startup step 3: **PASS** — scans entities for `pr` field, runs `gh pr view`, auto-advances MERGED, warns if `gh` unavailable.
+7. PR merge hook contains exact logic from old first-officer merge step 1: **PASS** — claims entities with `pr` field, checks MERGED/OPEN/unavailable.
+8. Workflows without lieutenants behave identically: **PASS** — zero hooks discovered, all fallbacks engaged.
+9. Hook section format documented in first-officer template: **PASS** — "Lieutenant Hook Convention" section at line 90.
+
+### Summary
+
+Validation initially found a functional bug: the pr-lieutenant template's hook sections used `__CAPTAIN__` and `__DIR__` template variables not handled by the sed substitution commands. Fixed in both `skills/commission/SKILL.md` (section 2f) and `skills/refit/SKILL.md` (section 3e). After the fix, the full test harness passes (64/64 checks) and all 9 acceptance criteria are met. Recommendation: **PASSED**.

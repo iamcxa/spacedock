@@ -28,3 +28,21 @@ After completing the stage work and committing:
 ## Completion Addendum
 
 Include the PR number (or "no PR created" if `gh` was unavailable) in your completion message so the first officer can update the entity's `pr` field.
+
+## Hook: startup
+
+Scan all entity files (in `__DIR__/` only, not `_archive/`) for entities with a non-empty `pr` field and a non-terminal status. For each, extract the PR number (strip any `#`, `owner/repo#` prefix) and check: `gh pr view {number} --json state --jq '.state'`.
+
+If `MERGED`, advance the entity to its terminal stage: set `status` to the terminal stage, `completed` to ISO 8601 now, `verdict: PASSED`, clear `worktree`, archive the file, and clean up any worktree/branch. Report each auto-advanced entity to __CAPTAIN__.
+
+If `gh` is not available, warn __CAPTAIN__ and skip PR state checks.
+
+## Hook: merge
+
+This hook claims entities that have a non-empty `pr` field.
+
+Extract the PR number (strip `#`, `owner/repo#` prefix). Check PR state with `gh pr view {number} --json state --jq '.state'`.
+
+- `MERGED`: The PR was merged on GitHub — skip local merge (the code is already on the target branch). Proceed to archive.
+- `OPEN`: The PR is still open — report to __CAPTAIN__ and wait. Do not archive until the PR is resolved.
+- If `gh` is not available: warn __CAPTAIN__ that PR state cannot be checked. Ask __CAPTAIN__ whether to proceed with local merge or wait.
