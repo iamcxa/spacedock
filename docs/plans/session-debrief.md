@@ -91,9 +91,14 @@ Scan commit messages and task files for gate-related activity:
 - Rejected gates (entity sent back for redo or discarded)
 - Extract the reasoning if available from stage reports
 
-### 5. Bugs and fixes
+### 5. Issues found
 
 Commits with `fix:` prefix in the workflow directory. Also scan for any entity whose stage report mentions FAIL items.
+
+Categorize each issue into two buckets:
+
+- **Workflow-specific** — bugs or quirks in the user's pipeline (their stages, their entities, their agent instructions). These stay in the debrief as local notes.
+- **Spacedock issues** — bugs or limitations in the spacedock framework itself (first-officer template, commission skill, status script, ensign behavior). These are candidates for GitHub issue filing.
 
 ### 6. What's next
 
@@ -124,8 +129,12 @@ duration: 2h30m  # approximate, from commit timestamps
 ## Decisions
 {captain-contributed: why gates were approved/rejected, scope changes, course corrections}
 
-## Issues Found
-{bugs discovered, process problems, anything that went wrong}
+## Issues — Workflow
+{bugs or quirks in the user's pipeline: their stages, entities, agent instructions}
+
+## Issues — Spacedock
+{bugs or limitations in the spacedock framework itself}
+- {description} — {filed: owner/repo#123 | not filed}
 
 ## Observations
 {captain-contributed: design insights, process improvements, things to remember}
@@ -135,6 +144,25 @@ duration: 2h30m  # approximate, from commit timestamps
 - {entity slug} — blocked at gate, needs review
 - {entity slug} — deferred: {reason}
 ```
+
+### GitHub issue filing for spacedock bugs
+
+When spacedock issues are identified, the skill offers to file them on the spacedock repo (`gh issue create`). This makes bug reporting frictionless — users won't file issues manually, but they'll say "yes" to a one-click prompt.
+
+The issue body must be **anonymized** — the user's actual mission, entity titles, and content must not leak. Instead, include:
+- Clear reproduction steps
+- Scale context: entity count, stage count, linear vs branching flow
+- Rough workflow description (e.g., "4-stage linear workflow processing design ideas")
+- Spacedock version (from `commissioned-by` in README frontmatter)
+
+The skill reads the spacedock repo URL from the plugin manifest (`repository` field in `.claude-plugin/plugin.json`). The `gh` CLI handles authentication — if the user isn't authenticated, the skill reports the error and suggests the captain file manually.
+
+Flow:
+1. Present each spacedock issue with a draft GitHub issue title and body
+2. Ask the captain: "File this on the spacedock repo? (y/n/edit)"
+3. If yes, run `gh issue create` and record the issue URL in the debrief
+4. If edit, let the captain modify the title/body before filing
+5. If no, note "not filed" in the debrief
 
 ## Open Questions (Resolved)
 
@@ -150,11 +178,13 @@ A: No. The captain explicitly invokes it. The first officer can *remind* the cap
 2. The skill identifies the workflow directory (same pattern as refit: ask if not provided).
 3. The skill determines session boundaries from the most recent debrief's `last-commit` field, or falls back to a reasonable heuristic, and confirms with the captain.
 4. The skill auto-extracts: commits (scoped to workflow dir), task state changes, gate decisions, and dispatchable entities.
-5. The skill presents the draft debrief to the captain and pauses for commentary (decisions, observations, issues).
-6. The skill writes the debrief to `{dir}/_debriefs/{date}-{sequence}.md` with YAML frontmatter and structured sections.
-7. The skill commits the debrief file.
-8. The first-officer template gains a startup step: read the latest debrief from `_debriefs/` for session context (after status, before dispatch). This is a template change in `templates/first-officer.md`, not a change to any commissioned first-officer instance.
-9. The debrief file uses only data available from git and local files — no external services.
+5. Issues found during the session are categorized into workflow-specific vs spacedock issues.
+6. For each spacedock issue, the skill offers to file a GitHub issue with anonymized workflow context (no mission/entity content leaked — only scale, stage shape, version).
+7. The skill presents the draft debrief to the captain and pauses for commentary (decisions, observations, issues).
+8. The skill writes the debrief to `{dir}/_debriefs/{date}-{sequence}.md` with YAML frontmatter and structured sections.
+9. The skill commits the debrief file.
+10. The first-officer template gains a startup step: read the latest debrief from `_debriefs/` for session context (after status, before dispatch). This is a template change in `templates/first-officer.md`, not a change to any commissioned first-officer instance.
+11. The debrief file uses only data available from git and local files — no external services (except `gh` for optional issue filing).
 
 ## Stage Report: ideation
 
@@ -163,8 +193,12 @@ A: No. The captain explicitly invokes it. The first officer can *remind* the cap
 - [x] Proposed approach: skill vs agent capability, automated vs interactive, output format
   Skill at `/spacedock:debrief`, hybrid auto-extract + captain commentary, markdown in `_debriefs/`
 - [x] Data sources identified and extraction method for each
-  Six sources: session boundary (prior debrief anchor), git log, frontmatter diffs, gate decisions, fix commits, status --next
+  Six sources: session boundary (prior debrief anchor), git log, frontmatter diffs, gate decisions, categorized issues, status --next
 - [x] How the next session consumes the debrief
   First officer reads latest file from `_debriefs/` during startup, after status check
 - [x] Acceptance criteria written
-  Nine acceptance criteria covering skill creation, extraction, captain interaction, output, and first-officer integration
+  Eleven acceptance criteria covering skill creation, extraction, issue categorization, GitHub filing, captain interaction, output, and first-officer integration
+- [x] Issue categorization: workflow-specific vs spacedock issues
+  See "Issues found" data source and "GitHub issue filing" section — two buckets with different handling
+- [x] GitHub issue filing for spacedock bugs with anonymized context
+  See "GitHub issue filing for spacedock bugs" section — uses `gh issue create`, anonymizes workflow details, captain approves each filing
