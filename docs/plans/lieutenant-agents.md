@@ -1,9 +1,9 @@
 ---
 title: Stage-specialized lieutenant agents
 id: 035
-status: backlog
+status: ideation
 source: CL
-started:
+started: 2026-03-27T00:00:00Z
 completed:
 verdict:
 score: 0.80
