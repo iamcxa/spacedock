@@ -77,7 +77,7 @@ if [ -f "$SELF_HOSTED_PIPELINE/README.md" ]; then
     echo "Running refit..."
     echo ""
 
-    CLAUDE_ARGS=(-p "/spacedock:refit $SELF_HOSTED_PIPELINE" --plugin-dir "$REPO_ROOT" --dangerously-skip-permissions)
+    CLAUDE_ARGS=("/spacedock:refit $SELF_HOSTED_PIPELINE" --plugin-dir "$REPO_ROOT" --dangerously-skip-permissions)
     if command -v safehouse >/dev/null 2>&1; then
         safehouse claude "${CLAUDE_ARGS[@]}"
     else
@@ -86,8 +86,7 @@ if [ -f "$SELF_HOSTED_PIPELINE/README.md" ]; then
 
     # Commit any refit changes
     if ! git diff-index --quiet HEAD --; then
-        git add -A
-        git commit -m "refit: upgrade workflow scaffolding to spacedock@$VERSION"
+        git commit -m "refit: upgrade workflow scaffolding to spacedock@$VERSION" -a
     else
         echo "(No refit changes to commit)"
     fi
