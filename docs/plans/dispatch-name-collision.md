@@ -1,7 +1,7 @@
 ---
 id: 051
 title: First-officer must use unique ensign names per dispatch
-status: implementation
+status: validation
 source: https://github.com/clkao/spacedock/issues/1
 started: 2026-03-27T05:50:00Z
 completed:
