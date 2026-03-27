@@ -267,3 +267,20 @@ This enforces TDD discipline that a generic ensign wouldn't follow. The stage de
 - [ ] The ensign template is unchanged — lieutenants are a separate mechanism, not a modification to ensigns
 - [ ] Lieutenant agent files follow the same behavioral contract as ensigns (same completion protocol, same stage report format, same rules about frontmatter)
 - [ ] Existing pipelines without `agent:` properties continue to work unchanged (all stages dispatch ensign by default)
+
+## Stage Report: implementation
+
+- [x] First-officer template reads the `agent` property from stages frontmatter and dispatches with the specified `subagent_type`, falling back to `ensign` when absent. Agent dispatch name follows pattern `{agent}-{slug}`. Worktree/branch naming uses `{agent}-{slug}` pattern consistently.
+  `templates/first-officer.md` dispatch step 4 reads `agent` property; step 7 uses `subagent_type="{agent}"` and `name="{agent}-{slug}"`; worktree step 6 uses `.worktrees/{agent}-{slug}` and branch `{agent}/{slug}`.
+- [x] Commission skill accepts `agent:` in stage state definitions during interactive design and passes it through to the generated README. Commission warns when a referenced lieutenant agent file does not exist after generation.
+  `skills/commission/SKILL.md` README template includes `{agent: {lieutenant-name} ...}` in stage state entries; new "Lieutenant Agent Warnings" section checks for missing agent files post-generation.
+- [x] Ensign template is NOT modified — lieutenants are a separate mechanism.
+  `git diff templates/ensign.md` shows no changes.
+- [x] Existing pipelines without `agent:` properties continue to work unchanged — all stages dispatch ensign by default (backward compatibility).
+  First-officer step 4: "If no `agent` property, default to `ensign`." No structural changes to dispatch flow for stages without `agent`.
+- [x] All changes committed to the worktree with a summary of what was built and where.
+  Commit `f6627ff` on branch `ensign/lieutenant-agents`.
+
+### Summary
+
+Updated `templates/first-officer.md` to read an optional `agent` property from each stage's frontmatter entry and dispatch with variable `subagent_type` instead of hardcoded `ensign`. Updated `skills/commission/SKILL.md` to accept `agent:` in stage definitions and warn about missing lieutenant agent files after generation. The ensign template is untouched. All "ensign" references in the first-officer template that meant "the dispatched worker" were updated to be agent-agnostic, preserving the ensign default.
