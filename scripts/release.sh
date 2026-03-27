@@ -1,6 +1,6 @@
 #!/bin/bash
 # ABOUTME: Release script that bumps versions, refits, generates changelog, and tags.
-# ABOUTME: Works in a release branch, does not push — gives the user control over final review.
+# ABOUTME: Works in a worktree so main stays clean during the release process.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -35,12 +35,14 @@ fi
 
 MAIN_BRANCH=$(git branch --show-current)
 RELEASE_BRANCH="release/$VERSION"
+WORKTREE_PATH="$REPO_ROOT/.worktrees/release-$VERSION"
 PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
-# --- Step 1: Create release branch and bump version ---
+# --- Step 1: Create release worktree and bump version ---
 
-echo "Creating release branch: $RELEASE_BRANCH"
-git checkout -b "$RELEASE_BRANCH"
+echo "Creating release worktree: $WORKTREE_PATH (branch: $RELEASE_BRANCH)"
+git worktree add "$WORKTREE_PATH" -b "$RELEASE_BRANCH"
+cd "$WORKTREE_PATH"
 
 PLUGIN_JSON=".claude-plugin/plugin.json"
 MARKETPLACE_JSON=".claude-plugin/marketplace.json"
@@ -138,12 +140,15 @@ cat "$CHANGELOG_FILE"
 echo ""
 echo "=========================================="
 
-# Create tag with proposed changelog (no push)
+# Create tag from release branch
 echo ""
 echo "Creating tag $TAG (local only, not pushed)..."
 git tag -a "$TAG" -m "Release $VERSION
 
 $(cat "$CHANGELOG_FILE")"
+
+# Return to main
+cd "$REPO_ROOT"
 
 # --- Step 4: Show next steps ---
 
@@ -152,8 +157,8 @@ echo "=========================================="
 echo "RELEASE PREPARED: $TAG"
 echo "=========================================="
 echo ""
-echo "The release is ready on branch '$RELEASE_BRANCH' with tag '$TAG'."
-echo "Nothing has been pushed yet."
+echo "The release is ready in worktree '$WORKTREE_PATH' (branch '$RELEASE_BRANCH') with tag '$TAG'."
+echo "Main branch is untouched. Nothing has been pushed."
 echo ""
 echo "To review:"
 echo "  git log $MAIN_BRANCH..$RELEASE_BRANCH --oneline"
@@ -166,12 +171,12 @@ echo ""
 echo "your changelog here'"
 echo ""
 echo "To publish:"
-echo "  git checkout $MAIN_BRANCH"
 echo "  git merge $RELEASE_BRANCH"
 echo "  git push origin $MAIN_BRANCH $TAG"
+echo "  git worktree remove $WORKTREE_PATH"
 echo "  git branch -d $RELEASE_BRANCH"
 echo ""
 echo "To abort:"
-echo "  git checkout $MAIN_BRANCH"
+echo "  git worktree remove $WORKTREE_PATH"
 echo "  git branch -D $RELEASE_BRANCH"
 echo "  git tag -d $TAG"
