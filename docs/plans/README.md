@@ -174,6 +174,8 @@ Validation pilots should use these when verifying implementation work:
 
 The test harness documents how to run `claude -p` with `--plugin-dir` for non-interactive commission testing, plus structural and guardrail assertions against the generated output. Use it for any task that changes `skills/commission/SKILL.md` or the first-officer template.
 
+All tests run via `claude -p` in worktrees. E2E tests that invoke `claude -p` (commission harness, gate guardrail, dispatch names, terminology benchmark) work within the standard dispatch environment and should be run as part of validation.
+
 ## Commit Discipline
 
 - Commit status changes at dispatch and merge boundaries
