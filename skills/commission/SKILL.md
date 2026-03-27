@@ -10,7 +10,7 @@ user-invocable: true
 
 You are commissioning a plain text workflow. A plain text workflow is a directory of markdown files with YAML frontmatter, where each file is a work entity that moves through stages. The directory's README is the single source of truth for schema and stages, and a self-describing Python script provides workflow status views.
 
-This is a v0 shuttle-mode workflow: one general-purpose ensign agent handles all stages. You will walk {captain} through interactive design, generate all workflow files, then launch a pilot run.
+This is a v0 shuttle-mode workflow: an ensign agent handles stages by default, with optional lieutenant agents for stages that need specialized methodology. You will walk {captain} through interactive design, generate all workflow files, then launch a pilot run.
 
 Follow these three phases in order. Do not skip or combine phases.
 
@@ -223,6 +223,7 @@ stages:
       {worktree: true — only if the stage modifies code or produces artifacts beyond the entity file}
       {fresh: true — only if an independent perspective matters, e.g., validation}
       {gate: true — if this stage is the SOURCE in an approval_gates transition}
+      {agent: {lieutenant-name} — only if {captain} specifies a lieutenant agent for this stage. Omit to use the default ensign. The value is the agent file basename without .md.}
     - name: {last_stage}
       terminal: true
   transitions:
@@ -272,7 +273,7 @@ worktree:
 | `completed` | ISO 8601 | When the {entity_label} reached terminal status |
 | `verdict` | enum | PASSED or REJECTED — set at final stage |
 | `score` | number | Priority score, 0.0–1.0 (optional). Workflows can upgrade to a multi-dimension rubric in their README. |
-| `worktree` | string | Worktree path while an ensign is active, empty otherwise |
+| `worktree` | string | Worktree path while a dispatched agent is active, empty otherwise |
 
 ## Stages
 
@@ -446,6 +447,14 @@ After generating all files, verify before proceeding:
 - [ ] `{project_root}/.claude/agents/ensign.md` exists with all sections
 - [ ] `.worktrees/` is in `{project_root}/.gitignore`
 
+### Lieutenant Agent Warnings
+
+After generation, check the README frontmatter for any stages with an `agent:` property. For each referenced agent, check whether `{project_root}/.claude/agents/{agent}.md` exists. If a referenced agent file does not exist, warn {captain}:
+
+> Stage '{stage_name}' references agent '{agent}' but `{project_root}/.claude/agents/{agent}.md` does not exist. You'll need to create this file before running the workflow.
+
+This is a warning, not a blocker — proceed with the pilot run regardless. The first officer will fall back to dispatching `ensign` if the referenced agent file is not found at runtime.
+
 ---
 
 ## Phase 3: Pilot Run
@@ -477,7 +486,7 @@ Tell {captain} what was generated:
 Do not spawn a subagent. Instead, the commission skill itself takes on the first-officer role for the initial run:
 
 1. Read the generated first-officer agent file at `{project_root}/.claude/agents/first-officer.md`.
-2. Follow its instructions: read the workflow README, run the status script, and dispatch ensigns for entities ready to advance.
+2. Follow its instructions: read the workflow README, run the status script, and dispatch agents for entities ready to advance.
 
 Execute the first-officer startup procedure directly. You are now the first officer for the remainder of this session.
 
@@ -509,4 +518,4 @@ After Step 3 or Step 4 (whether the pilot run succeeded or failed), always concl
 > claude --agent first-officer
 > ```
 >
-> The first officer will read the workflow state, pick up where things left off, and dispatch ensigns for any entities ready for their next stage.
+> The first officer will read the workflow state, pick up where things left off, and dispatch agents for any entities ready for their next stage.
