@@ -1,7 +1,7 @@
 ---
 id: 053
 title: Remove redundant Workflow Path section from first-officer template
-status: implementation
+status: validation
 source: CL
 started: 2026-03-27T07:02:00Z
 completed:
