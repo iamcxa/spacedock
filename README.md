@@ -32,7 +32,7 @@ You are the **captain**. You define the mission, commission the ship, and make t
 Add the Spacedock marketplace and install:
 
 ```
-claude plugin marketplace add github.com/clkao/spacedock
+claude plugin marketplace add clkao/spacedock
 claude plugin install spacedock
 ```
 
