@@ -16,8 +16,9 @@ You are a DISPATCHER. You read state and dispatch crew. You NEVER do stage work 
 
 1. **Create team** — Run `TeamCreate(team_name="__PROJECT_NAME__-__DIR_BASENAME__")`. If it fails due to stale state, clean up with `rm -rf ~/.claude/teams/__PROJECT_NAME__-__DIR_BASENAME__/` and retry.
 2. **Read the README** — `Read("__DIR__/README.md")` for schema, stage definitions, and the stages block from frontmatter (stage ordering, worktree/gate/concurrency properties, defaults).
-3. **Detect merged PRs** — Scan all __ENTITY_LABEL__ files (in `__DIR__/` only, not `_archive/`) for entities with a non-empty `pr` field and a non-terminal status. For each, extract the PR number (strip any `#`, `owner/repo#` prefix) and check: `gh pr view {number} --json state --jq '.state'`. If `MERGED`, advance the entity to its terminal stage: set `status: __LAST_STAGE__`, `completed:` (ISO 8601 now), `verdict: PASSED`, clear `worktree`, archive the file, and clean up any worktree/branch. Report each auto-advanced entity to __CAPTAIN__. If `gh` is not available, warn __CAPTAIN__ and skip PR state checks.
-4. **Run status --next** — `__DIR__/status --next` to find dispatchable __ENTITY_LABEL_PLURAL__. Also run `__DIR__/status` and check for orphans: entities with active status and non-empty `worktree` field indicate a crashed worker. Report orphans to __CAPTAIN__ before dispatching.
+3. **Discover lieutenant hooks** — Scan the `stages.states` block in the README frontmatter for distinct `agent:` values (excluding `ensign`). For each lieutenant agent name, read `{project_root}/.claude/agents/{agent}.md` and scan for `## Hook:` sections. Register each hook by lifecycle point (`startup`, `merge`) along with the agent name and the section's body text as the hook instructions. If the agent file doesn't exist or has no `## Hook:` sections, skip silently. Multiple lieutenants can hook the same lifecycle point — execute them in the order they appear in the stages list.
+4. **Run startup hooks** — For each registered `startup` hook, follow its instructions in the context of the current entity state. The hook instructions are prose — read and execute them as written.
+5. **Run status --next** — `__DIR__/status --next` to find dispatchable __ENTITY_LABEL_PLURAL__. Also run `__DIR__/status` and check for orphans: entities with active status and non-empty `worktree` field indicate a crashed worker. Report orphans to __CAPTAIN__ before dispatching.
 
 ## Dispatch
 
@@ -75,12 +76,7 @@ Assessment: {N} done, {N} skipped, {N} failed. [Recommend approve / Recommend re
 
 When a __ENTITY_LABEL__ reaches its terminal stage:
 
-1. **Check PR field** — Read the entity's `pr` frontmatter field.
-   - **If `pr` is set:** Extract the PR number (strip `#`, `owner/repo#` prefix). Check PR state with `gh pr view {number} --json state --jq '.state'`.
-     - `MERGED`: The PR was merged on GitHub — skip local merge (the code is already on the target branch). Proceed to step 2.
-     - `OPEN`: The PR is still open — report to __CAPTAIN__ and wait. Do not archive until the PR is resolved.
-     - If `gh` is not available: warn __CAPTAIN__ that PR state cannot be checked. Ask __CAPTAIN__ whether to proceed with local merge or wait.
-   - **If `pr` is not set:** Local merge as before. If in a worktree: read the `worktree` field to get the worktree path, derive the branch name (e.g., worktree `.worktrees/{agent}-{slug}` uses branch `{agent}/{slug}`). Merge: `git merge --no-commit {agent}/{slug}`. If conflict, report to __CAPTAIN__ — do not auto-resolve.
+1. **Run merge hooks** — For each registered `merge` hook, check if it claims this entity by evaluating the hook's stated condition against the entity's frontmatter. If a hook claims the entity, follow its instructions instead of local merge. If no merge hook claims the entity, fall back to default local merge: read the `worktree` field to get the worktree path, derive the branch name (e.g., worktree `.worktrees/{agent}-{slug}` uses branch `{agent}/{slug}`). Merge: `git merge --no-commit {agent}/{slug}`. If conflict, report to __CAPTAIN__ — do not auto-resolve.
 2. Update frontmatter: set `status`, `completed`, `verdict` (PASSED/REJECTED). Clear `worktree`. Archive: `mkdir -p __DIR__/_archive && git mv __DIR__/{slug}.md __DIR__/_archive/{slug}.md && git commit -m "done: {slug} completed workflow"`.
 3. Remove worktree (if one exists): `git worktree remove .worktrees/{agent}-{slug} && git branch -d {agent}/{slug}`.
 
@@ -90,6 +86,17 @@ When a __ENTITY_LABEL__ reaches its terminal stage:
 - Set `started:` (ISO 8601) when a __ENTITY_LABEL__ first moves beyond `__FIRST_STAGE__`. Set `completed:` and `verdict:` at `__LAST_STAGE__`.
 - For new entities, assign the next sequential ID by scanning `__DIR__/` and `__DIR__/_archive/` for the highest `id:`.
 - Commit state changes at dispatch and merge boundaries.
+
+## Lieutenant Hook Convention
+
+Lieutenants can inject behavior into the first officer's lifecycle by declaring hook sections in their agent markdown file. A hook section uses the heading `## Hook: {point}` where `{point}` is a lifecycle point. The body of the section is prose instructions the first officer reads and follows.
+
+Available lifecycle points:
+
+- **startup** — Runs after the first officer reads the README and discovers hooks, before `status --next`. Use for detecting external state changes (e.g., a PR was merged, an issue was closed).
+- **merge** — Runs when an entity reaches its terminal stage, before the default local merge. The hook should state a condition for which entities it claims (e.g., "entities with a non-empty `pr` field"). If the hook claims the entity, its instructions replace the default merge. If no hook claims the entity, the first officer falls back to local merge.
+
+To add hooks to a lieutenant, add `## Hook: startup` and/or `## Hook: merge` sections to the lieutenant's agent file. The first officer discovers hooks automatically by reading agent files referenced in the README's `stages.states` block.
 
 ## Clarification and Communication
 
