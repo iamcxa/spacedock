@@ -222,11 +222,17 @@ if [ -f "$FO" ]; then
   else
     fail "guardrail: report-once"
   fi
+  if grep -cE "NEVER self-approve|NOT treat ensign.*messages as approval" "$FO" | grep -qv "^0$"; then
+    pass "guardrail: gate self-approval prohibition"
+  else
+    fail "guardrail: gate self-approval prohibition"
+  fi
 else
   fail "guardrail: Agent tool required (file missing)"
   fail "guardrail: subagent_type prohibition (file missing)"
   fail "guardrail: TeamCreate in startup (file missing)"
   fail "guardrail: report-once (file missing)"
+  fail "guardrail: gate self-approval prohibition (file missing)"
 fi
 
 # -- README frontmatter: stages block --

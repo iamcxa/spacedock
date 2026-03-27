@@ -1,0 +1,41 @@
+#!/bin/bash
+# ABOUTME: Status viewer for the gated-pipeline test fixture.
+# ABOUTME: Displays task status from YAML frontmatter in markdown files.
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if [ "$1" = "--archived" ]; then
+  DIR="$SCRIPT_DIR/_archive"
+else
+  DIR="$SCRIPT_DIR"
+fi
+
+printf "%-25s %-10s %-30s %-7s %-10s\n" "TASK" "STATUS" "TITLE" "SCORE" "SOURCE"
+printf "%-25s %-10s %-30s %-7s %-10s\n" "----" "------" "-----" "-----" "------"
+
+for file in "$DIR"/*.md; do
+  [ "$(basename "$file")" = "README.md" ] && continue
+  [ ! -f "$file" ] && continue
+
+  slug="$(basename "$file" .md)"
+  status="" title="" score="" source=""
+  in_fm=0
+
+  while IFS= read -r line; do
+    case "$line" in
+      ---) if [ $in_fm -eq 0 ]; then in_fm=1; else break; fi ;;
+      *)
+        if [ $in_fm -eq 1 ]; then
+          case "$line" in
+            status:*) status="${line#*:}"; status="${status# }" ;;
+            title:*)  title="${line#*:}";  title="${title# }" ;;
+            score:*)  score="${line#*:}";  score="${score# }" ;;
+            source:*) source="${line#*:}"; source="${source# }" ;;
+          esac
+        fi
+        ;;
+    esac
+  done < "$file"
+
+  printf "%-25s %-10s %-30s %-7s %-10s\n" "$slug" "$status" "$title" "$score" "$source"
+done
