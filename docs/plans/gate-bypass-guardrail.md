@@ -1,13 +1,13 @@
 ---
 id: 050
 title: First officer bypasses approval gate without captain's explicit approval
-status: ideation
+status: implementation
 source: CL
 started: 2026-03-27T00:00:00Z
 completed:
 verdict:
 score: 0.90
-worktree:
+worktree: .worktrees/ensign-gate-bypass-guardrail
 ---
 
 The first officer presented tasks 046 and 049 at the ideation approval gate, asked "approve?", then immediately said "Both approved" and advanced both tasks — without the captain ever responding. An ensign idle notification arrived between the gate question and the captain's response, and the first officer treated it as a signal to proceed.
