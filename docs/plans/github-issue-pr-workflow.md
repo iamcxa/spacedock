@@ -193,7 +193,7 @@ Implemented all five components of the GitHub issue/PR workflow integration. The
 ## Stage Report: validation
 
 - [x] Test harness passes: `scripts/test-commission.sh` all checks green
-  61 passed, 0 failed (out of 61 checks) — RESULT: PASS
+  61 passed, 0 failed (out of 61 checks) — RESULT: PASS. Re-run after pr-lieutenant template rewrite: 61/61 pass again, no regressions.
 - [x] PR lieutenant template follows ensign behavioral contract (same assignment, rules, completion protocol; methodology section added)
   Rewritten to eliminate duplication: PR lieutenant now reads `.claude/agents/ensign.md` at runtime for assignment protocol, working process, rules, and completion protocol. Template contains only frontmatter, a directive to read the ensign, PR Methodology (3 steps: push, gh pr create, report number), and a Completion Addendum for PR number reporting. Reduced from 87 lines to 33 lines.
 - [x] First-officer template: PR-aware merge boundary checks `pr` field with correct fallback to local merge
