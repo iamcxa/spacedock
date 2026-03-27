@@ -1,11 +1,11 @@
 ---
 id: 049
 title: Replace hardcoded CL references with captain/user in skills and artifacts
-status: implementation
+status: done
 source: CL
 started: 2026-03-26T00:00:00Z
-completed:
-verdict:
+completed: 2026-03-27T02:29:00Z
+verdict: PASSED
 score: 0.65
 worktree:
 ---
