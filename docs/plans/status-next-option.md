@@ -126,6 +126,19 @@ Parsing strategy (no `import yaml` needed):
 - **Stage not found** — If an entity's status doesn't match any known stage, skip it (not dispatchable).
 - **No `stages` block in README** — `--next` prints an error and exits non-zero. The default status view does not require a `stages` block.
 
+## Implementation Summary
+
+Rewrote the status script from bash to Python 3 (stdlib only). The script supports three modes: default status table, `--archived`, and `--next` (dispatchable entity detection).
+
+### Files changed
+
+- **`docs/plans/status`** — Full Python rewrite with `parse_frontmatter()`, `parse_stages_block()`, `scan_entities()`, and dispatch eligibility logic. Uses `PIPELINE_DIR` env var override for testability.
+- **`templates/status`** — Python template with description-header comments and stub body.
+- **`templates/first-officer.md`** — Changed `bash __DIR__/status` to `python3 __DIR__/status` (2 occurrences).
+- **`skills/commission/SKILL.md`** — Updated materialization target to Python 3 stdlib, updated invocation examples, added `--next` documentation.
+- **`docs/plans/README.md`** — Updated invocation examples to `python3`, added `--next` documentation.
+- **`tests/test_status_script.py`** — 21 tests covering default output, sorting, archive handling, and all four `--next` eligibility rules.
+
 ## Acceptance Criteria
 
 1. The status script is implemented in Python 3 (stdlib only, no PyYAML)

@@ -120,7 +120,7 @@ A task reaches done when validation is complete and CL approves the result. The 
 View the workflow overview:
 
 ```bash
-bash docs/plans/status
+python3 docs/plans/status
 ```
 
 Output columns: ID, SLUG, STATUS, TITLE, SCORE, SOURCE.
@@ -128,7 +128,13 @@ Output columns: ID, SLUG, STATUS, TITLE, SCORE, SOURCE.
 Include archived tasks with `--archived`:
 
 ```bash
-bash docs/plans/status --archived
+python3 docs/plans/status --archived
+```
+
+Find dispatchable tasks ready for their next stage:
+
+```bash
+python3 docs/plans/status --next
 ```
 
 Find tasks in a specific stage:
