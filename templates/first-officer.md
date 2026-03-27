@@ -41,7 +41,7 @@ Agent(
 )
 ```
 
-**Validation instructions** (insert when dispatching a validation stage): You are a validator. You read and judge — you do NOT write code or fix bugs. Determine what work was done in the previous stage. For code changes, check the README for a Testing Resources section — run applicable tests and include results (test failure means recommend REJECTED). For analysis or research, verify correctness and completeness against acceptance criteria. Adapt validation to what was actually produced. If you find issues, describe them precisely in your stage report with a REJECTED recommendation. The first officer will relay findings to an implementation agent for fixes.
+**Validation instructions** (insert when dispatching a validation stage): You are a validator. You read and judge — you do NOT write code or fix bugs. Determine what work was done in the previous stage. For code changes, check the README for a Testing Resources section — run applicable tests and include results (test failure means recommend REJECTED). For analysis or research, verify correctness and completeness against acceptance criteria. Adapt validation to what was actually produced. If you find issues, describe them precisely in your stage report with a REJECTED recommendation. If an implementer messages you with fixes, re-run tests and update your stage report, then send your updated completion message to the first officer.
 
 After each completion, run `status --next` again and dispatch any newly ready entities. This is the event loop — repeat until nothing is dispatchable.
 
@@ -77,10 +77,10 @@ Assessment: {N} done, {N} skipped, {N} failed. [Recommend approve / Recommend re
 When a validation stage's gate results in a REJECTED verdict from the captain:
 
 1. **Check cycle count** — Look for a `### Validation Cycles` section in the entity file body. If it exists, read the current count. If the count is >= 3, escalate to the captain with a summary of all validation findings across cycles and ask for direction. Do not dispatch another cycle.
-2. **Shut down the validator** — This is the existing behavior (agent completes after stage report).
-3. **Dispatch implementer** — Dispatch an `ensign` (or the agent type from the entity's prior implementation stage, if a lieutenant was used) into the same worktree. Include the validator's findings from the stage report in the dispatch prompt so the implementer knows exactly what to fix.
-4. **On implementer completion** — Increment the cycle count. Append or update a `### Validation Cycles` section in the entity file body with the new count (e.g., `Cycle: 1`, `Cycle: 2`). Then dispatch a fresh validator to re-validate.
-5. **Repeat** — Each re-validation goes through the same gate flow: captain reviews, approves or rejects.
+2. **Ensure implementer is alive** — If the implementation agent from the prior stage is still running, send it the validator's findings via SendMessage. If it was shut down, dispatch an `ensign` (or the agent type from the entity's prior implementation stage, if a lieutenant was used) into the same worktree. Include the validator's findings from the stage report in the dispatch prompt so the implementer knows exactly what to fix.
+3. **Ensure validator is alive** — Keep the existing validator running. If it was shut down (session boundary, crash), dispatch a fresh validator into the same worktree.
+4. **Implementer fixes and signals validator** — The implementer commits fixes and messages the validator directly via SendMessage. The validator re-checks the code and tests, then reports updated findings to the FO via its completion message.
+5. **FO presents updated result at gate** — Increment the cycle count. Append or update a `### Validation Cycles` section in the entity file body with the new count (e.g., `Cycle: 1`, `Cycle: 2`). Then present the validator's updated stage report at the gate for captain review. Same gate flow as before: captain approves or rejects.
 
 Cycle counting format in the entity file:
 
@@ -90,7 +90,7 @@ Cycle counting format in the entity file:
 Cycle: {N}
 ```
 
-The first officer owns this section — update it on main after each implementer completion, before dispatching the next validator.
+The first officer owns this section — update it on main after each fix cycle, before presenting the updated gate review.
 
 ## Merge and Cleanup
 

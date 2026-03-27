@@ -64,6 +64,8 @@ The validator template will:
 
 ### 3. Communication and Iteration Protocol
 
+Practice runs showed the serial model (shut down validator, dispatch implementer, respawn validator) adds unnecessary FO round-trips. The parallel model lets implementer and validator coordinate directly while the FO observes.
+
 **Flow when validation finds issues:**
 
 ```
@@ -73,18 +75,21 @@ Validator finds bug
   → FO presents stage report at gate (validation has gate: true)
   → Captain reviews: approve REJECTED, or reject (redo validation)
   → If captain agrees findings are valid:
-      → FO dispatches implementation agent in worktree with findings
-      → Implementer fixes, commits, sends completion
-      → FO dispatches fresh validator to re-validate
+      → FO ensures implementer is alive (respawn if needed) with findings
+      → FO ensures validator is alive (keep running or respawn if crashed)
+      → Implementer fixes, commits, messages validator directly
+      → Validator re-checks, updates stage report, messages FO
+      → FO presents updated result at gate
       → Cycle repeats
 ```
 
 Key design points:
 
-- **FO mediates all communication.** No direct validator-to-implementer messaging. The FO is the dispatcher; it relays findings as dispatch context. This keeps the FO as the single source of truth for entity state.
-- **Iteration limit: 3 fix cycles** before escalation to captain. The FO tracks cycle count in the entity file body (a `### Validation Cycles` section or similar). After 3 cycles of rejected validation, the FO reports to the captain with a summary of all findings and asks for direction.
-- **Implementer disagreement:** Not an issue in this model. The implementer gets findings as dispatch context, not as a debate. If the finding is invalid, the implementer fixes the actual issue (or does nothing if there's nothing to fix), and the next validation pass should reflect the true state.
-- **Each validation dispatch is fresh.** The validator never accumulates state from prior cycles — each dispatch gets the current code state and the current acceptance criteria.
+- **Peer-to-peer fix cycles.** The implementer and validator coordinate directly via SendMessage for the fix/re-check cycle. The FO only re-enters when the validator sends its updated completion message. This avoids unnecessary FO round-trips between each fix and re-check.
+- **Validator persists across cycles.** The validator is NOT shut down between cycles — it stays alive as a reviewer. If it crashes or the session ends, the FO respawns a fresh one.
+- **FO owns the gate.** While agents coordinate directly for fixes, the FO still presents the updated stage report at the gate for captain review. The FO remains the single source of truth for entity state transitions.
+- **Iteration limit: 3 fix cycles** before escalation to captain. The FO tracks cycle count in the entity file body (a `### Validation Cycles` section). After 3 cycles of rejected validation, the FO reports to the captain with a summary of all findings and asks for direction.
+- **Implementer disagreement:** Not an issue in this model. The implementer gets findings as context, not as a debate. If the finding is invalid, the implementer fixes the actual issue (or does nothing if there's nothing to fix), and the next validation pass should reflect the true state.
 
 ### 4. Changes to First-Officer Template
 
@@ -107,10 +112,10 @@ No `agent:` property needed — `fresh: true` implies `validator`. Pipelines tha
 Add a `## Validation Rejection Flow` section after the existing "Completion and Gates" section. When a validation stage's gate results in a REJECTED verdict from the captain:
 
 1. Check cycle count. If >= 3, escalate to captain with full history.
-2. Shut down the validator (existing behavior).
-3. Dispatch an implementation agent (ensign or the agent type from the prior implementation stage) into the same worktree with findings from the validation stage report.
-4. When the implementer completes, dispatch a fresh validator.
-5. Increment cycle count.
+2. Ensure implementer is alive (respawn if needed) with validator findings.
+3. Ensure validator is alive (keep running or respawn if crashed).
+4. Implementer fixes and messages validator directly. Validator re-checks and reports to FO.
+5. FO increments cycle count and presents updated result at gate.
 
 **C. Validation instructions update:**
 Currently: "Determine what work was done in the previous stage. For code changes, check the README for a Testing Resources section — run applicable tests and include results..."
