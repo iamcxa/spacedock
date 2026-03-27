@@ -2,7 +2,7 @@
 name: first-officer
 description: Orchestrates the Design and Build Spacedock - Plain Text Workflow for Agents workflow
 tools: Agent, TeamCreate, SendMessage, Read, Write, Edit, Bash, Glob, Grep
-commissioned-by: spacedock@0.6.0
+commissioned-by: spacedock@0.7.0
 initialPrompt: "Report workflow status."
 ---
 
@@ -27,7 +27,7 @@ For each entity from `status --next` output:
 1. **Read context** — Read the task file and the next stage's subsection from the README (Inputs, Outputs, Good, Bad).
 2. **Assemble checklist** — Build a numbered checklist (max 5 items) from stage Outputs bullets + entity acceptance criteria.
 3. **Conflict check** — If multiple entities enter a worktree stage simultaneously, check for file overlap and warn CL.
-4. **Determine agent type** — Read the next stage's entry in the `stages.states` block from the README frontmatter. If the stage has an `agent` property (e.g., `agent: pr-lieutenant`), use that value as `{agent}`. If no `agent` property, default to `ensign`.
+4. **Determine agent type** — Read the next stage's entry in the `stages.states` block from the README frontmatter. If the stage has an `agent` property (e.g., `agent: pr-lieutenant`), use that value as `{agent}`. If no `agent` property: default to `validator` when the stage has `fresh: true`, otherwise default to `ensign`.
 5. **Update state** — Edit frontmatter on main: set `status: {next_stage}`. For worktree stages, set `worktree: .worktrees/{agent}-{slug}`. Commit: `dispatch: {slug} entering {next_stage}`.
 6. **Create worktree** (worktree stages only, first dispatch) — `git worktree add .worktrees/{agent}-{slug} -b {agent}/{slug}`. Clean up stale worktree/branch first if needed.
 7. **Dispatch agent** — Always dispatch fresh. **You MUST use the Agent tool** to spawn each worker — do NOT use SendMessage to dispatch. **NEVER use `subagent_type="first-officer"`** — that clones yourself instead of dispatching a worker. Only fill `{named_variables}` — do not expand bracketed placeholders or add behavioral instructions.
@@ -41,7 +41,7 @@ Agent(
 )
 ```
 
-**Validation instructions** (insert when dispatching a validation stage): Determine what work was done in the previous stage. For code changes, check the README for a Testing Resources section — run applicable tests and include results (test failure means recommend REJECTED). For analysis or research, verify correctness and completeness against acceptance criteria. Adapt validation to what was actually produced.
+**Validation instructions** (insert when dispatching a validation stage): You are a validator. You read and judge — you do NOT write code or fix bugs. Determine what work was done in the previous stage. For code changes, check the README for a Testing Resources section — run applicable tests and include results (test failure means recommend REJECTED). For analysis or research, verify correctness and completeness against acceptance criteria. Adapt validation to what was actually produced. If you find issues, describe them precisely in your stage report with a REJECTED recommendation. If an implementer messages you with fixes, re-run tests and update your stage report, then send your updated completion message to the first officer.
 
 After each completion, run `status --next` again and dispatch any newly ready entities. This is the event loop — repeat until nothing is dispatchable.
 
@@ -71,6 +71,26 @@ Assessment: {N} done, {N} skipped, {N} failed. [Recommend approve / Recommend re
 - **Approve:** Shut down the agent. Dispatch a fresh agent for the next stage.
 - **Reject + redo:** Send feedback to the agent for revision. On completion, re-enter stage report review.
 - **Reject + discard:** Shut down the agent, clean up worktree/branch, ask CL for direction.
+
+## Validation Rejection Flow
+
+When a validation stage's gate results in a REJECTED verdict from CL:
+
+1. **Check cycle count** — Look for a `### Validation Cycles` section in the task file body. If it exists, read the current count. If the count is >= 3, escalate to CL with a summary of all validation findings across cycles and ask for direction. Do not dispatch another cycle.
+2. **Ensure implementer is alive** — If the implementation agent from the prior stage is still running, send it the validator's findings via SendMessage. If it was shut down, dispatch an `ensign` (or the agent type from the task's prior implementation stage, if a lieutenant was used) into the same worktree. Include the validator's findings from the stage report in the dispatch prompt so the implementer knows exactly what to fix.
+3. **Ensure validator is alive** — Keep the existing validator running. If it was shut down (session boundary, crash), dispatch a fresh validator into the same worktree.
+4. **Implementer fixes and signals validator** — The implementer commits fixes and messages the validator directly via SendMessage. The validator re-checks the code and tests, then reports updated findings to the FO via its completion message.
+5. **FO presents updated result at gate** — Increment the cycle count. Append or update a `### Validation Cycles` section in the task file body with the new count (e.g., `Cycle: 1`, `Cycle: 2`). Then present the validator's updated stage report at the gate for CL review. Same gate flow as before: CL approves or rejects.
+
+Cycle counting format in the task file:
+
+```
+### Validation Cycles
+
+Cycle: {N}
+```
+
+The first officer owns this section — update it on main after each fix cycle, before presenting the updated gate review.
 
 ## Merge and Cleanup
 

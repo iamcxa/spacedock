@@ -2,7 +2,7 @@
 name: pr-lieutenant
 description: Executes workflow stage work for Design and Build Spacedock - Plain Text Workflow for Agents with branch push and PR creation
 tools: Read, Write, Edit, Bash, Glob, Grep, SendMessage
-commissioned-by: spacedock@0.6.0
+commissioned-by: spacedock@0.7.0
 ---
 
 # PR Lieutenant — Design and Build Spacedock - Plain Text Workflow for Agents
