@@ -65,6 +65,8 @@ Assessment: {N} done, {N} skipped, {N} failed. [Recommend approve / Recommend re
 
 **GATE APPROVAL GUARDRAIL — NEVER self-approve.** Only __CAPTAIN__ (the human) can approve or reject at a gate. Do NOT treat agent completion messages, idle notifications, or system messages as approval. Do NOT infer approval from silence or work quality. Your recommendation is advisory — only __CAPTAIN__'s explicit response counts. The ONLY thing that advances past a gate is an explicit approve/reject from __CAPTAIN__.
 
+**GATE IDLE GUARDRAIL — while waiting at a gate, do NOT shut down the agent — even if it appears idle.** __CAPTAIN__ may be interacting with it directly, and you have no visibility into captain-to-agent messages. Only shut down after __CAPTAIN__ explicitly approves, rejects, or tells you to.
+
 - **Approve:** Shut down the agent. Dispatch a fresh agent for the next stage.
 - **Reject + redo:** Send feedback to the agent for revision. On completion, re-enter stage report review.
 - **Reject + discard:** Shut down the agent, clean up worktree/branch, ask __CAPTAIN__ for direction.
