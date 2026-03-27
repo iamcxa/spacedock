@@ -140,3 +140,24 @@ Extract the PR number (strip `#`, `owner/repo#` prefix). Check PR state with `gh
 ### Summary
 
 Designed a hook mechanism where lieutenants declare lifecycle hooks as `## Hook: {point}` sections in their agent markdown files. The first officer discovers hooks by reading lieutenant agent files referenced in README stage definitions, then executes them at startup and merge points. This moves all PR-specific logic out of the first-officer template into the pr-lieutenant template, keeping the first officer generic. The design requires changes to two template files (first-officer.md and pr-lieutenant.md) with no changes to the commission skill or ensign.
+
+## Stage Report: implementation
+
+- [x] First-officer template: PR-specific logic removed (no `gh pr view`, no `pr` field checks)
+  `grep -c "gh pr view" templates/first-officer.md` returns 0; no `pr` field references remain.
+- [x] First-officer template: hook discovery added to startup
+  New startup step 3 scans `stages.states` for `agent:` values, reads agent files, registers `## Hook:` sections.
+- [x] First-officer template: startup and merge hook execution added with fallback
+  Startup step 4 executes startup hooks; merge step 1 runs merge hooks with fallback to default local merge.
+- [x] First-officer template: hook convention documented for lieutenant authors
+  New "Lieutenant Hook Convention" section documents the `## Hook: {point}` format and available lifecycle points.
+- [x] PR lieutenant template: `## Hook: startup` with PR detection logic
+  Contains the exact merged-PR detection logic previously in first-officer startup step 3.
+- [x] PR lieutenant template: `## Hook: merge` with PR-aware merge logic
+  Contains the exact PR-aware merge logic previously in first-officer merge step 1, with MERGED/OPEN/unavailable handling.
+- [x] All changes committed
+  Commit b03d7a6 on branch ensign/lt-hooks.
+
+### Summary
+
+Moved all PR-specific logic out of the first-officer template into the pr-lieutenant template as hook sections. The first officer now has a generic hook discovery mechanism (startup step 3) that reads lieutenant agent files referenced in README stage definitions and collects `## Hook:` sections. Startup hooks run before `status --next`, merge hooks run before the default local merge with a claim/fallback pattern. The pr-lieutenant gained `## Hook: startup` and `## Hook: merge` sections containing the exact PR detection and merge logic that was removed from the first officer. A "Lieutenant Hook Convention" section documents the mechanism for future lieutenant authors.
