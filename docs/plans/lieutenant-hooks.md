@@ -1,9 +1,9 @@
 ---
 id: 060
 title: Lieutenant hooks — lieutenants inject behavior into the first officer
-status: backlog
+status: ideation
 source: CL
-started:
+started: 2026-03-27T18:50:00Z
 completed:
 verdict:
 score:
