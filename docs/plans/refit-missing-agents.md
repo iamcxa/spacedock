@@ -25,3 +25,22 @@ The refit skill (`skills/refit/SKILL.md`) regenerates the first-officer and stat
 - [ ] Both show diffs and ask captain for confirmation before replacing
 - [ ] Version stamps are updated on regenerated agents
 - [ ] Agents not referenced by any stage (orphaned lieutenants) are reported but not deleted
+
+## Stage Report: implementation
+
+- [x] Phase 1: ensign and lieutenant discovery added (version stamp extraction)
+  Added items 4 and 5 to Phase 1 Step 2 — ensign reads `ensign.md`, lieutenant scans README `stages.states` for `agent:` properties
+- [x] Phase 2: ensign and lieutenant rows added to classification table
+  Added rows to both the strategy rationale table and the captain-facing upgrade plan table
+- [x] Phase 3d: ensign regeneration section added (sed from template, diff, confirm)
+  Section 3d follows the same pattern as 3b — sed `templates/ensign.md` with `__MISSION__`, `__ENTITY_LABEL__`, `__SPACEDOCK_VERSION__`, show diff, wait for confirmation
+- [x] Phase 3e: lieutenant regeneration section added (scan README stages, sed from template, diff, confirm, warn if template missing)
+  Section 3e iterates over `stages.states` entries with `agent:` property, checks for template existence, handles both existing and new agent files
+- [x] Phase 5: summary table updated with ensign and lieutenant rows
+  Added `ensign.md` and `{lieutenant}.md` rows between first-officer and README in the finalization summary
+- [x] All changes committed
+  Commit dcf247c on branch `ensign/refit-agents`
+
+### Summary
+
+Added ensign and lieutenant agent handling to all five phases of the refit skill. The changes follow the same patterns established by the existing first-officer regeneration — sed from template, show diff, ask captain. Degraded Mode stamp-only option was also updated to cover ensign and lieutenant agents. The acceptance criterion about orphaned lieutenants is addressed by the discovery phase noting missing files without attempting deletion.
