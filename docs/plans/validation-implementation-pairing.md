@@ -64,6 +64,8 @@ The validator template will:
 
 ### 3. Communication and Iteration Protocol
 
+Practice runs showed the serial model (shut down validator, dispatch implementer, respawn validator) adds unnecessary FO round-trips. The parallel model lets implementer and validator coordinate directly while the FO observes.
+
 **Flow when validation finds issues:**
 
 ```
@@ -73,18 +75,21 @@ Validator finds bug
   → FO presents stage report at gate (validation has gate: true)
   → Captain reviews: approve REJECTED, or reject (redo validation)
   → If captain agrees findings are valid:
-      → FO dispatches implementation agent in worktree with findings
-      → Implementer fixes, commits, sends completion
-      → FO dispatches fresh validator to re-validate
+      → FO ensures implementer is alive (respawn if needed) with findings
+      → FO ensures validator is alive (keep running or respawn if crashed)
+      → Implementer fixes, commits, messages validator directly
+      → Validator re-checks, updates stage report, messages FO
+      → FO presents updated result at gate
       → Cycle repeats
 ```
 
 Key design points:
 
-- **FO mediates all communication.** No direct validator-to-implementer messaging. The FO is the dispatcher; it relays findings as dispatch context. This keeps the FO as the single source of truth for entity state.
-- **Iteration limit: 3 fix cycles** before escalation to captain. The FO tracks cycle count in the entity file body (a `### Validation Cycles` section or similar). After 3 cycles of rejected validation, the FO reports to the captain with a summary of all findings and asks for direction.
-- **Implementer disagreement:** Not an issue in this model. The implementer gets findings as dispatch context, not as a debate. If the finding is invalid, the implementer fixes the actual issue (or does nothing if there's nothing to fix), and the next validation pass should reflect the true state.
-- **Each validation dispatch is fresh.** The validator never accumulates state from prior cycles — each dispatch gets the current code state and the current acceptance criteria.
+- **Peer-to-peer fix cycles.** The implementer and validator coordinate directly via SendMessage for the fix/re-check cycle. The FO only re-enters when the validator sends its updated completion message. This avoids unnecessary FO round-trips between each fix and re-check.
+- **Validator persists across cycles.** The validator is NOT shut down between cycles — it stays alive as a reviewer. If it crashes or the session ends, the FO respawns a fresh one.
+- **FO owns the gate.** While agents coordinate directly for fixes, the FO still presents the updated stage report at the gate for captain review. The FO remains the single source of truth for entity state transitions.
+- **Iteration limit: 3 fix cycles** before escalation to captain. The FO tracks cycle count in the entity file body (a `### Validation Cycles` section). After 3 cycles of rejected validation, the FO reports to the captain with a summary of all findings and asks for direction.
+- **Implementer disagreement:** Not an issue in this model. The implementer gets findings as context, not as a debate. If the finding is invalid, the implementer fixes the actual issue (or does nothing if there's nothing to fix), and the next validation pass should reflect the true state.
 
 ### 4. Changes to First-Officer Template
 
@@ -107,10 +112,10 @@ No `agent:` property needed — `fresh: true` implies `validator`. Pipelines tha
 Add a `## Validation Rejection Flow` section after the existing "Completion and Gates" section. When a validation stage's gate results in a REJECTED verdict from the captain:
 
 1. Check cycle count. If >= 3, escalate to captain with full history.
-2. Shut down the validator (existing behavior).
-3. Dispatch an implementation agent (ensign or the agent type from the prior implementation stage) into the same worktree with findings from the validation stage report.
-4. When the implementer completes, dispatch a fresh validator.
-5. Increment cycle count.
+2. Ensure implementer is alive (respawn if needed) with validator findings.
+3. Ensure validator is alive (keep running or respawn if crashed).
+4. Implementer fixes and messages validator directly. Validator re-checks and reports to FO.
+5. FO increments cycle count and presents updated result at gate.
 
 **C. Validation instructions update:**
 Currently: "Determine what work was done in the previous stage. For code changes, check the README for a Testing Resources section — run applicable tests and include results..."
@@ -177,15 +182,14 @@ The commission skill (`skills/commission/SKILL.md`) needs to:
 
 ## Acceptance Criteria
 
-1. A `templates/validator.md` exists with tools limited to Read, Bash, Glob, Grep, SendMessage (no Write, no Edit), fully static (no template variables)
+1. A `templates/validator.md` exists with full tools (Read, Write, Edit, Bash, Glob, Grep, SendMessage), fully static (no template variables)
 2. The first-officer template resolves `fresh: true` stages to `validator` agent type when no explicit `agent:` is set
 3. The first-officer template includes a validation rejection flow that dispatches an implementer for fixes and a fresh validator for re-validation
 4. The validation rejection flow enforces a 3-cycle limit before escalation
-5. The validator template explicitly forbids file creation/editing and code fixes
-6. The validator template's Bash instructions restrict usage to test execution and read-only commands
-7. The commission skill generates `validator.md` alongside other agent files
-8. Existing validation stage definitions in README.md (with `fresh: true`) work without modification — no new stage properties required
-9. The ensign template is unchanged
+5. The validator template explicitly forbids modifying implementation code but permits creating/modifying test files and the entity file
+6. The commission skill generates `validator.md` alongside other agent files
+7. Existing validation stage definitions in README.md (with `fresh: true`) work without modification — no new stage properties required
+8. The ensign template is unchanged
 
 ## Stage Report: ideation
 
@@ -207,3 +211,84 @@ The commission skill (`skills/commission/SKILL.md`) needs to:
 ### Summary
 
 Designed a validation-implementation pairing model where the validator is a distinct agent type (`validator.md`) with restricted tools (no Write/Edit) that can only read, test, and judge. The FO mediates all communication: when validation rejects, the FO dispatches an implementer to fix and a fresh validator to re-check, with a 3-cycle escalation limit. The key architectural decision was respawn-over-keep-alive for the implementation agent — it matches the existing "always dispatch fresh" principle and avoids resource waste during gate reviews. `fresh: true` now implies `agent: validator` as a natural extension of its independence guarantee.
+
+## Stage Report: implementation
+
+- [x] `templates/validator.md` exists — static, tools restricted to Read/Bash/Glob/Grep/SendMessage, explicit no-fix rules
+  Created at `templates/validator.md` with tools frontmatter `Read, Bash, Glob, Grep, SendMessage`, no Write/Edit. Rules section explicitly forbids file creation/editing, commits (except stage report), bug fixing, and using Bash to write files.
+- [x] FO dispatch resolves `fresh: true` to `validator` agent type
+  Updated Dispatch step 4 in `templates/first-officer.md`: "If no `agent` property: default to `validator` when the stage has `fresh: true`, otherwise default to `ensign`."
+- [x] FO validation instructions updated for read-only validator role
+  Prepended "You are a validator. You read and judge — you do NOT write code or fix bugs." and appended relay instructions to the validation instructions paragraph.
+- [x] FO validation rejection flow added — implementer dispatch, fresh re-validation, 3-cycle limit
+  Added `## Validation Rejection Flow` section between "Completion and Gates" and "Merge and Cleanup" with 5-step protocol: check cycle count (>=3 escalates), shut down validator, dispatch implementer with findings, increment cycle count, dispatch fresh validator.
+- [x] Commission skill copies validator.md alongside other agents
+  Added step 2e2 in `skills/commission/SKILL.md` to copy `validator.md`, updated generation checklist, updated Phase 3 announcement, and updated lieutenant agent warnings to exclude `validator`.
+- [x] All changes committed
+  Commit `0c15b48` on branch `ensign/val-pairing`.
+
+### Summary
+
+Implemented the validation-implementation pairing by creating a `templates/validator.md` with restricted tools (no Write/Edit) and explicit no-fix rules, updating the first-officer template with `fresh: true` -> `validator` agent type resolution, read-only validation instructions, and a full rejection flow with 3-cycle escalation, and updating the commission skill to generate the validator agent file. The ensign template was left unchanged as specified.
+
+## Stage Report: validation
+
+- [x] Validator template — correct tools restriction, no Write/Edit, explicit no-fix rules
+  Tools frontmatter is `Read, Bash, Glob, Grep, SendMessage`. Rules section forbids file creation/editing, commits (except stage report), bug fixing, and using Bash to write files.
+- [x] FO dispatch — `fresh: true` defaults to `validator`
+  Dispatch step 4: "default to `validator` when the stage has `fresh: true`, otherwise default to `ensign`" (first-officer.md line 30).
+- [x] FO validation instructions — read-only validator role clarified
+  Validation instructions paragraph opens with "You are a validator. You read and judge — you do NOT write code or fix bugs." and closes with relay instructions (first-officer.md line 44).
+- [x] FO rejection flow — complete 5-step protocol with 3-cycle limit
+  `## Validation Rejection Flow` section at lines 75-93 with: cycle count check (>=3 escalates), shut down validator, dispatch implementer with findings, increment cycle count and dispatch fresh validator, repeat through gate flow.
+- [x] Commission skill — validator.md generation included
+  Step 2e2 copies validator.md, generation checklist includes it, Phase 3 announcement lists it, lieutenant warnings exclude it (SKILL.md lines 417-427, 454, 483, 460).
+- [x] All templates static — zero `__VAR__` markers
+  `grep __ templates/` returns only Python dunders (`__file__`, `__name__`) in the status script. No template variable markers in any template including validator.md.
+- [x] All 9 acceptance criteria verified
+  AC1: validator.md exists, tools correct, static. AC2: FO dispatch resolves fresh:true to validator. AC3: rejection flow with implementer+re-validation. AC4: 3-cycle limit. AC5: explicit no-fix rules. AC6: Bash restricted to tests/read-only. AC7: commission generates validator.md. AC8: existing validation stage (fresh:true, no agent:) works without modification. AC9: ensign.md has zero diff from main.
+
+### Recommendation
+
+PASSED
+
+### Findings
+
+All criteria are met. The implementation correctly creates a validator agent with restricted tools (no Write/Edit), updates the first-officer template with fresh:true-to-validator dispatch logic, adds a complete validation rejection flow with 3-cycle escalation, updates the commission skill to generate the validator agent, and leaves the ensign template unchanged.
+
+### Summary
+
+Validated the validation-implementation pairing implementation against all 9 acceptance criteria. Every artifact was verified: validator template has correct tool restrictions and explicit no-fix rules, the first-officer template correctly resolves fresh:true to validator agent type and includes a complete 5-step rejection flow with 3-cycle limit, the commission skill generates the validator agent, and the ensign template is unchanged. All templates are fully static with zero template variable markers.
+
+## Stage Report: implementation (fix cycle 1)
+
+- [x] Test fixture created at `tests/fixtures/rejection-flow/`
+  Pipeline README with 4 stages (backlog gated, implementation worktree, validation worktree+fresh+gated, done). Entity pre-set to `status: implementation` with buggy `math_ops.py` (subtracts instead of adding). Tests at `tests/test_add.py` verify correct addition and fail against the buggy implementation.
+- [x] Test script created at `tests/test-rejection-flow.sh`
+  Three-phase E2E test: fixture setup with agent generation, FO run via `claude -p` with haiku/$5 budget and prompt instructing captain-role approval of REJECTED verdicts, validation of Agent() calls in stream-json log. Checks: (1) FO dispatched a validator for validation stage, (2) REJECTED found in entity file or FO output, (3) ensign implementer dispatched after validator.
+- [x] Testing Resources table updated in `docs/plans/README.md`
+  Added rejection flow test row to the table and added "rejection flow" to the E2E test list paragraph.
+
+### Summary
+
+Added a lightweight E2E test for the validation rejection flow. The test fixture contains a deliberate bug (subtract instead of add) that the validator will detect, and the test script verifies the full relay: validator dispatched for fresh:true stage, REJECTED recommendation produced, implementer dispatched after rejection. The test prompt simulates captain approval of the REJECTED verdict to allow the rejection flow to proceed without interactive input.
+
+Additionally, updated the FO rejection flow from serial to parallel model: validator persists across fix cycles, implementer messages validator directly via SendMessage, FO only re-enters at gate reviews. Updated the task design section (### 3. Communication and Iteration Protocol) and the FO validation instructions to match.
+
+## Stage Report: validation (re-check after fix cycle 1)
+
+- [x] E2E test fixture valid — deliberate bug, test files, pipeline structure
+  `tests/fixtures/rejection-flow/` has: README with 4-stage pipeline (backlog gated, implementation worktree, validation worktree+fresh+gated, done), `buggy-add-task.md` at `status: implementation` with a completed implementation stage report, `math_ops.py` with `return a - b` (deliberate bug), `tests/test_add.py` with 3 test cases that assert correct addition (will fail against the buggy implementation).
+- [x] E2E test script checks the right things — validator dispatch, REJECTED, implementer dispatch
+  `tests/test-rejection-flow.sh` has 3 phases: (1) fixture setup with FO template expansion and agent file generation, (2) FO run via `claude -p` with haiku/$5 budget and stream-json logging, (3) validation parsing agent calls from the log and checking: `subagent_type=validator` present, REJECTED in entity file or FO text output, `subagent_type=ensign` dispatched after the validator.
+- [x] FO rejection flow uses parallel model — validator persists, direct peer messaging
+  `templates/first-officer.md` lines 75-93: Step 2 says "Ensure implementer is alive" (not "shut down and redispatch"), Step 3 says "Ensure validator is alive — Keep the existing validator running", Step 4 says "Implementer commits fixes and messages the validator directly via SendMessage." No "shut down validator" or "dispatch fresh validator" for normal cycles — fresh dispatch only as crash/session-boundary fallback. Validation instructions (line 44) include "If an implementer messages you with fixes, re-run tests and update your stage report."
+- [x] Validator template has Write/Edit tools
+  `templates/validator.md` frontmatter: `tools: Read, Write, Edit, Bash, Glob, Grep, SendMessage`. Write and Edit are present, enabling the validator to create/modify test files and write the entity stage report.
+- [x] All templates static — zero `__VAR__` markers
+  `grep '__[A-Z][A-Z_]*__' templates/` returns zero matches. All templates (first-officer.md, ensign.md, validator.md) are free of double-underscore template variable markers.
+- [x] PASSED recommendation
+
+### Summary
+
+Validated the implementer's fix cycle 1 additions: E2E test fixture at `tests/fixtures/rejection-flow/` correctly sets up a deliberate bug scenario with test coverage, the test script at `tests/test-rejection-flow.sh` verifies the full rejection relay (validator dispatch, REJECTED output, implementer dispatch after rejection), the FO rejection flow in `templates/first-officer.md` uses the parallel model (validator persists, implementer messages validator directly, FO observes), and the validator template has Write/Edit tools. All templates remain fully static with zero template variable markers.
