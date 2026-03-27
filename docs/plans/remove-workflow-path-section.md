@@ -100,3 +100,20 @@ The `## Workflow Path` section is confirmed redundant: every instruction in the 
 ### Summary
 
 Removed the redundant `## Workflow Path` section from the first-officer template and all references to it across the codebase. Four files changed with a net removal of 10 lines. All other first-officer content (identity, startup, dispatch, state management, clarification) is untouched.
+
+## Stage Report: validation
+
+- [x] Test harness passes with no regressions (count should be lower than previous 61 since Workflow Path check was removed)
+  `test-commission.sh` reports 60 passed, 0 failed (down from 61 — the removed Workflow Path keyword check accounts for the difference)
+- [x] `## Workflow Path` absent from `templates/first-officer.md`
+  `grep "Workflow Path" templates/first-officer.md` returns no matches; confirmed by full file read (93 lines, sections: Identity, Startup, Dispatch, Completion/Gates, Merge/Cleanup, State Management, Clarification)
+- [x] `skills/refit/SKILL.md` does not reference Workflow Path
+  `grep "Workflow Path" skills/refit/SKILL.md` returns no matches
+- [x] `test-commission.sh` and `test-harness.md` no longer check for Workflow Path
+  `grep "Workflow Path" scripts/test-commission.sh` and `grep "Workflow Path" scripts/test-harness.md` both return no matches
+- [x] PASSED recommendation
+  All six acceptance criteria verified; test suite passes with expected count reduction; all other first-officer content preserved intact
+
+### Summary
+
+All validation checks pass. The test harness runs clean at 60/60 (down from 61 due to the removed Workflow Path keyword check). Grep confirms "Workflow Path" is absent from all four target files. The first-officer template retains all other sections unchanged. Recommendation: PASSED.
