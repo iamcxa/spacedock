@@ -31,6 +31,8 @@ Read each scaffolding file and extract its version stamp:
 1. **README** — Read `{dir}/README.md`. Extract version from YAML frontmatter `commissioned-by: spacedock@X.Y.Z`. Store as `{readme_version}`.
 2. **Status script** — Read `{dir}/status`. Extract version from `# commissioned-by: spacedock@X.Y.Z`. Store as `{status_version}`.
 3. **First-officer agent** — Read `{project_root}/.claude/agents/first-officer.md`. Extract version from YAML frontmatter `commissioned-by: spacedock@X.Y.Z`. Store as `{agent_version}`.
+4. **Ensign agent** — Read `{project_root}/.claude/agents/ensign.md`. Extract version from YAML frontmatter `commissioned-by: spacedock@X.Y.Z`. Store as `{ensign_version}`.
+5. **Lieutenant agents** — Read the README frontmatter `stages.states` entries. For each entry with an `agent:` property, check if `{project_root}/.claude/agents/{agent}.md` exists. If it does, extract its version from YAML frontmatter `commissioned-by: spacedock@X.Y.Z`. Store each as `{lt_{agent}_version}`. If the file doesn't exist, note it as missing.
 
 If a file doesn't exist, note it as missing and skip it.
 
@@ -55,6 +57,8 @@ Each scaffolding file gets a specific upgrade strategy based on how safe it is t
 | `status` | **Replace** | Mechanical script. Workflow-specific content (stage names) is extracted from the README. Users rarely customize beyond what's generated. |
 | `first-officer.md` | **Regenerate** | Standard template structure with workflow-specific values extracted from the existing README and agent. Show diff and ask the captain for confirmation before replacing. |
 | `README.md` | **Show diff** | Users customize stages, schema fields, quality criteria. Too risky to auto-replace. Show what the current template would produce and let the captain decide. |
+| `ensign.md` | **Regenerate** | Standard template structure with workflow-specific values. Show diff and ask the captain for confirmation before replacing. |
+| `{lieutenant}.md` | **Regenerate** | Standard template structure with workflow-specific values. Only present for stages that reference a lieutenant agent. Show diff and ask the captain for confirmation before replacing. |
 
 Present the classification to the captain:
 
@@ -65,8 +69,12 @@ Present the classification to the captain:
 > | `status` | {status_version or "no stamp"} | Replace |
 > | `first-officer.md` | {agent_version or "no stamp"} | Regenerate (with diff review) |
 > | `README.md` | {readme_version or "no stamp"} | Show diff (manual review) |
+> | `ensign.md` | {ensign_version or "no stamp"} | Regenerate (with diff review) |
+> | `{lieutenant}.md` (for each) | {lt_{agent}_version or "no stamp"} | Regenerate (with diff review) |
 >
 > Proceed?
+
+Only include lieutenant rows for agents actually referenced in the README `stages.states` entries.
 
 Wait for the captain to confirm before proceeding.
 
@@ -142,6 +150,55 @@ If the user added custom sections to the first-officer (sections not in the stan
 
 Do NOT auto-modify the README. The captain decides what to adopt.
 
+### 3d. Ensign Agent (Regenerate)
+
+1. Extract workflow-specific values from the README:
+   - **Mission** — from README H1
+   - **Entity label** — from README frontmatter `entity-label`
+
+2. Generate a new ensign using the template at `templates/ensign.md` (relative to the Spacedock plugin directory). Use `sed` to substitute the `__VAR__` markers:
+   - `__MISSION__` — the mission
+   - `__ENTITY_LABEL__` — the entity label
+   - `__SPACEDOCK_VERSION__` — `{current_version}`
+
+3. Show the captain a diff of the old vs new ensign:
+
+> **Ensign agent changes:**
+> {diff output}
+>
+> Replace the ensign agent? (y/n)
+
+4. Wait for the captain's confirmation before replacing `{project_root}/.claude/agents/ensign.md`.
+
+### 3e. Lieutenant Agents (Regenerate)
+
+Scan the README frontmatter `stages.states` for entries with an `agent:` property. For each referenced lieutenant agent:
+
+1. Check if the template exists at `templates/{agent}.md` (relative to the Spacedock plugin directory). If the template does not exist, warn the captain and skip:
+
+> **Warning:** Stage '{stage_name}' references agent '{agent}' but no template exists at `templates/{agent}.md`. Skipping regeneration — the existing agent file (if any) will not be updated.
+
+2. If the template exists, extract the same workflow-specific values as the ensign (mission, entity label) and generate a new lieutenant using `sed`:
+   - `__MISSION__` — the mission
+   - `__ENTITY_LABEL__` — the entity label
+   - `__SPACEDOCK_VERSION__` — `{current_version}`
+
+3. Show the captain a diff of the old vs new lieutenant:
+
+> **{agent} agent changes:**
+> {diff output}
+>
+> Replace the {agent} agent? (y/n)
+
+4. Wait for the captain's confirmation before replacing `{project_root}/.claude/agents/{agent}.md`.
+
+If the agent file does not currently exist at `{project_root}/.claude/agents/{agent}.md`, show the full generated content instead of a diff and ask:
+
+> **{agent} agent is new** (referenced by stage '{stage_name}' but not yet generated):
+> {full content}
+>
+> Create the {agent} agent? (y/n)
+
 ---
 
 ## Phase 4: Migrate Entity Data
@@ -200,6 +257,8 @@ Show a summary of what was migrated:
 > |------|--------|---------|
 > | `status` | Replaced | spacedock@{current_version} |
 > | `first-officer.md` | {Regenerated or Skipped} | spacedock@{current_version} |
+> | `ensign.md` | {Regenerated or Skipped} | spacedock@{current_version} |
+> | `{lieutenant}.md` (for each) | {Regenerated or Skipped or Created} | spacedock@{current_version} |
 > | `README.md` | {Stamp updated / User-reviewed / No changes} | spacedock@{current_version} |
 >
 > Suggest committing:
@@ -229,6 +288,8 @@ Add version stamps to each file without modifying anything else:
 - **README.md** — Add YAML frontmatter with `commissioned-by: spacedock@{current_version}` (wrap in `---` delimiters if frontmatter doesn't exist).
 - **status** — Insert `# commissioned-by: spacedock@{current_version}` as the second line (after `#!/bin/bash`).
 - **first-officer.md** — Add `commissioned-by: spacedock@{current_version}` to the YAML frontmatter.
+- **ensign.md** — Add `commissioned-by: spacedock@{current_version}` to the YAML frontmatter.
+- **Lieutenant agents** — For each lieutenant referenced in README `stages.states`, add `commissioned-by: spacedock@{current_version}` to the YAML frontmatter (if the file exists).
 
 ### Option 2: Full Refit with Review
 
