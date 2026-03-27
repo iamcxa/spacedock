@@ -74,10 +74,15 @@ if [ -f "$SELF_HOSTED_PIPELINE/README.md" ]; then
     echo "REFIT: Self-hosted pipeline ($SELF_HOSTED_PIPELINE)"
     echo "=========================================="
     echo ""
-    echo "Running refit (interactive)..."
+    echo "Running refit..."
     echo ""
 
-    claude "/spacedock:refit $SELF_HOSTED_PIPELINE" --plugin-dir "$REPO_ROOT"
+    CLAUDE_ARGS=(-p "/spacedock:refit $SELF_HOSTED_PIPELINE" --plugin-dir "$REPO_ROOT" --dangerously-skip-permissions)
+    if command -v safehouse >/dev/null 2>&1; then
+        safehouse claude "${CLAUDE_ARGS[@]}"
+    else
+        claude "${CLAUDE_ARGS[@]}"
+    fi
 
     # Commit any refit changes
     if ! git diff-index --quiet HEAD --; then
