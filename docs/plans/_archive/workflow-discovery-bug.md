@@ -1,13 +1,13 @@
 ---
 id: 066
 title: Fix workflow discovery — FO greps home directory instead of project root
-status: validation
+status: done
 source: 058 terminology experiment validation
 started: 2026-03-28T17:47:00Z
-completed:
-verdict:
+completed: 2026-03-28T17:58:00Z
+verdict: PASSED
 score: 0.85
-worktree: .worktrees/ensign-discovery-bug
+worktree:
 issue:
 pr:
 ---
@@ -137,3 +137,18 @@ This is correct behavior — a worktree-based dispatch should search within its 
 ### Summary
 
 The root cause is that the FO template tells the agent to grep `.` "from the project root" but agents run with cwd set to `~`, so `.` expands to the home directory. The fix replaces `.` with an absolute path from `git rev-parse --show-toplevel`, which the template already uses elsewhere. This works correctly for benchmark fixtures, worktrees, and production workflows. All four variant templates need the same one-line change.
+
+## Stage Report: implementation
+
+- [x] FO template step 1 updated to use `git rev-parse --show-toplevel`
+  Changed `templates/first-officer.md` step 1: resolve `project_root` via `git rev-parse --show-toplevel`, grep `"$project_root"` instead of `.`, removed ambiguous "from the project root" phrase
+- [ ] SKIP: All 4 variant templates updated with the same fix
+  Variant template directories (`templates-business/`, `templates-functional/`, `templates-kitchen/`) do not exist in the repo — they were part of the 058 terminology experiment which was rejected and never merged. Only `templates/first-officer.md` exists.
+- [x] Gate guardrail test passes (or test doesn't exercise discovery — document which)
+  The gate guardrail test (`tests/test-gate-guardrail.sh`) does not exercise workflow discovery — it copies fixture files directly and runs the FO with `--agent first-officer` which bypasses discovery. Static checks (guardrail text presence) verified intact after the edit.
+- [x] Changes committed
+  Committed to worktree branch
+
+### Summary
+
+Applied the one-line discovery fix to `templates/first-officer.md` step 1: the grep command now uses `"$project_root"` (resolved via `git rev-parse --show-toplevel`) instead of `.` which was expanding to the agent's cwd (`~`). The three variant templates mentioned in the entity file don't exist in the repo (rejected 058 experiment), so only the nautical template was updated. The gate guardrail test doesn't exercise discovery but its static checks confirm the template is otherwise intact.
