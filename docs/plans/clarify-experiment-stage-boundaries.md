@@ -163,6 +163,72 @@ The validator template already correctly frames validation as verifying existing
 - In 058, the validator found and fixed harness bugs before running the experiment. Under the proposed wording, the validator would instead report "harness is broken, cannot verify results, REJECTED" and the implementer would fix the harness.
 - This is the correct behavior — it maintains the independence principle. The validator shouldn't be fixing infrastructure it's supposed to be testing.
 
+## Expanded scope: Feedback agent pattern and `feedback-to` stage property
+
+### The coupling problem
+
+The FO dispatch logic (step 4) currently says: "default to `validator` when the stage has `fresh: true`." This couples two orthogonal concerns:
+- **Context freshness** (`fresh: true`) — should the agent start without prior context?
+- **Agent behavior** (validator vs ensign) — should the agent verify or produce?
+
+Non-development workflows might want `fresh: true` without a validator (e.g., "second opinion" stage).
+
+### Proposed: `feedback-to: {stage_name}` stage property
+
+Add `feedback-to` to the README stages block to explicitly declare feedback relationships:
+
+```yaml
+- name: implementation
+  worktree: true
+- name: validation
+  worktree: true
+  fresh: true
+  feedback-to: implementation
+  gate: true
+```
+
+This makes the pairing explicit. The FO reads `feedback-to` and knows: (1) this is a feedback stage, (2) on rejection, bounce findings back to the named stage's agent. The pattern generalizes beyond validation:
+
+- **Review** stage — reviewer checks work, bounces findings to author
+- **Validation** stage — validator tests implementation, bounces failures to implementer
+- **Approval** stage — approver evaluates proposal, bounces objections to proposer
+
+### Agent type defaults (revised dispatch logic)
+
+FO step 4 becomes:
+- Stage has `agent:` property → use that (always wins)
+- Stage has `feedback-to:` but no `agent:` → default to `validator`
+- Otherwise → default to `ensign`
+
+`fresh: true` is purely about context freshness — no longer drives agent type.
+
+### Generalized rejection flow
+
+The FO's `## Validation Rejection Flow` becomes a general `## Feedback Rejection Flow`:
+1. Feedback stage gets REJECTED at gate
+2. FO reads `feedback-to: {target_stage}` from stages block
+3. FO dispatches (or re-engages) an agent for the target stage with findings
+4. Target agent fixes, signals feedback agent
+5. Feedback agent re-checks, reports to FO
+6. FO presents at gate — same cycle limit (3) applies
+
+### Star Trek role mapping — lieutenant as feedback role
+
+In the hierarchy: ensign does work, the commanding officer provides feedback. The feedback agent maps to **lieutenant** — the officer who reviews the ensign's work and bounces it back. This reframes the validator as a type of lieutenant (the feedback role in the hierarchy), not a separate concept.
+
+- **Ensign** — does the work (implementation, production)
+- **Lieutenant** — provides feedback (review, validation, approval)
+- **First officer** — orchestrates the bounce between them
+
+This connects to task 064 (capability modules) which is already rethinking the lieutenant role. The pr-lieutenant was awkward as a stage agent, but "lieutenant" as a feedback role fits naturally.
+
+### Open questions (for next brainstorm session)
+
+1. Should `feedback-to` imply `fresh: true`? (Lean: no — keep explicit, but could be a sensible default)
+2. Does the validator template rename to lieutenant? Or is validator a specialization of lieutenant?
+3. How does this interact with task 064's capability modules — are feedback agents a capability or a core concept?
+4. Should `feedback-to` support chaining (e.g., approval → review → implementation)?
+
 ## Acceptance Criteria
 
 1. README `implementation` stage definition uses "produce the deliverable" language that covers code, experiments, analysis, and test suites — not just "write the code"
