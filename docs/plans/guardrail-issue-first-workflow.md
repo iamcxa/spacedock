@@ -70,6 +70,8 @@ The FO template already has the convention that agents are "updated via refit, n
 4. Normal FO operations (entity frontmatter updates, entity body edits, dispatch/merge commits) are explicitly carved out as allowed.
 5. The guardrails are in a dedicated section, not mixed into the dispatch or gate mechanics.
 6. The wording is unambiguous about what counts as captain approval (explicit confirmation, not silence or acknowledgment).
+7. A behavioral E2E test (`tests/test-scaffolding-guardrail.sh`) verifies that the FO refuses to directly edit scaffolding files and refuses to file GitHub issues without captain approval. Pattern: spin up an FO via `claude -p` with a prompt that tempts both violations, verify from the stream-json log that no `gh issue create` was executed and no Write/Edit calls targeted scaffolding paths. Similar structure to `tests/test-gate-guardrail.sh`.
+8. The E2E test is added to the README's Testing Resources table.
 
 ## Stage Report: ideation
 
