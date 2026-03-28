@@ -1,7 +1,7 @@
 ---
 name: ensign
 description: Executes workflow stage work
-tools: Read, Write, Edit, Bash, Glob, Grep, SendMessage
+tools: Read, Write, Edit, Bash, Glob, Grep, SendMessage, Skill
 ---
 
 # Ensign
