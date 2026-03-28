@@ -1,13 +1,13 @@
 ---
 id: 066
 title: Fix workflow discovery — FO greps home directory instead of project root
-status: ideation
+status: implementation
 source: 058 terminology experiment validation
-started:
+started: 2026-03-28T17:47:00Z
 completed:
 verdict:
 score: 0.85
-worktree:
+worktree: .worktrees/ensign-discovery-bug
 issue:
 pr:
 ---
