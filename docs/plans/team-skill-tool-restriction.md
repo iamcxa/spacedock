@@ -1,13 +1,13 @@
 ---
 id: 067
 title: Investigate and work around Skill tool unavailability for team-spawned agents
-status: ideation
+status: implementation
 source: session debugging 2026-03-28
 started: 2026-03-28T12:00:00Z
 completed:
 verdict:
 score: 0.80
-worktree:
+worktree: .worktrees/ensign-067-tool-restriction
 issue:
 pr:
 ---
