@@ -290,3 +290,84 @@ No migration needed. Workflows that never used a lieutenant have no hooks, no `_
 ### Summary
 
 Fleshed out the capability modules design across all seven design questions. The core model is: capability files live in `{workflow_dir}/_capabilities/` with YAML frontmatter (name, description, version) and `## Hook:` body sections, reusing the exact hook format from #060. The FO discovers hooks by scanning `_capabilities/*.md` instead of agent files referenced by stages. Commission adds a capability selection step and copies canonical files from the plugin's `capabilities/` directory. Refit manages capabilities like other scaffolding files, with version-based diffing and migration support for legacy pr-lieutenant workflows. The PR creation responsibility moves from a stage agent to the FO's merge flow via the pr-merge capability's merge hook, cleanly separating stage work from lifecycle transitions.
+
+## Open design question: Hook structure format
+
+The current design mixes condition logic ("this hook claims entities with a non-empty `pr` field") and action instructions ("push the branch, create a PR") together in free-form prose within each `## Hook:` section. The FO must parse prose to determine both whether a hook applies and what to do. With multiple capabilities hooking the same lifecycle point, this becomes harder to reason about.
+
+### Option A — Pure prose (status quo)
+
+Hooks are entirely free-form text. The FO reads and interprets.
+
+```markdown
+## Hook: merge
+
+This hook claims entities that have a non-empty `pr` field.
+
+Push the worktree branch: `git push origin {branch}`. Create a PR via
+`gh pr create`. Set the entity's `pr` field. If `gh` is not available,
+fall back to local merge.
+```
+
+**Pros:** Simple. Flexible. No new syntax to learn. The FO is an LLM — it can interpret prose.
+**Cons:** Conditions are implicit in paragraphs. Multiple hooks on the same lifecycle point require the FO to parse prose to determine applicability. No machine-readable way to inspect what a capability does without reading it.
+
+### Option B — Structured header + prose instructions
+
+Add scannable key-value lines at the top of each hook section to separate "when does this fire?" from "what to do." Instructions remain free-form prose.
+
+```markdown
+## Hook: merge
+
+claims: entities where `pr` field is non-empty
+fallback: local-merge
+
+### Instructions
+
+Push the worktree branch: `git push origin {branch}`. Create a PR via
+`gh pr create`. Set the entity's `pr` field.
+```
+
+**Pros:** The FO can quickly scan `claims:` to determine applicability without parsing paragraphs. `fallback:` makes degradation behavior explicit. Instructions stay flexible.
+**Cons:** Introduces a lightweight convention (the key-value lines) that needs to be documented and followed. `claims:` is still natural language, just more constrained.
+
+### Option C — YAML metadata block per hook
+
+Each hook section opens with a fenced YAML block declaring typed metadata. More machine-readable than Option B.
+
+```markdown
+## Hook: merge
+
+```yaml
+claims:
+  field: pr
+  condition: non-empty
+priority: 10
+fallback: local-merge
+`` `
+
+### Instructions
+
+Push the worktree branch...
+```
+
+**Pros:** Fully structured conditions. Could support tooling that inspects capabilities programmatically. Priority ordering is explicit.
+**Cons:** YAGNI — we have one capability and the FO is the only consumer. Adds parsing complexity. Nested YAML inside markdown is awkward. The conditions are simple enough that structured YAML buys little over a one-liner.
+
+### Option D — Executable hooks (scripts)
+
+Capabilities ship as shell scripts instead of prose. The FO executes them rather than interpreting instructions.
+
+```bash
+#!/bin/bash
+# Hook: merge
+# Claims: entities with non-empty pr field
+gh pr create --base main --head "$BRANCH" ...
+```
+
+**Pros:** Deterministic execution — no LLM interpretation variance. Testable independently.
+**Cons:** Loses LLM flexibility (handling edge cases, asking the captain for guidance). Error handling and entity state updates in shell are brittle. Fundamentally different paradigm from the rest of the system. Would need a defined interface (env vars, exit codes) for the FO to interact with.
+
+### Current lean
+
+Option B appears to be the sweet spot — minimal structure where it matters (conditions, fallback) while keeping the LLM-friendly prose instructions that make the system flexible. Deeper exploration needed before deciding.
