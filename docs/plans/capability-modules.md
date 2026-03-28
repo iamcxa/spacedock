@@ -371,3 +371,38 @@ gh pr create --base main --head "$BRANCH" ...
 ### Current lean
 
 Option B appears to be the sweet spot — minimal structure where it matters (conditions, fallback) while keeping the LLM-friendly prose instructions that make the system flexible. Deeper exploration needed before deciding.
+
+## Brainstorm: Other capabilities and lifecycle points
+
+Thinking beyond pr-merge, what other capabilities might exist and what integration points they need.
+
+### Plausible capabilities
+
+1. **pr-merge** (exists) — push branches, create/track PRs.
+2. **github-issues** — sync entities with GitHub issues. Create issue on intake, update labels on stage transitions, close on archive.
+3. **notifications** — post to Slack/email/webhook at key lifecycle moments.
+4. **scheduled-intake** — scan external sources (email, RSS, forms) and create new entities at startup.
+5. **ci-gate** — wait for CI pipeline to pass before allowing gate approval.
+6. **metrics/reporting** — track cycle times, throughput, rejection rates.
+7. **external-review** — route entities to external reviewers, poll for responses.
+
+### Lifecycle points needed
+
+The current design has two lifecycle points: `startup` and `merge`. The capabilities above suggest at least two more:
+
+| Point | When | Example capabilities |
+|-------|------|---------------------|
+| `startup` | FO boots, before status check | pr-merge (detect merged PRs), scheduled-intake (scan for new items), metrics (summary) |
+| `dispatch` | entity about to enter a stage | notifications (alert), github-issues (update labels), external-review (assign) |
+| `gate` | entity waiting at gate for captain | ci-gate (check CI), notifications (ping reviewer), external-review (poll) |
+| `merge` | entity reached terminal stage | pr-merge (push/create PR), github-issues (close issue), metrics (record) |
+
+### Implication for hook structure
+
+`dispatch` and `gate` hooks fire per-entity, per-stage-transition — not globally. A notification capability wouldn't fire on every dispatch, only for specific stages. A ci-gate only applies to certain gates.
+
+This strengthens the case for a `claims:` filtering mechanism. For startup/merge the conditions are simple (entity field checks). For dispatch/gate, hooks need to filter on entity fields AND stage properties, which is more complex.
+
+**Open question:** Does the need for dispatch/gate filtering push toward more structured claims (Option C direction), or are natural language conditions still sufficient given the FO is an LLM?
+
+**Status:** Presented to CL. Waiting for direction on which capabilities and lifecycle points to prioritize, and whether the expanded lifecycle points change the format decision.
