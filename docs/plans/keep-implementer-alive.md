@@ -93,11 +93,11 @@ The change is narrowly scoped to the FO template's Completion section. When a no
 - [x] Commission test harness passes
   65 passed, 0 failed (out of 65 checks). RESULT: PASS.
 - [x] All changes committed to worktree branch
-  Commit 25e5b78 on branch ensign/068-keep-alive: 1 file changed, 2 insertions, 2 deletions.
+  Commit 25e5b78 on branch ensign/068-keep-alive: 1 file changed, 2 insertions, 2 deletions. Fix cycle: commit 3dc41ea fixes contradictory shutdown instruction in step 2.
 
 ### Summary
 
-Two lines changed in `templates/first-officer.md`. The "If no gate" Completion path now does a look-ahead check for `feedback-to` on the next stage and keeps the completing agent alive if found. The Gate Approve path now cleans up any kept-alive agent alongside the feedback-stage agent. The Feedback Rejection Flow step 3 required no changes — verified unchanged. Commission test harness passes all 65 checks.
+Three lines changed in `templates/first-officer.md`. The "If no gate" Completion path now does a look-ahead check for `feedback-to` on the next stage and keeps the completing agent alive if found. The Gate Approve path now cleans up any kept-alive agent alongside the feedback-stage agent. The Feedback Rejection Flow step 3 required no changes — verified unchanged. Fix cycle: Completion step 2 (line 52) updated to defer shutdown decision to the "If no gate" path below, resolving contradiction where step 2 said "shut down" but line 54 conditionally kept the agent alive.
 
 ## Stage Report: validation
 
