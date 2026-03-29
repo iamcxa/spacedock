@@ -144,6 +144,10 @@ On FO startup, after reading the README and discovering mods, but before running
 8. The FO does not auto-redispatch orphans — captain approval is required.
 9. Orphan detection runs after startup hooks (defense in depth), and also explicitly skips entities with non-empty `pr` (primary guard).
 
+### Feedback Cycles
+
+Cycle: 1
+
 ## Stage Report: ideation
 
 - [x] Problem statement grounded in the specific lifecycle mismatch (with concrete examples from how 069 played out)
