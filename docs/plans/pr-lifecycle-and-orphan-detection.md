@@ -1,9 +1,9 @@
 ---
 id: 070
 title: PR lifecycle timing and startup orphan detection
-status: backlog
+status: ideation
 source: CL
-started:
+started: 2026-03-28T12:00:00Z
 completed:
 verdict:
 score: 0.80
