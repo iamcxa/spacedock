@@ -196,43 +196,49 @@ This should be deferred until after the core refactoring is done.
 
 ## Acceptance Criteria
 
-1. **`scripts/test-lib.sh` exists and is sourced by all 7 test scripts**
-   - Test: `grep -l 'source.*test-lib' scripts/test-*.sh tests/test-*.sh` returns 7 files
-   - Test: `bash scripts/test-lib.sh` exits 0 (file is syntactically valid)
+1. **`scripts/test_lib.py` exists and is imported by all 7 test scripts**
+   - Test: `grep -l 'import test_lib\|from test_lib' scripts/test_*.py tests/test_*.py` returns 7 files
+   - Test: `python3 -c "import scripts.test_lib"` exits 0 (module is syntactically valid)
 
-2. **All 7 test scripts use shared pass/fail/check/results from test-lib**
-   - Test: no script defines its own `pass()` or `fail()` function (grep returns empty)
+2. **All 7 test scripts use shared helpers from test_lib**
+   - Test: no script defines its own pass/fail/TestRunner (grep returns empty)
    - Test: all 7 scripts still pass when run individually
 
-3. **`test-commission.sh --snapshot-dir <path>` preserves the commissioned project**
-   - Test: run `test-commission.sh --snapshot-dir /tmp/snap`, verify `/tmp/snap/test-project/<workflow-dir>/README.md` exists, `.claude/agents/first-officer.md` exists, `commission-log.jsonl` exists
+3. **`test_commission.py --snapshot-dir <path>` preserves the commissioned project**
+   - Test: run with --snapshot-dir, verify snapshot contains workflow README, .claude/agents/first-officer.md, commission log
 
-4. **`test-checklist-e2e.sh --from-snapshot <path>` skips commission**
-   - Test: run with `--from-snapshot` pointing at a valid snapshot, verify no `commission-log.jsonl` is generated in the new test dir (proves commission was skipped), and E2E checks still pass
+4. **`test_checklist_e2e.py --from-snapshot <path>` skips commission**
+   - Test: run with --from-snapshot pointing at a valid snapshot, verify no commission runs, E2E checks still pass
 
 5. **Stats extraction runs automatically for every `claude -p` invocation**
-   - Test: run `test-commission.sh`, verify `stats-commission.txt` exists in the log dir and contains Wallclock, Messages, and Token lines
+   - Test: run test_commission.py, verify stats output contains wallclock, messages, model delegation, and token lines
 
 6. **Fixture-based tests use shared `setup_fixture` helper**
-   - Test: `grep -l 'setup_fixture\|generate_first_officer' tests/test-*.sh` returns all 4 fixture-based scripts
-   - Test: no script contains an inline `sed` substitution of the FO template
+   - Test: all fixture-based scripts use test_lib.setup_fixture / generate_first_officer
+   - Test: no script contains inline sed substitution of the FO template
 
 7. **No behavioral regression — all tests pass identically to before**
    - Test: run all 7 scripts, all return exit 0
 
 8. **Model flag propagation verified in stats output**
-   - Test: run `test-checklist-e2e.sh --model haiku`, verify stats show haiku as the primary model in both commission and FO phases
-   - Test: run with `--model sonnet`, verify sonnet appears in stats
-   - Stats must report model delegation per-phase (commission vs FO) so model override issues are visible
-   - If `--agent` overrides `--model` for subagents, document this and propose a fix (e.g., passing model to Agent() calls)
+   - Test: stats report model delegation per-phase (commission vs FO) so model override issues are visible
+   - If `--agent` overrides `--model` for subagents, document this and propose a fix
+
+9. **All test scripts use uv inline script metadata and require no pip install or venv**
+   - Test: `uv run scripts/test_commission.py --help` works without prior setup
+   - Test: no requirements.txt, setup.py, or pyproject.toml needed for test scripts
+
+10. **Implementer spot-checks: at least one commission-based and one fixture-based test must be run end-to-end by the implementer to verify results match the old bash versions**
+    - Run test_commission.py and verify 65/65 checks pass
+    - Run one fixture-based test (e.g., test_gate_guardrail.py) and verify it produces equivalent results
 
 ## Test Plan
 
-- **Unit-level**: validate `test-lib.sh` functions in isolation with a small shell test script that sources it and exercises pass/fail/check/test_results
-- **Integration**: run each of the 7 refactored scripts and verify they still pass
-- **Snapshot round-trip**: commission with `--snapshot-dir`, then E2E with `--from-snapshot`, verify the full flow works
-- **Cost**: the refactoring is shell-only, no API calls needed for the refactoring itself. Validation requires running the same tests that already exist (~$2-5 per full suite run)
-- **E2E test needed?**: No new E2E test — this is infrastructure refactoring; the existing E2E tests serve as the validation suite
+- **Unit-level**: validate test_lib.py classes in isolation (TestRunner, LogParser, StatsExtractor) with a pytest or standalone test script
+- **Integration**: implementer runs at least 2 scripts end-to-end (one commission-based, one fixture-based) and spot-checks results match old bash versions
+- **Snapshot round-trip**: commission with --snapshot-dir, then E2E with --from-snapshot, verify the full flow works
+- **Cost**: the refactoring itself is code-only (no API calls). Spot-check validation requires ~2 claude -p runs ($1-2)
+- **E2E test needed?**: No new E2E test — existing tests serve as the validation suite. Full model variation matrix deferred to after merge.
 
 ### Staff review findings (independent reviewer)
 
