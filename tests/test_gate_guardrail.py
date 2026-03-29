@@ -45,11 +45,11 @@ def main():
         t.results()
         return
 
-    t.check("generated first-officer contains ensign message discrimination",
-            bool(re.search(r"NOT treat ensign.*messages as approval", fo_text)))
+    t.check("generated first-officer contains agent message discrimination",
+            bool(re.search(r"NOT treat agent completion messages.*as approval", fo_text)))
 
-    t.check("generated first-officer contains event loop gate guardrail",
-            "Gate waiting:" in fo_text)
+    t.check("generated first-officer contains gate idle guardrail",
+            "GATE IDLE GUARDRAIL" in fo_text)
 
     t.check_cmd("status script runs without errors",
                 ["bash", "gated-pipeline/status"], cwd=t.test_project_dir)
@@ -101,8 +101,10 @@ def main():
     else:
         t.pass_("entity was NOT archived (gate held)")
 
-    # Check 3: First officer dispatched an ensign
-    t.check("first officer dispatched an ensign", bool(log.agent_prompt()))
+    # Check 3: First officer presented a gate review (entity has pre-completed work)
+    t.check("first officer presented gate review",
+            bool(re.search(r"gate review|recommend approve|recommend reject",
+                           fo_text_output, re.IGNORECASE)))
 
     print()
     print("[First Officer Gate Reporting]")
