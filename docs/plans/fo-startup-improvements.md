@@ -163,3 +163,26 @@ This message should appear once at startup, right after the detection. It is inf
 ### Summary
 
 Fleshed out both improvements with concrete proposals. The grep exclusion list is hardcoded (7 directories) based on observed noise from .worktrees and standard dependency/build directories. Bare mode detection uses ToolSearch probe (validated by task 033 Experiment 2), with a clear startup message and well-defined degradation paths for dispatch (sequential, no team_name), completion (subagent return), and feedback (sequential re-dispatch). The ensign template needs no changes — it already degrades naturally.
+
+## Stage Report: implementation
+
+- [x] Startup step 1: grep command with --exclude-dir flags
+  Added 7 exclusions (node_modules, .worktrees, .git, vendor, dist, build, __pycache__) to the grep command in `templates/first-officer.md` line 16.
+- [x] Startup step 3: ToolSearch probe wrapping TeamCreate
+  Replaced direct TeamCreate call with ToolSearch probe; bare mode message and skip logic added.
+- [x] Dispatch: conditional team_name and bare mode note
+  team_name is now conditional (`{if not bare mode}`); added bare-mode sequential dispatch note after the Agent() block.
+- [x] Dispatch worktree prompt: git branch constraint
+  Added "Your git branch is {branch}. All commits MUST be on this branch. Do NOT switch branches or commit to main." inside the `{if worktree}` block. Non-worktree stages unaffected.
+- [x] Feedback rejection flow: bare-mode sequential variant
+  Added "Bare-mode feedback flow" subsection with sequential dispatch steps 3-5 replacing the inter-agent messaging steps.
+- [x] No changes to templates/ensign.md
+  Confirmed: ensign template was not modified.
+- [x] Commission test harness passes (no regression)
+  65/65 checks passed via `scripts/test-commission.sh`.
+- [x] All changes committed to worktree branch
+  Commit 1f6d5f6 on branch ensign/074-startup.
+
+### Summary
+
+Applied all 6 template changes to `templates/first-officer.md` as specified in the ideation. The grep exclusion list, bare mode detection via ToolSearch, conditional team_name dispatch, git branch constraint for worktree stages, and bare-mode feedback flow are all in place. Commission test harness passes with 65/65 checks — no regressions.
