@@ -179,3 +179,27 @@ Identified four template sections that need modification in `templates/first-off
 ### Summary
 
 Applied the four proposed wording changes from ideation to `templates/first-officer.md`. The changes add an auto-bounce path for feedback stages with REJECTED recommendations (skipping captain wait), while preserving full gate presentation for PASSED recommendations and non-feedback stages. Commission test harness confirms no regressions (65/65 checks pass).
+
+## Stage Report: validation
+
+- [x] AC1: feedback-to + gate + REJECTED triggers immediate Feedback Rejection Flow
+  L85-87: gate flow checks `feedback-to` AND REJECTED before standard presentation; "enter the Feedback Rejection Flow immediately without waiting for captain approval"
+- [x] AC2: FO notifies captain of auto-bounce with summary and override option
+  L89-95: notification template includes entity title, one-line summary, and "Say override to intervene"
+- [x] AC3: feedback-to + PASSED goes through full gate with captain approval (unchanged)
+  L99: "If gate + no feedback-to, OR gate + feedback-to + PASSED: Present the stage report to the captain" — presentation block, guardrails, and approve/reject paths identical to main
+- [x] AC4: gated stage without feedback-to requires captain for both approve and reject (unchanged)
+  L99: stages without feedback-to always follow the standard gate presentation path; approve/reject resolution paths unchanged from main
+- [x] AC5: cycle limit >= 3 escalates even on auto-bounce
+  L127: "regardless of whether this was an auto-bounce or captain-initiated rejection" — explicit clause
+- [x] AC6: captain can override auto-bounce by saying "override"
+  L94+L97: notification says "Say override to intervene"; FO halts feedback cycle on captain intervention and follows standard gate resolution paths
+- [x] AC7: updated result after feedback cycle re-enters auto-bounce vs present logic
+  L131: "re-enter the gate flow from Completion and Gates — the same auto-bounce vs. present logic applies" — replaces old wording that always presented at gate
+- [x] Commission test harness passes (no regression)
+  65 passed, 0 failed — all file existence, guardrail, frontmatter, and completeness checks green
+- [x] Recommendation: PASSED
+
+### Summary
+
+All 7 acceptance criteria verified against the template diff. The 4 changed sections match the proposed wording from ideation exactly. The gate flow correctly branches on feedback-to + REJECTED for auto-bounce while preserving unchanged behavior for PASSED and non-feedback stages. The commission test harness confirms no regressions (65/65). Recommendation: PASSED.
