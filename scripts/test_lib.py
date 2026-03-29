@@ -133,6 +133,7 @@ def generate_first_officer(
     first_stage: str = "backlog",
     last_stage: str = "done",
     spacedock_version: str = "test",
+    project_name: str = "test-project",
 ) -> Path:
     """Generate first-officer.md from template with variable substitution."""
     template = runner.repo_root / "templates" / "first-officer.md"
@@ -143,7 +144,7 @@ def generate_first_officer(
         "__MISSION__": mission,
         "__DIR__": pipeline_dir,
         "__DIR_BASENAME__": dir_basename,
-        "__PROJECT_NAME__": "test-project",
+        "__PROJECT_NAME__": project_name,
         "__ENTITY_LABEL__": entity_label,
         "__ENTITY_LABEL_PLURAL__": entity_label_plural,
         "__CAPTAIN__": captain,
