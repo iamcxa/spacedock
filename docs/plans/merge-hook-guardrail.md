@@ -8,6 +8,7 @@ completed:
 verdict:
 score: 0.75
 worktree: .worktrees/ensign-077-merge-guardrail
+pr: "#15"
 ---
 
 When the captain approved 073 at the validation gate, the FO went straight to `git merge` without running the pr-merge mod's merge hook. The hook should have presented a PR summary and waited for push approval. Instead the entity was locally merged, archived, and cleaned up — bypassing the PR workflow entirely.
