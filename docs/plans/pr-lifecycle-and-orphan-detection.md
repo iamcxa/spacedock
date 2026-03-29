@@ -1,7 +1,7 @@
 ---
 id: 070
 title: PR lifecycle timing and startup orphan detection
-status: implementation
+status: validation
 source: CL
 started: 2026-03-28T12:00:00Z
 completed:
