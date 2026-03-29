@@ -75,6 +75,13 @@ Additionally, update the gate approval "Approve + terminal + worktree" path to:
 3. The gate approval "Approve + terminal + worktree" path no longer has its own inline merge hook instruction — it delegates to Merge and Cleanup.
 4. The guardrail explicitly states: no `git merge`, no archival, and no status advancement until merge hooks have completed.
 5. The guardrail explicitly addresses the PR-created case: if a hook set `pr`, stop — do not local merge.
+6. An E2E test (`tests/test-merge-hook-guardrail.sh`) verifies the merge hook actually fires at merge time. Design:
+   - Create a test mod (`_mods/test-hook.md`) with `## Hook: merge` that appends to `_merge-hook-fired.txt`
+   - Commission a no-gates workflow (backlog → work → done), one entity
+   - Run `claude -p --agent first-officer` to completion
+   - Assert `_merge-hook-fired.txt` exists and contains the entity slug
+   - Assert the entity was archived (merge completed after hook)
+7. The E2E test is added to the README's Testing Resources table.
 
 ### Open questions (resolved)
 
