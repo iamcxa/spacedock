@@ -8,6 +8,7 @@ completed:
 verdict:
 score: 0.70
 worktree: .worktrees/ensign-074-startup
+pr: "#16"
 ---
 
 Two improvements to the first-officer startup sequence.
