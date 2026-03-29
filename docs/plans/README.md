@@ -174,6 +174,7 @@ Validation pilots should use these when verifying implementation work:
 |----------|------|--------|
 | Commission test harness | `scripts/test-harness.md` | Batch-mode commission invocation, generated file validation, guardrail checks |
 | Rejection flow E2E test | `tests/test-rejection-flow.sh` | Validation rejection detection, validator-to-implementer relay dispatch |
+| Scaffolding guardrail E2E test | `tests/test-scaffolding-guardrail.sh` | Scaffolding change guardrail, issue filing guardrail |
 
 The test harness documents how to run `claude -p` with `--plugin-dir` for non-interactive commission testing, plus structural and guardrail assertions against the generated output. Use it for any task that changes `skills/commission/SKILL.md` or the first-officer template.
 
