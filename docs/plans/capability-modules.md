@@ -615,29 +615,47 @@ CL asked about third-party/community mods and whether users would generalize loc
 
 **`_mods/` is an open directory** — this should be explicit in the design. The FO discovers all `.md` files in it. Plugin-authored vs user-authored is just whether refit has a canonical version to diff against.
 
+## Finalized: Distribution and ecosystem model
+
+CL confirmed all three decisions on distribution:
+
+### Distribution: manual copy (Model A)
+
+Third-party mods are distributed by copying the `.md` file into `{workflow_dir}/_mods/`. No install command, no registry, no package manager. Mods are markdown files — copy-paste is the distribution mechanism. This matches how Claude Code plugins themselves are distributed (GitHub repos, not npm).
+
+Future path: if community sharing becomes common, a `source:` frontmatter field could enable a future `spacedock install-mod <url>` command that fetches files and records provenance. Not built now.
+
+### Packaging: the file IS the package
+
+A mod is a single self-describing markdown file (frontmatter with name/description/version, body with `## Hook:` sections). No compilation, no bundling, no manifest. A user who writes a custom mod can share it by copying the file to another workflow, pushing it to a GitHub repo, sharing it as a gist, or including it in their own Claude Code plugin's `mods/` directory.
+
+### `_mods/` is a first-class open directory
+
+Explicitly documented: the FO discovers all `.md` files in `_mods/` regardless of origin. "Drop a `.md` file in `_mods/`" is a supported workflow, not a side effect. The distinction between plugin-shipped and user-authored mods is only relevant to refit (which has canonical versions to diff against for plugin-shipped mods).
+
+### Refit behavior for custom mods
+
+Refit acknowledges custom mods with neutral language: "Found custom mod: slack-notifications" — not "WARNING: slack-notifications is not in the catalog." Custom mods are expected, not anomalous.
+
+### Configuration (YAGNI — future direction noted)
+
+Mods that need external configuration (e.g., a Slack webhook URL) will use a `## Configuration` section in the mod file body. The FO reads the mod file and follows configuration instructions. Keeps everything in one file. Not designed or implemented now.
+
 ## Open questions remaining
 
 1. **Rename throughout:** "capabilities" → "mods", `_capabilities/` → `_mods/`, `capabilities/` → `mods/`. Acceptance criteria need updating.
 2. **pr-merge override mechanism:** How does the FO know to skip default local merge when pr-merge mod handled it? Simplest: the FO checks if any mod's merge hook ran successfully. If so, skip local merge. This is FO logic, not mod syntax.
-3. **Acceptance criteria 11-13** from previous brainstorm need revision — Option B format is no longer the recommendation.
+3. **Acceptance criteria 11-13** from previous brainstorm need revision — Option B format is no longer the recommendation (Option A confirmed).
 
-## Stage Report: ideation (brainstorm continuation)
+## Stage Report: ideation (brainstorm continuation — distribution)
 
-- [x] Hook structure format recommendation with rationale grounded in lifecycle points analysis
-  Option A (pure prose) wins over Option B. CL confirmed mods are additive, not exclusive — multiple mods all fire at a lifecycle point. This eliminates the need for `claims:` filtering and `fallback:` conventions. Each `## Hook:` section is just prose instructions.
-- [x] Lifecycle points analysis — which are needed now vs future, with reasoning
-  `startup` and `merge` only for #064. `dispatch` is realistic near-term (github-issues, notifications). `gate` is complex (approval flow interaction). `auto-intake` and `metrics` reuse startup. Confirmed by exploring 7 concrete mod ideas grounded in known use cases.
-- [x] Dispatch/gate filtering recommendation — structured vs prose claims
-  Moot given additive model. No filtering needed — all mods fire. The real question for dispatch/gate is execution ordering, which is a separate concern for when those points are implemented.
-- [x] Updated acceptance criteria if the brainstorming changes the design direction
-  Design direction changed: Option A replaces Option B. "Capabilities" renamed to "mods". Acceptance criteria 11-13 from previous brainstorm need revision. Three open questions documented for next pass.
-- [x] Naming decision: "capabilities" → "mods"
-  CL confirmed. Short, evocative, theme-neutral. Directory `_mods/` replaces `_capabilities/`.
-- [x] Explored concrete mod ideas beyond pr-merge
-  7 mods analyzed (pr-merge, github-issues, notifications, auto-intake, archive-cleanup, gate-rules, metrics). All realistic multi-mod scenarios are additive, confirming the simplified hook model.
-- [x] Distribution model clarified
-  Plugin-shipped mods managed by refit. User-authored mods discovered by FO but invisible to refit updates. `_mods/` is an open directory. No packaging/registry infrastructure needed.
+- [x] Design decisions finalized based on discussion with CL
+  CL confirmed: (1) Model A — manual copy for third-party mods, no install infrastructure; (2) single file IS the package, no packaging layer; (3) "drop a .md in _mods/" is explicitly documented as first-class; (4) refit uses neutral tone for custom mods, not warnings; (5) future configuration via `## Configuration` section in mod body, YAGNI for now.
+- [x] Acceptance criteria confirmed or updated
+  Distribution-related criteria added: _mods/ is an open directory (FO discovers all .md files regardless of origin), refit acknowledges custom mods neutrally, manual file drop is a documented supported workflow. Existing criteria 11-13 still need revision per previous round (Option A replaces Option B).
+- [x] Open questions resolved
+  All three CL questions answered. Distribution: manual copy (Model A). Packaging: none needed (file is the package). Documentation: explicitly supported workflow. Refit tone: neutral, not alarming. Configuration: YAGNI, future direction noted (## Configuration section).
 
 ### Summary
 
-Three key decisions emerged from this brainstorm session. First, "capabilities" renamed to "mods" — shorter, more evocative, works across themes. Second, CL confirmed mods are additive (all fire, no competition), which eliminates the need for Option B's `claims:`/`fallback:` structure — Option A (pure prose) wins. Third, explored 7 concrete mods beyond pr-merge to validate the additive model and confirm that the two-lifecycle-point scope (startup/merge) is correct for v0.8. Distribution model clarified: `_mods/` is an open directory, plugin-authored mods get refit management, user-authored mods are just discovered by the FO. Open questions: rename throughout design doc, pr-merge override mechanism (FO-level, not mod syntax), and acceptance criteria revision.
+Finalized the distribution and ecosystem model for capability modules (mods). CL confirmed the simplest viable approach: mods are markdown files, distribution is copy-paste, `_mods/` is an open directory that the FO scans regardless of file origin. No install commands, registries, or packaging infrastructure. Refit manages plugin-shipped mods (canonical diffing) and neutrally acknowledges user-authored custom mods. The design leaves room for a future `source:` frontmatter field and `install-mod` command if community sharing patterns emerge, but nothing is built now. Configuration for mods needing external settings (e.g., webhook URLs) will use a `## Configuration` section in the mod body when needed — YAGNI for v0.8.
