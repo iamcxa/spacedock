@@ -173,7 +173,7 @@ Task 036 proposes treating commission as a compiler with `--target` (claude-code
 | **Gemini CLI** | Experimental subagents, `activate_skill` tool | `.gemini/agents/*.md` with YAML frontmatter | Subagent returns summary to parent | `activate_skill` auto-discovery |
 | **Cursor** | Subagents (v2.4, Jan 2026), orchestrator-worker pattern | Custom subagent definitions | Lead agent aggregates results | SKILL.md auto-discovery |
 | **GitHub Copilot** | Fleet mode (parallel subagents), `read_agent`/`task` tools | Custom agents via `.github/copilot/agents/` | Subagent results to orchestrator | SKILL.md, AGENTS.md |
-| **Windsurf** | 5 parallel agents (Feb 2026) | Cascade agent config | Sequential within Cascade flow | Skills via Cascade |
+| **Windsurf** | Parallel Cascade sessions via git worktrees (Wave 13) | Cascade config (no file-based agent defs) | No inter-session communication | Skills via Cascade |
 | **OpenCode** | Native subagents, agent teams (Feb 2026) | `.opencode/agents/*.md` or `opencode.json` | Event-driven peer-to-peer messaging | Tab-switch between primary agents |
 
 ### Spacedock constructs mapped to equivalents
@@ -181,15 +181,72 @@ Task 036 proposes treating commission as a compiler with `--target` (claude-code
 **Tier 1 — Portable now (phrasing changes only):**
 - Tool name references (`Read`, `Write`, `Bash`, `Glob`, `Edit`) — all agents have file/shell equivalents. Fix: use generic language ("read the file").
 - `{spacedock_plugin_dir}` template resolution — fix with symlink approach (templates travel with skill directory).
-- Git worktree commands — universal shell commands, work everywhere.
+- Git worktree commands — universal shell commands, work everywhere. Windsurf Wave 13 added explicit git worktree support; Copilot community is experimenting with worktree-based subagent isolation.
 
 **Tier 2 — Portable with adaptation (equivalents exist but differ):**
-- `.claude/agents/` agent definitions — Codex uses `~/.codex/agents/*.toml`, Gemini CLI uses `.gemini/agents/*.md`, OpenCode uses `.opencode/agents/*.md`, Copilot uses `.github/copilot/agents/`. The concept is universal; the format and location differ per agent. Commission could generate agent files in the target format.
-- Slash command invocation (`/commission`) — Gemini CLI auto-discovers skills via `activate_skill`. Cursor and Copilot load SKILL.md. Most agents now support progressive disclosure (load description first, full content on activation), so large skills are not problematic.
+- `.claude/agents/` agent definitions — every major agent now has an equivalent location and format:
+
+  | Agent | Agent file location | Format |
+  |-------|-------------------|--------|
+  | Claude Code | `.claude/agents/*.md` | Markdown with custom instructions |
+  | Codex | `~/.codex/agents/*.toml` | TOML with model, sandbox, MCP config |
+  | Gemini CLI | `.gemini/agents/*.md` | Markdown with YAML frontmatter |
+  | Cursor | `.cursor/agents/*.md` | Markdown with YAML frontmatter (name, description, model, readonly, is_background) |
+  | GitHub Copilot | `.github/copilot/agents/` | Custom agents; also reads AGENTS.md and CLAUDE.md |
+  | OpenCode | `.opencode/agents/*.md` or `opencode.json` | Markdown (filename = agent name) or JSON config |
+  | Windsurf | Cascade config | Not file-based agent definitions (yet) |
+
+- Slash command invocation (`/commission`) — Gemini CLI auto-discovers skills via `activate_skill` with progressive disclosure (frontmatter only until activated). Cursor and Copilot load SKILL.md. Codex supports skills via SKILL.md. Most agents now support on-demand activation, so large skills are not problematic.
 
 **Tier 3 — Requires target-specific orchestration:**
-- `Agent()` subagent spawning with `subagent_type` — all major agents now support subagent spawning, but the API differs. Claude Code uses `Agent(type="first-officer")`, Codex references custom agents by name, Gemini CLI uses `activate_skill` or subagent tools, Copilot uses `task` tool. The dispatch mechanism is the main compile target difference.
-- `TeamCreate` / `SendMessage` inter-agent communication — Claude Code's team messaging model is unique. Codex and Copilot use orchestrator-collects-results. OpenCode has event-driven peer-to-peer messaging. Gemini CLI subagents return summaries. The communication model varies most across agents.
+
+These are the constructs spacedock's *generated workflow runtime* depends on. Each has equivalents, but the API and communication model differ per agent.
+
+- **`Agent()` subagent spawning with `subagent_type`** — spacedock's first-officer dispatches ensigns via `Agent(type="ensign")`. Equivalents:
+
+  | Agent | Dispatch mechanism | Named agent support |
+  |-------|--------------------|-------------------|
+  | Claude Code | `Agent(type="ensign")` tool | Yes — `.claude/agents/ensign.md` |
+  | Codex | Reference custom agent by name in prompt; orchestrator spawns | Yes — `~/.codex/agents/*.toml`, also per-repo `.agents/` proposed |
+  | Gemini CLI | Subagents exposed as tools of same name; `@agent_name` explicit dispatch | Yes — `.gemini/agents/*.md` |
+  | Cursor | Task tool spawns subagent; custom agents via `.cursor/agents/` | Yes — recursive spawning supported (v2.5) |
+  | GitHub Copilot | `task` tool or `/fleet` for parallel dispatch; `@CUSTOM-AGENT-NAME` | Yes — custom agents as subagents (GA Mar 2026) |
+  | OpenCode | Subagents via config; agent teams via ensemble plugin | Yes — `.opencode/agents/*.md` |
+  | Windsurf | Parallel Cascade sessions via git worktrees (Wave 13) | No named agent dispatch — parallel sessions are independent |
+
+- **`TeamCreate` / `SendMessage` inter-agent communication** — spacedock's first-officer creates a team and sends messages to ensigns. This is the construct with the most variation:
+
+  | Agent | Communication model | Closest equivalent |
+  |-------|--------------------|--------------------|
+  | Claude Code | `TeamCreate` + `SendMessage` peer-to-peer; shared `TaskList` | Native — this is the source construct |
+  | Codex | Orchestrator collects results from subagents; no direct peer messaging. MCP + Agents SDK enables hand-offs via shared artifacts (`REQUIREMENTS.md`, `AGENT_TASKS.md`) | Orchestrator-collects pattern; no `SendMessage` equivalent |
+  | Gemini CLI | Subagent returns summary to parent; A2A protocol for remote agents; internal MessageBus migration in progress | Return-to-parent; no peer messaging between subagents |
+  | Cursor | Lead agent aggregates subagent results; async background agents (v2.5) | Orchestrator-collects; no peer messaging |
+  | GitHub Copilot | Fleet mode: orchestrator dispatches and collects; `/tasks` view for monitoring | Orchestrator-collects; no peer messaging |
+  | OpenCode | Event-driven peer-to-peer messaging (rebuilt Claude Code's model); append-only JSONL inboxes | **Closest match** — has `SendMessage` equivalent with peer-to-peer |
+  | Windsurf | Independent parallel sessions; no inter-session communication | No equivalent — sessions are isolated |
+
+- **`TaskCreate` / `TaskUpdate` shared task tracking** — spacedock uses shared task lists for coordination:
+
+  | Agent | Task tracking |
+  |-------|--------------|
+  | Claude Code | `TaskCreate`/`TaskUpdate` shared across team | Native |
+  | Codex | CSV-based batch orchestration (`spawn_agents_on_csv`, `report_agent_job_result`) | Batch-oriented, not real-time task board |
+  | Gemini CLI | No shared task primitive | None |
+  | Cursor | No shared task primitive (session-scoped) | None |
+  | GitHub Copilot | `/tasks` view shows subagent status | Read-only monitoring, not shared mutable state |
+  | OpenCode | Shared task board via ensemble plugin | **Closest match** |
+  | Windsurf | Cascade internal Todo list | Single-agent only |
+
+### Communication model implications for 036
+
+The research reveals **three distinct orchestration patterns** across agents, which suggests 036 might target patterns rather than individual agents:
+
+1. **Team messaging** (Claude Code, OpenCode): Peer-to-peer `SendMessage`, shared task lists. The first-officer can send work to specific ensigns and receive updates. This is spacedock's native model.
+
+2. **Orchestrator-collects** (Codex, Gemini CLI, Cursor, Copilot): The lead agent spawns workers and collects results. No direct worker-to-worker communication. The first-officer would need to be restructured as a sequential orchestrator that dispatches one ensign at a time (or in parallel batches) and collects results rather than using message passing.
+
+3. **Independent sessions** (Windsurf): Parallel sessions with no coordination primitive. The first-officer pattern doesn't map well. Workflows would need to be manually coordinated or use filesystem-as-state (shared files for communication).
 
 ### Per-agent assessment (updated)
 
@@ -201,7 +258,7 @@ Task 036 proposes treating commission as a compiler with `--target` (claude-code
 | GitHub Copilot | Yes | Likely (with Tier 1+2 fixes) | Yes (with target-specific orchestration) | REALISTIC — via 036 compile target |
 | Cursor | Yes | Likely (with Tier 1+2 fixes) | Yes (with target-specific orchestration) | REALISTIC — via 036 compile target |
 | OpenCode | Yes | Likely (with Tier 1+2 fixes) | Yes (with target-specific orchestration) | REALISTIC — via 036 compile target |
-| Windsurf | Yes | Likely (with Tier 1+2 fixes) | Uncertain (Cascade flow differs) | NEEDS INVESTIGATION |
+| Windsurf | Yes | Likely (with Tier 1+2 fixes) | No (no inter-session comms) | REALISTIC — portable target only (via 036) |
 
 ### Key insight: distribution vs. execution (revised)
 
@@ -218,9 +275,19 @@ Scope this task (057) to making `npx skills add` work for Claude Code users. The
 
 ### Impact on task 036
 
-The previous 036 spec proposed three targets: `claude-code`, `codex`, and `portable`. The research suggests more targets are viable: `gemini-cli`, `copilot`, `cursor`, and `opencode` all have subagent systems that could run spacedock workflows. Task 036's scope may expand, or a generic "subagent" target could cover agents with similar patterns.
+The previous 036 spec proposed three targets: `claude-code`, `codex`, and `portable`. The research suggests a pattern-based approach may be more effective than per-agent targets:
 
-Key finding for 036: Codex custom agents use TOML files in `~/.codex/agents/`, Gemini CLI uses `.gemini/agents/*.md` with YAML frontmatter, OpenCode uses `.opencode/agents/*.md`, and Copilot uses `.github/copilot/agents/`. The first-officer/ensign templates would need to be compiled into these target-specific formats.
+| Target pattern | Agents | Orchestration model | Agent file format |
+|---------------|--------|--------------------|--------------------|
+| **team-messaging** | Claude Code, OpenCode | Peer-to-peer SendMessage, shared tasks | `.claude/agents/*.md`, `.opencode/agents/*.md` |
+| **orchestrator-collects** | Codex, Gemini CLI, Cursor, Copilot | Lead spawns workers, collects results | TOML/MD varies per agent |
+| **portable** | Windsurf, any agent | No orchestration — manual or filesystem-as-state | README + status script only |
+
+Key findings for 036:
+- **Agent file formats differ but are all markdown or config-based.** The first-officer/ensign templates would need format adapters, not complete rewrites. Gemini CLI, Cursor, OpenCode, and Copilot all use markdown with YAML frontmatter — only Codex uses TOML.
+- **The communication model is the real compile-target differentiator**, not the agent file format. The first-officer's dispatch logic (TeamCreate + SendMessage) needs to be rewritten as orchestrator-collects for Codex/Gemini/Cursor/Copilot targets.
+- **OpenCode is the closest to Claude Code** — it rebuilt the agent-team system with event-driven peer-to-peer messaging. A `team-messaging` target could cover both with minimal adaptation.
+- **Windsurf's Wave 13 parallel sessions lack inter-agent communication**, so it falls into the `portable` category for now.
 
 ## Stage Report: ideation
 
@@ -237,4 +304,12 @@ Key finding for 036: Codex custom agents use TOML files in `~/.codex/agents/`, G
 
 ### Summary
 
-Conducted web research (previously missing) on the current multi-agent capabilities of Codex, Gemini CLI, Cursor, GitHub Copilot, Windsurf, and OpenCode. The previous analysis (based on May 2025 knowledge cutoff) incorrectly classified these as single-agent systems — as of Feb-Mar 2026, every major coding agent supports subagent spawning and multi-agent orchestration. This changes the cross-agent per-agent assessment from ASPIRATIONAL to REALISTIC for all major agents (via 036 compile targets). Updated the compatibility table with specific agent file formats (Codex TOML, Gemini `.gemini/agents/*.md`, etc.) and dispatch mechanisms. The 057 scope (distribution only) remains correct, but 036's opportunity is now significantly larger than the original spec anticipated. Also added `mods/` directory to the approach and resolved the 057/036 boundary.
+Conducted web research on multi-agent capabilities (subagent spawning, agent file formats, inter-agent communication, task tracking) across Codex, Gemini CLI, Cursor, GitHub Copilot, Windsurf, and OpenCode. The previous analysis (May 2025 cutoff) was substantially wrong: all major agents now support subagent spawning and most support named agent definitions.
+
+Key findings for construct-level compatibility:
+- **Agent file definitions:** Universal concept, format varies (Codex TOML, Gemini/Cursor/OpenCode markdown+YAML, Copilot has its own format). Commission can generate target-specific agent files.
+- **Subagent dispatch:** All agents support named-agent dispatch. APIs differ but the pattern (lead dispatches worker by name) is universal.
+- **Inter-agent communication:** The biggest differentiator. Three patterns emerged: (1) team-messaging (Claude Code, OpenCode), (2) orchestrator-collects (Codex, Gemini, Cursor, Copilot), (3) independent sessions (Windsurf). This is the primary compile-target axis for 036.
+- **Task tracking:** Only Claude Code and OpenCode have shared mutable task boards. Others use orchestrator monitoring or no equivalent.
+
+Proposed that 036 target *communication patterns* rather than individual agents — this would reduce the target matrix from 7+ agents to 3 patterns (team-messaging, orchestrator-collects, portable).
