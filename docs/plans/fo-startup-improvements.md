@@ -1,7 +1,7 @@
 ---
 id: 074
 title: First-officer startup improvements — README search and bare mode detection
-status: implementation
+status: validation
 source: CL
 started: 2026-03-29T18:00:00Z
 completed:
