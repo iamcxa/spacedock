@@ -89,11 +89,13 @@ Spacedock ships these components:
 
 **Option A with symlinks in the repo.** This is the simplest approach that works:
 
-1. **Add a `templates/` symlink inside each skill directory** pointing to `../../templates/`:
+1. **Add `templates/` and `mods/` symlinks inside each skill directory** pointing to the repo root:
    - `skills/commission/templates` -> `../../templates`
+   - `skills/commission/mods` -> `../../mods`
    - `skills/refit/templates` -> `../../templates`
+   - `skills/refit/mods` -> `../../mods`
 
-2. **Update skill prompts** to reference templates relative to the skill's own directory:
+2. **Update skill prompts** to reference templates and mods relative to the skill's own directory:
    - Change `{spacedock_plugin_dir}/templates/first-officer.md` to reference templates relative to the skill file location
    - The skills CLI's `copyDirectory()` uses `dereference: true` when copying files (and `cp` with `dereference: true` for symlinks), so symlinks to templates will be resolved and the actual files will be copied to the install destination
 
@@ -116,18 +118,46 @@ The prompt change is: replace all `{spacedock_plugin_dir}/templates/` references
 ## Acceptance criteria
 
 1. `npx skills add clkao/spacedock --list` shows both `commission` and `refit` skills
-2. `npx skills add clkao/spacedock -a claude-code` installs both skills to `.claude/skills/`
-3. After skills-CLI install, `/commission` generates a working workflow (templates are accessible)
-4. After skills-CLI install, `/refit` can detect and upgrade workflow scaffolding
+2. `npx skills add clkao/spacedock -a claude-code` installs both skills to `.agents/skills/` with symlinks to `.claude/skills/`
+3. After skills-CLI install, `/commission` generates a working workflow (templates and mods are accessible)
+4. After skills-CLI install, `/refit` can detect and upgrade workflow scaffolding (templates and mods are accessible)
 5. `claude plugin marketplace add clkao/spacedock` continues to work (no regression)
-6. Template files exist in the installed skill directories (e.g., `.claude/skills/commission/templates/first-officer.md`)
-7. The spacedock version is accessible to the refit skill regardless of install method
+6. Template files exist in the installed skill directories (e.g., `.agents/skills/commission/templates/first-officer.md`)
+7. Mod files exist in the installed skill directories (e.g., `.agents/skills/commission/mods/pr-merge.md`)
+8. The spacedock version is accessible to the refit skill regardless of install method
+
+### Out of scope (deferred to task 036)
+
+- Cross-agent execution (making generated workflows run on Codex, Gemini CLI, OpenCode)
+- `--target` parameter for commission
+- Tier 2/3 portability fixes (agent definitions, subagent spawning, team communication)
+
+## Relationship with task 036 (compile targets)
+
+Task 036 proposes treating commission as a compiler with `--target` (claude-code, codex, portable). Task 057 is about **distribution** — how spacedock gets installed. These operate at different layers:
+
+- **057 (this task):** Makes spacedock installable via `npx skills add`. The skill files need to be self-contained (templates bundled). This is target-agnostic — the symlink/embed approach works regardless of what commission generates.
+- **036 (compile targets):** Changes what commission *outputs* per platform. A `--target codex` would generate `AGENTS.md` instead of `.claude/agents/`. A `--target portable` would generate only README + status (no agent files).
+
+**Key insight:** 036 subsumes 057's cross-agent *execution* concerns. The "Cross-agent compatibility analysis" section above identified that single-agent platforms can't run spacedock's generated workflows because of Tier 3 constructs (Agent spawning, TeamCreate). Task 036 solves this by generating platform-native orchestration. So 057 should **not** attempt cross-agent execution fixes — it should only make the skill files installable.
+
+**What 057 owns:** Making `npx skills add clkao/spacedock` work for Claude Code users. Templates travel with skills, `{spacedock_plugin_dir}` references become relative, version detection works without plugin manifest.
+
+**What 036 owns:** Making commission generate output that runs on non-Claude-Code agents. The Tier 2/3 portability concerns (agent definitions, subagent spawning, team communication) are 036's scope.
+
+**No blocking dependency:** 057 can be implemented before 036 exists. The symlink approach is additive — it doesn't change the commission output format, just how the skill files locate their assets.
 
 ## Open questions
 
 1. **Symlink deref verification:** The skills CLI `copyDirectory()` uses `dereference: true` on individual file copies, but does it follow directory symlinks when iterating with `readdir`? Need to verify that `skills/commission/templates/` (a symlink to `../../templates/`) is traversed during copy. The `readdir` uses `withFileTypes` and filters `entry.isDirectory()` — need to confirm this returns true for symlinked directories. If not, actual directories with copies may be needed instead.
 
-2. **Skill prompt self-location:** How does a skill installed via the skills CLI know its own directory path? If the agent (e.g., Claude Code) presents skills by injecting their content into the system prompt, the skill has no way to know its filesystem location. This may require the skill to use a known install path (`.claude/skills/commission/templates/`) instead of a relative reference. Needs investigation.
+   **Mitigation if symlinks don't work:** Use a build script (`scripts/build-skills.sh`) that copies `templates/` into each skill directory before publishing. The built artifacts would be committed to the repo. This is Option D from the analysis — less clean but guaranteed to work. A lightweight alternative: commit actual directory copies (not symlinks) and use a CI check to ensure they stay in sync with `templates/`.
+
+2. **Skill prompt self-location:** How does a skill installed via the skills CLI know its own directory path? If the agent presents skills by injecting their content into the system prompt, the skill has no way to know its filesystem location. This may require the skill to use a known install path (`.agents/skills/commission/templates/`) instead of a relative reference. Needs investigation.
+
+   **Note:** This question applies to both `templates/` and `mods/` references. The `{spacedock_plugin_dir}` placeholder is resolved by Claude Code's plugin system. When installed via skills CLI, there is no plugin system — the skill is just a markdown file injected into context. The replacement mechanism needs to work without plugin-level path resolution.
+
+3. **Mods directory:** The current ideation focuses on `templates/` but both skills also reference `{spacedock_plugin_dir}/mods/`. The same symlink/embed approach applies: add `mods/` symlinks in each skill directory. This should be called out in the implementation plan.
 
 ## Cross-agent compatibility analysis
 
@@ -170,23 +200,17 @@ Scope this issue to Claude Code (no-plugin) as the realistic target. Cross-agent
 
 ## Stage Report: ideation
 
-- [x] Skills CLI mechanics researched — how it resolves repos, what it installs, expected structure
-  Analyzed all core source files: source-parser.ts, git.ts, skills.ts, installer.ts, plugin-manifest.ts, agents.ts
-- [x] Spacedock's full plugin structure documented — what files are needed for a working install
-  Documented all 9 components: 2 skills, 5 templates, 2 manifests; identified template dependency as the core challenge
-- [x] Compatibility assessment — can skills CLI and plugin marketplace coexist
-  Yes, they install to different locations; the gap is template access, not conflicts
-- [x] Proposed approach — concrete plan for making spacedock skills-installable
-  Option A: symlinks in repo + relative template references in skill prompts + version file for refit
-- [x] Acceptance criteria written — testable conditions for "done"
-  7 concrete, testable criteria covering both install methods and no regressions
-- [x] Compatibility assessment per agent (Claude Code no-plugin, Codex, Gemini, OpenCode)
-  Full construct inventory (7 constructs, 3 tiers) with per-agent mapping tables
-- [x] Realistic vs aspirational classification for each
-  Claude Code no-plugin: REALISTIC. Codex, Gemini CLI, OpenCode: ASPIRATIONAL (Tier 3 constructs block execution)
-- [x] Updated approach if compatibility findings change the design direction
-  Scope unchanged for this issue (Claude Code no-plugin target). Cross-agent runtime portability deferred to new issue per CL direction.
+- [x] Relationship between 057 (distribution via npx-skills) and 036 (compile targets) clarified
+  057 owns distribution (install path), 036 owns cross-agent execution (compile targets). No blocking dependency — 057 can ship first. New "Relationship with task 036" section added.
+- [x] Proposed approach updated if 036's compile-target model changes the design
+  036 does not change 057's design. The symlink approach is additive and target-agnostic. However, approach updated to include `mods/` directory (previously overlooked — both skills reference `{spacedock_plugin_dir}/mods/`).
+- [x] Open questions resolved or escalated
+  Q1 (symlink deref): unresolved but mitigation added (build script or committed copies as fallback). Q2 (self-location): unresolved, added note that it affects mods too. Q3 (mods): new question added and addressed in approach.
+- [x] Acceptance criteria updated if scope changed
+  Added criteria 7 (mods in installed directories). Added "Out of scope" section explicitly deferring cross-agent execution to 036. Updated criteria 3-4 to mention mods alongside templates.
+- [x] Clear definition of what's in-scope vs deferred to 036
+  In-scope: making npx-skills install work for Claude Code. Deferred: cross-agent execution, --target parameter, Tier 2/3 portability fixes.
 
 ### Summary
 
-Audited all seven Claude Code-specific constructs spacedock depends on and mapped equivalents (or lack thereof) across Codex, Gemini CLI, and OpenCode. The constructs fall into three portability tiers. Only Claude Code (no-plugin) is a realistic execution target — other agents lack subagent spawning (Agent tool), team communication (TeamCreate/SendMessage), and agent definitions (.claude/agents/). The proposed symlink approach remains correct for the scoped goal. CL directed that cross-agent runtime portability be spun off as a separate ideation issue.
+Analyzed the relationship between 057 (distribution) and 036 (compile targets). They operate at different layers with no blocking dependency — 057 makes spacedock installable, 036 makes generated output portable. The previous ideation's cross-agent compatibility analysis correctly identified the Tier 2/3 gap but 036 is now the designated owner of that work. Updated the approach to include `mods/` directory handling (both skills reference mods, not just templates). Two open questions remain unresolved (symlink deref behavior, skill self-location) with mitigations documented. Scope boundary with 036 is now explicit in acceptance criteria.
