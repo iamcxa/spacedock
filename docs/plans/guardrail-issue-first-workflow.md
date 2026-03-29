@@ -1,7 +1,7 @@
 ---
 id: 059
 title: Add guardrails — issue-first workflow and captain-approved GitHub issue filing
-status: implementation
+status: validation
 source: https://github.com/clkao/spacedock/issues/4
 started: 2026-03-28T00:09:00Z
 completed:
