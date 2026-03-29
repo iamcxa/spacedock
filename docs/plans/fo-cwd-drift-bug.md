@@ -110,3 +110,18 @@ All paths in the dispatch prompt MUST be absolute (rooted at `$project_root`).
 ### Summary
 
 The root cause is that the FO template has no guidance about cwd management, and several FO operations (orphan detection, worktree inspection) naturally encourage `cd` into worktrees. The proposed fix adds a "Working Directory" section to the FO template that prohibits `cd` and prescribes `git -C`, absolute paths, and the `Read` tool as alternatives. A secondary clarification makes `{entity_file_path}` explicitly absolute in the dispatch prompt. The fix is minimal — two additions to the FO template, no code changes.
+
+## Stage Report: implementation
+
+- [x] "Working Directory" section added to FO template after Startup
+  Added between Startup step 7 and Dispatch section at templates/first-officer.md:37-43
+- [x] Absolute path requirement added to Dispatch step 7
+  Appended "All paths in the dispatch prompt MUST be absolute (rooted at `$project_root`)." to step 7 at templates/first-officer.md:55
+- [x] Commission test harness passes (no regression)
+  65 passed, 0 failed (out of 65 checks) — RESULT: PASS
+- [x] All changes committed to worktree branch
+  Commit 6d2454c on ensign/072-fo-cwd-drift
+
+### Summary
+
+Added two targeted wording changes to `templates/first-officer.md`: a new "Working Directory" section after Startup that prohibits `cd` and prescribes `git -C`, absolute paths, and the `Read` tool as alternatives; and an absolute-path requirement appended to Dispatch step 7. Commission test harness passes with all 65 checks green.
