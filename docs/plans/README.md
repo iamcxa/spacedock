@@ -85,9 +85,13 @@ A task enters backlog when it is first proposed. It has a seed description but n
 A task moves to ideation when a pilot starts fleshing out the idea: clarify the problem, explore approaches, and produce a concrete description of what "done" looks like.
 
 - **Inputs:** The seed description and any relevant context (existing code, user feedback, related tasks)
-- **Outputs:** A fleshed-out task body with problem statement, proposed approach, acceptance criteria, and any open questions resolved
-- **Good:** Clearly scoped, actionable, addresses a real need, considers edge cases
-- **Bad:** Vague hand-waving, scope creep, solving problems that don't exist yet, no clear definition of done
+- **Outputs:** A fleshed-out task body with problem statement, proposed approach, acceptance criteria, and a test plan
+  - Acceptance criteria must include how each criterion will be tested
+  - Test plan: what tests verify the implementation, estimated cost/complexity, whether E2E tests are needed
+  - For template changes: specific before/after wording, not just "change X"
+- **Good:** Clearly scoped, actionable, addresses a real need, considers edge cases, test plan proportional to risk (static checks for simple wording, E2E for behavioral guarantees)
+- **Bad:** Vague hand-waving, scope creep, solving problems that don't exist yet, no clear definition of done, acceptance criteria without a test plan
+- **Staff review:** When the FO assesses ideation as complex (touches templates/scaffolding, requires E2E tests, or score >= 0.8), it spawns a fresh independent reviewer subagent before presenting at the ideation gate. The reviewer checks design soundness, test plan sufficiency, and gaps. The captain sees both the ideation and the reviewer's assessment.
 
 ### `implementation`
 
