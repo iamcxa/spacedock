@@ -1,13 +1,13 @@
 ---
 id: 068
 title: Keep implementer alive during feedback stage for faster fix cycles
-status: ideation
+status: implementation
 source: https://github.com/clkao/spacedock/issues/9
 started: 2026-03-29T03:06:00Z
 completed:
 verdict:
 score: 0.60
-worktree:
+worktree: .worktrees/ensign-068-keep-alive
 issue: "#9"
 pr:
 ---
