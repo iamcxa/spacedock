@@ -49,7 +49,7 @@ else
 fi
 
 # Check 2: Guardrail is in the Merge and Cleanup section
-MERGE_SECTION=$(awk '/^## Merge and Cleanup/,/^## [^#]/' "$TEMPLATE")
+MERGE_SECTION=$(awk '/^## Merge and Cleanup/{found=1} found && /^## / && !/^## Merge and Cleanup/{exit} found' "$TEMPLATE")
 if echo "$MERGE_SECTION" | grep -q "MERGE HOOK GUARDRAIL"; then
   pass "guardrail is in Merge and Cleanup section"
 else
