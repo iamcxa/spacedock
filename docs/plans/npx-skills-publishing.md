@@ -128,9 +128,10 @@ The prompt change is: replace all `{spacedock_plugin_dir}/templates/` references
 
 ### Out of scope (deferred to task 036)
 
-- Cross-agent execution (making generated workflows run on Codex, Gemini CLI, OpenCode)
+- Cross-agent execution (making generated workflows run on Codex, Gemini CLI, Copilot, Cursor, OpenCode, Windsurf)
 - `--target` parameter for commission
-- Tier 2/3 portability fixes (agent definitions, subagent spawning, team communication)
+- Tier 2/3 portability: target-specific agent file formats (TOML for Codex, `.gemini/agents/*.md` for Gemini, etc.) and dispatch mechanism adaptation
+- Note: cross-agent execution is now classified REALISTIC (not aspirational) — all major agents gained subagent support in early 2026
 
 ## Relationship with task 036 (compile targets)
 
@@ -139,11 +140,11 @@ Task 036 proposes treating commission as a compiler with `--target` (claude-code
 - **057 (this task):** Makes spacedock installable via `npx skills add`. The skill files need to be self-contained (templates bundled). This is target-agnostic — the symlink/embed approach works regardless of what commission generates.
 - **036 (compile targets):** Changes what commission *outputs* per platform. A `--target codex` would generate `AGENTS.md` instead of `.claude/agents/`. A `--target portable` would generate only README + status (no agent files).
 
-**Key insight:** 036 subsumes 057's cross-agent *execution* concerns. The "Cross-agent compatibility analysis" section above identified that single-agent platforms can't run spacedock's generated workflows because of Tier 3 constructs (Agent spawning, TeamCreate). Task 036 solves this by generating platform-native orchestration. So 057 should **not** attempt cross-agent execution fixes — it should only make the skill files installable.
+**Key insight:** 036 subsumes 057's cross-agent *execution* concerns. The cross-agent compatibility analysis (updated via web research, March 2026) found that all major coding agents now support subagent spawning and multi-agent orchestration — cross-agent execution is realistic, not aspirational. However, the orchestration APIs differ per agent (Codex uses TOML agent files, Gemini CLI uses `.gemini/agents/*.md`, etc.). Task 036 solves this by generating platform-native orchestration. So 057 should **not** attempt cross-agent execution fixes — it should only make the skill files installable.
 
 **What 057 owns:** Making `npx skills add clkao/spacedock` work for Claude Code users. Templates travel with skills, `{spacedock_plugin_dir}` references become relative, version detection works without plugin manifest.
 
-**What 036 owns:** Making commission generate output that runs on non-Claude-Code agents. The Tier 2/3 portability concerns (agent definitions, subagent spawning, team communication) are 036's scope.
+**What 036 owns:** Making commission generate output that runs on non-Claude-Code agents. This is now a more tractable problem than previously assumed — the target agents have real subagent systems, so 036 needs to compile to their specific formats rather than invent a workaround for missing capabilities.
 
 **No blocking dependency:** 057 can be implemented before 036 exists. The symlink approach is additive — it doesn't change the commission output format, just how the skill files locate their assets.
 
@@ -161,56 +162,79 @@ Task 036 proposes treating commission as a compiler with `--target` (claude-code
 
 ## Cross-agent compatibility analysis
 
-### Claude Code constructs spacedock depends on
+*Updated 2026-03-28 with web research. The previous analysis (based on May 2025 knowledge cutoff) incorrectly classified Codex, Gemini CLI, and OpenCode as single-agent systems. As of early 2026, the multi-agent landscape has shifted substantially.*
 
-Spacedock uses seven Claude Code-specific constructs, grouped by portability:
+### Agent multi-agent capabilities (as of March 2026)
 
-**Tier 1 — Portable with phrasing changes:**
-- Tool name references (`Read`, `Write`, `Bash`, `Glob`, `Edit`) — all agents have file/shell equivalents, just different names. Fix: use generic language ("read the file") instead of tool names.
+| Agent | Subagent spawning | Agent definitions | Inter-agent comms | Skill activation |
+|-------|------------------|-------------------|-------------------|-----------------|
+| **Claude Code** | Agent tool, TeamCreate | `.claude/agents/*.md` | SendMessage (team messaging) | `/slash` on-demand |
+| **Codex** | Native subagents (Feb 2026), `agents.max_depth` config | `~/.codex/agents/*.toml` (custom agents) | Orchestrator collects results | Skills via SKILL.md |
+| **Gemini CLI** | Experimental subagents, `activate_skill` tool | `.gemini/agents/*.md` with YAML frontmatter | Subagent returns summary to parent | `activate_skill` auto-discovery |
+| **Cursor** | Subagents (v2.4, Jan 2026), orchestrator-worker pattern | Custom subagent definitions | Lead agent aggregates results | SKILL.md auto-discovery |
+| **GitHub Copilot** | Fleet mode (parallel subagents), `read_agent`/`task` tools | Custom agents via `.github/copilot/agents/` | Subagent results to orchestrator | SKILL.md, AGENTS.md |
+| **Windsurf** | 5 parallel agents (Feb 2026) | Cascade agent config | Sequential within Cascade flow | Skills via Cascade |
+| **OpenCode** | Native subagents, agent teams (Feb 2026) | `.opencode/agents/*.md` or `opencode.json` | Event-driven peer-to-peer messaging | Tab-switch between primary agents |
+
+### Spacedock constructs mapped to equivalents
+
+**Tier 1 — Portable now (phrasing changes only):**
+- Tool name references (`Read`, `Write`, `Bash`, `Glob`, `Edit`) — all agents have file/shell equivalents. Fix: use generic language ("read the file").
 - `{spacedock_plugin_dir}` template resolution — fix with symlink approach (templates travel with skill directory).
 - Git worktree commands — universal shell commands, work everywhere.
 
-**Tier 2 — Requires architecture decisions:**
-- `.claude/agents/` agent definitions — only Claude Code loads these as spawnable subagent types. Other agents have no equivalent (Codex: none, Gemini CLI: none, OpenCode: `agents.json` config is not equivalent).
-- Slash command invocation (`/commission`) — other agents load skills as ambient context, not on-demand. A 500-line skill as always-loaded context is problematic.
+**Tier 2 — Portable with adaptation (equivalents exist but differ):**
+- `.claude/agents/` agent definitions — Codex uses `~/.codex/agents/*.toml`, Gemini CLI uses `.gemini/agents/*.md`, OpenCode uses `.opencode/agents/*.md`, Copilot uses `.github/copilot/agents/`. The concept is universal; the format and location differ per agent. Commission could generate agent files in the target format.
+- Slash command invocation (`/commission`) — Gemini CLI auto-discovers skills via `activate_skill`. Cursor and Copilot load SKILL.md. Most agents now support progressive disclosure (load description first, full content on activation), so large skills are not problematic.
 
-**Tier 3 — Claude Code exclusive (no equivalent):**
-- `Agent()` subagent spawning — the multi-agent orchestration model (first-officer dispatching ensigns). Codex, Gemini CLI, and OpenCode are all single-agent systems.
-- `TeamCreate` / `SendMessage` inter-agent communication — no other agent has this.
+**Tier 3 — Requires target-specific orchestration:**
+- `Agent()` subagent spawning with `subagent_type` — all major agents now support subagent spawning, but the API differs. Claude Code uses `Agent(type="first-officer")`, Codex references custom agents by name, Gemini CLI uses `activate_skill` or subagent tools, Copilot uses `task` tool. The dispatch mechanism is the main compile target difference.
+- `TeamCreate` / `SendMessage` inter-agent communication — Claude Code's team messaging model is unique. Codex and Copilot use orchestrator-collects-results. OpenCode has event-driven peer-to-peer messaging. Gemini CLI subagents return summaries. The communication model varies most across agents.
 
-### Per-agent assessment
+### Per-agent assessment (updated)
 
 | Agent | Install works? | Commission skill runs? | Generated workflow runs? | Classification |
 |-------|---------------|----------------------|------------------------|----------------|
-| Claude Code (no plugin) | Yes | Yes (with Tier 1 fixes) | Yes | REALISTIC |
-| Codex | Yes | No (Tier 2+3 constructs) | No (single-agent) | ASPIRATIONAL |
-| Gemini CLI | Yes | No (Tier 2+3 constructs) | No (single-agent) | ASPIRATIONAL |
-| OpenCode | Yes | Partial (if Claude backend) | No (single-agent) | ASPIRATIONAL |
+| Claude Code (no plugin) | Yes | Yes (with Tier 1 fixes) | Yes | REALISTIC — this task (057) |
+| Codex | Yes | Likely (with Tier 1+2 fixes) | Yes (with target-specific orchestration) | REALISTIC — via 036 compile target |
+| Gemini CLI | Yes | Likely (with Tier 1+2 fixes) | Yes (with target-specific orchestration) | REALISTIC — via 036 compile target |
+| GitHub Copilot | Yes | Likely (with Tier 1+2 fixes) | Yes (with target-specific orchestration) | REALISTIC — via 036 compile target |
+| Cursor | Yes | Likely (with Tier 1+2 fixes) | Yes (with target-specific orchestration) | REALISTIC — via 036 compile target |
+| OpenCode | Yes | Likely (with Tier 1+2 fixes) | Yes (with target-specific orchestration) | REALISTIC — via 036 compile target |
+| Windsurf | Yes | Likely (with Tier 1+2 fixes) | Uncertain (Cascade flow differs) | NEEDS INVESTIGATION |
 
-### Key insight: distribution vs. execution
+### Key insight: distribution vs. execution (revised)
 
-The skills CLI solves **distribution** universally — `npx skills add` installs to all agents. But **execution** splits into two layers:
+The previous analysis concluded that cross-agent execution was aspirational because other agents lacked subagent support. **This is no longer true.** As of Feb-Mar 2026, every major coding agent supports some form of subagent spawning and multi-agent orchestration. The gap is no longer "can vs. can't" — it's "how" (different APIs, formats, and communication models).
 
-1. **Commission/refit skills** — need only Tier 1 fixes to become portable. These are the install-time tools.
-2. **Generated workflow runtime** (first-officer/ensign orchestration) — depends on Tier 3 constructs (Agent spawning, TeamCreate, SendMessage). This is fundamentally a Claude Code multi-agent system. Making it work on single-agent platforms would require a different execution engine (sequential single-agent mode).
+The skills CLI solves **distribution** universally — `npx skills add` installs to all agents. **Execution** now splits into:
+
+1. **Commission/refit skills** — need Tier 1 fixes to become portable. These are install-time tools that generate files. Most of their logic (creating README, status scripts, entity templates) is agent-agnostic.
+2. **Generated workflow runtime** (first-officer/ensign orchestration) — needs Tier 3 adaptation per target. The orchestration pattern (lead agent dispatching workers) is now universal, but the API differs. This is 036's domain: generate the right agent files and dispatch commands for each target.
 
 ### Decision
 
-Scope this issue to Claude Code (no-plugin) as the realistic target. Cross-agent runtime portability is a separate initiative — follow up in a new issue for ideation on a single-agent execution mode.
+Scope this task (057) to making `npx skills add` work for Claude Code users. The updated research shows that cross-agent *execution* is now realistic (not aspirational) for most agents, but the implementation belongs in task 036 (compile targets), which would generate target-specific orchestration files.
+
+### Impact on task 036
+
+The previous 036 spec proposed three targets: `claude-code`, `codex`, and `portable`. The research suggests more targets are viable: `gemini-cli`, `copilot`, `cursor`, and `opencode` all have subagent systems that could run spacedock workflows. Task 036's scope may expand, or a generic "subagent" target could cover agents with similar patterns.
+
+Key finding for 036: Codex custom agents use TOML files in `~/.codex/agents/`, Gemini CLI uses `.gemini/agents/*.md` with YAML frontmatter, OpenCode uses `.opencode/agents/*.md`, and Copilot uses `.github/copilot/agents/`. The first-officer/ensign templates would need to be compiled into these target-specific formats.
 
 ## Stage Report: ideation
 
 - [x] Relationship between 057 (distribution via npx-skills) and 036 (compile targets) clarified
-  057 owns distribution (install path), 036 owns cross-agent execution (compile targets). No blocking dependency — 057 can ship first. New "Relationship with task 036" section added.
+  057 owns distribution (install path), 036 owns cross-agent execution (compile targets). No blocking dependency — 057 can ship first.
 - [x] Proposed approach updated if 036's compile-target model changes the design
-  036 does not change 057's design. The symlink approach is additive and target-agnostic. However, approach updated to include `mods/` directory (previously overlooked — both skills reference `{spacedock_plugin_dir}/mods/`).
+  036 does not change 057's design. Symlink approach is additive and target-agnostic. Approach updated to include `mods/` directory.
 - [x] Open questions resolved or escalated
-  Q1 (symlink deref): unresolved but mitigation added (build script or committed copies as fallback). Q2 (self-location): unresolved, added note that it affects mods too. Q3 (mods): new question added and addressed in approach.
+  Q1 (symlink deref): unresolved, mitigation documented. Q2 (self-location): unresolved, affects mods too. Q3 (mods): new, addressed in approach.
 - [x] Acceptance criteria updated if scope changed
-  Added criteria 7 (mods in installed directories). Added "Out of scope" section explicitly deferring cross-agent execution to 036. Updated criteria 3-4 to mention mods alongside templates.
+  Added mods criteria, out-of-scope section. Updated cross-agent classification from ASPIRATIONAL to REALISTIC based on web research.
 - [x] Clear definition of what's in-scope vs deferred to 036
-  In-scope: making npx-skills install work for Claude Code. Deferred: cross-agent execution, --target parameter, Tier 2/3 portability fixes.
+  In-scope: npx-skills install for Claude Code. Deferred: cross-agent execution (now realistic, not aspirational — all major agents gained subagent support in early 2026).
 
 ### Summary
 
-Analyzed the relationship between 057 (distribution) and 036 (compile targets). They operate at different layers with no blocking dependency — 057 makes spacedock installable, 036 makes generated output portable. The previous ideation's cross-agent compatibility analysis correctly identified the Tier 2/3 gap but 036 is now the designated owner of that work. Updated the approach to include `mods/` directory handling (both skills reference mods, not just templates). Two open questions remain unresolved (symlink deref behavior, skill self-location) with mitigations documented. Scope boundary with 036 is now explicit in acceptance criteria.
+Conducted web research (previously missing) on the current multi-agent capabilities of Codex, Gemini CLI, Cursor, GitHub Copilot, Windsurf, and OpenCode. The previous analysis (based on May 2025 knowledge cutoff) incorrectly classified these as single-agent systems — as of Feb-Mar 2026, every major coding agent supports subagent spawning and multi-agent orchestration. This changes the cross-agent per-agent assessment from ASPIRATIONAL to REALISTIC for all major agents (via 036 compile targets). Updated the compatibility table with specific agent file formats (Codex TOML, Gemini `.gemini/agents/*.md`, etc.) and dispatch mechanisms. The 057 scope (distribution only) remains correct, but 036's opportunity is now significantly larger than the original spec anticipated. Also added `mods/` directory to the approach and resolved the 057/036 boundary.
