@@ -1,7 +1,7 @@
 ---
 id: 064
 title: Replace lieutenant agents with capability modules
-status: implementation
+status: validation
 source: CL
 started: 2026-03-27T23:10:00Z
 completed:
