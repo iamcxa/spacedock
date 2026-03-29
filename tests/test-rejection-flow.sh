@@ -114,7 +114,7 @@ echo "--- Phase 2: Run first officer (this takes ~120-300s) ---"
 cd "$TEST_DIR/test-project"
 
 FO_EXIT=0
-claude -p "Process all tasks through the workflow. When you encounter a gate review where the validator recommends REJECTED, approve the REJECTED verdict so the rejection flow proceeds." \
+claude -p "Process all tasks through the workflow. When you encounter a gate review where the reviewer recommends REJECTED, approve the REJECTED verdict so the rejection flow proceeds." \
   --agent first-officer \
   --permission-mode bypassPermissions \
   --verbose \
@@ -180,7 +180,7 @@ else
   fail "FO dispatched an ensign for validation stage"
 fi
 
-# Check 2: The validator's stage report contains a REJECTED recommendation
+# Check 2: The reviewer's stage report contains a REJECTED recommendation
 # Look in entity files (main and worktree copies) and FO text output
 FOUND_REJECTED=false
 
@@ -200,9 +200,9 @@ if grep -qi "REJECTED" "$TEST_DIR/fo-texts.txt" 2>/dev/null; then
 fi
 
 if $FOUND_REJECTED; then
-  pass "validator stage report contains REJECTED recommendation"
+  pass "reviewer stage report contains REJECTED recommendation"
 else
-  fail "validator stage report contains REJECTED recommendation"
+  fail "reviewer stage report contains REJECTED recommendation"
 fi
 
 # Check 3: FO dispatched multiple ensigns (implementation + validation + fix after rejection)
