@@ -351,11 +351,13 @@ The specific guidance for experiments ("verify that the results exist, the metho
 ## Acceptance Criteria
 
 1. README `implementation` stage definition uses "produce the deliverable" language that covers code, experiments, analysis, and test suites — not just "write the code"
-2. README `validation` stage definition explicitly states the validator checks what was produced and does not produce the deliverable itself
-3. FO validation instructions distinguish "run existing tests to verify" from "run experiments to produce results"
-4. FO validation instructions state that a missing or incomplete deliverable is itself a REJECTED finding
-5. Validator template requires no changes (or changes are justified against the current wording)
+2. README `validation` stage definition explicitly states the feedback agent checks what was produced and does not produce the deliverable itself
+3. FO feedback instructions (replacing validation-specific instructions) distinguish "run the deliverable to verify behavior" from "produce new deliverable content"
+4. FO feedback instructions state that a missing or incomplete deliverable is itself a REJECTED finding
+5. Validator template dropped — feedback protocol is FO-injected dispatch instructions, not a separate agent type
 6. Edge cases (experimental, research, test-suite tasks) are covered by the proposed wording without special-case rules
+7. Commission Confirm Design presents stage behavior in human-readable language (approval gates, rejection flow) — not implementation vocabulary (`worktree`, `gate`, `fresh`)
+8. Commission infers implementation properties (`worktree`, `fresh`) from workflow design without exposing them to the user
 
 ## Stage Report: ideation
 
@@ -606,12 +608,42 @@ Properties the commission infers:
 - `worktree: true` — stage does substantive work beyond the entity file
 - `fresh: true` — stage is a feedback stage (usually wants independent perspective)
 
-### Impact on proposed changes (Changes 1-4)
+### Change 5: Commission Confirm Design — human-readable stage behavior
+
+Current commission Confirm Design output (SKILL.md line 134):
+```
+- **Stages:** pitch → draft → editorial-review → published
+- **Approval gates:** editorial-review → published
+```
+
+The stage arrow chain loses all per-stage properties. And the property names themselves (`worktree`, `gate`, `fresh`, `feedback-to`) are implementation vocabulary that non-software users shouldn't need to learn.
+
+Proposed: separate the stage sequence from behavioral properties, using plain language:
+
+```
+Stages: pitch → draft → editorial-review → published
+
+Approval gates: editorial-review (you review before publishing)
+On rejection: editorial-review bounces back to draft
+```
+
+The user decides on two things during commissioning:
+- **Where do I need to approve?** → maps to `gate: true`
+- **What happens when something gets rejected?** → maps to `feedback-to: {target}`
+
+The commission infers implementation details from the workflow design without exposing them:
+- `worktree: true` — stage does substantive work beyond the entity file
+- `fresh: true` — feedback stage (usually wants independent perspective)
+
+This means the commission skill's Question 2 (stage design) and Confirm Design template both need updating. The commission asks about workflow behavior in user terms, then translates to YAML properties in the generated README.
+
+### Impact on proposed changes (Changes 1-5)
 
 - **Change 1 (README implementation stage):** Still valid. Broadening to "produce the deliverable" is correct regardless of whether a validator template exists.
 - **Change 2 (README validation stage):** Still valid. The boundary statement applies to any feedback stage, not just ones using a validator agent.
 - **Change 3 (FO validation instructions):** Needs revision. Instead of being a block inserted for "validation stages," this becomes the generic feedback-role instructions inserted whenever `feedback-to` is present. The software-specific parts (file paths, line numbers, "run applicable tests") should be removed from the generic version and left to README stage definitions.
 - **Change 4 (Validator template — no changes):** Superseded. The validator template is dropped entirely.
+- **Change 5 (Commission Confirm Design):** Commission presents stage behavior in human-readable language, not implementation vocabulary. User decides on approval gates and rejection flow; commission infers `worktree`, `fresh`, etc.
 
 ### Open questions (for CL to decide)
 
