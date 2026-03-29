@@ -15,7 +15,11 @@ FAILURES=0
 PASSES=0
 
 cleanup() {
-  rm -rf "$TEST_DIR"
+  if [ -n "${KEEP_TEST_DIR:-}" ]; then
+    echo "Test dir preserved at: $TEST_DIR"
+  else
+    rm -rf "$TEST_DIR"
+  fi
 }
 trap cleanup EXIT
 
