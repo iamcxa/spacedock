@@ -556,17 +556,88 @@ Recommended additions to acceptance criteria:
 
 These can be finalized by CL after reviewing the brainstorming.
 
+## Brainstorm: Naming — "capabilities" → "mods"
+
+"Capabilities" is long and generic. "Mods" is 4 characters, evocative (ship modifications), familiar from gaming culture. Works for both spaceship and kitchen themes (kitchen mods are a thing). Directory becomes `_mods/` instead of `_capabilities/`.
+
+Other candidates considered: seasonings, toppings, extras, addons, mixins, traits. "Mods" wins on brevity and universality.
+
+**CL confirmed "mods" direction.** All references to "capabilities" should become "mods" in the final design.
+
+## Brainstorm: Hook structure — additive model simplifies everything
+
+CL confirmed mods are **additive**, not exclusive. Multiple mods hooking the same lifecycle point all fire — each does its own thing. This eliminates the need for `claims:` filtering entirely.
+
+**Why claims:/fallback: are unnecessary:**
+- `claims:` solves multi-mod disambiguation (which mod "wins"). With additive mods, they all run. No disambiguation needed.
+- `fallback:` is a per-mod property for degradation. But the real fallback is the FO's default behavior — if no mod handles merge, do local merge. That's a FO-level decision, not a mod-level one.
+- The only special case is pr-merge overriding default local merge. That's one boolean: "did any mod handle the merge?" Not a filtering language.
+
+**Result: Option A (pure prose) wins.** Each `## Hook:` section is just instructions. The FO runs all mods' hooks for each lifecycle point in alphabetical order by filename.
+
+```markdown
+## Hook: merge
+
+Push the worktree branch. Create a PR via `gh pr create`.
+Set the entity's `pr` field. If `gh` is unavailable, fall back to local merge.
+```
+
+No `claims:`, no `fallback:`, no `### Instructions` sub-heading.
+
+## Brainstorm: Other plausible mods
+
+Explored concrete mods beyond pr-merge, grounded in known PTP use cases (code pipelines, content pipelines, email triage, research):
+
+1. **pr-merge** — (exists) Push branches, create/track PRs. Hooks: startup (detect merged PRs), merge (push branch, create PR).
+2. **github-issues** — Sync entities with GitHub issues. Create issue on intake, update labels on stage transitions, close on archive. Hooks: startup, merge, potentially dispatch.
+3. **notifications** — Post to Slack/webhook at lifecycle moments. Hooks: startup (summary), merge (completion), potentially dispatch/gate.
+4. **auto-intake** — Scan external sources (email, GitHub issues, RSS, directory) at startup and create new entities. Hook: startup only.
+5. **archive-cleanup** — Control post-merge behavior (delete worktree branch, close linked issues, export). Hook: merge.
+6. **gate-rules** — Add automatic conditions to gates beyond captain approval (CI green, time delays). Hook: gate (not yet implemented).
+7. **metrics** — Track cycle times, throughput, stage durations. Hooks: startup (summary), merge (record completion).
+
+**Key finding:** The realistic multi-mod scenarios (pr-merge + github-issues on merge, auto-intake + metrics on startup) are all additive. Mods don't compete for exclusive handling. This confirms the additive model and Option A.
+
+## Brainstorm: Mod distribution model
+
+CL asked about third-party/community mods and whether users would generalize local customizations into shareable mods.
+
+**Current model (sufficient for now):**
+- Plugin ships canonical mods in `mods/` directory
+- Commission copies selected mods to `{dir}/_mods/`
+- Refit diffs local against canonical versions
+
+**User-authored mods:** Users can drop any `.md` file into `_mods/`. The FO discovers everything in the directory regardless of origin. Refit only manages files that have canonical counterparts in the plugin's `mods/` directory.
+
+**Third-party sharing:** A mod is a markdown file. No code, no dependencies, no packaging. Sharing is copy-paste. If community sharing becomes a real pattern, a future `spacedock install-mod <url>` command could fetch files into `_mods/`. Not needed now.
+
+**The `version` field** in frontmatter only matters for refit's canonical diffing. User-created mods don't need it.
+
+**`_mods/` is an open directory** — this should be explicit in the design. The FO discovers all `.md` files in it. Plugin-authored vs user-authored is just whether refit has a canonical version to diff against.
+
+## Open questions remaining
+
+1. **Rename throughout:** "capabilities" → "mods", `_capabilities/` → `_mods/`, `capabilities/` → `mods/`. Acceptance criteria need updating.
+2. **pr-merge override mechanism:** How does the FO know to skip default local merge when pr-merge mod handled it? Simplest: the FO checks if any mod's merge hook ran successfully. If so, skip local merge. This is FO logic, not mod syntax.
+3. **Acceptance criteria 11-13** from previous brainstorm need revision — Option B format is no longer the recommendation.
+
 ## Stage Report: ideation (brainstorm continuation)
 
 - [x] Hook structure format recommendation with rationale grounded in lifecycle points analysis
-  Recommends Option B with one refinement: `claims:` is optional (absent for global hooks like startup, present for entity-specific hooks like merge). Option A fails at scale (no scannable filtering), Option C is YAGNI (structured query language for an LLM consumer), Option D inverts the system paradigm. Format confirmed to scale to dispatch/gate hooks via natural-language claims with full FO context.
+  Option A (pure prose) wins over Option B. CL confirmed mods are additive, not exclusive — multiple mods all fire at a lifecycle point. This eliminates the need for `claims:` filtering and `fallback:` conventions. Each `## Hook:` section is just prose instructions.
 - [x] Lifecycle points analysis — which are needed now vs future, with reasoning
-  `startup` and `merge` only for #064 (refactoring, not behavioral expansion). `dispatch` is realistic near-term (github-issues, notifications) but needs before/after-worktree design work. `gate` is near-term but complex (interaction with approval flow, polling for CI). `scheduled-intake` and `metrics` reuse existing hooks. `external-review` is better modeled as a custom stage.
+  `startup` and `merge` only for #064. `dispatch` is realistic near-term (github-issues, notifications). `gate` is complex (approval flow interaction). `auto-intake` and `metrics` reuse startup. Confirmed by exploring 7 concrete mod ideas grounded in known use cases.
 - [x] Dispatch/gate filtering recommendation — structured vs prose claims
-  Natural language claims remain sufficient. The FO has entity + stage context at dispatch/gate time, making two-field conditions unambiguous in prose. Structured claims would only help non-LLM consumers (none exist). The real risk with dispatch/gate is ordering, not filtering — that's a separate design concern for when those points are implemented.
+  Moot given additive model. No filtering needed — all mods fire. The real question for dispatch/gate is execution ordering, which is a separate concern for when those points are implemented.
 - [x] Updated acceptance criteria if the brainstorming changes the design direction
-  Design direction confirmed, not changed. Proposed three additional acceptance criteria: Option B hook format, claims/fallback conventions per hook type, and dispatch/gate documented as future.
+  Design direction changed: Option A replaces Option B. "Capabilities" renamed to "mods". Acceptance criteria 11-13 from previous brainstorm need revision. Three open questions documented for next pass.
+- [x] Naming decision: "capabilities" → "mods"
+  CL confirmed. Short, evocative, theme-neutral. Directory `_mods/` replaces `_capabilities/`.
+- [x] Explored concrete mod ideas beyond pr-merge
+  7 mods analyzed (pr-merge, github-issues, notifications, auto-intake, archive-cleanup, gate-rules, metrics). All realistic multi-mod scenarios are additive, confirming the simplified hook model.
+- [x] Distribution model clarified
+  Plugin-shipped mods managed by refit. User-authored mods discovered by FO but invisible to refit updates. `_mods/` is an open directory. No packaging/registry infrastructure needed.
 
 ### Summary
 
-Explored all three open design questions in depth. Hook structure: Option B wins with an optional-claims refinement — global hooks (startup) omit `claims:`, entity-specific hooks (merge) include it. Lifecycle points: ship #064 with startup/merge only; dispatch is realistic near-term but needs its own design pass; gate is complex due to approval flow interaction. Filtering: natural language claims are sufficient even for dispatch/gate because the FO has full entity + stage context; the harder problem is hook execution ordering, which is a separate concern. No changes to the core design direction — refinements to the hook format convention and confirmation that the two-lifecycle-point scope is correct for this task.
+Three key decisions emerged from this brainstorm session. First, "capabilities" renamed to "mods" — shorter, more evocative, works across themes. Second, CL confirmed mods are additive (all fire, no competition), which eliminates the need for Option B's `claims:`/`fallback:` structure — Option A (pure prose) wins. Third, explored 7 concrete mods beyond pr-merge to validate the additive model and confirm that the two-lifecycle-point scope (startup/merge) is correct for v0.8. Distribution model clarified: `_mods/` is an open directory, plugin-authored mods get refit management, user-authored mods are just discovered by the FO. Open questions: rename throughout design doc, pr-merge override mechanism (FO-level, not mod syntax), and acceptance criteria revision.
