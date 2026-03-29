@@ -1,9 +1,9 @@
 ---
 id: 078
 title: Modular test harness — shared commission snapshot, reusable E2E phases
-status: backlog
+status: ideation
 source: CL — test duplication observed during model variation runs
-started:
+started: 2026-03-29T20:30:00Z
 completed:
 verdict:
 score: 0.70
