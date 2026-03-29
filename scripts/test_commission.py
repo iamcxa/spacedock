@@ -20,17 +20,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_lib import TestRunner, run_commission, extract_stats, file_contains, file_grep
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(description="Commission skill test")
     parser.add_argument("--model", default="opus", help="Model to use (default: opus)")
     parser.add_argument("--effort", default="low", help="Effort level (default: low)")
     parser.add_argument("--snapshot-dir", default=None, help="Save commissioned project to this directory")
-    parser.add_argument("extra_args", nargs="*", help="Additional args passed to claude")
-    return parser.parse_args()
+    return parser.parse_known_args()
 
 
 def main():
-    args = parse_args()
+    args, extra_args = parse_args()
     t = TestRunner("Commission Skill Test", keep_test_dir=bool(os.environ.get("KEEP_LOG")))
 
     workflow_dir = t.test_dir / "v0-test-1"
@@ -55,7 +54,7 @@ All inputs for this workflow:
 
 Skip interactive questions and confirmation — use these inputs directly. Make reasonable assumptions for anything not specified. Do NOT run the pilot phase — just generate the files and stop."""
 
-    extra = ["--model", args.model, "--effort", args.effort] + args.extra_args
+    extra = ["--model", args.model, "--effort", args.effort] + extra_args
     log_path = t.log_dir / "test-log.jsonl"
     cmd = [
         "claude", "-p", prompt,

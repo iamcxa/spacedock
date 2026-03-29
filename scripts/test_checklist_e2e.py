@@ -22,16 +22,15 @@ from test_lib import (
 )
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(description="Checklist protocol E2E test")
     parser.add_argument("--from-snapshot", default=None, help="Use a snapshot dir instead of commissioning")
     parser.add_argument("--model", default=None, help="Model override for claude")
-    parser.add_argument("extra_args", nargs="*", help="Additional args passed to claude")
-    return parser.parse_args()
+    return parser.parse_known_args()
 
 
 def main():
-    args = parse_args()
+    args, extra_args = parse_args()
     t = TestRunner("Checklist Protocol E2E Test")
 
     if args.from_snapshot:
@@ -75,7 +74,7 @@ All inputs for this workflow:
 
 Skip interactive questions and confirmation — use these inputs directly. Make reasonable assumptions for anything not specified. Do NOT run the pilot phase — just generate the files and stop."""
 
-        extra = list(args.extra_args)
+        extra = list(extra_args)
         if args.model:
             extra.extend(["--model", args.model])
         run_commission(t, prompt, extra_args=extra)
@@ -120,7 +119,7 @@ Skip interactive questions and confirmation — use these inputs directly. Make 
     extra_fo = ["--max-budget-usd", "2.00"]
     if args.model:
         extra_fo.extend(["--model", args.model])
-    extra_fo.extend(args.extra_args)
+    extra_fo.extend(extra_args)
 
     run_first_officer(
         t,
