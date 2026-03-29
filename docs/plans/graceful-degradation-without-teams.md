@@ -126,6 +126,10 @@ Key choices:
 2. Does `Agent()` without `team_name` still work when teams are disabled? (The sd11-test findings suggest yes — Agent as parent-child subagent works without teams)
 3. If TeamCreate fails, does the commission/first-officer recover or abort the pilot?
 
+### Feedback Cycles
+
+Cycle: 1
+
 ## Stage Report: ideation
 
 - [x] Problem statement: what we're testing and why (commission auto-run with teams disabled)
