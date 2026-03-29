@@ -663,3 +663,7 @@ This means the commission skill's Question 2 (stage design) and Confirm Design t
 ### Summary
 
 Finalized ideation across four rounds of brainstorming and direct discussion with CL. The task evolved from targeted wording fixes (Changes 1-3) to a broader architectural shift: drop the validator template entirely, make the feedback protocol FO-owned generic infrastructure triggered by `feedback-to` stage property, and simplify the commission's user-facing presentation to hide implementation vocabulary. Five proposed changes with eight acceptance criteria are ready for implementation.
+
+### Validation Cycles
+
+Cycle: 1
