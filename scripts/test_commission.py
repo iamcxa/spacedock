@@ -17,7 +17,7 @@ from pathlib import Path
 
 # test_lib is in the same directory
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_lib import TestRunner, run_commission, extract_stats, file_contains, file_grep
+from test_lib import TestRunner, create_test_project, run_commission, extract_stats, file_contains, file_grep
 
 
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
@@ -32,8 +32,9 @@ def main():
     args, extra_args = parse_args()
     t = TestRunner("Commission Skill Test", keep_test_dir=bool(os.environ.get("KEEP_LOG")))
 
-    workflow_dir = t.test_dir / "v0-test-1"
-    fo_path = t.test_dir / ".claude" / "agents" / "first-officer.md"
+    create_test_project(t)
+    workflow_dir = t.test_project_dir / "v0-test-1"
+    fo_path = t.test_project_dir / ".claude" / "agents" / "first-officer.md"
 
     # --- Phase 1: Run commission ---
 
@@ -65,7 +66,7 @@ Skip interactive questions and confirmation — use these inputs directly. Make 
     ] + extra
 
     with open(log_path, "w") as log_file:
-        result = subprocess.run(cmd, stdout=log_file, stderr=subprocess.STDOUT, cwd=t.test_dir)
+        result = subprocess.run(cmd, stdout=log_file, stderr=subprocess.STDOUT, cwd=t.test_project_dir)
 
     print()
     if result.returncode != 0:

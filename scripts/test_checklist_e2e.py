@@ -53,6 +53,21 @@ def main():
             t.results()
             return
 
+        # Add acceptance criteria to first entity (matching non-snapshot behavior)
+        for entity_file in sorted(workflow_dir.glob("*.md")):
+            if entity_file.name == "README.md":
+                continue
+            with open(entity_file, "a") as f:
+                f.write("""
+
+## Acceptance Criteria
+
+1. The output file contains the word "hello"
+2. The output file is valid UTF-8
+""")
+            git_add_commit(t.test_project_dir, "setup: add acceptance criteria to entity")
+            break
+
         t.pass_("loaded snapshot")
         print()
     else:
