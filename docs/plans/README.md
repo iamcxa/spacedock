@@ -1,5 +1,5 @@
 ---
-commissioned-by: spacedock@0.8.0
+commissioned-by: spacedock@0.8.1
 entity-type: entity
 entity-label: task
 entity-label-plural: tasks
