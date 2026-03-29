@@ -3,6 +3,12 @@
 
 set -uo pipefail
 
+EXTRA_ARGS=()
+while [[ $# -gt 0 ]]; do
+  EXTRA_ARGS+=("$1")
+  shift
+done
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TEST_DIR="$(mktemp -d)"
 FAILURES=0
@@ -56,6 +62,7 @@ claude -p "$PROMPT" \
   --permission-mode bypassPermissions \
   --verbose \
   --output-format stream-json \
+  ${EXTRA_ARGS[@]:+"${EXTRA_ARGS[@]}"} \
   2>&1 > "$TEST_DIR/commission-log.jsonl" || CLAUDE_EXIT=$?
 
 echo ""
@@ -108,6 +115,7 @@ claude -p "Process all entities through the workflow. Process one entity through
   --verbose \
   --output-format stream-json \
   --max-budget-usd 2.00 \
+  ${EXTRA_ARGS[@]:+"${EXTRA_ARGS[@]}"} \
   2>&1 > "$TEST_DIR/fo-log.jsonl" || FO_EXIT=$?
 
 echo ""
