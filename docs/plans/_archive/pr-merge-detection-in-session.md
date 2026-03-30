@@ -1,13 +1,13 @@
 ---
 id: 071
 title: Detect PR merges during long-running sessions
-status: validation
+status: done
 source: CL
 started: 2026-03-29T05:28:00Z
-completed:
-verdict:
+completed: 2026-03-30T00:30:00Z
+verdict: PASSED
 score: 0.80
-worktree: .worktrees/ensign-071-pr-merge-detection
+worktree:
 issue:
 pr: "#14"
 ---

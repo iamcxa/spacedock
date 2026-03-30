@@ -1,13 +1,13 @@
 ---
 id: 074
 title: First-officer startup improvements — README search and bare mode detection
-status: validation
+status: done
 source: CL
 started: 2026-03-29T18:00:00Z
-completed:
-verdict:
+completed: 2026-03-30T00:30:00Z
+verdict: PASSED
 score: 0.70
-worktree: .worktrees/ensign-074-startup
+worktree:
 pr: "#16"
 ---
 

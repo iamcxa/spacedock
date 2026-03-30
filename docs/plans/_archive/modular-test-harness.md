@@ -1,13 +1,13 @@
 ---
 id: 078
 title: Modular test harness — shared commission snapshot, reusable E2E phases
-status: implementation
+status: done
 source: CL — test duplication observed during model variation runs
 started: 2026-03-29T20:30:00Z
-completed:
-verdict:
+completed: 2026-03-30T00:30:00Z
+verdict: PASSED
 score: 0.70
-worktree: .worktrees/ensign-078-modular-test
+worktree:
 pr: "#17"
 ---
 
