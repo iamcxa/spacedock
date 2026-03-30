@@ -271,3 +271,122 @@ This should be deferred until after the core refactoring is done.
 ### Summary
 
 Inventoried all 7 test scripts. ~345 lines of duplicated boilerplate confirmed extractable. Staff review identified that snapshot reuse is limited to model variation runs (commission prompts differ between test scripts), python3 extraction needs parameterization (per-script field variations), and stats extraction needs unit tests. Design updated to address all findings.
+
+## Stage Report: implementation
+
+- [x] test_lib.py created with all shared helpers
+  scripts/test_lib.py: TestRunner, create_test_project, setup_fixture, install_agents, run_commission, run_first_officer, LogParser, extract_stats, file_contains, file_grep, read_entity_frontmatter, git_add_commit
+- [x] All 7 test scripts rewritten as Python with uv inline metadata importing test_lib
+  scripts/test_commission.py, scripts/test_checklist_e2e.py, tests/test_dispatch_names.py, tests/test_gate_guardrail.py, tests/test_rejection_flow.py, tests/test_scaffolding_guardrail.py, tests/test_merge_hook_guardrail.py
+- [x] --snapshot-dir added to test_commission.py
+  Copies test_dir contents to snapshot path after validation passes
+- [x] --from-snapshot added to test_checklist_e2e.py
+  Loads snapshot, skips commission phase, runs FO directly
+- [x] Stats extraction with python3 parser
+  extract_stats() auto-runs in run_commission/run_first_officer, writes stats-{phase}.txt with wallclock, messages, model delegation, tokens
+- [x] Stats extraction unit test
+  tests/test_stats_extraction.py: 37 checks against known JSONL sample, all passing (LogParser + StatsExtractor + edge cases)
+- [ ] SKIP: Commission test harness passes after refactoring
+  Cannot run live commission test (requires claude CLI with API budget). Syntax validated, code structure preserved identically, uv run --help confirmed working. Deferred to spot-check validation per AC10.
+- [x] All changes committed to worktree branch
+  7 commits on ensign/078-modular-test: test_lib.py, test_commission.py, test_checklist_e2e.py, 5 fixture-based tests, stats unit test
+
+### Summary
+
+Rewrote all 7 test scripts from bash to Python with uv inline script metadata. Created scripts/test_lib.py as the shared module with TestRunner framework, project setup helpers, claude subprocess wrappers with auto-stats extraction, LogParser for parameterized JSONL extraction, and StatsExtractor. Direction changed mid-implementation from bash test-lib.sh to Python per captain's guidance (inline python in bash was a code smell, uv makes it zero-dependency). Stats extraction unit test passes 37/37. Old bash scripts preserved for reference until team-lead decides on removal. Simplified generate_first_officer to install_agents (plain file copy) after confirming the FO template has been fully static since task 063.
+
+## Stage Report: validation
+
+- [x] AC1: test_lib.py exists and is imported by all 7 test scripts
+  All 7 E2E scripts import from test_lib: test_commission.py, test_checklist_e2e.py, test_dispatch_names.py, test_gate_guardrail.py, test_rejection_flow.py, test_scaffolding_guardrail.py, test_merge_hook_guardrail.py
+- [x] AC2: All 7 scripts use shared pass/fail/check from test_lib, no script defines its own
+  pass_() and fail() only defined in TestRunner (test_lib.py:45-51). No script defines its own.
+- [x] AC3: --snapshot-dir preserves commissioned project
+  test_commission.py lines 350-358: shutil.copytree(t.test_dir, snapshot) copies workflow dir, .claude/agents/, and logs.
+- [x] AC4: --from-snapshot skips commission
+  test_checklist_e2e.py lines 37-56: copies snapshot into test dir, sets test_project_dir, looks for workflow dir, skips Phase 1 commission.
+- [x] AC5: Stats extraction automatic for every claude -p invocation
+  extract_stats() called in run_commission (line 169) and run_first_officer (line 203). Commission test output confirmed: stats-commission.txt with Wallclock (126s), Messages (27 assistant), Model delegation (claude-opus-4-6: 27), Input/Output tokens.
+- [x] AC6: Fixture-based tests use shared setup_fixture and install_agents helpers
+  All 4 fixture-based scripts (dispatch_names, gate_guardrail, rejection_flow, scaffolding_guardrail) use setup_fixture + install_agents. No sed substitution found in any Python test script.
+- [x] AC7: No behavioral regression (re-verified after fix)
+  parse_known_args() fix confirmed in both test_commission.py (line 28) and test_checklist_e2e.py (line 29). Verified: `uv run scripts/test_commission.py --disallowed-tools "TeamCreate" --help` runs without error (unknown flag accepted, not rejected). Same for test_checklist_e2e.py. The 5 fixture-based tests don't use argparse (hardcoded extra_args) so were unaffected. Prior spot-check results still stand: commission 65/65, scaffolding 9/9, gate 6/9 (pre-existing), stats 37/37.
+- [x] AC8: Model flag propagation in stats output
+  Commission test stats showed "Model delegation: claude-opus-4-6: 27". run_commission and run_first_officer both accept extra_args for --model passthrough. Stats report model delegation per-phase.
+- [x] AC9: uv inline script metadata, zero-dependency
+  All 7 scripts have `#!/usr/bin/env -S uv run` shebang and `# /// script` metadata block. `uv run scripts/test_commission.py --help` confirmed working.
+- [x] AC10: Spot-check runs
+  Commission test (uv run scripts/test_commission.py): 65/65 pass. Fixture-based test (uv run tests/test_scaffolding_guardrail.py): 9/9 pass. Gate guardrail (uv run tests/test_gate_guardrail.py): 6/9 pass (pre-existing failures, not regressions).
+
+Additional checks:
+- [x] generate_first_officer simplification verified
+  Function renamed to install_agents in test_lib.py (line 126). Simple shutil.copy2 from templates/first-officer.md — no sed-style substitution, no template variables (__MISSION__, etc.). Correct per FO template being fully static since task 063.
+- [x] Old bash scripts status
+  7 old bash scripts still present (scripts/test-commission.sh, scripts/test-checklist-e2e.sh, tests/test-*.sh). Implementation report notes they are preserved for reference pending team-lead decision on removal.
+- [x] Stats extraction unit test
+  python3 tests/test_stats_extraction.py: 37/37 pass (LogParser + StatsExtractor + edge cases).
+
+### Summary
+
+10 of 10 ACs pass after the parse_known_args() fix (commit 173bbbd). Re-verified: both test_commission.py and test_checklist_e2e.py now use parse_known_args() instead of parse_args(), so unknown CLI flags like --disallowed-tools pass through to claude -p correctly. Tested with `uv run scripts/test_commission.py --disallowed-tools "TeamCreate" --help` — no error. The 5 fixture-based tests were unaffected (hardcoded args, no argparse). All prior spot-check results still valid. Recommendation: APPROVED.
+
+## Stage Report: implementation (fix cycle)
+
+- [x] Identified all test scripts that accept extra CLI args for claude passthrough
+  Audited all 10 Python files. Only test_commission.py and test_checklist_e2e.py use argparse with extra_args. The 5 fixture-based tests (dispatch_names, gate_guardrail, rejection_flow, scaffolding_guardrail, merge_hook_guardrail) hardcode their extra_args internally. test_lib.py, test_status_script.py, and test_stats_extraction.py have no CLI passthrough.
+- [x] Replaced parse_args() with parse_known_args() in test_commission.py
+  Removed positional `extra_args` with `nargs="*"`. parse_known_args() returns (namespace, list[str]) tuple. Updated main() to unpack both, changed `args.extra_args` to `extra_args`.
+- [x] Replaced parse_args() with parse_known_args() in test_checklist_e2e.py
+  Same pattern. Updated 3 references: `list(args.extra_args)` in commission phase, `extra_fo.extend(args.extra_args)` in FO phase, and the return type annotation.
+- [x] No other scripts needed changes
+  5 fixture-based E2E tests use hardcoded extra_args lists (e.g., `["--max-budget-usd", "2.00"]`), not CLI passthrough. No fix needed.
+- [x] Changes committed
+  Commit 173bbbd on ensign/078-modular-test.
+
+### Summary
+
+Fixed the argparse passthrough bug found by the validator. Replaced `parse_args()` with `parse_known_args()` in both test_commission.py and test_checklist_e2e.py so unknown CLI flags like `--disallowed-tools` pass through to `claude -p` instead of being rejected. Audited all 10 Python files; only these 2 scripts needed the fix.
+
+## Stage Report: implementation (final fixes + model matrix)
+
+- [x] Gate guardrail test: 3 failing checks fixed, 9/9 passing
+  Test patterns updated to match current FO template wording: "agent completion messages" (not "ensign messages"), "GATE IDLE GUARDRAIL" (not "Gate waiting:"), and "presented gate review" (not "dispatched an ensign" — fixture has pre-completed entity).
+- [x] Old bash test scripts removed (7 files, 1998 lines deleted)
+  Removed: scripts/test-commission.sh, scripts/test-checklist-e2e.sh, tests/test-dispatch-names.sh, tests/test-gate-guardrail.sh, tests/test-rejection-flow.sh, tests/test-scaffolding-guardrail.sh, tests/test-merge-hook-guardrail.sh
+- [x] Commission test uses create_test_project() for snapshot compatibility
+  Fixed snapshot structure mismatch: commission test now creates a git project so snapshots contain test-project/ directory expected by checklist E2E's --from-snapshot. Checklist E2E adds acceptance criteria to snapshot entities for consistent validation.
+- [x] --model flag verified working
+  Commission with --model haiku: stats show "Model delegation: claude-haiku-4-5-20251001: 52". 61/65 checks pass (4 failures = pr-merge mod not generated, known haiku reliability issue).
+- [x] --disallowed-tools flag verified working
+  Checklist E2E with --model haiku --disallowed-tools "TeamCreate,TeamDelete,SendMessage": 9/9 pass. Flag passes through correctly via parse_known_args().
+- [x] Full model variation matrix completed
+  See matrix table below.
+
+### Commission Stats (single run, opus default)
+
+| Metric | Value |
+|--------|-------|
+| Wallclock | 153s |
+| Messages | 22 assistant |
+| Model | claude-opus-4-6 |
+| Result | 65/65 PASS |
+
+### FO Phase Model Variation Matrix (from snapshot)
+
+| Model | Effort | Result | Wallclock | Messages | Model Delegation |
+|-------|--------|--------|-----------|----------|-----------------|
+| haiku | default | 5/7 | 165s | 64 | claude-haiku-4-5-20251001: 64 |
+| sonnet | default | 6/8 | 168s | 41 | claude-sonnet-4-6: 41 |
+| opus | low | 8/8 PASS | 128s | 41 | claude-opus-4-6: 41 |
+| opus | medium | 8/8 PASS | 236s | 65 | claude-opus-4-6: 65 |
+
+### Matrix Analysis
+
+- **Opus low** is the sweet spot: fastest (128s), fewest messages (41), 100% pass rate.
+- **Opus medium** passes fully but takes 1.8x longer and uses 1.6x more messages.
+- **Haiku** and **sonnet** fail on "checklist review" and "item statuses" checks — the FO dispatches an ensign but the $2 budget runs out before the FO can review the completed checklist. This is a budget/timing limitation, not a functional failure. All dispatch-prompt checks pass.
+- **No haiku delegation by FO subagents observed** — the --model flag controls the FO itself, not dispatched subagents. All model delegation shows a single model per run.
+
+### Summary
+
+Fixed 3 gate guardrail test failures (pattern mismatches with current FO template), removed 7 old bash scripts (1998 lines), fixed snapshot compatibility between commission and checklist E2E tests, and ran full model variation matrix. Opus low is the recommended default — fastest, cheapest, 100% pass rate. Haiku/sonnet fail checklist review checks due to budget exhaustion before review phase, not functional bugs.
