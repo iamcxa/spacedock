@@ -88,7 +88,36 @@ evaluates results. 700 experiments over 2 days, discovered 20 optimizations.
 Hypothesis-driven but implicit — the LLM's chain of thought contains the
 reasoning, but it's not a first-class artifact that gets reviewed or recorded.
 
-## VFlow — Backward-Chaining Workflow (Proposed)
+## VFlow — Domain-Specific Agentic Workflow Discovery (Verilog)
+
+AFlow adapted for hardware design. Extends the MCTS workflow search with
+domain-specific operators and multi-objective optimization for Verilog code
+generation.
+
+- **Algorithm**: CEPE-MCTS (Cooperative Evolution with Past Experience MCTS) —
+  multi-population cooperative evolution that balances multiple hardware
+  objectives: functional correctness, area, power, timing, token cost
+- **Domain operators**: Hardware-specific verification (syntactic correctness,
+  functional behavior, synthesizability) layered on top of AFlow's general
+  operators
+- **Discovered workflow**: The optimization converged on a 5-step pattern:
+  1. Problem analysis
+  2. Multiple implementation generation
+  3. Ensemble integration
+  4. Comprehensive testing
+  5. Targeted refinement
+- **Results**: 20–30% pass@1 improvement over prompting baselines on VerilogEval
+  and RTLLM2.0; matches designer-level area/power efficiency
+
+Key insight: domain-specific operators and multi-objective scoring significantly
+improve workflow discovery over generic AFlow. The discovered 5-step pattern
+(analyze → generate multiple → ensemble → test → refine) resembles human
+engineering workflows and emerged from search rather than being designed.
+
+- Paper: https://arxiv.org/abs/2504.03723
+- Based on: AFlow (https://arxiv.org/pdf/2410.10762)
+
+## Backward-Chaining Workflow (Proposed — Unnamed)
 
 A variant approach to workflow execution that works backward from the terminal
 gate's approval criteria rather than forward from the initial stage.
@@ -107,7 +136,7 @@ question 3 was fundamentally wrong and the other three are fine.
 
 ### Backward chaining
 
-VFlow starts at the terminal gate and decomposes backward:
+Start at the terminal gate and decompose backward:
 
 ```
 approve ← "what evidence?" ← verify ← "what results?" ← analyze ← "what schema?" ← model ← "what data?" ← intake
@@ -157,7 +186,7 @@ result is injected into the parent's context when it returns.
 
 ### Comparison
 
-| | Forward (current) | AFlow | VFlow |
+| | Forward (current) | AFlow/VFlow | Backward chaining |
 |---|---|---|---|
 | Direction | intake → done | search over topologies | done → intake |
 | Stage definition | Fixed at commission | Discovered by MCTS | Discovered by backward decomposition |
@@ -168,9 +197,9 @@ result is injected into the parent's context when it returns.
 
 ### Open questions
 
-1. **Coexistence vs replacement** — Is VFlow a mode that coexists with forward
-   workflows (use forward for routine work, backward for hard problems), or does
-   it replace the linear stage model entirely?
+1. **Coexistence vs replacement** — Is backward chaining a mode that coexists
+   with forward workflows (use forward for routine work, backward for hard
+   problems), or does it replace the linear stage model entirely?
 
 2. **Recursion depth** — How deep does the backward walk go before hitting a base
    case? A 5-stage workflow could produce a 5-deep call stack, each with full
@@ -184,6 +213,6 @@ result is injected into the parent's context when it returns.
    needed) then switch to backward (verify determines what analysis to request)?
    The base cases are pre-computed, the decomposition is dynamic.
 
-5. **Spacedock representation** — Is VFlow a different workflow type
+5. **Spacedock representation** — Is this a different workflow type
    (`direction: backward` in README frontmatter)? A different FO template? Or
    does it live outside the current entity/stage model entirely?
