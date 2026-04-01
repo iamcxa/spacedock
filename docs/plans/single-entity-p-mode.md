@@ -14,9 +14,18 @@ pr:
 
 ## Problem Statement
 
-The first-officer currently assumes an interactive session with a captain (human). Its event loop runs indefinitely: dispatch agents, wait at gates for captain approval, fire idle hooks, repeat "until the captain ends the session." This makes it unsuitable for `claude -p` (non-interactive, pipe mode) when you want to process a single entity through a workflow programmatically.
+The first-officer agent hangs when invoked via `claude -p`. It never terminates on its own.
 
-Today's workaround: `claude -p` already works for gate-free workflows because the FO dispatches all entities, processes completions, and eventually hits an idle state where there's nothing to dispatch. The session then ends naturally when the LLM has nothing left to do. But it processes **all** dispatchable entities, not a targeted one. And for gated workflows, the FO blocks forever at the gate waiting for captain approval that never comes.
+The root cause is the FO's event loop design: it dispatches agents, waits at gates for captain approval, fires idle hooks, and repeats "until the captain ends the session." In an interactive session, the captain (human) is the termination signal. In `-p` mode, there is no captain — the session has no mechanism to end.
+
+**Evidence from existing tests:**
+- The gate guardrail test (`tests/test_gate_guardrail.py`) uses `--max-budget-usd 1.00` to kill the session. Comment on line 70: "expected — session ends when budget runs out at gate." The FO never exits on its own at a gate.
+- The checklist E2E test (`scripts/test_checklist_e2e.py`) uses `--max-budget-usd 2.00` as a safety cap AND a prompt hint: "Process one entity through one stage, then stop." The "then stop" is a prompt-level suggestion to the LLM — not a platform mechanism.
+- Both tests rely on the budget cap as the actual termination mechanism, not the FO deciding it's done.
+
+This is not just about gates. Even in a gate-free workflow, the FO's event loop says "repeat... until the captain ends the session." Whether the LLM decides to stop producing output after processing all entities is undefined behavior — it works sometimes (the LLM happens to go idle), but it's not reliable and it's not by design.
+
+**The deeper question:** What actually controls session termination in `claude -p`? Is it the LLM deciding it has nothing left to say? A token limit? An explicit exit mechanism agents can invoke? Until we understand this, any template changes are speculative.
 
 **Use case:** A user wants to run a single entity through a workflow as a batch job:
 ```bash
@@ -28,9 +37,67 @@ This needs to:
 2. Run only that entity through its remaining stages
 3. Handle gates without a captain (auto-approve or skip)
 4. Print a structured result to stdout
-5. Exit cleanly — no idle loop, no waiting
+5. **Terminate reliably** — not hang, not depend on budget caps, not hope the LLM decides to stop
 
-## Proposed Approach
+## Spike: Session Termination in `claude -p`
+
+Before committing to any template changes, we need to understand the termination mechanism. The proposed approach below is conditional on spike findings.
+
+### What we need to learn
+
+1. **What controls session termination in `claude -p`?** When does the process exit? Options:
+   - **LLM-driven:** The LLM produces a final assistant turn with no tool calls, and `claude -p` treats that as "done." The session ends because the LLM decided to stop talking.
+   - **Explicit mechanism:** There's an API or tool the agent can call to signal "I'm done" (e.g., a `done()` tool, a special return value, an exit status mechanism).
+   - **Token/budget exhaustion:** The session runs until `--max-budget-usd` or token limits are hit. There is no graceful termination.
+
+2. **Can prompt instructions reliably trigger termination?** The checklist E2E test uses "then stop" in the prompt. Does the LLM reliably stop, or does it sometimes keep going (checking for more work, firing idle hooks)?
+
+3. **Does `initialPrompt` interact with `-p` prompts?** When using `claude -p "Process X" --agent first-officer`, the agent frontmatter has `initialPrompt: "Report workflow status."` Does the `-p` prompt replace or supplement `initialPrompt`? This determines whether the FO sees the user's entity-targeting prompt at all.
+
+4. **Can template prose override the event loop?** If the FO template says "repeat until the captain ends the session" but a single-entity-mode section says "exit after this entity is done," does the LLM follow the termination instruction, or does the event loop prose win?
+
+### Spike design
+
+Run three experiments in a temp project with a simple gate-free workflow (backlog -> work -> done, 1 entity):
+
+**Experiment A — Baseline: does the FO terminate naturally?**
+```bash
+claude -p "Report workflow status." --agent first-officer \
+  --permission-mode bypassPermissions \
+  --verbose --output-format stream-json \
+  --max-budget-usd 3.00 \
+  2>&1 > baseline.jsonl
+```
+Observe: Does it process the entity and exit? Or does it hang at idle until budget runs out? Check the stream-json log for the last few turns — is there a natural end or a budget-cap kill?
+
+**Experiment B — Prompt-directed termination**
+```bash
+claude -p "Process test-entity through all stages, then stop." --agent first-officer \
+  --permission-mode bypassPermissions \
+  --verbose --output-format stream-json \
+  --max-budget-usd 3.00 \
+  2>&1 > directed.jsonl
+```
+Observe: Does "then stop" cause reliable termination after the entity is done? Compare with Experiment A.
+
+**Experiment C — Gated workflow, prompt-directed**
+Same as B but with `gate: true` on the work stage. Observe: Does the FO auto-approve and exit, or hang at the gate despite the prompt instruction?
+
+**Cost:** ~$1.50-3.00 total for all three experiments. Time: ~5-10 min.
+
+### Spike outcomes and next steps
+
+| Spike finding | Implication for approach |
+|---|---|
+| LLM-driven termination works reliably with prompt instructions | Template approach is viable. Add single-entity mode section with termination prose. The LLM will follow "exit after done" instructions. |
+| LLM-driven termination is unreliable (sometimes hangs) | Need a harder mechanism. Options: (a) a wrapper script with a timeout, (b) a hook/mod that checks entity status and calls an exit tool if one exists, (c) accept `--max-budget-usd` as the termination mechanism and document it. |
+| Explicit exit mechanism exists (exit tool, done signal) | Template approach is viable AND reliable. Use the explicit mechanism in the single-entity mode section. |
+| `-p` prompt does not override `initialPrompt` | Entity targeting via prompt won't work. Need a different injection point (env var, config file, or a separate agent variant). |
+| Template prose cannot override event loop behavior | The FO template is too rigid for conditional modes. Need either a separate agent file (`first-officer-batch.md`) or a fundamentally different approach. |
+
+## Proposed Approach (pending spike)
+
+The approach below assumes the spike confirms that LLM-driven or explicit termination works. If the spike reveals a harder problem, the approach will need revision.
 
 ### Where the logic lives: In the FO template itself
 
@@ -49,166 +116,125 @@ claude -p "Process my-feature through all stages and exit" --agent first-officer
 claude -p "Process entity 042 through all stages and exit" --agent first-officer
 ```
 
-### Template changes
+### Template changes (contingent on spike)
 
 Add a new section to the FO template: `## Single-Entity Mode`
 
-This section instructs the FO to detect when the user prompt (the `initialPrompt` override from `-p`) names a specific entity and requests processing to completion. When detected, the FO:
+This section instructs the FO to detect when the user prompt names a specific entity and requests processing to completion. When detected, the FO:
 
 1. **Scopes dispatch to only the named entity.** After `status --next`, filter to only the target entity. Ignore all others.
 2. **Auto-approves gates.** In single-entity mode, the captain is absent. Gates auto-approve if the stage report recommends PASSED. If the stage report recommends REJECTED and the stage has `feedback-to`, the auto-bounce feedback loop runs as normal (up to the 3-cycle limit). If REJECTED with no `feedback-to`, or after 3 failed cycles, the FO reports the failure and exits.
-3. **Exits after terminal or failure.** When the target entity reaches terminal status (done/archived) or fails irrecoverably, the FO prints a structured result and stops. No idle hooks, no "waiting for captain."
+3. **Terminates after the target entity is resolved.** When the target entity reaches terminal status or fails irrecoverably, the FO prints a structured result and stops. The specific termination mechanism depends on spike findings (prompt instruction, explicit exit tool, or documented `--max-budget-usd` pattern).
 4. **Prints result to stdout.** On completion, the FO outputs the entity's final state: frontmatter fields, verdict, and the last stage report. This is the "return value" for the pipe.
 
-#### Before/after for key FO template sections
+#### Key template modifications (before/after)
 
-**Startup (step 7)** — currently:
-```
-7. **Run status --next** — `{workflow_dir}/status --next` to find dispatchable entities.
-```
-After (add to end of Startup):
-```
-8. **Detect single-entity mode** — If the initial prompt names a specific entity (by slug, ID, or title) and requests processing to completion (phrases like "process X", "run X through", "advance X"), enter single-entity mode:
-   - Resolve the target: match against entity slugs, IDs, and titles in the workflow directory.
-   - If no match found, report "Entity not found: {name}" and exit.
-   - If the entity is already terminal, report its current state and exit.
-   - Set the scope: only this entity will be dispatched. All other entities are ignored by `status --next` filtering.
-```
-
-**Gate handling** — currently the GATE APPROVAL GUARDRAIL says "NEVER self-approve." This needs a single-entity-mode exception. After the guardrail paragraph, add:
+**Gate handling** — currently the GATE APPROVAL GUARDRAIL says "NEVER self-approve." This needs a single-entity-mode exception:
 ```
 **Single-entity mode exception:** When in single-entity mode (no interactive captain), gates auto-resolve based on the stage report recommendation. PASSED → approve. REJECTED with feedback-to → auto-bounce (same as the existing auto-bounce for feedback stages). REJECTED without feedback-to → report failure and exit. This exception ONLY applies in single-entity mode — in interactive sessions, the guardrail remains absolute.
 ```
 
-**Event loop termination** — currently:
+**Event loop termination** — currently says "repeat... until the captain ends the session." Add:
 ```
-This is the event loop — repeat from step 1 after each agent completion until the captain ends the session.
-```
-After:
-```
-This is the event loop — repeat from step 1 after each agent completion until the captain ends the session.
-
 **Single-entity mode termination:** In single-entity mode, the event loop exits when the target entity reaches terminal status or is irrecoverably blocked. On exit, print the entity's final state (frontmatter, verdict, last stage report body) and terminate. Do not fire idle hooks or wait for captain input.
 ```
 
-**New section to add after "Clarification and Communication":**
-```
-## Single-Entity Mode
-
-When the initial prompt names a specific entity and requests it be processed to completion, the first officer enters single-entity mode. This mode is designed for non-interactive `claude -p` invocations.
-
-### Detection
-
-Single-entity mode activates when the initial prompt (from `-p` or `initialPrompt` override) contains:
-- A reference to a specific entity by slug, ID, or title
-- A request to process, run, or advance it (e.g., "process X through all stages", "run X to completion")
-
-If the prompt says "Report workflow status" (the default `initialPrompt`), this is NOT single-entity mode — it is the normal interactive startup.
-
-### Behavior differences
-
-| Aspect | Interactive mode | Single-entity mode |
-|--------|-----------------|-------------------|
-| Scope | All dispatchable entities | Named entity only |
-| Gates | Captain approves/rejects | Auto-resolve from stage report |
-| Feedback loops | Run with captain oversight | Run autonomously (3-cycle limit) |
-| Idle hooks | Fire when nothing dispatchable | Do not fire |
-| Orphan detection | Report to captain | Skip (not relevant) |
-| Termination | Captain ends session | Entity reaches terminal or fails |
-| Output | Status reports to captain | Final entity state to stdout |
-
-### Gate auto-resolution
-
-In single-entity mode, gate approval is automatic:
-- **PASSED recommendation:** Auto-approve. Proceed to next stage or terminal.
-- **REJECTED + feedback-to:** Auto-bounce into feedback loop. The 3-cycle limit still applies. After 3 failed cycles, exit with failure.
-- **REJECTED + no feedback-to:** Exit with failure. Print the stage report.
-
-### Exit protocol
-
-When the target entity reaches terminal status or fails:
-
-1. Print the entity's final state: all frontmatter fields and the body content (including stage reports).
-2. If terminal with verdict PASSED, exit code 0 (natural session end).
-3. If terminal with verdict REJECTED or failed mid-workflow, print the failure reason.
-
-The first officer does not attempt to process other entities, fire idle hooks, or wait for input after the target entity is resolved.
-```
+**New section — `## Single-Entity Mode`** — detection logic, behavior table, gate auto-resolution rules, and exit protocol. Full wording to be finalized after the spike confirms the termination mechanism.
 
 ### What does NOT change
 
-- **Startup steps 1-6** (discovery, README, team, mods, startup hooks, orphan detection in interactive mode). Single-entity mode still needs to discover the workflow and read the README. It skips orphan detection since it only cares about the target entity.
+- **Startup steps 1-6** (discovery, README, team, mods, startup hooks). Single-entity mode still needs to discover the workflow and read the README. It skips orphan detection since it only cares about the target entity.
 - **Dispatch mechanics** (Agent tool, worktree creation, ensign instructions). The dispatch itself is identical — only the selection of *which* entities to dispatch changes.
 - **Merge and cleanup.** Terminal entities still go through the merge/archive flow.
 - **State management.** Frontmatter updates are the same.
 - **Feedback rejection flow.** The mechanics are identical — only the trigger changes (auto-bounce instead of captain-initiated rejection).
 
+### Alternative approaches (if spike reveals problems)
+
+**If prompt-directed termination is unreliable:**
+- **Separate agent file** (`first-officer-batch.md`): A stripped-down FO with no event loop — just linear entity processing. Duplicates dispatch logic but guarantees termination. Downside: two agent files to maintain.
+- **Wrapper script approach:** A shell script that invokes `claude -p` with a timeout and checks entity status after termination. Pragmatic but loses the "exit cleanly" property.
+- **Accept budget-cap termination:** Document `--max-budget-usd` as the official termination mechanism for `-p` mode. Crude but honest. The FO does its work, the budget cap kills it, and the caller checks entity status from the file system.
+
+**If `-p` prompt doesn't reach the FO:**
+- **Environment variable injection:** `SPACEDOCK_TARGET_ENTITY=my-feature claude -p --agent first-officer`. The FO template reads the env var at startup.
+- **Config file:** Write target entity to a temp file, FO reads it. More complex than needed.
+
 ## Acceptance Criteria
 
-1. **Entity targeting works by slug, ID, and title.**
+### Spike phase (must pass before implementation)
+
+S1. **Termination mechanism is understood and documented.**
+    - Test: Spike experiments A, B, C produce clear answers to the four questions in the spike design.
+
+S2. **A reliable termination path exists for single-entity mode.**
+    - Test: At least one spike experiment shows the FO terminating naturally (not via budget cap) after entity processing completes.
+
+### Implementation phase (contingent on spike)
+
+1. **Entity targeting works by slug.**
    - Test: Invoke FO with `claude -p "Process test-entity through all stages" --agent first-officer` on a workflow with multiple entities. Only the named entity advances.
-   - Test: Also test by ID (`Process entity 001`) and title (`Process "My Feature"`).
 
 2. **Gate auto-approval works for PASSED recommendations.**
    - Test: Create a gated workflow with a single entity. Run in `-p` mode. The entity should pass through the gate without captain input and reach terminal status.
 
-3. **Gate auto-bounce works for REJECTED + feedback-to.**
-   - Test: Create a gated workflow with `feedback-to`. Seed an entity that will produce a REJECTED validation. Verify the feedback loop runs and either resolves (PASSED on retry) or hits the 3-cycle limit and exits with failure.
+3. **Session terminates reliably after entity completes.**
+   - Test: The FO exits without hitting the budget cap. Stream-json log shows a natural end, not a budget-kill.
 
-4. **Gate REJECTED without feedback-to exits cleanly.**
-   - Test: Create a gated workflow without `feedback-to`. Force a REJECTED result. Verify the FO exits with the failure reason printed.
-
-5. **Entity already terminal is handled.**
-   - Test: Run single-entity mode on an entity with `status: done`. The FO should report its current state and exit immediately.
-
-6. **Entity not found is handled.**
+4. **Entity not found is handled.**
    - Test: Run single-entity mode with a non-existent slug. The FO should report "Entity not found" and exit.
 
-7. **Interactive mode is unaffected.**
-   - Test: Run `claude --agent first-officer` (interactive, no `-p`) normally. The gate guardrail still blocks. The event loop still waits. No single-entity behavior activates.
+5. **Interactive mode is unaffected.**
+   - Test: The FO template still contains "NEVER self-approve" guardrail. The single-entity mode exception text explicitly limits itself to single-entity mode.
 
-8. **Final state is printed to stdout.**
-   - Test: After successful processing, the entity's frontmatter and stage reports appear in the session output (stdout for `-p` mode).
+6. **Final state is printed to stdout.**
+   - Test: After successful processing, the entity's frontmatter and stage reports appear in the session output.
 
 ## Test Plan
 
-**Approach: Fixture-based tests using `claude -p`, same pattern as existing test-gate-guardrail.sh.**
+### Phase 1: Spike (pre-implementation)
 
-Tests validate from `--output-format stream-json` logs and final file state — same approach as the existing E2E tests.
+Three experiments as described in "Spike: Session Termination in `claude -p`" above. Each uses a minimal fixture workflow (backlog -> work -> done, 1 entity). Validate from stream-json logs.
 
-### Test 1: Single-entity targeting (E2E)
+- Cost: ~$1.50-3.00 total
+- Time: ~5-10 min
+- Pass criteria: Clear answers to all four spike questions. At least one experiment shows natural termination.
+
+### Phase 2: Implementation tests (post-spike, contingent on findings)
+
+**Approach: Fixture-based tests using `claude -p`, same pattern as existing tests.**
+
+Tests validate from `--output-format stream-json` logs and final file state.
+
+#### Test 1: Single-entity targeting (E2E)
 - Fixture: 3 entities in backlog, no gates, 3 stages (backlog -> work -> done).
 - Invoke: `claude -p "Process entity-b through all stages" --agent first-officer`
-- Validate: entity-b reaches `done`, entity-a and entity-c remain in `backlog`.
+- Validate: entity-b reaches `done`, entity-a and entity-c remain in `backlog`. Session terminates without hitting budget cap.
 - Cost: ~$0.50-1.00. Run time: ~1-2 min.
 
-### Test 2: Gate auto-approval (E2E)
+#### Test 2: Gate auto-approval (E2E)
 - Fixture: 1 entity, stages backlog -> work -> done, work has `gate: true`.
 - Invoke: `claude -p "Process test-entity through all stages" --agent first-officer`
 - Validate: entity reaches `done` (gate was auto-approved). Stream log shows gate auto-resolution, NOT captain approval.
 - Cost: ~$0.50-1.00. Run time: ~1-2 min.
 - **Critical test** — this is the core behavioral change. The existing gate guardrail test confirms the FO blocks in interactive mode; this test confirms it auto-approves in single-entity mode.
 
-### Test 3: Entity not found (E2E, cheap)
-- Fixture: 1 entity named `real-entity`.
-- Invoke: `claude -p "Process nonexistent-entity through all stages" --agent first-officer`
-- Validate: FO output contains "not found" or equivalent. No entities advance.
-- Cost: ~$0.25. Run time: ~30s.
-
-### Test 4: Interactive mode regression (static check)
+#### Test 3: Interactive mode regression (static check)
 - Validate: The FO template still contains "NEVER self-approve" guardrail text.
 - Validate: The single-entity mode section contains "ONLY applies in single-entity mode."
 - Cost: $0 (grep, no LLM).
 
-### Tests NOT needed (and why)
+#### Tests NOT needed (and why)
 
 - **Feedback loop E2E:** The feedback loop mechanics are unchanged — only the trigger differs. The existing feedback tests cover the mechanics. A static check that the 3-cycle limit text is preserved is sufficient.
-- **Already-terminal entity:** This is a simple conditional (check status, print, exit). A static check that the instruction exists in the template is sufficient. An E2E test would cost $0.50+ for a trivial branch.
+- **Already-terminal entity:** This is a simple conditional (check status, print, exit). A static check that the instruction exists in the template is sufficient.
+- **Entity not found E2E:** The FO simply reports and exits. If the spike shows prompt-directed termination works, this is the trivial case. A static check is sufficient.
 
-### Cost estimate
-- 3 E2E tests: ~$1.50-3.00 total
+#### Cost estimate
+- Spike: ~$1.50-3.00
+- 2 E2E tests: ~$1.00-2.00
 - 1 static check: $0
-- Total: ~$1.50-3.00
+- Total: ~$2.50-5.00
 
 ## Edge Cases
 
@@ -236,16 +262,16 @@ If the user's prompt matches multiple entities (e.g., "Process test" matches "te
 ## Stage Report: ideation
 
 - [x] Problem statement clearly articulated
-  See "## Problem Statement" — the FO's interactive event loop and gate guardrail make it incompatible with `claude -p` for targeted single-entity processing.
+  See "## Problem Statement" — the root issue is that the FO hangs in `-p` mode because it has no termination signal. Evidence from existing tests: both gate guardrail and checklist E2E tests rely on `--max-budget-usd` budget caps to kill the session, not natural termination.
 - [x] Proposed approach with specific template changes (before/after wording for key sections)
-  See "## Proposed Approach" — logic lives in the FO template as a new `## Single-Entity Mode` section. Before/after wording provided for Startup step 7→8, gate handling exception, event loop termination, and the full new section with detection/behavior/gate/exit subsections.
+  See "## Proposed Approach (pending spike)" — logic lives in the FO template, contingent on spike confirming the termination mechanism. Before/after wording for gate handling exception and event loop termination. Full single-entity-mode section deferred until spike resolves the termination question. Alternative approaches documented for each spike failure mode.
 - [x] Acceptance criteria with testable conditions
-  See "## Acceptance Criteria" — 8 criteria covering entity targeting (slug/ID/title), gate auto-approval, gate auto-bounce, gate rejection exit, already-terminal, not-found, interactive regression, and stdout output.
+  See "## Acceptance Criteria" — split into spike phase (2 criteria: termination mechanism understood, reliable path exists) and implementation phase (6 criteria: entity targeting, gate auto-approval, reliable termination, not-found, interactive regression, stdout output).
 - [x] Test plan with cost/complexity estimates and whether E2E tests are needed
-  See "## Test Plan" — 3 E2E tests ($1.50-3.00 total), 1 static check ($0), with explicit rationale for tests NOT needed (feedback loop E2E, already-terminal E2E).
+  See "## Test Plan" — Phase 1 spike ($1.50-3.00, 3 experiments), Phase 2 implementation (2 E2E tests + 1 static check, $1.00-2.00). Total ~$2.50-5.00.
 - [x] Edge cases considered (entity doesn't exist, entity already done, gate failures, feedback loops)
   See "## Edge Cases" — 7 edge cases: entity not found, already terminal, mid-workflow orphan, gate failure without feedback-to, feedback exhaustion (3 cycles), multiple workflows, ambiguous reference.
 
 ### Summary
 
-The single-entity mode is a behavioral addition to the FO template, not a separate agent or wrapper. The FO detects when the user prompt names a specific entity and enters a constrained mode: scoped dispatch (one entity), auto-resolving gates from stage report recommendations, autonomous feedback loops (3-cycle limit), and clean exit on terminal/failure. The key design decision is that gate auto-approval is a single-entity-mode exception to the existing "NEVER self-approve" guardrail — interactive mode is completely unaffected. Three E2E tests validate the core behaviors; the critical test is gate auto-approval, which directly inverts the existing gate guardrail test.
+Revised ideation to acknowledge the root issue: the FO literally never terminates in `-p` mode. Existing tests use budget caps to kill sessions. Added a spike phase (3 experiments, ~$1.50-3.00) to answer the fundamental question: what controls session termination in `claude -p`? The proposed template approach is contingent on the spike confirming that LLM-driven or explicit termination works. If the spike reveals termination is unreliable, alternative approaches are documented: separate agent file, wrapper script, or accept budget-cap termination. Implementation acceptance criteria and tests are contingent on spike results.
