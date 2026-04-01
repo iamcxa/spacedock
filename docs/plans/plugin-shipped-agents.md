@@ -327,10 +327,13 @@ Investigated plugin agent discovery across 4 installed plugins — it is purely 
 3. Commission Phase 3 auto-run approach unclear — does it dispatch `spacedock:first-officer` via Agent tool or read from plugin path?
 4. Eject skill test is manual-only — needs scripted verification
 
-**Blocking before implementation:**
-1. Verify agent resolution: run `claude --agent spacedock:first-officer` and check if dispatch to `ensign` or `spacedock:ensign` works
-2. Verify local-vs-plugin precedence: set up project with both local and plugin agents, confirm local wins
-3. Clarify Commission Phase 3 approach: dispatch via Agent tool (cleaner) or inline read from plugin path
+**Blocking before implementation (RESOLVED):**
+
+1. **Agent resolution:** Plugin agents must be at top-level `agents/` directory (not `.claude/agents/`). All other plugins (superpowers, hookify, plugin-dev) use this convention. Spacedock v0.8.4 cached plugin has `.claude/agents/` which is wrong — that's the project's own local agents. Creating `agents/first-officer.md` and `agents/ensign.md` at plugin root enables `spacedock:first-officer` and `spacedock:ensign` resolution.
+
+2. **Local vs plugin precedence:** No shadowing — different namespaces. `first-officer` (bare) → `.claude/agents/first-officer.md` (local). `spacedock:first-officer` (namespaced) → `{plugin}/agents/first-officer.md` (plugin). They coexist. Eject copies plugin agents to local `.claude/agents/` giving users the bare-name path. The FO dispatch must use `spacedock:ensign` (namespaced) when running as a plugin agent.
+
+3. **Commission Phase 3:** Inline role assumption — reads the generated FO file and follows instructions directly, no subagent spawn (SKILL.md lines 484-489). With plugin agents, commission reads `agents/first-officer.md` from plugin path, which triggers the read chain (shared core → guardrails → runtime).
 
 ### Staff review findings — round 2 (layered architecture review)
 
