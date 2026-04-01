@@ -1,13 +1,13 @@
 ---
 id: 081
 title: Team name collision across sessions
-status: backlog
+status: implementation
 source: CL
-started:
+started: 2026-04-01T00:00:00Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/validator-team-name-collision
 pr:
 ---
 
