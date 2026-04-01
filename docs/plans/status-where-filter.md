@@ -44,11 +44,11 @@ Uses the new filter to simplify first-officer template prose:
   test_where_composes_with_next and test_where_composes_with_archived both pass
 - [x] All existing + new unit tests pass
   32/32 pass after scan_entities fix (commit 2c2f041) to pass through all frontmatter fields
-- [ ] SKIP: E2E checklist test passes on opus/low
-  8/9 checks pass. The "first officer performed checklist review" check failed due to LLM phrasing variance (FO said "Stage report review" instead of matching the test regex). Not a --where bug — pre-existing E2E flakiness.
+- [x] E2E checklist test passes on opus/low
+  9/9 checks pass after FO template fix (commit 6cc2e77) renamed "Stage report review" to "Checklist review"
 - [x] Any issues found in the --where implementation documented
   Found and reported scan_entities() hardcoded field bug; fixed in commit 2c2f041. No remaining --where issues.
 
 ### Summary
 
-Added 10 unit tests covering all --where operators and edge cases. Initial run found scan_entities() bug (hardcoded fields blocked --where on pr); fixed in 2c2f041, all 32 unit tests now pass. E2E had one soft failure from LLM phrasing variance unrelated to --where. Recommendation: PASSED — all acceptance criteria met after the scan_entities fix.
+Added 10 unit tests covering all --where operators and edge cases. Initial run found scan_entities() bug (hardcoded fields blocked --where on pr); fixed in 2c2f041, all 32 unit tests now pass. E2E rerun after FO template fix (commit 6cc2e77) passes 9/9 checks. All acceptance criteria met.
