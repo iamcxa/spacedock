@@ -1,9 +1,9 @@
 ---
 id: 080
 title: Single-entity -p mode for first-officer
-status: backlog
+status: ideation
 source: CL
-started:
+started: 2026-03-31T00:00:00Z
 completed:
 verdict:
 score:
