@@ -25,6 +25,8 @@ The root cause is the FO's event loop design: it dispatches agents, waits at gat
 
 This is not just about gates. Even in a gate-free workflow, the FO's event loop says "repeat... until the captain ends the session." Whether the LLM decides to stop producing output after processing all entities is undefined behavior — it works sometimes (the LLM happens to go idle), but it's not reliable and it's not by design.
 
+**Current production workaround:** The spacedock solver (which invokes the FO via `claude -p` to process entities) cannot use `run_command_streaming` because it blocks forever. Instead, it polls the filesystem every 5 seconds for the expected artifact (e.g., `answers.json`). Once the file appears and has content, it waits 10 more seconds for any final writes, then kills the process and reads the result from the file system. This is file-polling + process kill — it works but it's brittle, artifact-specific, and throws away anything the FO might have printed to stdout.
+
 **The deeper question:** What actually controls session termination in `claude -p`? Is it the LLM deciding it has nothing left to say? A token limit? An explicit exit mechanism agents can invoke? Until we understand this, any template changes are speculative.
 
 **Use case:** A user wants to run a single entity through a workflow as a batch job:
@@ -37,11 +39,13 @@ This needs to:
 2. Run only that entity through its remaining stages
 3. Handle gates without a captain (auto-approve or skip)
 4. Print a structured result to stdout
-5. **Terminate reliably** — not hang, not depend on budget caps, not hope the LLM decides to stop
+5. **Terminate reliably** — not hang, not depend on budget caps, not require file-polling + process kill
 
 ## Spike: Session Termination in `claude -p`
 
 Before committing to any template changes, we need to understand the termination mechanism. The proposed approach below is conditional on spike findings.
+
+**Why this matters now:** The production workaround (file-polling + process kill) is artifact-specific — it only works when you know the exact output file to watch for. It can't generalize to arbitrary workflows. Any solution needs to be at least as reliable as "poll for known artifact + kill" but work for any entity/workflow combination without knowing the artifact name in advance.
 
 ### What we need to learn
 
@@ -262,7 +266,7 @@ If the user's prompt matches multiple entities (e.g., "Process test" matches "te
 ## Stage Report: ideation
 
 - [x] Problem statement clearly articulated
-  See "## Problem Statement" — the root issue is that the FO hangs in `-p` mode because it has no termination signal. Evidence from existing tests: both gate guardrail and checklist E2E tests rely on `--max-budget-usd` budget caps to kill the session, not natural termination.
+  See "## Problem Statement" — the root issue is that the FO hangs in `-p` mode because it has no termination signal. Evidence from existing tests (budget caps as kill mechanism) and from the production workaround (file-polling + process kill for the spacedock solver).
 - [x] Proposed approach with specific template changes (before/after wording for key sections)
   See "## Proposed Approach (pending spike)" — logic lives in the FO template, contingent on spike confirming the termination mechanism. Before/after wording for gate handling exception and event loop termination. Full single-entity-mode section deferred until spike resolves the termination question. Alternative approaches documented for each spike failure mode.
 - [x] Acceptance criteria with testable conditions
