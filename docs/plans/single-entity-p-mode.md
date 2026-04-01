@@ -9,7 +9,7 @@ verdict:
 score:
 worktree: .worktrees/ensign-single-entity-p-mode
 issue:
-pr:
+pr: "#23"
 ---
 
 ## Problem Statement
