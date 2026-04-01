@@ -16,6 +16,7 @@ Read the shared documents in this order before acting:
 - If the user gives an explicit workflow path, use it.
 - If not, discover candidate workflows from the current repository.
 - If multiple candidates exist, ask the user which workflow to manage.
+- If the user names a specific entity and asks to process it through the workflow, apply the shared single-entity mode rules.
 
 ## Packaged Worker Registry
 
@@ -29,6 +30,11 @@ Split worker identity into:
 ## Dispatch Adapter
 
 Codex does not natively spawn packaged names like `spacedock:ensign`.
+
+Codex effectively operates in bare-mode dispatch:
+- the first officer owns orchestration directly
+- worker results return through `spawn_agent` completion, not team messaging
+- if the run is bounded to a single entity or first meaningful outcome, terminate once that condition is satisfied
 
 For each dispatch:
 1. Resolve the logical id through the packaged worker registry.
@@ -68,4 +74,4 @@ For the current Codex spike:
 - if the workflow is waiting at a gate, report the gate review and stop
 - if a worker returns a verdict or concrete evidence, summarize it and stop
 - if a feedback stage rejects, mention the follow-up target even if the full bounce loop is not completed in the same run
-
+- when the run is explicitly in single-entity mode, prefer the shared single-entity termination/output rules over generic status summaries

@@ -16,6 +16,18 @@ This file captures the shared first-officer semantics derived from the current S
 6. Detect orphaned worktree entities by checking `status --where "worktree !="` and report anomalies rather than auto-redispatching.
 7. Run `{workflow_dir}/status --next` to identify dispatchable entities.
 
+## Single-Entity Mode
+
+When the user names a specific entity and asks to process it through the workflow, switch into single-entity mode.
+
+Single-entity mode changes the normal event loop in these ways:
+- scope dispatch to the named entity only
+- resolve the entity reference against slugs, titles, and IDs and stop on ambiguity instead of guessing
+- auto-resolve gates from the report verdict when no interactive operator is present
+- skip operator prompting for orphan worktrees and choose the deterministic recovery path instead
+- stop once the target entity reaches a terminal state or an irrecoverable blocked state
+- if the workflow README defines a `## Output Format` section, use it for the final output; otherwise fall back to reporting status, verdict, and entity ID
+
 ## Working Directory
 
 Your working directory stays at the project root. Do not `cd` into worktrees. Use:
@@ -58,6 +70,9 @@ When a worker completes:
 3. If checklist items are missing, send the worker back once to repair the report.
 4. Check whether the completed stage is gated.
 
+The checklist review should produce an explicit count summary in the form:
+- `{N} done, {N} skipped, {N} failed`
+
 If the stage is not gated:
 - advance normally
 - if the next stage is terminal, continue into merge handling
@@ -67,12 +82,13 @@ If the stage is gated:
 - never self-approve
 - present the stage report to the human operator
 - keep the worker alive while waiting at the gate
+- if the stage is a feedback gate that recommends `REJECTED`, auto-bounce directly into the feedback rejection flow instead of waiting on manual review
 
 ## Feedback Rejection Flow
 
 When a feedback stage recommends REJECTED:
 
-1. Read the stage's `feedback-to` target.
+1. Read the rejected stage's `feedback-to` target. That target names the stage that must receive the fix request, not the reviewer stage itself.
 2. Track feedback cycles in a `### Feedback Cycles` section in the entity body.
 3. If cycles reach 3, escalate to the human instead of dispatching another round.
 4. Route the findings back to the target stage in the same worktree.
@@ -85,7 +101,7 @@ The first officer owns the `### Feedback Cycles` section and keeps it on the mai
 
 When an entity reaches its terminal stage:
 
-1. Run registered merge hooks before any local merge.
+1. Run registered merge hooks before any local merge, archival, or status advancement.
 2. If a merge hook created or set a `pr` field, report the PR-pending state and do not local-merge.
 3. If no merge hook handled the merge, perform the default local merge from the stage worktree branch.
 4. Set `completed:` and `verdict:` in frontmatter and clear `worktree:`.
@@ -131,4 +147,3 @@ Treat these as scaffolding files:
 - workflow `README.md` files with `commissioned-by` frontmatter
 
 Do not directly commit scaffolding changes without a tracking artifact such as a workflow task or approved issue. Do not file GitHub issues without explicit human approval.
-

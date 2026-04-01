@@ -38,6 +38,7 @@ def test_first_officer_shared_core_covers_latest_template_sections():
 
     for heading in [
         "## Startup",
+        "## Single-Entity Mode",
         "## Working Directory",
         "## Dispatch",
         "## Completion and Gates",
@@ -49,6 +50,10 @@ def test_first_officer_shared_core_covers_latest_template_sections():
         "## Scaffolding and Issue Filing",
     ]:
         assert heading in text
+
+    assert "## Output Format" in read_text("templates/first-officer.md")
+    assert "Output Format" in text
+    assert "feedback-to" in text
 
 
 def test_ensign_shared_core_keeps_stage_report_protocol():
