@@ -83,7 +83,26 @@ Agent file format: standard YAML frontmatter with `name`, `description`, and opt
 
 Key observation: spacedock 0.3.0 and 0.4.0 already shipped `first-officer.md` via `agents/` but the current version (0.8.2) removed this in favor of commission-time copying to `.claude/agents/`. This task restores and extends that pattern.
 
-### 2. Proposed plugin directory layout
+### 2. Layered architecture (from codex/multi-agent-spike)
+
+The codex spike extracted monolithic agent templates into a three-layer architecture:
+
+**Layer 1 — Shared core** (`references/`, platform-agnostic):
+- `first-officer-shared-core.md` — FO semantics: startup, dispatch, gates, feedback, merge, state management
+- `ensign-shared-core.md` — worker semantics: assignment, stage report protocol, completion
+- `code-project-guardrails.md` — git, paths, scaffolding rules
+
+**Layer 2 — Platform runtime adapter** (`references/`, platform-specific):
+- Codex: `codex-first-officer-runtime.md`, `codex-ensign-runtime.md` (already exist)
+- Claude Code: `claude-first-officer-runtime.md`, `claude-ensign-runtime.md` (NEW — covers teams vs bare mode, Agent tool dispatch, SendMessage, captain interaction, gate idle guardrail)
+
+**Layer 3 — Thin entry point** (agent file or skill):
+- Claude Code: `agents/first-officer.md` — reads shared core → guardrails → Claude runtime → acts
+- Codex: `skills/first-officer/SKILL.md` — reads shared core → guardrails → Codex runtime → acts
+
+This means `templates/first-officer.md` and `templates/ensign.md` are eliminated entirely. Their content is decomposed into shared core + Claude runtime adapter. The agent entry points are thin wrappers (~20 lines).
+
+### 3. Proposed plugin directory layout
 
 ```
 spacedock/
@@ -91,23 +110,31 @@ spacedock/
     plugin.json
     marketplace.json
   agents/
-    first-officer.md    ← currently at templates/first-officer.md
-    ensign.md           ← currently at templates/ensign.md
+    first-officer.md    ← thin wrapper (reads references/)
+    ensign.md           ← thin wrapper (reads references/)
+  references/
+    first-officer-shared-core.md   ← platform-agnostic FO semantics
+    ensign-shared-core.md          ← platform-agnostic worker semantics
+    code-project-guardrails.md     ← shared rules
+    claude-first-officer-runtime.md ← Claude Code FO adapter (NEW)
+    claude-ensign-runtime.md        ← Claude Code ensign adapter (NEW)
+    codex-first-officer-runtime.md  ← Codex FO adapter (from spike)
+    codex-ensign-runtime.md         ← Codex ensign adapter (from spike)
+    codex-packaged-agents.json      ← Codex worker registry (from spike)
   templates/
     status              ← stays (commission materializes this)
-    first-officer.md    ← REMOVE (move to agents/)
-    ensign.md           ← REMOVE (move to agents/)
   skills/
     commission/SKILL.md
-    refit/SKILL.md
+    first-officer/SKILL.md  ← Codex entry point (from spike)
+    ensign/SKILL.md         ← Codex entry point (from spike)
   mods/
     pr-merge.md
   ...
 ```
 
-The `templates/` directory retains only the `status` template (which requires variable substitution at commission time). Agent files move to `agents/` since they are static and need no substitution.
+`templates/` retains only `status`. Agent behavior lives in `references/` (shared core + runtime adapters). Entry points in `agents/` (Claude Code) and `skills/` (Codex) are thin wrappers.
 
-### 3. Commission changes
+### 4. Commission changes
 
 **Remove from SKILL.md:**
 - Phase 2 step 2d: "Generate First-Officer Agent" (cp template to `.claude/agents/first-officer.md`)
@@ -125,19 +152,19 @@ The `templates/` directory retains only the `status` template (which requires va
 - All other Phase 2 steps (README, status, seed entities, mods)
 - Agent warnings for custom stage agents (those still go to `.claude/agents/`)
 
-### 4. FO dispatch: namespaced vs bare agent names
+### 5. FO dispatch: namespaced agent names
 
-The FO template currently dispatches with `subagent_type="{agent}"` where `{agent}` defaults to `ensign`. Two scenarios:
+The codex spike solved this with the `dispatch_agent_id` / `worker_key` split:
+- `dispatch_agent_id` = logical name used in reasoning (e.g., `spacedock:ensign`)
+- `worker_key` = filesystem-safe stem for worktrees/branches (e.g., `spacedock-ensign` or just `ensign`)
 
-**Scenario A — FO invoked as `spacedock:first-officer` (plugin agent):**
-When running as a plugin agent, Claude Code should resolve `ensign` to `spacedock:ensign` if no local `.claude/agents/ensign.md` exists. **This needs verification.** If Claude Code does NOT do this resolution, the FO template must dispatch `spacedock:ensign` explicitly.
+The Claude Code runtime adapter should use `spacedock:ensign` as the default `subagent_type`. This resolves to the plugin agent when running as `spacedock:first-officer`, and the local agent takes precedence when ejected.
 
-**Scenario B — FO invoked as `first-officer` (local ejected agent):**
-Local `.claude/agents/ensign.md` would also exist (eject copies both). Resolution to `ensign` works as today.
+The `worker_key` derivation (stripping `:` for paths) is already defined in the codex spike's `codex-first-officer-prompt.md` and should be extracted into the shared core.
 
-**Recommendation:** Update the FO template default from `ensign` to `spacedock:ensign`. This works in both scenarios — when running from plugin (resolves to plugin agent) and when running from local eject (local agent with matching name takes precedence). The README `agent:` field for custom stages would still use bare names for project-local agents. Verify this assumption during implementation.
+**Open question (still needs verification):** Does `subagent_type="spacedock:ensign"` work in the Claude Code Agent tool? If not, the Claude runtime adapter needs to handle resolution.
 
-### 5. Refit skill changes
+### 6. Refit skill changes
 
 The refit skill currently:
 - Compares local `.claude/agents/{agent}.md` against `templates/{agent}.md`
@@ -149,7 +176,7 @@ The refit skill currently:
 
 **Recommendation:** Keep refit for scaffolding updates (status script, README version stamp, mod updates, entity migration). Remove agent-related phases from refit. Add a separate `/spacedock eject` skill for agent pinning.
 
-### 6. Eject skill design
+### 7. Eject skill design
 
 **`/spacedock eject`** — copies current plugin agents to `.claude/agents/` for version pinning.
 
@@ -172,7 +199,7 @@ The refit skill currently:
 
 **Edge case — custom stages with `agent:` property:** The eject skill only copies agents shipped with the plugin. Custom stage agents (user-created) are not affected.
 
-### 7. Test harness impact (considering 078 Python rewrite)
+### 8. Test harness impact (considering 078 Python rewrite)
 
 Current fixture-based tests do:
 ```bash
@@ -192,7 +219,7 @@ Tests run `claude -p --agent spacedock:first-officer` instead of `--agent first-
 
 **Recommendation: Option A.** Tests should be self-contained and not depend on plugin installation state. The sed substitution pattern moves from `templates/first-officer.md` to `agents/first-officer.md` (source path changes, that's it). The 078 Python rewrite would use the same approach — `setup_fixture` copies from `agents/` instead of `templates/`.
 
-### 8. Terminology consideration (task 058)
+### 9. Terminology consideration (task 058)
 
 Task 058 is in `validation` status — the terminology experiment has been designed but not yet run. Key findings from the ideation:
 
@@ -204,41 +231,48 @@ Task 058 is in `validation` status — the terminology experiment has been desig
 
 ## Acceptance Criteria
 
-1. **Plugin agents directory exists with both agents**
-   - `agents/first-officer.md` and `agents/ensign.md` exist at plugin root
-   - Content is identical to current `templates/first-officer.md` and `templates/ensign.md`
-   - Test: `diff agents/first-officer.md templates/first-officer.md` shows no diff (before template removal)
+1. **Layered architecture implemented**
+   - Shared core files exist in `references/`: `first-officer-shared-core.md`, `ensign-shared-core.md`, `code-project-guardrails.md` (already from codex spike)
+   - Claude Code runtime adapters exist: `references/claude-first-officer-runtime.md`, `references/claude-ensign-runtime.md`
+   - Test: all reference files exist and are non-empty
 
-2. **Templates directory cleaned up**
+2. **Plugin agents are thin wrappers**
+   - `agents/first-officer.md` reads shared core → guardrails → Claude runtime → acts (~20 lines)
+   - `agents/ensign.md` same pattern
+   - Test: agent files contain `Read` instructions pointing to reference files, no embedded behavioral prose
+
+3. **Templates eliminated**
    - `templates/first-officer.md` and `templates/ensign.md` are removed
    - `templates/status` remains
    - Test: `ls templates/` shows only `status`
 
-3. **Commission skill no longer copies agents**
+4. **Commission skill no longer copies agents**
    - Phase 2 steps 2d and 2e removed from SKILL.md
    - Generation checklist updated (no agent file checks)
    - Post-completion guidance uses `spacedock:first-officer`
    - Test: grep SKILL.md for "2d", "2e", "Generate First-Officer", "Generate Ensign" returns nothing
 
-4. **FO template dispatches with namespaced agent type**
-   - `subagent_type` default is `spacedock:ensign` (or confirmed that bare `ensign` resolves correctly)
-   - Test: grep `agents/first-officer.md` for the dispatch subagent_type value
+5. **FO dispatches with namespaced agent type**
+   - Default `subagent_type` is `spacedock:ensign`
+   - `worker_key` derivation strips `:` for filesystem paths
+   - Test: grep Claude runtime adapter for dispatch default
 
-5. **Refit skill updated**
-   - Agent comparison phases removed (3b, 3d, 3e, or equivalent)
-   - Upgrade plan table no longer lists first-officer.md or ensign.md
+6. **Refit skill updated**
+   - Agent comparison phases removed
    - Test: grep SKILL.md for removed sections returns nothing
 
-6. **Eject skill exists and works**
-   - `skills/eject/SKILL.md` created with the designed behavior
-   - Copies `agents/*.md` to `.claude/agents/`
-   - Shows diffs when local copies already exist
-   - Test: manual test — run eject, verify files appear in `.claude/agents/`
+7. **Eject skill exists and works**
+   - `skills/eject/SKILL.md` copies `agents/*.md` to `.claude/agents/`
+   - Test: manual test — run eject, verify files appear
 
-7. **Existing tests still pass**
-   - Fixture-based tests updated to source from `agents/` instead of `templates/`
-   - All test scripts pass (no behavioral regression)
-   - Test: run each test script, verify exit 0
+8. **Behavioral equivalence**
+   - Claude Code FO running via thin wrapper + references produces the same behavior as the current monolithic template
+   - Test: run existing E2E tests (gate guardrail, rejection flow, output format) against the new layered agents
+   - All test scripts pass with no regression
+
+9. **Codex spike merged cleanly**
+   - `codex/multi-agent-spike` branch changes are incorporated
+   - Codex-specific files coexist with Claude Code files without conflict
 
 ## Test Plan
 
