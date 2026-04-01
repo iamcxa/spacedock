@@ -125,13 +125,13 @@ While waiting at a gate, do NOT shut down the dispatched agent.
 
 When a gate-stage with `feedback-to` is rejected:
 
-1. Look up the `feedback-to` target stage in README frontmatter.
+1. **Read `feedback-to`** — look up the `feedback-to` property on the rejected stage. It names another stage (e.g., `feedback-to: implementation` means the implementation stage). The agent for THAT stage receives the fix request — not the reviewer.
 2. Check cycle count in the entity file's `### Feedback Cycles` section. If >= 3, escalate to captain.
-3. Send the reviewer's findings to the target-stage agent (via SendMessage if alive, or dispatch a fresh agent into the same worktree with the findings in the dispatch prompt so it knows exactly what to fix). Keep the reviewer alive.
-4. Target agent fixes and signals reviewer. Reviewer re-checks and reports to FO.
+3. **Dispatch fix agent** — dispatch a fresh ensign into the same worktree for the `feedback-to` stage. Include the reviewer's findings from the stage report in the dispatch prompt so the agent knows exactly what to fix. Keep the reviewer alive.
+4. Fix agent commits fixes and messages reviewer. Reviewer re-checks and reports to FO.
 5. Increment cycle count. Re-enter gate flow.
 
-**Bare mode:** Dispatch target agent with findings (wait), then dispatch reviewer (wait), then present at gate.
+**Bare mode:** Dispatch fix agent (wait), then dispatch reviewer (wait), then present at gate.
 
 ## Merge and Cleanup
 
