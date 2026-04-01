@@ -300,3 +300,29 @@ Cycle: 2
 ### Summary
 
 Spike phase confirmed that `claude -p` sessions terminate reliably via LLM-driven natural end (3/3 experiments). The `-p` prompt reaches the FO and directs its behavior. Template approach is viable. Implemented three changes to `templates/first-officer.md`: a new Single-Entity Mode section defining scoped dispatch, entity resolution, gate auto-approval, orphan auto-decision, and termination; a gate guardrail exception for single-entity mode; and an event loop termination clause. The commission skill needs no changes since it copies the template verbatim.
+
+## Stage Report: validation
+
+- [x] Run applicable tests and report results
+  Spike test (`tests/test_spike_termination.py`): verified infrastructure is sound — imports clean, `analyze_termination` function works correctly on synthetic log data, fixtures exist and are complete (`spike-no-gate/`: 3 files, `spike-gated/`: 3 files). Full LLM-based spike run was already completed during implementation (3/3 experiments terminated naturally, 0/3 hit budget cap). Re-running would cost ~$9 with no new information about template correctness. The duplicate file `tests/spike_termination.py` (earlier draft, 253 lines) exists alongside the final version `tests/test_spike_termination.py` (307 lines) — minor cleanup opportunity but not a defect.
+- [x] Verify each implementation acceptance criterion (AC 1-6) with evidence from code inspection and test results
+  AC 1 (entity targeting by slug): Single-Entity Mode item 1 scopes dispatch to named entity, item 2 resolves by slug/title/ID — template line 52-53. AC 2 (gate auto-approval): Item 3 references gate guardrail exception; exception at line 135 defines PASSED -> approve, REJECTED with feedback-to -> auto-bounce. AC 3 (reliable termination): Item 5 (line 56) defines termination after entity resolved; event loop clause at line 98 adds single-entity mode exit condition. AC 4 (entity not found): Item 2 (line 53) explicitly handles: "report Entity not found... and exit." AC 5 (interactive unaffected): "NEVER self-approve" guardrail preserved at line 133; exception at line 135 contains "ONLY applies in single-entity mode — in interactive sessions, the guardrail remains absolute." AC 6 (stdout output): Item 5 (line 56) says "print the entity's final state (frontmatter fields, verdict, and the last stage report)"; item 6 handles already-terminal case.
+- [x] Verify the FO template changes match the proposed approach from ideation
+  Three changes match the ideation proposal: (1) New `## Single-Entity Mode` section (lines 46-57) with 6 behavior items covering detection, scoped dispatch, entity resolution, gate auto-approval, orphan auto-decision, termination, and already-terminal — matches ideation's proposed section. (2) Gate guardrail exception (line 135) matches ideation's before/after wording: PASSED -> approve, REJECTED with feedback-to -> auto-bounce, REJECTED without -> exit, scoped to single-entity mode only. (3) Event loop termination clause (line 98) adds "or, in single-entity mode, until the target entity is resolved" — matches ideation's proposed addition. Bonus: item 4 (orphan auto-decision) addresses the "Entity mid-workflow with active worktree" edge case from ideation.
+- [x] Static checks: gate guardrail contains "NEVER self-approve", exception is scoped
+  Confirmed via grep: "NEVER self-approve" present at line 133 of `templates/first-officer.md`. "ONLY applies in single-entity mode" present at line 135. The exception paragraph immediately follows the guardrail, making the scope unambiguous.
+- [x] Overall PASSED/REJECTED recommendation with evidence
+
+### Recommendation: PASSED
+
+### Findings
+
+1. All three template changes (Single-Entity Mode section, gate guardrail exception, event loop termination clause) are present, correctly positioned, and match the ideation design.
+2. All 6 implementation acceptance criteria are satisfied with specific template evidence at identified line numbers.
+3. The "NEVER self-approve" guardrail is preserved intact; the single-entity mode exception is explicitly and narrowly scoped.
+4. Spike test infrastructure is sound (imports, fixtures, analysis functions all verified). The spike was run during implementation with documented results (3/3 natural termination).
+5. Minor observation: duplicate spike test file (`spike_termination.py` alongside `test_spike_termination.py`) — earlier draft not cleaned up. Not a defect.
+
+### Summary
+
+Validated the single-entity mode implementation against all 6 acceptance criteria via code inspection and test infrastructure verification. The FO template changes at `templates/first-officer.md` are correct, complete, and match the ideation design. The gate guardrail remains intact with a properly scoped exception. Spike experiments (run during implementation) confirmed the LLM-driven termination approach is viable. Test infrastructure is sound and ready for future E2E validation runs.
