@@ -81,7 +81,7 @@ This is the event loop — repeat from step 1 after each agent completion until 
 
 When a dispatched agent sends its completion message:
 
-1. **Stage report review** — Read the entity file. Verify every dispatched checklist item appears in the `## Stage Report` section. If items are missing, send the agent back once to update the file.
+1. **Stage report review** — Read the entity file. Verify every dispatched checklist item appears in the `## Stage Report` section with a DONE, SKIPPED, or FAILED status. Report the checklist review to the captain: "{N} done, {N} skipped, {N} failed." If items are missing, send the agent back once to update the file.
 2. **Check gate** — Read the completed stage's `gate` property from the stages block in README frontmatter. If no gate, proceed to the "If no gate" path below. If gate, keep agent alive for potential redo.
 
 **If no gate:** If terminal, proceed to merge. Otherwise, check whether the next stage has `feedback-to` pointing at this stage. If yes, keep the agent alive — do not shut it down. Run `status --next` and dispatch the next stage.
