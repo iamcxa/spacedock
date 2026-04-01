@@ -283,3 +283,20 @@ Revised ideation to acknowledge the root issue: the FO literally never terminate
 ### Feedback Cycles
 
 Cycle: 2
+
+## Stage Report: implementation
+
+- [x] Spike experiments A, B, C executed and findings documented
+  Ran via `tests/test_spike_termination.py`. Results: A terminated naturally in 47s (reported status, asked to dispatch, stopped); B terminated naturally in 130s (processed entity to done, archived, printed summary); C terminated naturally in 132s (stopped at gate awaiting captain approval). All 3 used natural_end, 0/3 hit budget cap. Fixtures at `tests/fixtures/spike-no-gate/` and `tests/fixtures/spike-gated/`.
+- [x] Termination mechanism understood and documented (spike acceptance criterion S1)
+  LLM-driven termination: `claude -p` sessions end when the LLM produces a final assistant turn with no tool calls. This happens reliably in all tested scenarios. The `-p` prompt supplements (does not replace) `initialPrompt` — both reach the FO. Prompt instructions like "then stop" work but are not strictly necessary; the FO stops naturally when it needs captain input or has nothing left to do.
+- [x] Reliable termination path identified (spike acceptance criterion S2)
+  All 3 experiments terminated naturally without budget cap. Exp B confirms end-to-end: entity processed through all stages, archived, and session exited cleanly. The template approach is viable.
+- [x] FO template updated with single-entity mode section (if spike confirms viability)
+  Added `## Single-Entity Mode` section (6 behavior items: scoped dispatch, entity resolution, gate auto-approval, orphan auto-decision, termination, already-terminal). Added gate guardrail exception for single-entity mode. Updated event loop termination clause. Changes at `templates/first-officer.md`.
+- [ ] SKIP: Commission skill updated to emit the new FO section (if spike confirms viability)
+  The commission skill copies the FO template verbatim (`cp` in step 2d of SKILL.md). No commission changes are needed — the template update is sufficient.
+
+### Summary
+
+Spike phase confirmed that `claude -p` sessions terminate reliably via LLM-driven natural end (3/3 experiments). The `-p` prompt reaches the FO and directs its behavior. Template approach is viable. Implemented three changes to `templates/first-officer.md`: a new Single-Entity Mode section defining scoped dispatch, entity resolution, gate auto-approval, orphan auto-decision, and termination; a gate guardrail exception for single-entity mode; and an event loop termination clause. The commission skill needs no changes since it copies the template verbatim.
