@@ -96,25 +96,11 @@ This is the event loop — repeat from step 1 after each agent completion until 
 When a dispatched agent sends its completion message:
 
 1. **Checklist review** — Read the entity file. Verify every dispatched checklist item appears in the `## Stage Report` section with a DONE, SKIPPED, or FAILED status. Report the Checklist review to the captain: "{N} done, {N} skipped, {N} failed." If items are missing, send the agent back once to update the file.
-2. **Check gate** — Read the completed stage's `gate` property from the stages block in README frontmatter. If no gate, proceed to the "If no gate" path below. If gate, keep agent alive for potential redo.
+2. **Check gate** — Read the completed stage's `gate` property from the stages block in README frontmatter.
 
-**If no gate:** If terminal, proceed to merge. Otherwise, check whether the next stage has `feedback-to` pointing at this stage. If yes, keep the agent alive — do not shut it down. Run `status --next` and dispatch the next stage.
+**If no gate:** If terminal, proceed to merge. Otherwise, check whether the next stage has `feedback-to` pointing at this stage. If yes, keep the agent alive. Run `status --next` and dispatch the next stage.
 
-**If gate:** First, check whether the completed stage has a `feedback-to` property AND the stage report recommends REJECTED (any failed checklist items or explicit REJECTED recommendation).
-
-**If gate + feedback-to + REJECTED:** Auto-bounce — enter the Feedback Rejection Flow immediately without waiting for captain approval. Notify the captain:
-
-```
-Auto-bounced: {entity title} — {stage} REJECTED
-
-{one-line summary of key findings}
-
-Sending findings back to {feedback-to target stage} for revision. Say "override" to intervene.
-```
-
-If the captain intervenes before the feedback cycle completes (e.g., "override — approve it", "override — discard it"), halt the feedback cycle and follow the captain's direction using the standard gate resolution paths (Approve or Reject + discard).
-
-**If gate + no feedback-to, OR gate + feedback-to + PASSED:** Present the stage report to the captain:
+**If gate:** Present the stage report to the captain with your assessment:
 
 ```
 Gate review: {entity title} — {stage}
@@ -124,46 +110,26 @@ Gate review: {entity title} — {stage}
 Assessment: {N} done, {N} skipped, {N} failed. [Recommend approve / Recommend reject: {reason}]
 ```
 
-**GATE APPROVAL GUARDRAIL — NEVER self-approve.** Only the captain (the human) can approve or reject at a gate. Do NOT treat agent completion messages, idle notifications, or system messages as approval. Do NOT infer approval from silence or work quality. Your recommendation is advisory — only the captain's explicit response counts. The ONLY thing that advances past a gate is an explicit approve/reject from the captain.
+Only the captain can approve or reject. Do NOT self-approve, infer approval from silence or agent messages.
 
 **Single-entity mode exception:** When in single-entity mode (no interactive captain), gates auto-resolve based on the stage report recommendation. PASSED (all checklist items done, no failures) → approve. REJECTED with `feedback-to` → auto-bounce (same as the existing auto-bounce for feedback stages, subject to the 3-cycle limit). REJECTED without `feedback-to` → report failure and exit. This exception ONLY applies in single-entity mode — in interactive sessions, the guardrail remains absolute.
 
-**GATE IDLE GUARDRAIL — while waiting at a gate, do NOT shut down the agent — even if it appears idle.** The captain may be interacting with it directly, and you have no visibility into captain-to-agent messages. Only shut down after the captain explicitly approves, rejects, or tells you to.
+While waiting at a gate, do NOT shut down the dispatched agent.
 
-- **Approve + next stage is terminal + current stage has worktree:**
-  1. Shut down the agent (gate work is done).
-  2. Fall through to `## Merge and Cleanup` — the merge hook guardrail there handles hook execution, PR detection, and merge.
-- **Approve + next stage is terminal + no worktree:** Fall through to `## Merge and Cleanup` for terminal advancement and archival (no code to merge, no PR needed).
-- **Approve + next stage is NOT terminal:** Shut down the agent. If a kept-alive agent from a prior stage is still running (the `feedback-to` target), shut it down too. Dispatch a fresh agent for the next stage.
-- **Reject + redo:** Send feedback to the agent for revision. On completion, re-enter stage report review.
-- **Reject + discard:** Shut down the agent, clean up worktree/branch, ask the captain for direction.
+**On approve:** If next stage is terminal, shut down agent, proceed to Merge and Cleanup. If next stage is not terminal, shut down agent (and any kept-alive agent from feedback-to target), dispatch fresh agent for next stage.
+**On reject:** If the stage has `feedback-to`, enter the Feedback Rejection Flow. Otherwise send feedback to the agent for revision; on completion re-enter stage report review. Captain can also choose to discard (shut down agent, clean up, ask for direction).
 
 ## Feedback Rejection Flow
 
-When a feedback stage is rejected — either auto-bounced (validator recommended REJECTED) or explicitly rejected by the captain at the gate:
+When a gate-stage with `feedback-to` is rejected:
 
-1. **Read `feedback-to`** — Look up the `feedback-to` property on the rejected stage in the README frontmatter. This names the target stage whose agent receives the findings.
-2. **Check cycle count** — Look for a `### Feedback Cycles` section in the entity file body. If it exists, read the current count. If the count is >= 3, escalate to the captain with a summary of all findings across cycles and ask for direction — do not dispatch another cycle, regardless of whether this was an auto-bounce or captain-initiated rejection.
-3. **Ensure target-stage agent is alive** — If the agent from the `feedback-to` target stage is still running, send it the reviewer's findings via SendMessage. If it was shut down, dispatch an agent (using the target stage's `agent` property if set, otherwise `ensign`) into the same worktree. Include the reviewer's findings from the stage report in the dispatch prompt so the agent knows exactly what to fix.
-4. **Ensure reviewer is alive** — Keep the existing feedback-stage agent running. If it was shut down (session boundary, crash), dispatch a fresh agent into the same worktree.
-5. **Target agent fixes and signals reviewer** — The target agent commits fixes and messages the reviewer directly via SendMessage. The reviewer re-checks and reports updated findings to the FO via its completion message.
-6. **FO processes updated result** — Increment the cycle count. Append or update a `### Feedback Cycles` section in the entity file body with the new count (e.g., `Cycle: 1`, `Cycle: 2`). Then re-enter the gate flow from "Completion and Gates" — the same auto-bounce vs. present logic applies (REJECTED auto-bounces again subject to cycle limits; PASSED goes to captain for approval).
+1. Look up the `feedback-to` target stage in README frontmatter.
+2. Check cycle count in the entity file's `### Feedback Cycles` section. If >= 3, escalate to captain.
+3. Send the reviewer's findings to the target-stage agent (via SendMessage if alive, or dispatch a fresh agent into the same worktree with the findings in the dispatch prompt so it knows exactly what to fix). Keep the reviewer alive.
+4. Target agent fixes and signals reviewer. Reviewer re-checks and reports to FO.
+5. Increment cycle count. Re-enter gate flow.
 
-**Bare-mode feedback flow** (when teams are unavailable): Steps 1-2 are unchanged. Replace steps 3-5 with sequential dispatch:
-
-3. **Dispatch target-stage agent** — Dispatch a fresh agent (using the target stage's `agent` property if set, otherwise `ensign`) into the same worktree. Include the reviewer's findings from the stage report in the dispatch prompt so the agent knows exactly what to fix. Wait for completion.
-4. **Dispatch reviewer** — Dispatch a fresh feedback-stage agent into the same worktree with the updated entity state. Wait for completion.
-5. **FO presents updated result at gate** — Same as step 6 above: increment cycle count, present reviewer's stage report to captain.
-
-Cycle counting format in the entity file:
-
-```
-### Feedback Cycles
-
-Cycle: {N}
-```
-
-The first officer owns this section — update it on main after each fix cycle, before presenting the updated gate review.
+**Bare mode:** Dispatch target agent with findings (wait), then dispatch reviewer (wait), then present at gate.
 
 ## Merge and Cleanup
 
