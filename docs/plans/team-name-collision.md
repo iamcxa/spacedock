@@ -35,15 +35,17 @@ Replaced the team creation logic in `templates/first-officer.md` startup step 3.
 ## Stage Report: validation
 
 - [x] The old `rm -rf` pattern is fully removed from `templates/first-officer.md`
-  Confirmed via grep: no `rm -rf` matches in templates/first-officer.md. Step 3 at line 18 uses suffix probing only.
-- [x] The new text correctly describes numeric suffix probing
-  Step 3 sets `base_name`, checks `~/.claude/teams/{base_name}/`, tries `{base_name}-2`, `{base_name}-3`, etc., and calls `TeamCreate` with the first free name.
+  Line 18 contains `rm -rf` only inside a negative guardrail: `**NEVER delete existing team directories** (\`rm -rf ~/.claude/teams/...\`)`. No actionable rm -rf instruction remains.
+- [x] Step 3 instructs the FO to use the returned `team_name`, not the requested name
+  Line 18: "**IMPORTANT:** TeamCreate may return a different `team_name` than requested... Always read the returned `team_name` from the TeamCreate result and store it — use this actual team name for all subsequent dispatch calls, not the originally requested name."
+- [x] The dispatch template (Agent call) uses `{team_name}` (the stored variable) not `{project_name}-{dir_basename}`
+  Line 62: `team_name="{team_name}"` with comment `// use the actual team_name returned by TeamCreate, not the requested name`. The old hardcoded `{project_name}-{dir_basename}` no longer appears in the dispatch block.
 - [x] The instruction is clear enough that an LLM agent would follow it unambiguously
-  The algorithm is explicit: set base_name, check existence, increment suffix, use first free name. The bold **NEVER delete existing team directories** guardrail reinforces the constraint.
-- [ ] SKIP: Existing tests pass (`uv run pytest tests/ --ignore=tests/fixtures -x -q`)
-  No pytest runner exists in this project. Tests are standalone E2E scripts (uv run tests/test_*.py) that spawn real Claude agents with API budget. The implementation report's claim of "22 passed (uv run pytest)" appears inaccurate — pytest is not installed. The E2E tests test full pipeline behavior, not the specific rm-rf change; the change is a template text edit with no programmatic logic to unit-test.
-- [x] No other files reference the old `rm -rf ~/.claude/teams/` pattern (grep the repo)
-  Grep found the pattern in two expected places: (1) docs/plans/team-name-collision.md (the entity file describing the bug — expected), (2) .claude/agents/first-officer.md line 18 (the live agent file, not yet refitted from the updated template — expected per project convention that agent files are regenerated via refit, not edited directly).
+  Step 3 (line 18) uses bold **IMPORTANT** to flag the store-and-reuse pattern. The dispatch template (line 62) reinforces with an inline comment. An LLM reading this would: (1) call TeamCreate with the derived name, (2) read the returned team_name, (3) store it, (4) use the stored value in all Agent() dispatch calls. The flow is explicit and unambiguous.
+- [x] Existing tests pass (`uv run pytest tests/ --ignore=tests/fixtures -x -q`)
+  32 passed, 5 warnings in 1.42s (ran via `uv run --with pytest pytest tests/ --ignore=tests/fixtures -x -q`). pytest is not a declared dependency but runs successfully with inline install. All tests pass.
+- [x] No other files in the repo reference the old `rm -rf ~/.claude/teams/` pattern (grep the full repo)
+  Grep for `rm -rf.*\.claude/teams` found 3 files: (1) `templates/first-officer.md` line 18 — negative guardrail only, not actionable. (2) `docs/plans/team-name-collision.md` — the entity file describing the bug, expected. (3) `.claude/agents/first-officer.md` line 18 — live agent file still has old `rm -rf` instruction, awaiting refit from the updated template (agent files are not directly edited per project convention).
 
 ### Recommendation
 
@@ -51,8 +53,8 @@ PASSED
 
 ### Findings
 
-All criteria for the template change are met. The `templates/first-officer.md` file correctly replaces the `rm -rf` pattern with numeric suffix probing and includes a bold guardrail against deleting team directories. The `.claude/agents/first-officer.md` still carries the old pattern but is excluded from direct editing per project convention — it will be updated when refit runs against the updated template. The test suite uses E2E scripts rather than pytest, so the exact command from the checklist cannot be executed, but the change is a prose template edit with no programmatic logic requiring unit testing.
+All six acceptance criteria are met. The template correctly addresses the root cause identified by the spike: TeamCreate silently returns a random name on collision rather than erroring. The fix instructs the FO to store and reuse the actual returned `team_name` rather than assuming the requested name was used. The `rm -rf` pattern survives only as a "NEVER do this" guardrail. The dispatch block uses `{team_name}` (the stored variable) not the old hardcoded `{project_name}-{dir_basename}`. One note: `.claude/agents/first-officer.md` still carries the old actionable `rm -rf` instruction and needs refit to pick up the template change.
 
 ### Summary
 
-Validated the team name collision fix in `templates/first-officer.md` startup step 3. The old `rm -rf` cleanup-and-retry logic is fully replaced with numeric suffix probing (`{base}-2`, `{base}-3`, etc.) and an explicit "NEVER delete" guardrail. The instruction is unambiguous for an LLM agent to follow. One note: the live `.claude/agents/first-officer.md` still has the old pattern and needs refit to pick up the change.
+Revalidated the team name collision fix after the spike revealed the first implementation (numeric suffix probing) was based on a wrong assumption. The current fix in `templates/first-officer.md` correctly handles TeamCreate's actual behavior: store the returned `team_name` and use it for all dispatch calls. All 32 existing tests pass. The live agent file at `.claude/agents/first-officer.md` still needs refit to sync with the updated template.
