@@ -234,10 +234,10 @@ def run_codex_first_officer(
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
                 cwd=runner.test_project_dir,
-                timeout=180,
+                timeout=90,
             )
         except subprocess.TimeoutExpired:
-            print("\n  TIMEOUT: codex first officer exceeded 180s limit")
+            print("\n  TIMEOUT: codex first officer exceeded 90s limit")
             return 124
 
     print()
