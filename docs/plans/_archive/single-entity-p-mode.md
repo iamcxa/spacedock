@@ -1,13 +1,13 @@
 ---
 id: 080
 title: Single-entity -p mode for first-officer
-status: validation
+status: done
 source: CL
 started: 2026-03-31T00:00:00Z
-completed:
-verdict:
+completed: 2026-04-01T21:00:00Z
+verdict: PASSED
 score:
-worktree: .worktrees/ensign-single-entity-p-mode
+worktree:
 issue:
 pr: "#23"
 ---
