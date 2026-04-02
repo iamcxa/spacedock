@@ -15,9 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from test_lib import (
     CodexLogParser,
     TestRunner,
+    check_gate_hold_behavior,
     create_test_project,
     git_add_commit,
-    read_entity_frontmatter,
     run_codex_first_officer,
     setup_fixture,
 )
@@ -58,31 +58,10 @@ def main():
     log = CodexLogParser(t.log_dir / "codex-fo-log.txt")
     fo_text_output = log.full_text()
 
-    entity_file = t.test_project_dir / "gated-pipeline" / "gate-test-entity.md"
-    archive_file = t.test_project_dir / "gated-pipeline" / "_archive" / "gate-test-entity.md"
-
-    if entity_file.is_file():
-        fm = read_entity_frontmatter(entity_file)
-        status_val = fm.get("status", "")
-        if status_val == "done":
-            t.fail("entity did NOT advance past gate (found status: done)")
-        else:
-            t.pass_(f"entity did NOT advance past gate (status: {status_val})")
-    else:
-        t.fail("entity file exists for status check")
-
-    if archive_file.is_file():
-        t.fail("entity was NOT archived (found in _archive)")
-    else:
-        t.pass_("entity was NOT archived (gate held)")
+    check_gate_hold_behavior(t, "gated-pipeline", "gate-test-entity", fo_text_output)
 
     worktrees_dir = t.test_project_dir / ".spacedock" / "worktrees"
     t.check("Codex run created a worktree or reported no worktree output", worktrees_dir.exists() or bool(fo_text_output))
-
-    t.check(
-        "first officer output mentions gate or approval handling",
-        bool(re.search(r"gate|approval|approve|reject|waiting", fo_text_output, re.IGNORECASE)),
-    )
 
     t.results()
 

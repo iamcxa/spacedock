@@ -18,6 +18,8 @@ from test_lib import (
     TestRunner,
     create_test_project,
     git_add_commit,
+    rejection_follow_up_observed,
+    rejection_signal_present,
     run_codex_first_officer,
     setup_fixture,
 )
@@ -77,17 +79,10 @@ def main():
     entity_main = t.test_project_dir / "rejection-pipeline" / "buggy-add-task.md"
     worktrees_dir = t.test_project_dir / ".spacedock" / "worktrees"
 
-    found_rejected = bool(re.search(r"REJECTED|recommend reject|failing test|Expected 5, got -1", worker_messages, re.IGNORECASE))
-    if entity_main.is_file() and re.search(r"REJECTED", entity_main.read_text(), re.IGNORECASE):
-        found_rejected = True
-
-    if worktrees_dir.is_dir():
-        for wt in worktrees_dir.iterdir():
-            wt_entity = wt / "rejection-pipeline" / "buggy-add-task.md"
-            if wt_entity.is_file() and re.search(r"REJECTED", wt_entity.read_text(), re.IGNORECASE):
-                found_rejected = True
-
-    t.check("validation surfaced a rejection signal", found_rejected)
+    t.check(
+        "validation surfaced a rejection signal",
+        rejection_signal_present("rejection-pipeline", "buggy-add-task", entity_main, worktrees_dir, worker_messages, fo_text),
+    )
     t.check("at least one worker completed", bool(worker_messages.strip()))
 
     spawn_count = log.spawn_count()
@@ -96,21 +91,10 @@ def main():
         spawn_count >= 2 or bool(re.search(r"validation|implementation", worker_messages, re.IGNORECASE)),
     )
 
-    follow_up_observed = False
-    if re.search(r"feedback-to|follow-up|fix|rework|implementation", worker_messages, re.IGNORECASE):
-        follow_up_observed = True
-    if re.search(r"feedback-to|follow-up|fix|rework|implementation", fo_text, re.IGNORECASE):
-        follow_up_observed = True
-
-    if worktrees_dir.is_dir():
-        for wt in worktrees_dir.iterdir():
-            wt_entity = wt / "rejection-pipeline" / "buggy-add-task.md"
-            if wt_entity.is_file():
-                text = wt_entity.read_text()
-                if re.search(r"Feedback Cycles|Stage Report: validation|Stage Report: implementation", text, re.IGNORECASE):
-                    follow_up_observed = True
-
-    t.check("follow-up work after rejection was observable", follow_up_observed)
+    t.check(
+        "follow-up work after rejection was observable",
+        rejection_follow_up_observed("rejection-pipeline", "buggy-add-task", worktrees_dir, worker_messages, fo_text),
+    )
 
     main_entity_text = entity_main.read_text() if entity_main.is_file() else ""
     worktree_match = re.search(r"^worktree:\s*(.+)$", main_entity_text, re.MULTILINE)

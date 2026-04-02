@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from test_lib import (
     TestRunner, LogParser, create_test_project, setup_fixture,
     install_agents, assembled_agent_content, run_first_officer, git_add_commit,
-    file_contains,
+    rejection_signal_present,
 )
 
 
@@ -111,26 +111,12 @@ def main():
     t.check("FO dispatched an ensign for validation stage", len(ensign_calls) > 0)
 
     # Check 2: The reviewer's stage report contains a REJECTED recommendation
-    found_rejected = False
-
-    # Check entity file on main
     entity_main = t.test_project_dir / "rejection-pipeline" / "buggy-add-task.md"
-    if entity_main.is_file() and re.search(r"REJECTED", entity_main.read_text(), re.IGNORECASE):
-        found_rejected = True
-
-    # Check entity files in any worktree
     worktrees_dir = t.test_project_dir / ".worktrees"
-    if worktrees_dir.is_dir():
-        for wt in worktrees_dir.iterdir():
-            wt_entity = wt / "rejection-pipeline" / "buggy-add-task.md"
-            if wt_entity.is_file() and re.search(r"REJECTED", wt_entity.read_text(), re.IGNORECASE):
-                found_rejected = True
-
-    # Check FO text output
-    if re.search(r"REJECTED", fo_text, re.IGNORECASE):
-        found_rejected = True
-
-    t.check("reviewer stage report contains REJECTED recommendation", found_rejected)
+    t.check(
+        "reviewer stage report contains REJECTED recommendation",
+        rejection_signal_present("rejection-pipeline", "buggy-add-task", entity_main, worktrees_dir, fo_text),
+    )
 
     # Check 3: FO dispatched multiple ensigns (implementation + validation + fix after rejection)
     ensign_count = len(ensign_calls)

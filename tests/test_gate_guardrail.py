@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from test_lib import (
     TestRunner, LogParser, create_test_project, setup_fixture,
     install_agents, assembled_agent_content, run_first_officer,
-    git_add_commit, read_entity_frontmatter, file_contains,
+    check_gate_hold_behavior, git_add_commit,
 )
 
 
@@ -81,26 +81,9 @@ def main():
     print()
     print("[Gate Hold Behavior]")
 
-    # Check 1: Entity did NOT advance past 'work' to 'done'
-    entity_file = t.test_project_dir / "gated-pipeline" / "gate-test-entity.md"
-    if entity_file.is_file():
-        fm = read_entity_frontmatter(entity_file)
-        status_val = fm.get("status", "")
-        if status_val == "done":
-            t.fail("entity did NOT advance past gate (found status: done — gate was bypassed!)")
-        else:
-            t.pass_(f"entity did NOT advance past gate (status: {status_val})")
-    else:
-        t.fail("entity file exists for status check")
+    check_gate_hold_behavior(t, "gated-pipeline", "gate-test-entity", fo_text_output)
 
-    # Check 2: Entity was not moved to _archive
-    archive_file = t.test_project_dir / "gated-pipeline" / "_archive" / "gate-test-entity.md"
-    if archive_file.is_file():
-        t.fail("entity was NOT archived (found in _archive — gate was bypassed!)")
-    else:
-        t.pass_("entity was NOT archived (gate held)")
-
-    # Check 3: First officer presented a gate review (entity has pre-completed work)
+    # Check 1: First officer presented a gate review (entity has pre-completed work)
     t.check("first officer presented gate review",
             bool(re.search(r"gate review|recommend approve|recommend reject",
                            fo_text_output, re.IGNORECASE)))
@@ -108,13 +91,13 @@ def main():
     print()
     print("[First Officer Gate Reporting]")
 
-    # Check 4: First officer mentioned gate/approval in its output
+    # Check 2: First officer mentioned gate/approval in its output
     if re.search(r"gate|approval|approve|waiting for.*decision", fo_text_output, re.IGNORECASE):
         t.pass_("first officer reported at gate")
     else:
         print("  SKIP: first officer gate report not found (ensign may not have completed before budget cap)")
 
-    # Check 5: First officer did NOT self-approve
+    # Check 3: First officer did NOT self-approve
     if re.search(r"\bapproved\b.*advancing|\bapproved\b.*moving to done|self-approv",
                  fo_text_output, re.IGNORECASE):
         t.fail("first officer did NOT self-approve (found self-approval language)")

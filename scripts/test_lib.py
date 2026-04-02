@@ -754,6 +754,79 @@ def read_entity_frontmatter(entity_path: Path) -> dict[str, str]:
     return fields
 
 
+def iter_worktree_entity_paths(worktrees_dir: Path, workflow_dir: str, entity_slug: str) -> list[Path]:
+    """Return matching entity paths under per-worker worktrees for one workflow entity."""
+    if not worktrees_dir.is_dir():
+        return []
+    return [
+        wt / workflow_dir / f"{entity_slug}.md"
+        for wt in worktrees_dir.iterdir()
+        if (wt / workflow_dir / f"{entity_slug}.md").is_file()
+    ]
+
+
+def check_gate_hold_behavior(runner: TestRunner, workflow_dir: str, entity_slug: str, fo_text_output: str) -> None:
+    """Assert that a gated entity remains active and unarchived."""
+    entity_file = runner.test_project_dir / workflow_dir / f"{entity_slug}.md"
+    archive_file = runner.test_project_dir / workflow_dir / "_archive" / f"{entity_slug}.md"
+
+    if entity_file.is_file():
+        fm = read_entity_frontmatter(entity_file)
+        status_val = fm.get("status", "")
+        if status_val == "done":
+            runner.fail("entity did NOT advance past gate (found status: done)")
+        else:
+            runner.pass_(f"entity did NOT advance past gate (status: {status_val})")
+    else:
+        runner.fail("entity file exists for status check")
+
+    if archive_file.is_file():
+        runner.fail("entity was NOT archived (found in _archive)")
+    else:
+        runner.pass_("entity was NOT archived (gate held)")
+
+    runner.check(
+        "first officer output mentions gate or approval handling",
+        bool(re.search(r"gate|approval|approve|reject|waiting", fo_text_output, re.IGNORECASE)),
+    )
+
+
+def rejection_signal_present(
+    workflow_dir: str,
+    entity_slug: str,
+    main_entity_path: Path,
+    worktrees_dir: Path,
+    *texts: str,
+) -> bool:
+    """Return True when rejection evidence appears in main/worktree entities or runtime output."""
+    patterns = r"REJECTED|recommend reject|failing test|Expected 5, got -1"
+    if any(re.search(patterns, text, re.IGNORECASE) for text in texts if text):
+        return True
+    if main_entity_path.is_file() and re.search(r"REJECTED", main_entity_path.read_text(), re.IGNORECASE):
+        return True
+    return any(
+        re.search(r"REJECTED", path.read_text(), re.IGNORECASE)
+        for path in iter_worktree_entity_paths(worktrees_dir, workflow_dir, entity_slug)
+    )
+
+
+def rejection_follow_up_observed(
+    workflow_dir: str,
+    entity_slug: str,
+    worktrees_dir: Path,
+    *texts: str,
+) -> bool:
+    """Return True when logs or entity artifacts show post-rejection follow-up activity."""
+    pattern = r"feedback-to|follow-up|fix|rework|implementation"
+    if any(re.search(pattern, text, re.IGNORECASE) for text in texts if text):
+        return True
+    for path in iter_worktree_entity_paths(worktrees_dir, workflow_dir, entity_slug):
+        text = path.read_text()
+        if re.search(r"Feedback Cycles|Stage Report: validation|Stage Report: implementation", text, re.IGNORECASE):
+            return True
+    return False
+
+
 def file_contains(path: Path | str, pattern: str, case_insensitive: bool = False) -> bool:
     """Check if a file contains a regex pattern."""
     text = Path(path).read_text()
