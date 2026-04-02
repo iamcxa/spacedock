@@ -1,13 +1,13 @@
 ---
 id: 076
 title: Ship agents with plugin and add eject skill for local pinning
-status: ideation
+status: implementation
 source: CL — architectural discussion 2026-03-29
 started: 2026-03-29T21:30:00Z
 completed:
 verdict:
 score: 0.85
-worktree:
+worktree: .worktrees/ensign-plugin-shipped-agents
 ---
 
 Ship first-officer and ensign as plugin-level agents (`spacedock:first-officer`, `spacedock:ensign`) instead of generating them per-project via commission. Add an eject/pin skill for users who want version stability.
@@ -261,9 +261,7 @@ Task 058 is in `validation` status — the terminology experiment has been desig
    - Agent comparison phases removed
    - Test: grep SKILL.md for removed sections returns nothing
 
-7. **Eject skill exists and works**
-   - `skills/eject/SKILL.md` copies `agents/*.md` to `.claude/agents/`
-   - Test: manual test — run eject, verify files appear
+7. ~~**Eject skill exists and works**~~ — DESCOPED (deferred to separate task)
 
 8. **Behavioral equivalence — content coverage**
    - Thin wrapper + shared core + Claude runtime adapter, when assembled, cover every behavioral section present in the monolithic template
