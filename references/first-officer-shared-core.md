@@ -14,7 +14,18 @@ This file captures the shared first-officer semantics. Keep it aligned with `age
 4. Discover mod hooks by scanning `{workflow_dir}/_mods/*.md` for `## Hook:` sections. Register `startup`, `idle`, and `merge` hooks in alphabetical order by mod filename.
 5. Run startup hooks before normal dispatch.
 6. Detect orphaned worktree entities by checking `status --where "worktree !="` and report anomalies rather than auto-redispatching.
-7. Run `{workflow_dir}/status --next` to identify dispatchable entities.
+7. Run `status --next` to identify dispatchable entities.
+
+## Status Viewer
+
+The status viewer ships with the plugin at `skills/commission/bin/status`. Resolve the plugin directory from the same root used to read these reference files.
+
+Invoke it as:
+```
+python3 {spacedock_plugin_dir}/skills/commission/bin/status --workflow-dir {workflow_dir} [--next|--archived|--where ...]
+```
+
+Use this for all `status` calls: `--next`, `--where "pr !="`, `--where "worktree !="`, etc.
 
 ## Single-Entity Mode
 
