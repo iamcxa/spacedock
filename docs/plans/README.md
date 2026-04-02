@@ -1,5 +1,5 @@
 ---
-commissioned-by: spacedock@0.8.5
+commissioned-by: spacedock@0.9.0
 entity-type: entity
 entity-label: task
 entity-label-plural: tasks
@@ -91,7 +91,7 @@ A task moves to ideation when a pilot starts fleshing out the idea: clarify the 
   - For template changes: specific before/after wording, not just "change X"
 - **Good:** Clearly scoped, actionable, addresses a real need, considers edge cases, test plan proportional to risk (static checks for simple wording, E2E for behavioral guarantees)
 - **Bad:** Vague hand-waving, scope creep, solving problems that don't exist yet, no clear definition of done, acceptance criteria without a test plan
-- **Staff review:** When the FO assesses ideation as complex (touches templates/scaffolding, requires E2E tests, or score >= 0.8), it spawns a fresh independent reviewer subagent before presenting at the ideation gate. The reviewer checks design soundness, test plan sufficiency, and gaps. The captain sees both the ideation and the reviewer's assessment.
+- **Staff review:** When the FO assesses ideation as complex (touches scaffolding, requires E2E tests, or score >= 0.8), it spawns a fresh independent reviewer subagent before presenting at the ideation gate. The reviewer checks design soundness, test plan sufficiency, and gaps. The captain sees both the ideation and the reviewer's assessment.
 
 ### `implementation`
 
@@ -129,7 +129,7 @@ A task reaches done when validation is complete and CL approves the result. The 
 View the workflow overview:
 
 ```bash
-docs/plans/status
+skills/commission/bin/status docs/plans
 ```
 
 Output columns: ID, SLUG, STATUS, TITLE, SCORE, SOURCE.
@@ -137,13 +137,13 @@ Output columns: ID, SLUG, STATUS, TITLE, SCORE, SOURCE.
 Include archived tasks with `--archived`:
 
 ```bash
-docs/plans/status --archived
+skills/commission/bin/status docs/plans --archived
 ```
 
 Find dispatchable tasks ready for their next stage:
 
 ```bash
-docs/plans/status --next
+skills/commission/bin/status docs/plans --next
 ```
 
 Find tasks in a specific stage:

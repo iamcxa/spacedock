@@ -1,13 +1,13 @@
 ---
 id: 076
 title: Ship agents with plugin and add eject skill for local pinning
-status: validation
+status: done
 source: CL — architectural discussion 2026-03-29
 started: 2026-03-29T21:30:00Z
-completed:
-verdict:
+completed: 2026-04-02T20:30:00Z
+verdict: PASSED
 score: 0.85
-worktree: .worktrees/ensign-plugin-shipped-agents
+worktree:
 pr: "#26"
 ---
 

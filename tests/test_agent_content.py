@@ -83,14 +83,14 @@ def test_ensign_shared_core_keeps_stage_report_protocol():
     text = read_text("references/ensign-shared-core.md")
     assert "## Stage Report: {stage_name}" in text
     assert "overwrite" in text.lower()
-    assert ".claude/agents/" in text
+    assert "agents/" in text
     assert "Do NOT modify YAML frontmatter" in text
 
 
 def test_code_project_guardrails_cover_worktrees_and_scaffolding():
     text = read_text("references/code-project-guardrails.md")
     assert ".worktrees/" in text
-    assert ".claude/agents/" in text
+    assert "agents/" in text
     assert "git worktree" in text
     assert "scaffolding" in text.lower()
 
