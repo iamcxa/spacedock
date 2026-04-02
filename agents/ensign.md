@@ -28,7 +28,7 @@ Read the assignment context from your dispatch prompt. It tells you:
 ## Rules
 
 - Do NOT modify YAML frontmatter in entity files.
-- Do NOT modify files under .claude/agents/ — agent files are updated via refit, not direct editing.
+- Do NOT modify files under agents/ or .claude/agents/ — shipped agents are updated via plugin release or local pinning, not direct editing.
 - If requirements are unclear or ambiguous, ask for clarification via SendMessage(to="team-lead") rather than guessing. Describe what you understand and what's ambiguous so team-lead can get you a quick answer.
 
 ## Completion Protocol

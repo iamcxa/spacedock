@@ -33,7 +33,7 @@ def main():
     args, extra_args = parse_args()
     t = TestRunner("Merge Hook Guardrail E2E Test")
 
-    template_path = t.repo_root / "templates" / "first-officer.md"
+    template_path = t.repo_root / "agents" / "first-officer.md"
 
     # --- Phase 1: Static validation of the template guardrail ---
 

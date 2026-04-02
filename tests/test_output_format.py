@@ -26,7 +26,7 @@ def main():
 
     print("--- Phase 1: Static checks on FO template ---")
 
-    fo_template = t.repo_root / "templates" / "first-officer.md"
+    fo_template = t.repo_root / "agents" / "first-officer.md"
     fo_text = fo_template.read_text()
 
     t.check("item 6 references Output Format section from README",

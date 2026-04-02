@@ -129,15 +129,15 @@ def setup_fixture(runner: TestRunner, fixture_name: str, pipeline_dir: str) -> P
 
 
 def install_agents(runner: TestRunner, include_ensign: bool = False) -> Path:
-    """Copy agent templates into the test project's .claude/agents/ directory."""
+    """Copy shipped plugin agents into the test project's .claude/agents/ directory."""
     agents_dir = runner.test_project_dir / ".claude" / "agents"
     agents_dir.mkdir(parents=True, exist_ok=True)
 
     fo_path = agents_dir / "first-officer.md"
-    shutil.copy2(runner.repo_root / "templates" / "first-officer.md", fo_path)
+    shutil.copy2(runner.repo_root / "agents" / "first-officer.md", fo_path)
 
     if include_ensign:
-        shutil.copy2(runner.repo_root / "templates" / "ensign.md", agents_dir / "ensign.md")
+        shutil.copy2(runner.repo_root / "agents" / "ensign.md", agents_dir / "ensign.md")
 
     return fo_path
 
@@ -186,11 +186,12 @@ def run_first_officer(
     extra_args: list[str] | None = None,
     log_name: str = "fo-log.jsonl",
 ) -> int:
-    """Run claude -p --agent first-officer. Returns exit code."""
+    """Run claude -p --plugin-dir ... --agent spacedock:first-officer. Returns exit code."""
     log_path = runner.log_dir / log_name
     cmd = [
         "claude", "-p", prompt,
-        "--agent", "first-officer",
+        "--plugin-dir", str(runner.repo_root),
+        "--agent", "spacedock:first-officer",
         "--permission-mode", "bypassPermissions",
         "--verbose",
         "--output-format", "stream-json",

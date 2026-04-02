@@ -6,7 +6,7 @@ user-invocable: true
 
 # Refit a Workflow
 
-You are refitting (upgrading) an existing workflow to match the current Spacedock version. This covers scaffolding files (status script, first-officer agent, README) and, when schema changes require it, migrating entity frontmatter data.
+You are refitting (upgrading) an existing workflow to match the current Spacedock version. This covers README and any locally pinned agent files, while plugin-shipped runtime assets update automatically. When schema changes require it, you may also migrate entity frontmatter data.
 
 Follow these five phases in order. Do not skip or combine phases.
 
@@ -27,9 +27,8 @@ Store the confirmed path as `{dir}`. Resolve it to an absolute path. Also derive
 Read each scaffolding file and extract its version stamp:
 
 1. **README** — Read `{dir}/README.md`. Extract version from YAML frontmatter `commissioned-by: spacedock@X.Y.Z`. Store as `{readme_version}`.
-2. **Status script** — Read `{dir}/status`. Extract version from `# commissioned-by: spacedock@X.Y.Z`. Store as `{status_version}`.
-3. **Agent files** — Agent templates are static (no version stamps). For each agent (`first-officer.md`, `ensign.md`, and any agents referenced in README `stages.states`), check if `{project_root}/.claude/agents/{agent}.md` exists. Compare its content to the corresponding template at `{spacedock_plugin_dir}/templates/{agent}.md`. Store whether each agent matches its template or differs.
-4. **Mod files** — Scan `{dir}/_mods/*.md` for installed mods. For each, read the `version` frontmatter field. Match against canonical mods at `{spacedock_plugin_dir}/mods/{name}.md` by filename. Store the local version and canonical version for each. Also scan `{spacedock_plugin_dir}/mods/*.md` for mods not yet installed.
+2. **Pinned agent files** — Plugin agents are the default runtime. For each agent (`first-officer`, `ensign`, and any agents referenced in README `stages.states`), check whether a local pinned copy exists at `{project_root}/.claude/agents/{agent}.md`. If it exists, compare its content to the canonical plugin agent at `{spacedock_plugin_dir}/agents/{agent}.md`. Store whether each pinned copy matches or differs.
+3. **Plugin-shipped runtime assets** — Note that the status viewer and mods are plugin-shipped runtime assets. They are not refit targets and update with the installed Spacedock plugin version.
 
 If a file doesn't exist, note it as missing and skip it.
 
@@ -40,7 +39,7 @@ Read `.claude-plugin/plugin.json` from the Spacedock plugin directory (the direc
 ### Step 4 — Evaluate
 
 - If all version stamps match `{current_version}` and all agent files match their templates: report "Workflow is already up to date." and stop.
-- If no stamps were found on any versioned file (README, status): enter **Degraded Mode** (see below).
+- If no stamps were found on any versioned file (README): enter **Degraded Mode** (see below).
 - Otherwise: proceed to Phase 2 with the list of outdated files and mismatched agents.
 
 ---
@@ -51,12 +50,10 @@ Each scaffolding file gets a specific upgrade strategy based on how safe it is t
 
 | File | Strategy | Rationale |
 |------|----------|-----------|
-| `status` | **Replace** | Mechanical script. Workflow-specific content (stage names) is extracted from the README. Users rarely customize beyond what's generated. |
-| `first-officer.md` | **Copy if changed** | Static template — compare on-disk to template, show diff and ask the captain for confirmation before replacing. |
+| `first-officer` pinned agent | **Copy if changed** | Optional local pin of the plugin agent — compare on-disk to the shipped plugin agent, show diff and ask the captain for confirmation before replacing. |
 | `README.md` | **Show diff** | Users customize stages, schema fields, quality criteria. Too risky to auto-replace. Show what the current template would produce and let the captain decide. |
-| `ensign.md` | **Copy if changed** | Static template — compare on-disk to template, show diff and ask the captain for confirmation before replacing. |
-| `{agent}.md` | **Copy if changed** | Static template. Only present for stages that reference a non-default agent. Show diff and ask the captain for confirmation before replacing. |
-| `_mods/{name}.md` | **Version diff** | Compare `version` frontmatter against canonical. Show diff if changed, ask for confirmation. |
+| `ensign` pinned agent | **Copy if changed** | Optional local pin of the plugin agent — compare on-disk to the shipped plugin agent, show diff and ask the captain for confirmation before replacing. |
+| `{agent}` pinned agent | **Copy if changed** | Optional local pin. Only present for stages that reference a custom agent. Show diff against the shipped plugin agent and ask the captain for confirmation before replacing. |
 
 Present the classification to the captain:
 
@@ -64,16 +61,15 @@ Present the classification to the captain:
 >
 > | File | Current State | Strategy |
 > |------|--------------|----------|
-> | `status` | {status_version or "no stamp"} | Replace |
-> | `first-officer.md` | {matches template / differs from template / missing} | Copy if changed |
+> | `first-officer` pinned agent | {matches plugin agent / differs / missing} | Copy if changed |
 > | `README.md` | {readme_version or "no stamp"} | Show diff (manual review) |
-> | `ensign.md` | {matches template / differs from template / missing} | Copy if changed |
-> | `{agent}.md` (for each) | {matches template / differs from template / missing} | Copy if changed |
-> | `_mods/{name}.md` (for each) | {local_version vs canonical_version / custom mod} | Version diff |
+> | `ensign` pinned agent | {matches plugin agent / differs / missing} | Copy if changed |
+> | `{agent}` pinned agent (for each) | {matches plugin agent / differs / missing} | Copy if changed |
+> | plugin-shipped runtime assets | managed by installed Spacedock version | No action |
 >
 > Proceed?
 
-Only include agent rows for agents actually referenced in the README `stages.states` entries. Omit agent rows where the on-disk file already matches the template. For mods, include all files found in `_mods/`.
+Only include agent rows for agents actually referenced in the README `stages.states` entries. Omit agent rows where the on-disk file already matches the template.
 
 Wait for the captain to confirm before proceeding.
 
@@ -93,22 +89,9 @@ Before generating any files, read `{dir}/README.md` and extract:
 3. **Schema fields** — from the `## Schema` section's YAML block.
 4. **Entity description** — from the first paragraph after the H1.
 
-### 3a. Status Script (Replace + Materialize)
+### 3a. First-Officer Agent (Copy if changed)
 
-Generate the status script from the reference template at `templates/status` (relative to the Spacedock plugin directory).
-
-1. Read the template file.
-2. Fill in the two variable fields:
-   - `{current_version}` — the target Spacedock version
-   - `{stage1}, {stage2}, ..., {last_stage}` — the workflow's stage names in order (extracted from README)
-3. Show the captain the diff between the old status script's description header and the new one. (Only the header matters — the implementation will be regenerated regardless.)
-4. Replace `{dir}/status` with the filled-in template.
-5. Preserve the executable bit (`chmod +x`).
-6. **Materialize** — read back the description header and replace the stub body with a working bash implementation that satisfies the description. The implementation must work on bash 3.2+ (no associative arrays, no bash 4+ features). Keep the description header intact — only replace everything after it.
-
-### 3b. First-Officer Agent (Copy if changed)
-
-1. Compare `{project_root}/.claude/agents/first-officer.md` to the template at `{spacedock_plugin_dir}/templates/first-officer.md`.
+1. Compare the local pinned `first-officer` copy at `{project_root}/.claude/agents/{agent}.md` (with `{agent}=first-officer`) to the shipped plugin agent at `{spacedock_plugin_dir}/agents/{agent}.md`.
 
 2. If they match, skip. If they differ, show the captain a diff:
 
@@ -124,7 +107,7 @@ If the user added custom sections to the first-officer (sections not in the stan
 > **Warning:** The existing first-officer has custom sections that aren't in the standard template. These will be lost if you replace it:
 > {list of custom section headings}
 
-### 3c. README (Show Diff)
+### 3b. README (Show Diff)
 
 1. Generate what the current commission template would produce for this workflow, using the extracted values (mission, stages, schema, etc.).
 2. Diff it against the user's current README.
@@ -140,9 +123,9 @@ If the user added custom sections to the first-officer (sections not in the stan
 
 Do NOT auto-modify the README. The captain decides what to adopt.
 
-### 3d. Ensign Agent (Copy if changed)
+### 3c. Ensign Agent (Copy if changed)
 
-1. Compare `{project_root}/.claude/agents/ensign.md` to the template at `{spacedock_plugin_dir}/templates/ensign.md`.
+1. Compare the local pinned `ensign` copy at `{project_root}/.claude/agents/{agent}.md` (with `{agent}=ensign`) to the shipped plugin agent at `{spacedock_plugin_dir}/agents/{agent}.md`.
 
 2. If they match, skip. If they differ, show the captain a diff:
 
@@ -151,17 +134,17 @@ Do NOT auto-modify the README. The captain decides what to adopt.
 >
 > Replace the ensign agent? (y/n)
 
-3. Wait for the captain's confirmation before replacing `{project_root}/.claude/agents/ensign.md`.
+3. Wait for the captain's confirmation before replacing the local pinned ensign copy.
 
-### 3e. Stage Agents (Copy if changed)
+### 3d. Stage Agents (Copy if changed)
 
 Scan the README frontmatter `stages.states` for entries with an `agent:` property. For each referenced agent:
 
-1. Check if the template exists at `{spacedock_plugin_dir}/templates/{agent}.md`. If the template does not exist, warn the captain and skip:
+1. Check if the shipped plugin agent exists at `{spacedock_plugin_dir}/agents/{agent}.md`. If it does not exist, warn the captain and skip:
 
-> **Warning:** Stage '{stage_name}' references agent '{agent}' but no template exists at `templates/{agent}.md`. Skipping — the existing agent file (if any) will not be updated.
+> **Warning:** Stage '{stage_name}' references agent '{agent}' but no shipped plugin agent exists at `agents/{agent}.md`. Skipping — any existing local pinned copy will not be updated.
 
-2. If the template exists, compare `{project_root}/.claude/agents/{agent}.md` to the template. If they match, skip. If they differ, show the captain a diff:
+2. If the shipped plugin agent exists, compare `{project_root}/.claude/agents/{agent}.md` to it. If they match, skip. If they differ, show the captain a diff:
 
 > **{agent} agent changes:**
 > {diff output}
@@ -177,50 +160,11 @@ If the agent file does not currently exist at `{project_root}/.claude/agents/{ag
 >
 > Create the {agent} agent? (y/n)
 
-### 3f. Mods (Version diff)
+### 3e. Plugin-Shipped Runtime Assets
 
-For each mod file in `{dir}/_mods/*.md`:
+The status viewer and mods are plugin-shipped runtime assets. They are not copied into workflows during refit. Report this explicitly to the captain:
 
-1. **Match against canonical** — Check if `{spacedock_plugin_dir}/mods/{name}.md` exists (matching by filename).
-
-2. **If canonical exists** — Compare the `version` frontmatter field in the local file against the canonical file.
-   - If versions match: report "up to date" and skip.
-   - If versions differ: show a diff between the local and canonical files. Ask the captain:
-
-> **Mod update: {name}** (local: {local_version} → canonical: {canonical_version})
-> {diff output}
->
-> Update this mod? (y/n)
-
-3. **If no canonical match** — The mod is custom (user-authored or third-party). Acknowledge neutrally:
-
-> Found custom mod: **{name}** — {description from frontmatter}. No canonical version to compare against. No action needed.
-
-4. **New mods available** — For each canonical mod in `{spacedock_plugin_dir}/mods/*.md` not present in `{dir}/_mods/`, offer to install:
-
-> New mod available: **{name}** — {description from frontmatter}. Install it? (y/n)
-
-   If accepted, copy the canonical file to `{dir}/_mods/{name}.md`. Create `_mods/` if it doesn't exist.
-
-### 3g. Legacy Migration (pr-lieutenant → pr-merge mod)
-
-If `{project_root}/.claude/agents/pr-lieutenant.md` exists and `{dir}/_mods/pr-merge.md` does not, offer migration:
-
-> **Migration: pr-lieutenant → pr-merge mod**
->
-> Your workflow uses a pr-lieutenant agent for PR management. Spacedock now uses mods instead. I'll:
-> 1. Create `{dir}/_mods/pr-merge.md` with the PR management mod
-> 2. Remove `agent: pr-lieutenant` from any README stage entries
-> 3. Regenerate the first-officer with mod discovery
->
-> The pr-lieutenant agent file at `.claude/agents/pr-lieutenant.md` will be left in place. You can delete it manually if no longer needed.
->
-> Proceed? (y/n)
-
-If accepted:
-1. Copy `{spacedock_plugin_dir}/mods/pr-merge.md` to `{dir}/_mods/pr-merge.md`
-2. Edit the README frontmatter: remove `agent: pr-lieutenant` from any stage entries
-3. The first-officer update in step 3b already handles the FO template change
+> Spacedock now uses plugin-shipped runtime assets for workflow status and mods. No workflow-local status script or mod files will be generated or replaced during refit.
 
 ---
 
@@ -270,7 +214,7 @@ Show a summary of what was migrated:
 
 ## Phase 5: Finalize
 
-1. Update version stamps to `{current_version}` in versioned files that were replaced (status script, README).
+1. Update version stamps to `{current_version}` in versioned files that were replaced (README).
 2. For the README (if the captain didn't request changes), update only the version stamp in YAML frontmatter: `commissioned-by: spacedock@{current_version}`.
 3. Show a summary:
 
@@ -278,11 +222,10 @@ Show a summary of what was migrated:
 >
 > | File | Action |
 > |------|--------|
-> | `status` | Replaced |
 > | `first-officer.md` | {Replaced / Already current / Skipped} |
 > | `ensign.md` | {Replaced / Already current / Skipped} |
 > | `{agent}.md` (for each) | {Replaced / Already current / Created / Skipped} |
-> | `_mods/{name}.md` (for each) | {Updated / Already current / Installed / Custom (no action)} |
+> | plugin-shipped runtime assets | Managed by installed Spacedock version |
 > | `README.md` | {Stamp updated / User-reviewed / No changes} |
 >
 > Suggest committing:
@@ -294,7 +237,7 @@ Show a summary of what was migrated:
 
 ## Degraded Mode (No Version Stamp)
 
-When no version stamps are found on the README or status script, the original baseline cannot be determined. Inform the captain and offer two options:
+When no version stamps are found on the README, the original baseline cannot be determined. Inform the captain and offer two options:
 
 > **No version stamps found.** This workflow was commissioned before version stamping was implemented, or the stamps were removed. I can't determine what the original scaffolding looked like.
 >
@@ -310,13 +253,12 @@ When no version stamps are found on the README or status script, the original ba
 Add version stamps to versioned files without modifying anything else:
 
 - **README.md** — Add YAML frontmatter with `commissioned-by: spacedock@{current_version}` (wrap in `---` delimiters if frontmatter doesn't exist).
-- **status** — Insert `# commissioned-by: spacedock@{current_version}` as the second line (after `#!/bin/bash`).
 
 Agent files are static templates and do not carry version stamps. They are updated by comparing to the template content.
 
 ### Option 2: Full Refit with Review
 
-Execute Phase 3, but show a full diff for every file (including status and first-officer) and require the captain's explicit approval before replacing each one. Never auto-replace files without a version stamp — the risk of overwriting customizations is too high.
+Execute Phase 3, but show a full diff for every file (including first-officer) and require the captain's explicit approval before replacing each one. Never auto-replace files without a version stamp — the risk of overwriting customizations is too high.
 
 ---
 

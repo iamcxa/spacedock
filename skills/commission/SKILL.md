@@ -6,7 +6,7 @@ user-invocable: true
 
 # Commission a Plain Text Workflow
 
-You are commissioning a plain text workflow. A plain text workflow is a directory of markdown files with YAML frontmatter, where each file is a work entity that moves through stages. The directory's README is the single source of truth for schema and stages, and a self-describing Python script provides workflow status views.
+You are commissioning a plain text workflow. A plain text workflow is a directory of markdown files with YAML frontmatter, where each file is a work entity that moves through stages. The directory's README is the single source of truth for schema and stages, and the Spacedock plugin provides the plugin-shipped status viewer and plugin-shipped PR merge mod at runtime.
 
 This is a v0 shuttle-mode workflow: an ensign agent handles all stages, with optional mods that inject behavior at lifecycle points (e.g., PR creation at merge time). You will walk {captain} through interactive design, generate all workflow files, then launch a pilot run.
 
@@ -303,7 +303,7 @@ pr:
 View the workflow overview:
 
 ```bash
-{dir}/status
+python3 {spacedock_plugin_dir}/skills/commission/bin/status --workflow-dir {dir}
 ```
 
 Output columns: ID, SLUG, STATUS, TITLE, SCORE, SOURCE.
@@ -311,13 +311,13 @@ Output columns: ID, SLUG, STATUS, TITLE, SCORE, SOURCE.
 Include archived {entity_label_plural} with `--archived`:
 
 ```bash
-{dir}/status --archived
+python3 {spacedock_plugin_dir}/skills/commission/bin/status --workflow-dir {dir} --archived
 ```
 
 Find dispatchable {entity_label_plural} ready for their next stage:
 
 ```bash
-{dir}/status --next
+python3 {spacedock_plugin_dir}/skills/commission/bin/status --workflow-dir {dir} --next
 ```
 
 Find {entity_label_plural} in a specific stage:
@@ -352,19 +352,7 @@ Description of this {entity_label} and what it aims to achieve.
 - Commit {entity_label} body updates when substantive
 ````
 
-### 2b. Generate `{dir}/status`
-
-Generate the status script from the reference template at `templates/status` (relative to the Spacedock plugin directory).
-
-1. Read the template file.
-2. Fill in the variable fields:
-   - `{spacedock_version}` — from plugin.json
-   - `{entity_label}` — from the design phase
-   - `{stage1}, {stage2}, ..., {last_stage}` — the workflow's stage names in order
-3. Write the result to `{dir}/status`.
-4. Make it executable: `chmod +x {dir}/status`.
-
-### 2c. Generate Seed Entities
+### 2b. Generate Seed Entities
 
 For each seed entity, create `{dir}/{slug}.md` where `{slug}` is the title converted to lowercase with spaces replaced by hyphens, non-alphanumeric characters (except hyphens) removed.
 
@@ -390,60 +378,16 @@ pr:
 {Description/thesis from {captain}'s seed input.}
 ```
 
-### 2d. Generate First-Officer Agent
-
-Copy the first-officer agent template to `{project_root}/.claude/agents/first-officer.md`.
-
-**IMPORTANT: Use Bash to write this file, NOT the Write tool.** The Write tool is often blocked for `.claude/` paths.
-
-The template is static — no substitution needed. Copy it verbatim.
-
-```bash
-mkdir -p {project_root}/.claude/agents
-cp "{spacedock_plugin_dir}/templates/first-officer.md" {project_root}/.claude/agents/first-officer.md
-```
-
-### 2e. Generate Ensign Agent
-
-Copy the ensign agent template to `{project_root}/.claude/agents/ensign.md`.
-
-**IMPORTANT: Use Bash to write this file, NOT the Write tool.** The Write tool is often blocked for `.claude/` paths.
-
-The template is static — no substitution needed. Copy it verbatim.
-
-```bash
-cp "{spacedock_plugin_dir}/templates/ensign.md" {project_root}/.claude/agents/ensign.md
-```
-
-### 2f. Install Mods (conditional)
-
-Check the README frontmatter for any stages with `worktree: true`. If at least one stage uses a worktree, offer the pr-merge mod:
-
-> This workflow has worktree stages. Install the **pr-merge** mod? (Pushes branches and creates GitHub PRs for completed entities.)
->
-> (y/n, default: y)
-
-In batch mode, install pr-merge by default for workflows with worktree stages. If the user explicitly says "no mods" or "no pr-merge", skip.
-
-If installing, copy the mod:
-
-```bash
-mkdir -p {dir}/_mods
-cp "{spacedock_plugin_dir}/mods/pr-merge.md" {dir}/_mods/pr-merge.md
-```
-
-If no stage uses a worktree, skip this step entirely — do not offer pr-merge.
-
 ### Generation Checklist
 
 After generating all files, verify before proceeding:
 
 - [ ] `{dir}/README.md` exists with mission, schema, all stage definitions, and {entity_label} template
-- [ ] `{dir}/status` exists and is executable
 - [ ] Each seed entity file exists at `{dir}/{slug}.md` with valid YAML frontmatter
-- [ ] `{project_root}/.claude/agents/first-officer.md` exists with all sections
-- [ ] `{project_root}/.claude/agents/ensign.md` exists with all sections
-- [ ] `{dir}/_mods/pr-merge.md` exists (only if a worktree stage exists and pr-merge was accepted)
+- [ ] The plugin-shipped first officer is available at `agents/first-officer.md`
+- [ ] The plugin-shipped ensign is available at `agents/ensign.md`
+- [ ] The plugin-shipped status viewer is available at `skills/commission/bin/status`
+- [ ] The plugin-shipped PR merge mod is available at `mods/pr-merge.md`
 - [ ] `.worktrees/` is in `{project_root}/.gitignore`
 
 ### Agent Warnings
@@ -467,16 +411,16 @@ Tell {captain} what was generated:
 > Workflow generated! Here's what I created:
 >
 > - `{dir}/README.md` — workflow schema and stage definitions
-> - `{dir}/status` — workflow status viewer
 > - {for each seed entity: "`{dir}/{slug}.md` — {title}"}
-> - `{project_root}/.claude/agents/first-officer.md` — workflow orchestrator
-> - `{project_root}/.claude/agents/ensign.md` — stage worker agent
-> - {if pr-merge mod was installed: "`{dir}/_mods/pr-merge.md` — PR merge mod"}
+> - `agents/first-officer.md` — plugin-shipped workflow orchestrator
+> - `agents/ensign.md` — plugin-shipped stage worker agent
+> - `skills/commission/bin/status` — plugin-shipped status viewer
+> - `mods/pr-merge.md` — plugin-shipped PR merge mod
 >
 > To run this workflow in future sessions, start Claude Code with:
 >
 > ```
-> claude --agent first-officer
+> claude --agent spacedock:first-officer
 > ```
 >
 > Starting the initial run now...
@@ -485,8 +429,8 @@ Tell {captain} what was generated:
 
 Do not spawn a subagent. Instead, the commission skill itself takes on the first-officer role for the initial run:
 
-1. Read the generated first-officer agent file at `{project_root}/.claude/agents/first-officer.md`.
-2. Follow its instructions: read the workflow README, run the status script, and dispatch agents for entities ready to advance.
+1. Read the plugin-shipped first-officer agent file at `{spacedock_plugin_dir}/agents/first-officer.md`.
+2. Follow its instructions: read the workflow README, run the plugin-shipped status viewer, and dispatch agents for entities ready to advance.
 
 Execute the first-officer startup procedure directly. You are now the first officer for the remainder of this session.
 
@@ -503,7 +447,7 @@ Process entities following the first-officer event loop. When the workflow reach
 If the pilot run fails (agent errors, YAML gets mangled, dispatch issues):
 
 - Report exactly what happened, including any error messages
-- Show the current state of the workflow (`{dir}/status`)
+- Show the current state of the workflow with `python3 {spacedock_plugin_dir}/skills/commission/bin/status --workflow-dir {dir}`
 - Do not retry automatically — let {captain} decide next steps
 
 This is v0. Either it works or we learn why it didn't.
@@ -515,7 +459,7 @@ After Step 3 or Step 4 (whether the pilot run succeeded or failed), always concl
 > **What's next?** To continue working this workflow in a future session, start Claude Code with:
 >
 > ```
-> claude --agent first-officer
+> claude --agent spacedock:first-officer
 > ```
 >
 > The first officer will read the workflow state, pick up where things left off, and dispatch agents for any entities ready for their next stage.
