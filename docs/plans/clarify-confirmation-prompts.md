@@ -49,3 +49,11 @@ The other 7 confirmation prompts in refit are fine — they all name the action 
 2. No collateral damage — other confirmation prompts unchanged — DONE. The diff (commit 7f969e5) shows exactly 3 single-line changes across 2 files. The 5 OK prompts identified in ideation are untouched: `Update this mod? (y/n)` (refit:125), `Install it? (y/n)` (refit:133), `Apply this migration? (y/n)` (refit:189), `confirm or describe changes` (commission:95), `(y/n, default: y)` for pr-merge (commission:379).
 3. Context check — surrounding lines of each edit are coherent — DONE. Each replacement fits naturally in its blockquote context and the subsequent instructions (wait for confirmation, handle acceptance) remain consistent with the new prompt wording.
 4. Recommendation — PASSED. All acceptance criteria met. The three ambiguous prompts have been replaced with clear, action-specific alternatives. No unintended side effects.
+
+### Round 2: Commission summary template rewrite
+
+1. Commission summary template rewritten — conversational tone, no schema-speak — DONE. Replaced the field-list template (lines 128–141) with natural prose: captain intro, stage walkthrough, rejection flow, custom fields, pilot run items, file location.
+2. Old field names removed — no "Entity:", "Item label:", "Seed entities:", "Address:", "Approval gates:" in the template — DONE. Grep confirms zero matches for these field names in SKILL.md.
+3. New wording matches target — captain intro, natural stage intro, pilot run, file location sentence — DONE. Template opens with `I'll call you {captain}`, describes stages with lettered list, uses "Our pilot run will be with:", and closes with `All files will be created in {dir} for you to review.`
+4. Consistency check — no stale references to old field names elsewhere in SKILL.md — DONE. Searched for "Seed entities", "Item label", "Approval gates:", and "Address:" across the full file — no matches outside the replaced block.
+5. Changes committed on ensign/clarify-confirmation-prompts branch — DONE. Commit 5569381.
