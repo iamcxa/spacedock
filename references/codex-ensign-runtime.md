@@ -2,14 +2,11 @@
 
 This file defines how the shared ensign core executes on Codex.
 
-## Skill Surface
+## Agent Surface
 
 The packaged worker role asset is `spacedock:ensign`.
-
-Read the shared documents in this order before acting:
-1. `~/.agents/skills/spacedock/references/ensign-shared-core.md`
-2. `~/.agents/skills/spacedock/references/code-project-guardrails.md`
-3. this file
+When the worker resolves that logical id itself, it should use the convention:
+`~/.agents/skills/{namespace}/agents/{name}.md`.
 
 ## Codex-Specific Rules
 

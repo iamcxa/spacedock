@@ -44,24 +44,46 @@ def main():
     print()
     print("--- Phase 2: Run Codex first officer ---")
 
-    fo_exit = run_codex_first_officer(t, "packaged-agent-pipeline")
-    t.check("Codex launcher returned an exit code", fo_exit is not None)
+    fo_exit = run_codex_first_officer(
+        t,
+        "packaged-agent-pipeline",
+        run_goal=(
+            "Process only the entity `buggy-add-task`. "
+            "Dispatch the validation stage, wait for the validation worker to finish, "
+            "then summarize the outcome and stop. "
+            "Do not begin any follow-up dispatch after the validation result. "
+            "When you dispatch the worker, use the exact Codex pattern "
+            "`spawn_agent(agent_type=\"worker\", fork_context=false, message=<fully self-contained prompt>)` "
+            "followed by `wait_agent(...)`."
+        ),
+    )
+    t.check("Codex launcher exited cleanly", fo_exit == 0)
 
     print()
     print("--- Phase 3: Validate explicit packaged-agent path ---")
 
     log = CodexLogParser(t.log_dir / "codex-fo-log.txt")
     fo_text = log.full_text()
+    worker_messages = log.completed_agent_messages()
     invocation_text = (t.log_dir / "codex-fo-invocation.txt").read_text()
     t.check("harness invoked the spacedock first officer skill", "spacedock:first-officer" in invocation_text)
     t.check("FO or worker output mentions spacedock packaged id", bool(re.search(r"spacedock:ensign", fo_text)))
-    t.check("FO or worker output mentions the ensign skill asset", "ensign/SKILL.md" in fo_text)
+    t.check(
+        "FO or worker output mentions packaged agent resolution",
+        "spacedock:ensign" in fo_text and (
+            "~/.agents/skills/{namespace}/agents/{name}.md" in fo_text
+            or "role_asset_name: ensign" in fo_text
+            or "ensign.md" in fo_text
+        ),
+    )
     t.check("FO spawned a worker for the packaged agent path", log.spawn_count() >= 1)
+    t.check("worker completed and returned a result", len(worker_messages) >= 1)
 
-    worktrees_dir = t.test_project_dir / ".worktrees"
-    worktree_names = [wt.name for wt in worktrees_dir.iterdir()] if worktrees_dir.is_dir() else []
-    t.check("safe packaged worker key appears in worktree names", any("spacedock-ensign" in name for name in worktree_names))
-    t.check("raw packaged worker id does not leak into worktree names", not any("spacedock:ensign" in name for name in worktree_names))
+    entity_text = (workflow_dir / "buggy-add-task.md").read_text()
+    worktree_match = re.search(r"^worktree:\s*(.+)$", entity_text, re.MULTILINE)
+    worktree_value = worktree_match.group(1).strip() if worktree_match else ""
+    t.check("safe packaged worker key appears in worktree path", "spacedock-ensign" in worktree_value)
+    t.check("raw packaged worker id does not leak into worktree path", "spacedock:ensign" not in worktree_value)
 
     branches = subprocess.run(
         ["git", "branch", "--list"],
@@ -70,8 +92,8 @@ def main():
         cwd=t.test_project_dir,
         check=True,
     ).stdout
-    t.check("safe packaged worker key appears in branch names", "spacedock-ensign/" in branches)
-    t.check("raw packaged worker id does not leak into branch names", "spacedock:ensign/" not in branches)
+    t.check("safe packaged worker key appears in branch names", "spacedock-ensign-" in branches)
+    t.check("raw packaged worker id does not leak into branch names", "spacedock:ensign" not in branches)
 
     t.results()
 

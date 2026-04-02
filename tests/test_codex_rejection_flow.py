@@ -51,19 +51,33 @@ def main():
     print()
     print("--- Phase 2: Run Codex first officer ---")
 
-    fo_exit = run_codex_first_officer(t, "rejection-pipeline")
-    t.check("Codex launcher returned an exit code", fo_exit is not None)
+    fo_exit = run_codex_first_officer(
+        t,
+        "rejection-pipeline",
+        run_goal=(
+            "Process only the entity `buggy-add-task`. "
+            "Drive the workflow until validation finishes and you can report the rejection verdict "
+            "and the follow-up target. Then stop immediately. "
+            "Do not start a second repair cycle after reporting that first rejection outcome. "
+            "When you dispatch workers, use the exact Codex pattern "
+            "`spawn_agent(agent_type=\"worker\", fork_context=false, message=<fully self-contained prompt>)` "
+            "followed by `wait_agent(...)`."
+        ),
+        timeout_s=240,
+    )
+    t.check("Codex launcher exited cleanly", fo_exit == 0)
 
     print()
     print("--- Phase 3: Validate ---")
 
     log = CodexLogParser(t.log_dir / "codex-fo-log.txt")
     fo_text = log.full_text()
+    worker_messages = "\n".join(log.completed_agent_messages())
 
     entity_main = t.test_project_dir / "rejection-pipeline" / "buggy-add-task.md"
-    worktrees_dir = t.test_project_dir / ".worktrees"
+    worktrees_dir = t.test_project_dir / ".spacedock" / "worktrees"
 
-    found_rejected = bool(re.search(r"REJECTED|recommend reject|failing test|Expected 5, got -1", fo_text, re.IGNORECASE))
+    found_rejected = bool(re.search(r"REJECTED|recommend reject|failing test|Expected 5, got -1", worker_messages, re.IGNORECASE))
     if entity_main.is_file() and re.search(r"REJECTED", entity_main.read_text(), re.IGNORECASE):
         found_rejected = True
 
@@ -74,14 +88,17 @@ def main():
                 found_rejected = True
 
     t.check("validation surfaced a rejection signal", found_rejected)
+    t.check("at least one worker completed", bool(worker_messages.strip()))
 
     spawn_count = log.spawn_count()
     t.check(
         "multiple worker dispatches occurred",
-        spawn_count >= 2 or bool(re.search(r"validation|implementation", fo_text, re.IGNORECASE)),
+        spawn_count >= 2 or bool(re.search(r"validation|implementation", worker_messages, re.IGNORECASE)),
     )
 
     follow_up_observed = False
+    if re.search(r"feedback-to|follow-up|fix|rework|implementation", worker_messages, re.IGNORECASE):
+        follow_up_observed = True
     if re.search(r"feedback-to|follow-up|fix|rework|implementation", fo_text, re.IGNORECASE):
         follow_up_observed = True
 
@@ -95,19 +112,11 @@ def main():
 
     t.check("follow-up work after rejection was observable", follow_up_observed)
 
-    if worktrees_dir.is_dir():
-        worktree_names = [wt.name for wt in worktrees_dir.iterdir()]
-    else:
-        worktree_names = []
-
-    t.check(
-        "packaged worker uses safe worktree key",
-        any("spacedock-ensign" in name for name in worktree_names),
-    )
-    t.check(
-        "logical packaged id does not leak into worktree names",
-        not any("spacedock:ensign" in name for name in worktree_names),
-    )
+    main_entity_text = entity_main.read_text() if entity_main.is_file() else ""
+    worktree_match = re.search(r"^worktree:\s*(.+)$", main_entity_text, re.MULTILINE)
+    worktree_value = worktree_match.group(1).strip() if worktree_match else ""
+    t.check("packaged worker uses safe worktree key", "spacedock-ensign" in worktree_value)
+    t.check("logical packaged id does not leak into worktree path", "spacedock:ensign" not in worktree_value)
 
     t.results()
 

@@ -44,9 +44,13 @@ def main():
     fo_exit = run_codex_first_officer(
         t,
         "gated-pipeline",
+        run_goal=(
+            "Process only the entity `gate-test-entity`. "
+            "Stop immediately after you present the gate review and waiting-for-approval result."
+        ),
     )
 
-    t.check("Codex launcher returned an exit code", fo_exit is not None)
+    t.check("Codex launcher exited cleanly", fo_exit == 0)
 
     print()
     print("--- Phase 3: Validate ---")
@@ -72,7 +76,7 @@ def main():
     else:
         t.pass_("entity was NOT archived (gate held)")
 
-    worktrees_dir = t.test_project_dir / ".worktrees"
+    worktrees_dir = t.test_project_dir / ".spacedock" / "worktrees"
     t.check("Codex run created a worktree or reported no worktree output", worktrees_dir.exists() or bool(fo_text_output))
 
     t.check(

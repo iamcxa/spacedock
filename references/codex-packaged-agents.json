@@ -1,7 +1,0 @@
-{
-  "spacedock:ensign": {
-    "asset_kind": "skill",
-    "asset_path": "skills/ensign/SKILL.md",
-    "worker_key": "spacedock-ensign"
-  }
-}

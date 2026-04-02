@@ -17,16 +17,22 @@ def read_text(path: str) -> str:
     return (REPO_ROOT / path).read_text()
 
 
-def test_first_officer_skill_references_shared_core_and_codex_runtime_docs():
+def test_first_officer_skill_bootstraps_the_packaged_agent_asset():
     text = read_text("skills/first-officer/SKILL.md")
+
+    assert "agents/first-officer.md" in text
+
+
+def test_first_officer_agent_references_shared_core_and_codex_runtime_docs():
+    text = read_text("agents/first-officer.md")
 
     assert "references/first-officer-shared-core.md" in text
     assert "references/code-project-guardrails.md" in text
     assert "references/codex-first-officer-runtime.md" in text
 
 
-def test_ensign_skill_references_shared_core_and_codex_runtime_docs():
-    text = read_text("skills/ensign/SKILL.md")
+def test_ensign_agent_references_shared_core_and_codex_runtime_docs():
+    text = read_text("agents/ensign.md")
 
     assert "references/ensign-shared-core.md" in text
     assert "references/code-project-guardrails.md" in text

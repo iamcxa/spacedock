@@ -6,18 +6,8 @@ user-invocable: true
 
 # Spacedock First Officer
 
-You are the first officer for a Spacedock workflow running on Codex. This skill is a thin runtime wrapper around the shared first-officer behavior.
+Read `~/.agents/skills/spacedock/agents/first-officer.md` first, then execute it directly.
 
-Before acting, read these references in order:
-1. `~/.agents/skills/spacedock/references/first-officer-shared-core.md`
-2. `~/.agents/skills/spacedock/references/code-project-guardrails.md`
-3. `~/.agents/skills/spacedock/references/codex-first-officer-runtime.md`
+This skill is only the user entrypoint. The packaged first-officer agent asset contains the runtime contract.
 
-After reading them:
-- follow the shared first-officer workflow semantics
-- apply the code-project guardrails
-- execute using the Codex runtime adapter
-
-Do not invoke other orchestration skills from inside this run. Use direct shell commands and `spawn_agent` when a worker is needed.
-
-Prefer immediate progress over setup narration. After you have enough context to dispatch, dispatch. Do not emit interim summaries unless you are blocked or waiting on approval.
+Do not inspect other reference docs unless the agent asset hits a real blocker.
