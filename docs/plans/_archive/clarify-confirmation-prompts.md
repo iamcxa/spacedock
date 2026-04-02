@@ -1,15 +1,15 @@
 ---
 id: 082
 title: Clarify ambiguous confirmation prompts in commission and refit skills
-status: backlog
+status: done
 source: code audit
-started:
-completed:
-verdict:
+started: 2026-04-02T19:15:00Z
+completed: 2026-04-02T20:45:00Z
+verdict: PASSED
 score: 0.3
 worktree:
 issue: "#25"
-pr:
+pr: "#27"
 ---
 
 The commission skill's design confirmation prompt is confusing:
