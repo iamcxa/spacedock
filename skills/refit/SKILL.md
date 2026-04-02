@@ -6,7 +6,7 @@ user-invocable: true
 
 # Refit a Workflow
 
-You are refitting (upgrading) an existing workflow to match the current Spacedock version. This covers scaffolding files (status script, README, mods) and, when schema changes require it, migrating entity frontmatter data. Agent files are shipped with the Spacedock plugin and do not need local updates.
+You are refitting (upgrading) an existing workflow to match the current Spacedock version. This covers scaffolding files (README, mods) and, when schema changes require it, migrating entity frontmatter data. Agent files and the status viewer are shipped with the Spacedock plugin and do not need local updates.
 
 Follow these five phases in order. Do not skip or combine phases.
 
@@ -27,8 +27,8 @@ Store the confirmed path as `{dir}`. Resolve it to an absolute path. Also derive
 Read each scaffolding file and extract its version stamp:
 
 1. **README** — Read `{dir}/README.md`. Extract version from YAML frontmatter `commissioned-by: spacedock@X.Y.Z`. Store as `{readme_version}`.
-2. **Status script** — Read `{dir}/status`. Extract version from `# commissioned-by: spacedock@X.Y.Z`. Store as `{status_version}`.
-3. **Mod files** — Scan `{dir}/_mods/*.md` for installed mods. For each, read the `version` frontmatter field. Match against canonical mods at `{spacedock_plugin_dir}/mods/{name}.md` by filename. Store the local version and canonical version for each. Also scan `{spacedock_plugin_dir}/mods/*.md` for mods not yet installed.
+2. **Mod files** — Scan `{dir}/_mods/*.md` for installed mods. For each, read the `version` frontmatter field. Match against canonical mods at `{spacedock_plugin_dir}/mods/{name}.md` by filename. Store the local version and canonical version for each. Also scan `{spacedock_plugin_dir}/mods/*.md` for mods not yet installed.
+3. **Legacy status script** — If `{dir}/status` exists, note it for cleanup (status now ships with the plugin).
 
 If a file doesn't exist, note it as missing and skip it.
 
@@ -39,7 +39,7 @@ Read `.claude-plugin/plugin.json` from the Spacedock plugin directory (the direc
 ### Step 4 — Evaluate
 
 - If all version stamps match `{current_version}`: report "Workflow is already up to date." and stop.
-- If no stamps were found on any versioned file (README, status): enter **Degraded Mode** (see below).
+- If no stamps were found on any versioned file (README): enter **Degraded Mode** (see below).
 - Otherwise: proceed to Phase 2 with the list of outdated files.
 
 ---
@@ -50,9 +50,9 @@ Each scaffolding file gets a specific upgrade strategy based on how safe it is t
 
 | File | Strategy | Rationale |
 |------|----------|-----------|
-| `status` | **Replace** | Mechanical script. Workflow-specific content (stage names) is extracted from the README. Users rarely customize beyond what's generated. |
 | `README.md` | **Show diff** | Users customize stages, schema fields, quality criteria. Too risky to auto-replace. Show what the current template would produce and let the captain decide. |
 | `_mods/{name}.md` | **Version diff** | Compare `version` frontmatter against canonical. Show diff if changed, ask for confirmation. |
+| `status` (legacy) | **Remove** | Status viewer now ships with the plugin. Remove the workflow-local copy if present. |
 
 Present the classification to the captain:
 
@@ -86,18 +86,12 @@ Before generating any files, read `{dir}/README.md` and extract:
 3. **Schema fields** — from the `## Schema` section's YAML block.
 4. **Entity description** — from the first paragraph after the H1.
 
-### 3a. Status Script (Replace + Materialize)
+### 3a. Legacy Status Script (Remove)
 
-Generate the status script from the reference template at `templates/status` (relative to the Spacedock plugin directory).
+If `{dir}/status` exists, it's a legacy workflow-local status script. The status viewer now ships with the Spacedock plugin at `skills/commission/bin/status`.
 
-1. Read the template file.
-2. Fill in the two variable fields:
-   - `{current_version}` — the target Spacedock version
-   - `{stage1}, {stage2}, ..., {last_stage}` — the workflow's stage names in order (extracted from README)
-3. Show the captain the diff between the old status script's description header and the new one. (Only the header matters — the implementation will be regenerated regardless.)
-4. Replace `{dir}/status` with the filled-in template.
-5. Preserve the executable bit (`chmod +x`).
-6. **Materialize** — read back the description header and replace the stub body with a working bash implementation that satisfies the description. The implementation must work on bash 3.2+ (no associative arrays, no bash 4+ features). Keep the description header intact — only replace everything after it.
+1. Inform the captain: "The status viewer is now plugin-shipped. Removing the workflow-local `{dir}/status` script."
+2. `git rm {dir}/status`
 
 ### 3b. README (Show Diff)
 
@@ -207,15 +201,14 @@ Show a summary of what was migrated:
 
 ## Phase 5: Finalize
 
-1. Update version stamps to `{current_version}` in versioned files that were replaced (status script, README).
-2. For the README (if the captain didn't request changes), update only the version stamp in YAML frontmatter: `commissioned-by: spacedock@{current_version}`.
-3. Show a summary:
+1. Update version stamp to `{current_version}` in the README YAML frontmatter: `commissioned-by: spacedock@{current_version}`.
+2. Show a summary:
 
 > **Refit complete:**
 >
 > | File | Action |
 > |------|--------|
-> | `status` | Replaced |
+> | `status` | {Removed (legacy) / Not present} |
 > | `_mods/{name}.md` (for each) | {Updated / Already current / Installed / Custom (no action)} |
 > | `README.md` | {Stamp updated / User-reviewed / No changes} |
 >
@@ -228,7 +221,7 @@ Show a summary of what was migrated:
 
 ## Degraded Mode (No Version Stamp)
 
-When no version stamps are found on the README or status script, the original baseline cannot be determined. Inform the captain and offer two options:
+When no version stamps are found on the README, the original baseline cannot be determined. Inform the captain and offer two options:
 
 > **No version stamps found.** This workflow was commissioned before version stamping was implemented, or the stamps were removed. I can't determine what the original scaffolding looked like.
 >

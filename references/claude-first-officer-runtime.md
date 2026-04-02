@@ -81,7 +81,7 @@ In teams mode, the fix agent and reviewer can interact via messaging. Keep the r
 
 After each agent completion:
 
-1. **Check PR-pending entities** — Run `{workflow_dir}/status --where "pr !="`. For each, check PR state via `gh pr view`. Advance merged PRs.
+1. **Check PR-pending entities** — Run `status --where "pr !="`. For each, check PR state via `gh pr view`. Advance merged PRs.
 2. **Run `status --next`** — Dispatch any newly ready entities.
 3. **If nothing is dispatchable** — Fire `idle` hooks (from registered mods), then re-run `status --next`. If entities became dispatchable (e.g., a hook advanced an entity), dispatch them. If still nothing, the event loop iteration ends.
 

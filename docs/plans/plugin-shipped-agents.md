@@ -1,7 +1,7 @@
 ---
 id: 076
 title: Ship agents with plugin and add eject skill for local pinning
-status: implementation
+status: validation
 source: CL — architectural discussion 2026-03-29
 started: 2026-03-29T21:30:00Z
 completed:
@@ -10,22 +10,33 @@ score: 0.85
 worktree: .worktrees/ensign-plugin-shipped-agents
 ---
 
-Ship first-officer and ensign as plugin-level agents (`spacedock:first-officer`, `spacedock:ensign`) instead of generating them per-project via commission. Add an eject/pin skill for users who want version stability.
+Ship runtime assets (agents, status viewer, mods) with the Spacedock plugin instead of generating or copying them per-project. Commissioned workflows become data-only directories (README, entities).
 
 ## Context
 
 - Task 063 made agents fully static (zero template variables, runtime workflow discovery)
 - `claude --agent spacedock:first-officer` works — confirmed with `superpowers:code-reviewer` pattern
 - Commission currently copies templates to `.claude/agents/` — unnecessary since agents are workflow-agnostic
-- Refit exists solely to update stale local agent copies
+- Commission currently generates `{dir}/status` per workflow — unnecessary since it's a mechanical script parameterized only by stage names
+- Refit exists solely to update stale local agent/status copies
 
 ## Design
 
-**Default (plugin-shipped):**
-- `spacedock:first-officer` and `spacedock:ensign` available from the plugin
-- Commission generates only workflow files: README, status script, entities, _mods/
-- No agents copied to `.claude/agents/`
-- Plugin updates deliver agent improvements to all projects automatically
+**Desired end state — commissioned workflows are data-only:**
+- `spacedock:first-officer` and `spacedock:ensign` available from the plugin via `agents/`
+- Status viewer ships at `skills/commission/bin/status` with `--workflow-dir` mode
+- Mods ship at `mods/` in the plugin root
+- Commission generates ONLY: README, seed entities
+- No agents, status scripts, or mods copied into the workflow directory
+- Plugin updates deliver improvements to all projects automatically
+- FO resolves status viewer and mods from the plugin directory at runtime
+
+**Current implementation scope (076):**
+- ✅ Agents: layered architecture (shared core + runtime adapters + thin wrappers) shipped via `agents/`
+- ✅ Status viewer: ships at `skills/commission/bin/status` — commission stops generating per-workflow `{dir}/status`
+- ✅ FO: resolves status from plugin path, resolves mods from `{workflow_dir}/_mods/` (mods migration deferred)
+- ⏳ Mods: still copied per-workflow (migration to plugin-resolved mods is a follow-up)
+- ⏳ Eject skill: descoped to separate task
 
 **Eject/pin skill (`/spacedock eject`):**
 - Copies current plugin agents to `.claude/agents/first-officer.md` and `ensign.md`
