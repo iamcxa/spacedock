@@ -8,6 +8,7 @@ completed:
 verdict:
 score: 0.85
 worktree: .worktrees/ensign-plugin-shipped-agents
+pr: "#26"
 ---
 
 Ship runtime assets (agents, status viewer, mods) with the Spacedock plugin instead of generating or copying them per-project. Commissioned workflows become data-only directories (README, entities).
