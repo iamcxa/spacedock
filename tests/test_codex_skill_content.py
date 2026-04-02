@@ -80,5 +80,13 @@ def test_code_project_guardrails_cover_worktrees_and_scaffolding():
     assert "scaffolding" in text.lower()
 
 
+def test_codex_runtime_docs_cover_merge_hook_finalize_path():
+    text = read_text("references/codex-first-officer-runtime.md")
+
+    assert "codex_finalize_terminal_entity.py" in text
+    assert "merge hooks" in text.lower()
+    assert "archive" in text.lower()
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
