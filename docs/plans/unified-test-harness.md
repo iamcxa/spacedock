@@ -1,7 +1,7 @@
 ---
 id: "084"
 title: Unify test harness across Claude Code and Codex runtimes
-status: ideation
+status: validation
 source: CL — 076 validation findings
 started: 2026-04-02T16:35:40Z
 completed:
