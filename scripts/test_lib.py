@@ -87,6 +87,7 @@ def resolve_codex_worker(agent_id: str, repo_root: Path | None = None) -> dict[s
 
 def build_codex_first_officer_invocation_prompt(
     workflow_dir: str | Path,
+    agent_id: str = "spacedock:first-officer",
     run_goal: str | None = None,
 ) -> str:
     workflow_dir = Path(workflow_dir)
@@ -95,11 +96,11 @@ def build_codex_first_officer_invocation_prompt(
         extra_goal = f"\n{run_goal.strip()}\n"
     return textwrap.dedent(
         f"""
-        Use the `spacedock:first-officer` skill to manage the workflow at `{workflow_dir}`.
+        Use the `{agent_id}` skill to manage the workflow at `{workflow_dir}`.
 
         Treat that path as the explicit workflow target. Do not ask to discover alternatives.
         Stay tightly bounded to the requested goal.
-        Let the skill bootstrap the packaged first-officer agent asset and follow that agent directly.
+        Let the skill bootstrap the packaged workflow agent asset and follow that agent directly.
         For bounded single-entity dispatches, prefer the helper at `~/.agents/skills/spacedock/scripts/codex_prepare_dispatch.py`
         instead of manually editing frontmatter, composing worktree names, or building the worker assignment by hand.
         For bounded terminal-completion runs, prefer the helper at `~/.agents/skills/spacedock/scripts/codex_finalize_terminal_entity.py`
@@ -376,15 +377,16 @@ def run_commission(
 def run_first_officer(
     runner: TestRunner,
     prompt: str,
+    agent_id: str = "spacedock:first-officer",
     extra_args: list[str] | None = None,
     log_name: str = "fo-log.jsonl",
 ) -> int:
-    """Run claude -p --plugin-dir ... --agent spacedock:first-officer. Returns exit code."""
+    """Run claude -p --plugin-dir ... --agent <agent_id>. Returns exit code."""
     log_path = runner.log_dir / log_name
     cmd = [
         "claude", "-p", prompt,
         "--plugin-dir", str(runner.repo_root),
-        "--agent", "spacedock:first-officer",
+        "--agent", agent_id,
         "--permission-mode", "bypassPermissions",
         "--verbose",
         "--output-format", "stream-json",
@@ -415,6 +417,7 @@ def run_first_officer(
 def run_codex_first_officer(
     runner: TestRunner,
     workflow_dir: str,
+    agent_id: str = "spacedock:first-officer",
     run_goal: str | None = None,
     extra_args: list[str] | None = None,
     log_name: str = "codex-fo-log.txt",
@@ -423,7 +426,7 @@ def run_codex_first_officer(
     """Run the Codex first-officer skill via codex exec. Returns exit code."""
     log_path = runner.log_dir / log_name
     workflow_path = (runner.test_project_dir / workflow_dir).resolve()
-    prompt = build_codex_first_officer_invocation_prompt(workflow_path, run_goal=run_goal)
+    prompt = build_codex_first_officer_invocation_prompt(workflow_path, agent_id=agent_id, run_goal=run_goal)
     (runner.log_dir / "codex-fo-invocation.txt").write_text(prompt + "\n")
 
     skill_home = prepare_codex_skill_home(runner.test_dir, runner.repo_root)
