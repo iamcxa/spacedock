@@ -42,3 +42,10 @@ The other 7 confirmation prompts in refit are fine — they all name the action 
 3. Refit SKILL.md line 150 updated — DONE. Replaced generic `> Proceed? (y/n)` with `> Proceed with pr-lieutenant migration? (y/n)`
 4. Grep verification passes — DONE. All old strings absent, all new strings present (6/6 assertions passed).
 5. Changes committed on ensign/clarify-confirmation-prompts branch — DONE. Commit 7f969e5.
+
+## Stage Report: validation
+
+1. Grep assertions — all 6 pass — DONE. Old strings `y/n/changes`, bare `> Proceed?`, and `> Proceed? (y/n)` are absent from their respective files. New strings `Accept this design, or tell me what to change.`, `Proceed with this upgrade plan? (y/n)`, and `Proceed with pr-lieutenant migration? (y/n)` are present.
+2. No collateral damage — other confirmation prompts unchanged — DONE. The diff (commit 7f969e5) shows exactly 3 single-line changes across 2 files. The 5 OK prompts identified in ideation are untouched: `Update this mod? (y/n)` (refit:125), `Install it? (y/n)` (refit:133), `Apply this migration? (y/n)` (refit:189), `confirm or describe changes` (commission:95), `(y/n, default: y)` for pr-merge (commission:379).
+3. Context check — surrounding lines of each edit are coherent — DONE. Each replacement fits naturally in its blockquote context and the subsequent instructions (wait for confirmation, handle acceptance) remain consistent with the new prompt wording.
+4. Recommendation — PASSED. All acceptance criteria met. The three ambiguous prompts have been replaced with clear, action-specific alternatives. No unintended side effects.
