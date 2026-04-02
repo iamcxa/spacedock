@@ -70,7 +70,7 @@ def main():
 
     fo_exit = run_first_officer(
         t,
-        "Process all tasks through the workflow. When you encounter a gate review where the reviewer recommends REJECTED, approve the REJECTED verdict so the rejection flow proceeds.",
+        "Process all tasks through the workflow at rejection-pipeline/. When you encounter a gate review where the reviewer recommends REJECTED, approve the REJECTED verdict so the rejection flow proceeds.",
         extra_args=["--model", args.model, "--effort", args.effort, "--max-budget-usd", "5.00"],
     )
 

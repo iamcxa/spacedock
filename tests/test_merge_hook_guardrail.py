@@ -58,7 +58,7 @@ def main():
     with_hook_project = t.test_project_dir
     run_first_officer(
         t,
-        "Process all tasks through the workflow to completion.",
+        "Process all tasks through the workflow at merge-hook-pipeline/ to completion.",
         extra_args=["--model", args.model, "--effort", args.effort, "--max-budget-usd", "2.00"],
     )
 
@@ -129,7 +129,7 @@ def main():
     nomods_log = "fo-nomods-log.jsonl"
     run_first_officer(
         t,
-        "Process all tasks through the workflow to completion.",
+        "Process all tasks through the workflow at merge-hook-pipeline/ to completion.",
         extra_args=["--model", args.model, "--effort", args.effort, "--max-budget-usd", "2.00"],
         log_name=nomods_log,
     )
