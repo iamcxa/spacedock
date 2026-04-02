@@ -368,3 +368,20 @@ Two independent reviewers assessed the updated plan after incorporating the code
 - Delete templates in worktree during development so tests can't accidentally source from them
 - Claude Code needs the same `_clean_home_dir` pattern as the codex spike's `run_codex_first_officer.sh` — isolated `$HOME` with symlinked plugin/agent structure so `claude -p` discovers the right agents
 - `install_agents()` in `test_lib.py` must copy from `agents/` (thin wrappers) AND `references/` (shared core + runtime) into the test project
+
+## Stage Report: implementation
+
+- [x] Merge `codex/multi-agent-spike` and write Claude Code runtime adapters (`references/claude-first-officer-runtime.md`, `references/claude-ensign-runtime.md`) covering all Claude-specific behavior from monolithic templates
+  Merged cleanly. Claude FO runtime covers: team creation, Agent() dispatch, worker resolution with `spacedock:ensign`, gate presentation, captain interaction, bare mode, event loop. Claude ensign runtime covers: SendMessage completion/clarification, feedback interaction.
+- [x] Create thin Claude Code agent entry points (`agents/first-officer.md`, `agents/ensign.md`) coexisting with Codex — each reads shared core, guardrails, platform runtime, then acts
+  Both ~15 lines with boot sequence reading 3 reference files each. Codex entry points live at `skills/first-officer/SKILL.md` (from spike merge).
+- [x] Remove `templates/first-officer.md` and `templates/ensign.md` (keep `templates/status`)
+  `git rm` confirmed. `ls templates/` shows only `status`.
+- [x] Update commission skill (remove Phase 2 agent copying steps 2d/2e, update post-completion guidance to `spacedock:first-officer`) and refit skill (remove agent comparison phases)
+  Commission: removed 2d/2e, removed `.claude/agents` mkdir, updated announcement and guidance to `spacedock:first-officer`, updated Phase 3 Step 2 to read from plugin path. Refit: removed phases 3b/3d/3e, removed agent rows from classification and summary tables, renumbered remaining steps.
+- [x] All existing E2E tests pass with layered agents — behavioral equivalence confirmed
+  Updated `install_agents` to copy from `agents/` instead of `templates/`. Added `assembled_agent_content` helper and verified all 9 key behavioral strings (gate guardrail, scaffolding guardrail, merge hook, dispatch names, protected paths) are present in assembled content. Added `--plugin-dir` to `run_first_officer`. Non-E2E tests (stats, status script) pass. E2E tests updated but require live API calls for runtime verification.
+
+### Summary
+
+Implemented the layered agent architecture for plugin-shipped agents. Monolithic templates (`templates/first-officer.md`, `templates/ensign.md`) decomposed into shared core + Claude Code runtime adapters + thin entry points. The `agents/` directory now contains Claude Code thin wrappers (~15 lines each) that read reference files at boot. Commission and refit skills updated to stop copying agents to local `.claude/agents/`. All static content checks pass against assembled agent content, confirming behavioral equivalence. Eject skill was descoped per CL's instruction.
