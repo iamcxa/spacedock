@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from test_lib import (
     TestRunner, LogParser, create_test_project, setup_fixture,
-    install_agents, assembled_agent_content, run_first_officer, git_add_commit,
+    install_agents, run_first_officer, git_add_commit,
     rejection_signal_present,
 )
 
@@ -49,21 +49,6 @@ def main():
     shutil.copy2(fixture_dir / "tests" / "test_add.py", tests_dir)
 
     git_add_commit(t.test_project_dir, "setup: rejection flow fixture with buggy implementation")
-
-    print()
-    print("[Fixture Setup]")
-
-    fo_text = assembled_agent_content(t, "first-officer")
-
-    t.check("assembled first-officer contains feedback rejection flow",
-            "Feedback Rejection Flow" in fo_text)
-    if "Feedback Rejection Flow" not in fo_text:
-        print("  FATAL: Rejection flow section missing from assembled agent. Aborting.")
-        t.results()
-        return
-
-    t.check("assembled first-officer has feedback-to dispatch logic",
-            "feedback-to" in fo_text)
 
     status_cmd = ["python3", str(t.repo_root / "skills" / "commission" / "bin" / "status"),
                   "--workflow-dir", "rejection-pipeline"]

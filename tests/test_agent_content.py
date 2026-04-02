@@ -2,12 +2,18 @@
 # /// script
 # requires-python = ">=3.10"
 # ///
-# ABOUTME: Content-level checks for the Codex skill assets and their shared maintenance structure.
+# ABOUTME: Static content checks for shared Claude/Codex agent contracts and guardrails.
 
 from __future__ import annotations
 
+import re
+import sys
 from pathlib import Path
+
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+from test_lib import TestRunner, assembled_agent_content
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -17,9 +23,22 @@ def read_text(path: str) -> str:
     return (REPO_ROOT / path).read_text()
 
 
+def section_text(text: str, heading: str, stop_patterns: tuple[str, ...]) -> str:
+    lines: list[str] = []
+    in_section = False
+    for line in text.splitlines():
+        if re.match(rf"^{re.escape(heading)}$", line):
+            in_section = True
+            continue
+        if in_section and any(re.match(pattern, line) for pattern in stop_patterns):
+            break
+        if in_section:
+            lines.append(line)
+    return "\n".join(lines)
+
+
 def test_first_officer_skill_bootstraps_the_packaged_agent_asset():
     text = read_text("skills/first-officer/SKILL.md")
-
     assert "../../agents/first-officer.md" in text
 
 
@@ -37,16 +56,12 @@ def test_packaged_agent_entry_points_select_runtime_adapter():
     assert "references/claude-ensign-runtime.md" in ensign_text
 
 
-def test_codex_skill_references_codex_runtime():
-    skill_text = read_text("skills/first-officer/SKILL.md")
-    assert "../../agents/first-officer.md" in skill_text
-
-
 def test_first_officer_shared_core_covers_all_behavioral_sections():
     text = read_text("references/first-officer-shared-core.md")
 
     for heading in [
         "## Startup",
+        "## Status Viewer",
         "## Single-Entity Mode",
         "## Working Directory",
         "## Dispatch",
@@ -66,7 +81,6 @@ def test_first_officer_shared_core_covers_all_behavioral_sections():
 
 def test_ensign_shared_core_keeps_stage_report_protocol():
     text = read_text("references/ensign-shared-core.md")
-
     assert "## Stage Report: {stage_name}" in text
     assert "overwrite" in text.lower()
     assert ".claude/agents/" in text
@@ -75,7 +89,6 @@ def test_ensign_shared_core_keeps_stage_report_protocol():
 
 def test_code_project_guardrails_cover_worktrees_and_scaffolding():
     text = read_text("references/code-project-guardrails.md")
-
     assert ".worktrees/" in text
     assert ".claude/agents/" in text
     assert "git worktree" in text
@@ -84,10 +97,44 @@ def test_code_project_guardrails_cover_worktrees_and_scaffolding():
 
 def test_codex_runtime_docs_cover_merge_hook_finalize_path():
     text = read_text("references/codex-first-officer-runtime.md")
-
     assert "codex_finalize_terminal_entity.py" in text
     assert "merge hooks" in text.lower()
     assert "archive" in text.lower()
+
+
+def test_assembled_claude_first_officer_has_gate_guardrails():
+    t = TestRunner("agent content", keep_test_dir=False)
+    text = assembled_agent_content(t, "first-officer")
+    assert "self-approve" in text.lower()
+    assert re.search(r"only the captain can approve|never self-approve", text, re.IGNORECASE)
+    assert "Gate review:" in text or "gate review" in text.lower()
+
+
+def test_assembled_claude_first_officer_has_rejection_flow_guardrails():
+    t = TestRunner("agent content", keep_test_dir=False)
+    text = assembled_agent_content(t, "first-officer")
+    assert "Feedback Rejection Flow" in text
+    assert "feedback-to" in text
+
+
+def test_assembled_claude_first_officer_has_merge_hook_guardrails():
+    t = TestRunner("agent content", keep_test_dir=False)
+    text = assembled_agent_content(t, "first-officer")
+
+    merge_section = section_text(text, "## Merge and Cleanup", (r"^## ",))
+    gate_section = section_text(text, "## Completion and Gates", (r"^## Feedback", r"^## Merge"))
+
+    assert (
+        "merge hooks before any local merge" in merge_section.lower()
+        or "run registered merge hooks" in merge_section.lower()
+    )
+    assert "merge hook" in merge_section.lower()
+    assert "registered" in merge_section.lower() or "hook" in merge_section.lower()
+    assert re.search(r"before any local merge|before.*local merge", merge_section, re.IGNORECASE)
+    assert re.search(r"do not.*local.merge|not local-merge", merge_section, re.IGNORECASE)
+    assert re.search(r"terminal.*merge|merge handling", text, re.IGNORECASE)
+    assert not re.search(r"Run merge hooks.*_mods", gate_section, re.IGNORECASE)
+    assert re.search(r"no merge hook.*default local merge|If no merge", text, re.IGNORECASE)
 
 
 if __name__ == "__main__":

@@ -17,9 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from test_lib import (
     TestRunner, LogParser, create_test_project, setup_fixture,
-    install_agents, assembled_agent_content, run_first_officer,
-    git_add_commit, read_entity_frontmatter, file_contains,
-    extract_stats,
+    install_agents, run_first_officer, git_add_commit, read_entity_frontmatter,
 )
 
 
@@ -34,81 +32,9 @@ def main():
     args, extra_args = parse_args()
     t = TestRunner("Merge Hook Guardrail E2E Test")
 
-    # --- Phase 1: Static validation of the assembled agent guardrail ---
+    # --- Phase 1: Set up test project with merge hook mod ---
 
-    print("--- Phase 1: Assembled agent guardrail validation ---")
-    print()
-    print("[Assembled Agent Guardrail Text]")
-
-    assembled_text = assembled_agent_content(t, "first-officer")
-
-    # Extract Merge and Cleanup section from assembled content
-    merge_section_lines = []
-    in_section = False
-    for line in assembled_text.splitlines():
-        if re.match(r"^## Merge and Cleanup", line):
-            in_section = True
-            continue
-        if in_section and re.match(r"^## ", line):
-            break
-        if in_section:
-            merge_section_lines.append(line)
-    merge_section = "\n".join(merge_section_lines)
-
-    # Check 1: Merge hooks are referenced before local merge
-    t.check("merge hooks run before local merge in assembled agent",
-            "merge hooks before any local merge" in merge_section.lower()
-            or "run registered merge hooks" in merge_section.lower())
-    if "merge hook" not in merge_section.lower():
-        print("  FATAL: Merge hook guardrail text missing from assembled agent. Aborting.")
-        t.results()
-        return
-
-    # Check 2: Guardrail is in the Merge and Cleanup section
-    t.check("merge hook behavior is in Merge and Cleanup section",
-            "merge hook" in merge_section.lower())
-
-    # Check 3: Guardrail references hook registry discovery
-    t.check("guardrail references hook discovery",
-            "registered" in merge_section.lower() or "hook" in merge_section.lower())
-
-    # Check 4: Guardrail blocks merge before hooks complete
-    t.check("guardrail blocks merge before hooks",
-            bool(re.search(r"before any local merge|before.*local merge", merge_section, re.IGNORECASE)))
-
-    # Check 5: Guardrail handles PR-created case
-    t.check("guardrail handles PR-created stop condition",
-            bool(re.search(r"do not.*local.merge|not local-merge", merge_section, re.IGNORECASE)))
-
-    # Check 6: Gate completion leads to merge handling
-    t.check("gate completion references merge handling",
-            bool(re.search(r"terminal.*merge|merge handling", assembled_text, re.IGNORECASE)))
-
-    # Check 7: Gate approval path does NOT have inline merge hook instructions
-    # (merge hooks should be in the Merge section, not duplicated in gate section)
-    gate_section_lines = []
-    in_gate = False
-    for line in assembled_text.splitlines():
-        if re.match(r"^## Completion and Gates", line):
-            in_gate = True
-            continue
-        if in_gate and re.match(r"^## (Feedback|Merge)", line):
-            break
-        if in_gate:
-            gate_section_lines.append(line)
-    gate_section = "\n".join(gate_section_lines)
-    t.check("gate section does NOT have inline merge hook instruction",
-            not bool(re.search(r"Run merge hooks.*_mods", gate_section, re.IGNORECASE)))
-
-    # Check 8: No-mods fallback in the guardrail
-    t.check("guardrail has no-mods fallback",
-            bool(re.search(r"no merge hook.*default local merge|If no merge", assembled_text, re.IGNORECASE)))
-
-    print()
-
-    # --- Phase 2: Set up test project with merge hook mod ---
-
-    print("--- Phase 2: Set up test project with merge hook mod ---")
+    print("--- Phase 1: Set up test project with merge hook mod ---")
 
     create_test_project(t)
     fixture_dir = t.repo_root / "tests" / "fixtures" / "merge-hook-pipeline"
@@ -119,25 +45,14 @@ def main():
 
     git_add_commit(t.test_project_dir, "setup: merge hook guardrail test fixture")
 
-    print()
-    print("[Fixture Setup — With Hook]")
-
-    fo_text = assembled_agent_content(t, "first-officer")
-    t.check("assembled first-officer contains merge hook guardrail",
-            "merge hook" in fo_text.lower() and "before any merge" in fo_text.lower())
-    if "merge hook" not in fo_text.lower():
-        print("  FATAL: Merge hook guardrail text missing from assembled agent. Aborting.")
-        t.results()
-        return
-
     t.check_cmd("status script runs without errors",
                 ["bash", "merge-hook-pipeline/status"], cwd=t.test_project_dir)
 
     print()
 
-    # --- Phase 3: Run first officer (with hook mod) ---
+    # --- Phase 2: Run first officer (with hook mod) ---
 
-    print("--- Phase 3: Run first officer with hook mod (this takes ~60-120s) ---")
+    print("--- Phase 2: Run first officer with hook mod (this takes ~60-120s) ---")
 
     # Save the original test_project_dir and log for the with-hook run
     with_hook_project = t.test_project_dir
@@ -147,9 +62,9 @@ def main():
         extra_args=["--model", args.model, "--effort", args.effort, "--max-budget-usd", "2.00"],
     )
 
-    # --- Phase 4: Validate hook fired ---
+    # --- Phase 3: Validate hook fired ---
 
-    print("--- Phase 4: Validate merge hook execution ---")
+    print("--- Phase 3: Validate merge hook execution ---")
     print()
     print("[Merge Hook Execution]")
 
@@ -180,9 +95,9 @@ def main():
 
     print()
 
-    # --- Phase 5: Set up and run no-mods fallback test ---
+    # --- Phase 4: Set up and run no-mods fallback test ---
 
-    print("--- Phase 5: Set up no-mods fallback test ---")
+    print("--- Phase 4: Set up no-mods fallback test ---")
 
     # Create a new test project for the no-mods run
     nomods_project = t.test_dir / "test-no-mods"
@@ -222,7 +137,7 @@ def main():
                 ["bash", "merge-hook-pipeline/status"], cwd=nomods_project)
 
     print()
-    print("--- Phase 6: Run first officer without mods (this takes ~60-120s) ---")
+    print("--- Phase 5: Run first officer without mods (this takes ~60-120s) ---")
 
     # Point runner at the no-mods project for this run
     t.test_project_dir = nomods_project
@@ -234,9 +149,9 @@ def main():
         log_name=nomods_log,
     )
 
-    # --- Phase 7: Validate no-mods fallback ---
+    # --- Phase 6: Validate no-mods fallback ---
 
-    print("--- Phase 7: Validate no-mods fallback ---")
+    print("--- Phase 6: Validate no-mods fallback ---")
     print()
     print("[No-Mods Fallback]")
 

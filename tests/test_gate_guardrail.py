@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from test_lib import (
     TestRunner, LogParser, create_test_project, setup_fixture,
-    install_agents, assembled_agent_content, run_first_officer,
+    install_agents, run_first_officer,
     check_gate_hold_behavior, git_add_commit,
 )
 
@@ -31,24 +31,6 @@ def main():
     install_agents(t)
 
     git_add_commit(t.test_project_dir, "setup: gated workflow fixture")
-
-    print()
-    print("[Fixture Setup]")
-
-    fo_text = assembled_agent_content(t, "first-officer")
-
-    t.check("assembled first-officer contains gate guardrail",
-            "self-approve" in fo_text.lower())
-    if "self-approve" not in fo_text.lower():
-        print("  FATAL: Guardrail text missing from assembled agent. Aborting.")
-        t.results()
-        return
-
-    t.check("assembled first-officer contains captain-only gate approval",
-            bool(re.search(r"only the captain can approve|never self-approve", fo_text, re.IGNORECASE)))
-
-    t.check("assembled first-officer contains gate presentation format",
-            "Gate review:" in fo_text or "gate review" in fo_text.lower())
 
     t.check_cmd("status script runs without errors",
                 ["bash", "gated-pipeline/status"], cwd=t.test_project_dir)
