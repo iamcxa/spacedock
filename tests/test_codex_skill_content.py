@@ -21,6 +21,7 @@ def test_first_officer_skill_bootstraps_the_packaged_agent_asset():
     text = read_text("skills/first-officer/SKILL.md")
 
     assert "agents/first-officer.md" in text
+    assert "../../agents/first-officer.md" in text
 
 
 def test_first_officer_agent_references_shared_core_and_codex_runtime_docs():
