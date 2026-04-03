@@ -9,7 +9,7 @@ verdict:
 score: 0.7
 worktree: .worktrees/ensign-agent-boot-skill-preload
 issue:
-pr:
+pr: "#29"
 ---
 
 # Agent boot via skill preloading
