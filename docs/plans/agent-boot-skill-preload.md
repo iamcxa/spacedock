@@ -33,12 +33,12 @@ From Claude Code source analysis (ch08-sub-agents.md, Step 10):
 
 > Agent definitions can specify `skills: ["my-skill"]` in their frontmatter. Loaded skills become user messages prepended to the agent's conversation. This means the agent "reads" its skill instructions before seeing the task prompt.
 
-Skills have access to `${CLAUDE_SKILL_DIR}` for reliable path resolution. Skills also support inline shell execution (`!command`) for materializing file content at load time. This means:
+Skills have access to `${CLAUDE_SKILL_DIR}` for reliable path resolution. Verified: haiku/low correctly resolves `${CLAUDE_SKILL_DIR}/../../references/...` paths from a skill and reads the target files. This means:
 
 1. Agent files stay thin (identity + frontmatter)
-2. A boot skill reads reference files via `${CLAUDE_SKILL_DIR}` and inline shell
+2. A boot skill instructs the model to Read reference files via `${CLAUDE_SKILL_DIR}` resolved paths
 3. The skill content is injected into the agent's conversation before it sees the task prompt
-4. No model-dependent file reading — content is materialized by the platform
+4. Path resolution is reliable because `${CLAUDE_SKILL_DIR}` is substituted by the platform before the model sees it
 
 ### Architecture
 
@@ -48,8 +48,8 @@ agents/
   ensign.md                     ← thin: identity + skills: ["spacedock:ensign-boot"]
 
 skills/
-  first-officer-boot/SKILL.md   ← inlines FO references via shell
-  ensign-boot/SKILL.md          ← inlines ensign references via shell
+  first-officer-boot/SKILL.md   ← Read instructions with resolved paths
+  ensign-boot/SKILL.md          ← Read instructions with resolved paths
   first-officer/SKILL.md        ← Codex entry point (unchanged)
 
 references/                     ← source of truth (unchanged)
@@ -64,18 +64,26 @@ references/                     ← source of truth (unchanged)
 
 ### Boot skill content
 
-Each boot skill is ~3 lines of inline shell that cats the relevant reference files:
+Each boot skill uses `Read` instructions with `${CLAUDE_SKILL_DIR}` for reliable path resolution:
 
 ```markdown
 ---
 name: first-officer-boot
 ---
-`!cat ${CLAUDE_SKILL_DIR}/../../references/first-officer-shared-core.md`
-`!cat ${CLAUDE_SKILL_DIR}/../../references/code-project-guardrails.md`
-`!cat ${CLAUDE_SKILL_DIR}/../../references/claude-first-officer-runtime.md`
+Read these reference files before doing anything else:
+
+1. Read `${CLAUDE_SKILL_DIR}/../../references/first-officer-shared-core.md`
+2. Read `${CLAUDE_SKILL_DIR}/../../references/code-project-guardrails.md`
+3. Read `${CLAUDE_SKILL_DIR}/../../references/claude-first-officer-runtime.md`
+
+Then begin the Startup procedure from the shared core.
 ```
 
-The platform substitutes `${CLAUDE_SKILL_DIR}`, executes the shell commands, and injects the combined output as a user message before the agent sees its task. No model guessing, no path resolution failures.
+The platform substitutes `${CLAUDE_SKILL_DIR}` with the skill's absolute directory path. The model then reads the files using resolved absolute paths — no guessing, no global search.
+
+**Verified:** haiku/low correctly resolves `${CLAUDE_SKILL_DIR}/../../references/...` paths from a skill and reads the target files.
+
+**Why not inline shell (`!cat`)?** Inline shell execution can be disabled by user settings. `Read` instructions work regardless of shell permissions.
 
 ### Agent file changes
 
@@ -115,7 +123,7 @@ Codex entry point (`skills/first-officer/SKILL.md`) continues reading references
 ## Acceptance criteria
 
 1. Boot skills exist: `skills/first-officer-boot/SKILL.md` and `skills/ensign-boot/SKILL.md`
-2. Boot skills use `${CLAUDE_SKILL_DIR}` + inline shell to cat reference files — no `Read` instructions
+2. Boot skills use `${CLAUDE_SKILL_DIR}` + `Read` instructions for reference files — paths resolve reliably
 3. Agent files use `skills: ["spacedock:first-officer-boot"]` / `["spacedock:ensign-boot"]` in frontmatter
 4. Agent files contain only identity (no operational instructions in the body)
 5. Haiku/low follows the preloaded instructions without path resolution issues
