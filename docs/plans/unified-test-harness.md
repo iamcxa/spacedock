@@ -1,11 +1,11 @@
 ---
 id: "084"
 title: Unify test harness across Claude Code and Codex runtimes
-status: validation
+status: done
 source: CL — 076 validation findings
 started: 2026-04-02T16:35:40Z
-completed:
-verdict:
+completed: 2026-04-03T03:30:00Z
+verdict: PASSED
 score: 0.75
 worktree: .worktrees/ensign-084-unified-test-harness
 issue:
