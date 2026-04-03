@@ -136,41 +136,37 @@ Each stage section must have specific, mission-relevant content in its Inputs, O
 
 ### First-officer agent completeness
 
-The agent file (`agents/first-officer.md`) is a thin wrapper. It contains YAML frontmatter with `name: first-officer`, `description:`, and `skills: ["spacedock:first-officer"]`, plus a dispatcher identity statement and a boot sequence fallback.
+```bash
+grep -c "^##\|^###" "$REPO_ROOT/agents/first-officer.md"
+```
 
-The operational contract lives in reference files loaded by the `spacedock:first-officer` skill via `${CLAUDE_SKILL_DIR}` path resolution. To check the full assembled content (agent + references), use the `assembled_agent_content()` helper from `scripts/test_lib.py`, or manually concatenate:
+Open the file and verify these sections are present:
 
-- `agents/first-officer.md`
-- `references/first-officer-shared-core.md`
-- `references/code-project-guardrails.md`
-- `references/claude-first-officer-runtime.md`
-
-Verify these sections are present in the assembled content:
-
+- YAML frontmatter with `name: first-officer`, `description:`, and `tools:` including `Agent`
 - Identity statement establishing the first officer as a DISPATCHER
-- Startup procedure
-- Dispatch section
-- Completion and Gates
-- Merge and Cleanup
+- Startup sequence: TeamCreate → Read README → run status → check orphans (4 steps)
+- Dispatching section with an `Agent()` call block that includes `subagent_type`, `name`, `team_name`, and `prompt`
+- Event Loop
 - State Management
+- `initialPrompt` in frontmatter
 
 ### First-officer guardrails
 
-Guardrail text lives in the reference files, not in the agent file directly. Check the assembled content (agent + references) for these:
-
 ```bash
-# Check assembled content (agent + all references)
-cat "$REPO_ROOT/agents/first-officer.md" \
-    "$REPO_ROOT/references/first-officer-shared-core.md" \
-    "$REPO_ROOT/references/code-project-guardrails.md" \
-    "$REPO_ROOT/references/claude-first-officer-runtime.md" \
-    > /tmp/assembled-fo.md
-
-grep -c "NEVER self-approve" /tmp/assembled-fo.md
-grep -c "Agent tool" /tmp/assembled-fo.md
+grep -c "MUST use the Agent tool" "$REPO_ROOT/agents/first-officer.md"
+grep -c "NEVER use.*subagent_type.*first-officer" "$REPO_ROOT/agents/first-officer.md"
+grep -c "TeamCreate" "$REPO_ROOT/agents/first-officer.md"
+grep -c "Report workflow state ONCE\|Report.*ONCE" "$REPO_ROOT/agents/first-officer.md"
+grep -cE "NEVER self-approve|NOT treat ensign.*messages as approval" "$REPO_ROOT/agents/first-officer.md"
 ```
 
-The automated tests use `assembled_agent_content()` from `scripts/test_lib.py` for these checks.
+All five must return at least 1. These guardrails prevent known dispatch bugs:
+
+- **Agent tool required**: first officer must use Agent (not SendMessage) to spawn ensigns
+- **subagent_type guardrail**: first officer must not clone itself as `first-officer`
+- **TeamCreate in Startup**: first officer must create its own team before dispatching
+- **Report-once**: first officer must not spam status messages at approval gates
+- **Gate self-approval prohibition**: first officer must not self-approve at gates or treat ensign messages as captain approval
 
 ### No leaked template variables
 
@@ -384,7 +380,7 @@ bash tests/test-gate-guardrail.sh
 
 ### How it works
 
-The test copies a pre-built workflow fixture from `tests/fixtures/gated-pipeline/` into a temporary git repo. The fixture has stages `backlog -> work -> done` where `work` has `gate: true`. The plugin-shipped first-officer agent is installed into the test project. The first officer is run via `claude -p` with `--max-budget-usd 1.00`.
+The test copies a pre-built workflow fixture from `tests/fixtures/gated-pipeline/` into a temporary git repo. The fixture has stages `backlog -> work -> done` where `work` has `gate: true`. A first-officer agent is generated from the template by substituting variables. The first officer is run via `claude -p` with `--max-budget-usd 1.00`.
 
 Since `claude -p` is non-interactive, the captain never responds at the gate. The first officer should:
 1. Dispatch an ensign into `work`
@@ -394,16 +390,17 @@ Since `claude -p` is non-interactive, the captain never responds at the gate. Th
 
 ### Validation checks
 
-1. **Gate guardrail present** — The assembled first-officer content (agent + reference files) contains "self-approve" guardrail text
-2. **Entity did NOT advance past gate** — Entity status is not `done` (still in `work` or `backlog`)
-3. **Entity was NOT archived** — Entity was not moved to `_archive/` (which only happens at terminal stage)
-4. **First officer dispatched an ensign** — At least one Agent() call was made
-5. **First officer reported at gate** — Output contains gate/approval language (SKIP if ensign didn't complete)
-6. **First officer did NOT self-approve** — Output does not contain self-approval language
+1. **Gate guardrail present** — The generated first-officer contains "NEVER self-approve" and ensign message discrimination text
+2. **Event loop guardrail present** — The generated first-officer contains "Gate waiting:" reinforcement text
+3. **Entity did NOT advance past gate** — Entity status is not `done` (still in `work` or `backlog`)
+4. **Entity was NOT archived** — Entity was not moved to `_archive/` (which only happens at terminal stage)
+5. **First officer dispatched an ensign** — At least one Agent() call was made
+6. **First officer reported at gate** — Output contains gate/approval language (SKIP if ensign didn't complete)
+7. **First officer did NOT self-approve** — Output does not contain self-approval language
 
 ### What this catches
 
-In the incident that motivated this test, the first officer asked "approve?" at a gate, then an ensign idle notification arrived, and the first officer treated it as approval — advancing the entity without the captain responding. The guardrail text in the reference files (loaded via the skill) explicitly prohibits this behavior, and the test verifies the first officer holds at the gate when no captain input is available.
+In the incident that motivated this test, the first officer asked "approve?" at a gate, then an ensign idle notification arrived, and the first officer treated it as approval — advancing the entity without the captain responding. The guardrail text explicitly prohibits this behavior, and the test verifies the first officer holds at the gate when no captain input is available.
 
 ### Operational notes
 
