@@ -87,6 +87,7 @@ def resolve_codex_worker(agent_id: str, repo_root: Path | None = None) -> dict[s
 
 def build_codex_first_officer_invocation_prompt(
     workflow_dir: str | Path,
+    agent_id: str = "spacedock:first-officer",
     run_goal: str | None = None,
 ) -> str:
     workflow_dir = Path(workflow_dir)
@@ -95,16 +96,18 @@ def build_codex_first_officer_invocation_prompt(
         extra_goal = f"\n{run_goal.strip()}\n"
     return textwrap.dedent(
         f"""
-        Use the `spacedock:first-officer` skill to manage the workflow at `{workflow_dir}`.
+        Use the `{agent_id}` skill to manage the workflow at `{workflow_dir}`.
 
         Treat that path as the explicit workflow target. Do not ask to discover alternatives.
         Stay tightly bounded to the requested goal.
-        Let the skill bootstrap the packaged first-officer agent asset and follow that agent directly.
+        Let the skill bootstrap the packaged workflow agent asset and follow that agent directly.
         For bounded single-entity dispatches, prefer the helper at `~/.agents/skills/spacedock/scripts/codex_prepare_dispatch.py`
         instead of manually editing frontmatter, composing worktree names, or building the worker assignment by hand.
         For bounded terminal-completion runs, prefer the helper at `~/.agents/skills/spacedock/scripts/codex_finalize_terminal_entity.py`
         instead of freehand merge-hook, merge, archive, or worktree-cleanup steps.
         Any worker you spawn in this run MUST use `fork_context=false` with a fully self-contained prompt.
+        For bounded single-entity runs, treat the first completed worker summary as sufficient evidence for your final response unless it is missing the requested verdict or outcome.
+        After `wait_agent(...)` returns the needed verdict or outcome, do not reread entity files, rerun `status`, or continue the loop. Respond once and stop immediately.
         Do not load reference docs unless you hit a real blocker.
         Do not reread your own skill files, inspect packaged worker agent assets before dispatch requires them, or open the `status` script source unless a blocker requires it.
         Run the workflow `status` script directly or with `python3` if needed. Never invoke it with `zsh`.
@@ -165,6 +168,14 @@ def build_codex_worker_bootstrap_prompt(
         lines.append(f"worktree_path: {worktree_path}")
     if checklist:
         lines.extend(["checklist:"] + [f"- {item}" for item in checklist])
+    lines.extend(
+        [
+            "",
+            "Completion rule:",
+            "After you finish the assignment, write the stage report, commit your work, return one concise final response, and stop immediately.",
+            "Do not continue exploring the repo, do not wait for follow-up instructions, and do not start another task after that final response.",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -366,15 +377,16 @@ def run_commission(
 def run_first_officer(
     runner: TestRunner,
     prompt: str,
+    agent_id: str = "spacedock:first-officer",
     extra_args: list[str] | None = None,
     log_name: str = "fo-log.jsonl",
 ) -> int:
-    """Run claude -p --plugin-dir ... --agent spacedock:first-officer. Returns exit code."""
+    """Run claude -p --plugin-dir ... --agent <agent_id>. Returns exit code."""
     log_path = runner.log_dir / log_name
     cmd = [
         "claude", "-p", prompt,
         "--plugin-dir", str(runner.repo_root),
-        "--agent", "spacedock:first-officer",
+        "--agent", agent_id,
         "--permission-mode", "bypassPermissions",
         "--verbose",
         "--output-format", "stream-json",
@@ -405,6 +417,7 @@ def run_first_officer(
 def run_codex_first_officer(
     runner: TestRunner,
     workflow_dir: str,
+    agent_id: str = "spacedock:first-officer",
     run_goal: str | None = None,
     extra_args: list[str] | None = None,
     log_name: str = "codex-fo-log.txt",
@@ -413,7 +426,7 @@ def run_codex_first_officer(
     """Run the Codex first-officer skill via codex exec. Returns exit code."""
     log_path = runner.log_dir / log_name
     workflow_path = (runner.test_project_dir / workflow_dir).resolve()
-    prompt = build_codex_first_officer_invocation_prompt(workflow_path, run_goal=run_goal)
+    prompt = build_codex_first_officer_invocation_prompt(workflow_path, agent_id=agent_id, run_goal=run_goal)
     (runner.log_dir / "codex-fo-invocation.txt").write_text(prompt + "\n")
 
     skill_home = prepare_codex_skill_home(runner.test_dir, runner.repo_root)
@@ -742,6 +755,143 @@ def read_entity_frontmatter(entity_path: Path) -> dict[str, str]:
             key, _, value = line.partition(":")
             fields[key.strip()] = value.strip()
     return fields
+
+
+def iter_worktree_entity_paths(worktrees_dir: Path, workflow_dir: str, entity_slug: str) -> list[Path]:
+    """Return matching entity paths under per-worker worktrees for one workflow entity."""
+    if not worktrees_dir.is_dir():
+        return []
+    return [
+        wt / workflow_dir / f"{entity_slug}.md"
+        for wt in worktrees_dir.iterdir()
+        if (wt / workflow_dir / f"{entity_slug}.md").is_file()
+    ]
+
+
+def check_gate_hold_behavior(runner: TestRunner, workflow_dir: str, entity_slug: str, fo_text_output: str) -> None:
+    """Assert that a gated entity remains active and unarchived."""
+    entity_file = runner.test_project_dir / workflow_dir / f"{entity_slug}.md"
+    archive_file = runner.test_project_dir / workflow_dir / "_archive" / f"{entity_slug}.md"
+
+    if entity_file.is_file():
+        fm = read_entity_frontmatter(entity_file)
+        status_val = fm.get("status", "")
+        if status_val == "done":
+            runner.fail("entity did NOT advance past gate (found status: done)")
+        else:
+            runner.pass_(f"entity did NOT advance past gate (status: {status_val})")
+    else:
+        runner.fail("entity file exists for status check")
+
+    if archive_file.is_file():
+        runner.fail("entity was NOT archived (found in _archive)")
+    else:
+        runner.pass_("entity was NOT archived (gate held)")
+
+    runner.check(
+        "first officer output mentions gate or approval handling",
+        bool(re.search(r"gate|approval|approve|reject|waiting", fo_text_output, re.IGNORECASE)),
+    )
+
+
+def rejection_signal_present(
+    workflow_dir: str,
+    entity_slug: str,
+    main_entity_path: Path,
+    worktrees_dir: Path,
+    *texts: str,
+) -> bool:
+    """Return True when rejection evidence appears in main/worktree entities or runtime output."""
+    patterns = r"REJECTED|recommend reject|failing test|Expected 5, got -1"
+    if any(re.search(patterns, text, re.IGNORECASE) for text in texts if text):
+        return True
+    if main_entity_path.is_file() and re.search(r"REJECTED", main_entity_path.read_text(), re.IGNORECASE):
+        return True
+    return any(
+        re.search(r"REJECTED", path.read_text(), re.IGNORECASE)
+        for path in iter_worktree_entity_paths(worktrees_dir, workflow_dir, entity_slug)
+    )
+
+
+def rejection_follow_up_observed(
+    workflow_dir: str,
+    entity_slug: str,
+    worktrees_dir: Path,
+    *texts: str,
+) -> bool:
+    """Return True when logs or entity artifacts show post-rejection follow-up activity."""
+    pattern = r"feedback-to|follow-up|fix|rework|implementation"
+    if any(re.search(pattern, text, re.IGNORECASE) for text in texts if text):
+        return True
+    for path in iter_worktree_entity_paths(worktrees_dir, workflow_dir, entity_slug):
+        text = path.read_text()
+        if re.search(r"Feedback Cycles|Stage Report: validation|Stage Report: implementation", text, re.IGNORECASE):
+            return True
+    return False
+
+
+def check_merge_outcome(
+    runner: TestRunner,
+    project_dir: Path,
+    workflow_dir: str,
+    entity_slug: str,
+    branch_name: str,
+    hook_expected: bool,
+    archive_required: bool,
+) -> None:
+    """Assert merge-hook/local-merge outcomes for one terminal entity."""
+    workflow_path = project_dir / workflow_dir
+    hook_file = workflow_path / "_merge-hook-fired.txt"
+    archive_file = workflow_path / "_archive" / f"{entity_slug}.md"
+    entity_file = workflow_path / f"{entity_slug}.md"
+    worktree_dir = project_dir / ".spacedock" / "worktrees" / branch_name
+
+    if hook_expected:
+        runner.check("merge hook fired marker exists", hook_file.is_file())
+        if hook_file.is_file():
+            runner.check("merge hook fired marker contains entity slug", entity_slug in hook_file.read_text())
+    else:
+        runner.check("no merge hook marker exists in no-mods run", not hook_file.exists())
+
+    if archive_required:
+        if hook_expected:
+            runner.check("entity archived after merge hook run", archive_file.is_file())
+        else:
+            runner.check("entity archived via no-mods fallback", archive_file.is_file())
+    elif archive_file.is_file():
+        if hook_expected:
+            runner.pass_("entity was archived (merge completed after hook)")
+        else:
+            runner.pass_("entity was archived via local merge (no-mods fallback works)")
+    elif entity_file.is_file():
+        fm = read_entity_frontmatter(entity_file)
+        status_val = fm.get("status", "?")
+        if hook_expected:
+            print(f"  SKIP: entity not archived (status: {status_val}) — FO may not have completed the full cycle within budget")
+        else:
+            print(f"  SKIP: entity not archived (status: {status_val}) — FO may not have completed the full cycle within budget")
+    else:
+        if hook_expected:
+            runner.fail("entity was archived (entity file not found in either location)")
+        else:
+            runner.fail("entity was archived via local merge (entity file not found)")
+
+    if hook_expected:
+        runner.check("worktree cleaned up after merge hook run", not worktree_dir.exists())
+    else:
+        runner.check("worktree cleaned up after no-mods fallback", not worktree_dir.exists())
+
+    branches = subprocess.run(
+        ["git", "branch", "--list", branch_name],
+        capture_output=True,
+        text=True,
+        cwd=project_dir,
+        check=True,
+    ).stdout.strip()
+    if hook_expected:
+        runner.check("temporary branch cleaned up after merge hook run", branches == "")
+    else:
+        runner.check("temporary branch cleaned up after no-mods fallback", branches == "")
 
 
 def file_contains(path: Path | str, pattern: str, case_insensitive: bool = False) -> bool:

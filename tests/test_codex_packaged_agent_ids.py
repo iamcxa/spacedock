@@ -51,6 +51,16 @@ def test_exec_harness_invokes_first_officer_skill_by_name():
     assert "codex-first-officer-prompt.md" not in prompt
 
 
+def test_exec_harness_can_target_a_custom_logical_agent_id():
+    prompt = build_codex_first_officer_invocation_prompt(
+        "/tmp/example-workflow",
+        agent_id="acme:first-officer",
+    )
+
+    assert "acme:first-officer" in prompt
+    assert "spacedock:first-officer" not in prompt
+
+
 def test_packaged_worker_bootstrap_tells_worker_to_read_agent_first():
     resolved = resolve_codex_worker("spacedock:ensign")
 

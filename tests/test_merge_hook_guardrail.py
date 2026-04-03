@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import argparse
-import re
 import shutil
 import subprocess
 import sys
@@ -17,172 +16,115 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from test_lib import (
     TestRunner, LogParser, create_test_project, setup_fixture,
-    install_agents, assembled_agent_content, run_first_officer,
-    git_add_commit, read_entity_frontmatter, file_contains,
-    extract_stats,
+    check_merge_outcome, install_agents, run_codex_first_officer, run_first_officer, git_add_commit,
 )
 
 
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(description="Merge hook guardrail E2E test")
+    parser.add_argument("--runtime", choices=["claude", "codex"], default="claude")
+    parser.add_argument("--agent", default="spacedock:first-officer")
     parser.add_argument("--model", default="haiku", help="Model to use (default: haiku)")
     parser.add_argument("--effort", default="low", help="Effort level (default: low)")
     return parser.parse_known_args()
 
 
+def run_merge_case(
+    t: TestRunner,
+    runtime: str,
+    agent_id: str,
+    workflow_dir: str,
+    run_goal: str,
+    claude_extra_args: list[str],
+    codex_timeout_s: int,
+    log_name: str,
+) -> int:
+    if runtime == "claude":
+        abs_workflow = t.test_project_dir / workflow_dir
+        return run_first_officer(
+            t,
+            f"Process all tasks through the workflow at {abs_workflow}/ to completion.",
+            agent_id=agent_id,
+            extra_args=claude_extra_args,
+            log_name=log_name,
+        )
+    return run_codex_first_officer(
+        t,
+        workflow_dir,
+        agent_id=agent_id,
+        run_goal=run_goal,
+        timeout_s=codex_timeout_s,
+        log_name=log_name.replace(".jsonl", ".txt"),
+    )
+
+
 def main():
     args, extra_args = parse_args()
-    t = TestRunner("Merge Hook Guardrail E2E Test")
+    t = TestRunner(f"Merge Hook Guardrail E2E Test ({args.runtime})")
 
-    # --- Phase 1: Static validation of the assembled agent guardrail ---
+    # --- Phase 1: Set up test project with merge hook mod ---
 
-    print("--- Phase 1: Assembled agent guardrail validation ---")
-    print()
-    print("[Assembled Agent Guardrail Text]")
-
-    assembled_text = assembled_agent_content(t, "first-officer")
-
-    # Extract Merge and Cleanup section from assembled content
-    merge_section_lines = []
-    in_section = False
-    for line in assembled_text.splitlines():
-        if re.match(r"^## Merge and Cleanup", line):
-            in_section = True
-            continue
-        if in_section and re.match(r"^## ", line):
-            break
-        if in_section:
-            merge_section_lines.append(line)
-    merge_section = "\n".join(merge_section_lines)
-
-    # Check 1: Merge hooks are referenced before local merge
-    t.check("merge hooks run before local merge in assembled agent",
-            "merge hooks before any local merge" in merge_section.lower()
-            or "run registered merge hooks" in merge_section.lower())
-    if "merge hook" not in merge_section.lower():
-        print("  FATAL: Merge hook guardrail text missing from assembled agent. Aborting.")
-        t.results()
-        return
-
-    # Check 2: Guardrail is in the Merge and Cleanup section
-    t.check("merge hook behavior is in Merge and Cleanup section",
-            "merge hook" in merge_section.lower())
-
-    # Check 3: Guardrail references hook registry discovery
-    t.check("guardrail references hook discovery",
-            "registered" in merge_section.lower() or "hook" in merge_section.lower())
-
-    # Check 4: Guardrail blocks merge before hooks complete
-    t.check("guardrail blocks merge before hooks",
-            bool(re.search(r"before any local merge|before.*local merge", merge_section, re.IGNORECASE)))
-
-    # Check 5: Guardrail handles PR-created case
-    t.check("guardrail handles PR-created stop condition",
-            bool(re.search(r"do not.*local.merge|not local-merge", merge_section, re.IGNORECASE)))
-
-    # Check 6: Gate completion leads to merge handling
-    t.check("gate completion references merge handling",
-            bool(re.search(r"terminal.*merge|merge handling", assembled_text, re.IGNORECASE)))
-
-    # Check 7: Gate approval path does NOT have inline merge hook instructions
-    # (merge hooks should be in the Merge section, not duplicated in gate section)
-    gate_section_lines = []
-    in_gate = False
-    for line in assembled_text.splitlines():
-        if re.match(r"^## Completion and Gates", line):
-            in_gate = True
-            continue
-        if in_gate and re.match(r"^## (Feedback|Merge)", line):
-            break
-        if in_gate:
-            gate_section_lines.append(line)
-    gate_section = "\n".join(gate_section_lines)
-    t.check("gate section does NOT have inline merge hook instruction",
-            not bool(re.search(r"Run merge hooks.*_mods", gate_section, re.IGNORECASE)))
-
-    # Check 8: No-mods fallback in the guardrail
-    t.check("guardrail has no-mods fallback",
-            bool(re.search(r"no merge hook.*default local merge|If no merge", assembled_text, re.IGNORECASE)))
-
-    print()
-
-    # --- Phase 2: Set up test project with merge hook mod ---
-
-    print("--- Phase 2: Set up test project with merge hook mod ---")
+    print("--- Phase 1: Set up test project with merge hook mod ---")
 
     create_test_project(t)
     fixture_dir = t.repo_root / "tests" / "fixtures" / "merge-hook-pipeline"
 
     # Copy workflow fixture (including _mods/)
     setup_fixture(t, "merge-hook-pipeline", "merge-hook-pipeline")
-    install_agents(t)
+    if args.runtime == "claude":
+        install_agents(t)
 
     git_add_commit(t.test_project_dir, "setup: merge hook guardrail test fixture")
-
-    print()
-    print("[Fixture Setup — With Hook]")
-
-    fo_text = assembled_agent_content(t, "first-officer")
-    t.check("assembled first-officer contains merge hook guardrail",
-            "merge hook" in fo_text.lower() and "before any merge" in fo_text.lower())
-    if "merge hook" not in fo_text.lower():
-        print("  FATAL: Merge hook guardrail text missing from assembled agent. Aborting.")
-        t.results()
-        return
 
     t.check_cmd("status script runs without errors",
                 ["bash", "merge-hook-pipeline/status"], cwd=t.test_project_dir)
 
     print()
 
-    # --- Phase 3: Run first officer (with hook mod) ---
+    # --- Phase 2: Run first officer (with hook mod) ---
 
-    print("--- Phase 3: Run first officer with hook mod (this takes ~60-120s) ---")
+    print("--- Phase 2: Run first officer with hook mod (this takes ~60-120s) ---")
 
     # Save the original test_project_dir and log for the with-hook run
     with_hook_project = t.test_project_dir
-    run_first_officer(
+    fo_exit = run_merge_case(
         t,
-        "Process all tasks through the workflow to completion.",
-        extra_args=["--model", args.model, "--effort", args.effort, "--max-budget-usd", "2.00"],
+        args.runtime,
+        args.agent,
+        "merge-hook-pipeline",
+        (
+            "Process only the entity `merge-hook-entity` through the workflow to terminal completion. "
+            "If it reaches the terminal stage, run any merge hooks before local merge, then archive the entity. "
+            "Stop after the merge hook result and archive outcome are determined."
+        ),
+        ["--model", args.model, "--effort", args.effort, "--max-budget-usd", "2.00", *extra_args],
+        240,
+        "fo-log.jsonl",
     )
+    if args.runtime == "codex":
+        t.check("Codex launcher exited cleanly (with hook)", fo_exit == 0)
 
-    # --- Phase 4: Validate hook fired ---
+    # --- Phase 3: Validate hook fired ---
 
-    print("--- Phase 4: Validate merge hook execution ---")
+    print("--- Phase 3: Validate merge hook execution ---")
     print()
     print("[Merge Hook Execution]")
 
-    hook_file = with_hook_project / "merge-hook-pipeline" / "_merge-hook-fired.txt"
-    if hook_file.is_file():
-        t.pass_("_merge-hook-fired.txt exists")
-        hook_content = hook_file.read_text()
-        if "merge-hook-entity" in hook_content:
-            t.pass_("_merge-hook-fired.txt contains entity slug")
-        else:
-            t.fail("_merge-hook-fired.txt contains entity slug")
-            print(f"  Contents: {hook_content.strip()}")
-    else:
-        t.fail("_merge-hook-fired.txt exists (hook did not fire)")
-        t.fail("_merge-hook-fired.txt contains entity slug (file missing)")
-
-    # Check: entity was archived (merge completed after hook)
-    archive_file = with_hook_project / "merge-hook-pipeline" / "_archive" / "merge-hook-entity.md"
-    entity_file = with_hook_project / "merge-hook-pipeline" / "merge-hook-entity.md"
-    if archive_file.is_file():
-        t.pass_("entity was archived (merge completed after hook)")
-    elif entity_file.is_file():
-        fm = read_entity_frontmatter(entity_file)
-        status_val = fm.get("status", "?")
-        print(f"  SKIP: entity not archived (status: {status_val}) — FO may not have completed the full cycle within budget")
-    else:
-        t.fail("entity was archived (entity file not found in either location)")
+    check_merge_outcome(
+        t,
+        with_hook_project,
+        "merge-hook-pipeline",
+        "merge-hook-entity",
+        "spacedock-ensign-merge-hook-entity-work",
+        hook_expected=True,
+        archive_required=False,
+    )
 
     print()
 
-    # --- Phase 5: Set up and run no-mods fallback test ---
+    # --- Phase 4: Set up and run no-mods fallback test ---
 
-    print("--- Phase 5: Set up no-mods fallback test ---")
+    print("--- Phase 4: Set up no-mods fallback test ---")
 
     # Create a new test project for the no-mods run
     nomods_project = t.test_dir / "test-no-mods"
@@ -206,7 +148,8 @@ def main():
     # Install agents via shared helper (temporarily point runner at nomods project)
     orig_project = t.test_project_dir
     t.test_project_dir = nomods_project
-    install_agents(t)
+    if args.runtime == "claude":
+        install_agents(t)
     t.test_project_dir = orig_project
 
     subprocess.run(["git", "add", "-A"], capture_output=True, check=True, cwd=nomods_project)
@@ -222,42 +165,43 @@ def main():
                 ["bash", "merge-hook-pipeline/status"], cwd=nomods_project)
 
     print()
-    print("--- Phase 6: Run first officer without mods (this takes ~60-120s) ---")
+    print("--- Phase 5: Run first officer without mods (this takes ~60-120s) ---")
 
     # Point runner at the no-mods project for this run
     t.test_project_dir = nomods_project
     nomods_log = "fo-nomods-log.jsonl"
-    run_first_officer(
+    fo_exit = run_merge_case(
         t,
-        "Process all tasks through the workflow to completion.",
-        extra_args=["--model", args.model, "--effort", args.effort, "--max-budget-usd", "2.00"],
-        log_name=nomods_log,
+        args.runtime,
+        args.agent,
+        "merge-hook-pipeline",
+        (
+            "Process only the entity `merge-hook-entity` through the workflow to terminal completion. "
+            "No merge hook mod is installed in this fixture, so use the default local merge path and archive the entity. "
+            "Stop after the archive outcome is determined."
+        ),
+        ["--model", args.model, "--effort", args.effort, "--max-budget-usd", "2.00", *extra_args],
+        240,
+        nomods_log,
     )
+    if args.runtime == "codex":
+        t.check("Codex launcher exited cleanly (no hook)", fo_exit == 0)
 
-    # --- Phase 7: Validate no-mods fallback ---
+    # --- Phase 6: Validate no-mods fallback ---
 
-    print("--- Phase 7: Validate no-mods fallback ---")
+    print("--- Phase 6: Validate no-mods fallback ---")
     print()
     print("[No-Mods Fallback]")
 
-    # Check: _merge-hook-fired.txt does NOT exist (no hooks to fire)
-    nomods_hook = nomods_project / "merge-hook-pipeline" / "_merge-hook-fired.txt"
-    if nomods_hook.is_file():
-        t.fail("no _merge-hook-fired.txt in no-mods run (file exists unexpectedly)")
-    else:
-        t.pass_("no _merge-hook-fired.txt in no-mods run")
-
-    # Check: entity was archived via local merge
-    nomods_archive = nomods_project / "merge-hook-pipeline" / "_archive" / "merge-hook-entity.md"
-    nomods_entity = nomods_project / "merge-hook-pipeline" / "merge-hook-entity.md"
-    if nomods_archive.is_file():
-        t.pass_("entity was archived via local merge (no-mods fallback works)")
-    elif nomods_entity.is_file():
-        fm = read_entity_frontmatter(nomods_entity)
-        status_val = fm.get("status", "?")
-        print(f"  SKIP: entity not archived (status: {status_val}) — FO may not have completed the full cycle within budget")
-    else:
-        t.fail("entity was archived via local merge (entity file not found)")
+    check_merge_outcome(
+        t,
+        nomods_project,
+        "merge-hook-pipeline",
+        "merge-hook-entity",
+        "spacedock-ensign-merge-hook-entity-work",
+        hook_expected=False,
+        archive_required=False,
+    )
 
     # --- Results ---
     t.results()

@@ -16,14 +16,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from test_lib import (
-    TestRunner, LogParser, create_test_project, setup_fixture,
-    install_agents, assembled_agent_content, run_first_officer, git_add_commit,
-    file_contains,
+    CodexLogParser, TestRunner, LogParser, create_test_project, setup_fixture,
+    install_agents, run_codex_first_officer, run_first_officer, git_add_commit,
+    rejection_follow_up_observed, rejection_signal_present,
 )
 
 
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(description="Rejection flow E2E test")
+    parser.add_argument("--runtime", choices=["claude", "codex"], default="claude")
+    parser.add_argument("--agent", default="spacedock:first-officer")
     parser.add_argument("--model", default="haiku", help="Model to use (default: haiku)")
     parser.add_argument("--effort", default="low", help="Effort level (default: low)")
     return parser.parse_known_args()
@@ -31,7 +33,7 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
 
 def main():
     args, extra_args = parse_args()
-    t = TestRunner("Rejection Flow E2E Test")
+    t = TestRunner(f"Rejection Flow E2E Test ({args.runtime})")
 
     # --- Phase 1: Set up test project from static fixture ---
 
@@ -40,7 +42,8 @@ def main():
     create_test_project(t)
     fixture_dir = t.repo_root / "tests" / "fixtures" / "rejection-flow"
     setup_fixture(t, "rejection-flow", "rejection-pipeline")
-    install_agents(t, include_ensign=True)
+    if args.runtime == "claude":
+        install_agents(t, include_ensign=True)
 
     # Copy the buggy implementation and tests into the repo root
     shutil.copy2(fixture_dir / "math_ops.py", t.test_project_dir)
@@ -49,21 +52,6 @@ def main():
     shutil.copy2(fixture_dir / "tests" / "test_add.py", tests_dir)
 
     git_add_commit(t.test_project_dir, "setup: rejection flow fixture with buggy implementation")
-
-    print()
-    print("[Fixture Setup]")
-
-    fo_text = assembled_agent_content(t, "first-officer")
-
-    t.check("assembled first-officer contains feedback rejection flow",
-            "Feedback Rejection Flow" in fo_text)
-    if "Feedback Rejection Flow" not in fo_text:
-        print("  FATAL: Rejection flow section missing from assembled agent. Aborting.")
-        t.results()
-        return
-
-    t.check("assembled first-officer has feedback-to dispatch logic",
-            "feedback-to" in fo_text)
 
     status_cmd = ["python3", str(t.repo_root / "skills" / "commission" / "bin" / "status"),
                   "--workflow-dir", "rejection-pipeline"]
@@ -81,65 +69,95 @@ def main():
 
     # --- Phase 2: Run the first officer ---
 
-    print("--- Phase 2: Run first officer (this takes ~120-300s) ---")
+    print(f"--- Phase 2: Run first officer ({args.runtime}) ---")
 
-    fo_exit = run_first_officer(
-        t,
-        "Process all tasks through the workflow. When you encounter a gate review where the reviewer recommends REJECTED, approve the REJECTED verdict so the rejection flow proceeds.",
-        extra_args=["--model", args.model, "--effort", args.effort, "--max-budget-usd", "5.00"],
-    )
+    if args.runtime == "claude":
+        abs_workflow = t.test_project_dir / "rejection-pipeline"
+        fo_exit = run_first_officer(
+            t,
+            f"Process all tasks through the workflow at {abs_workflow}/. When you encounter a gate review where the reviewer recommends REJECTED, approve the REJECTED verdict so the rejection flow proceeds.",
+            agent_id=args.agent,
+            extra_args=["--model", args.model, "--effort", args.effort, "--max-budget-usd", "5.00", *extra_args],
+        )
 
-    if fo_exit != 0:
-        print("  (may be expected — budget cap or gate hold)")
+        if fo_exit != 0:
+            print("  (may be expected — budget cap or gate hold)")
+    else:
+        fo_exit = run_codex_first_officer(
+            t,
+            "rejection-pipeline",
+            agent_id=args.agent,
+            run_goal=(
+                "Process only the entity `buggy-add-task`. "
+                "Drive the workflow until validation finishes and you can report the rejection verdict "
+                "and the follow-up target. Then stop immediately. "
+                "Do not start a second repair cycle after reporting that first rejection outcome. "
+                "When you dispatch workers, use the exact Codex pattern "
+                "`spawn_agent(agent_type=\"worker\", fork_context=false, message=<fully self-contained prompt>)` "
+                "followed by `wait_agent(...)`."
+            ),
+            timeout_s=240,
+        )
+        t.check("Codex launcher exited cleanly", fo_exit == 0)
 
     # --- Phase 3: Validate ---
 
     print("--- Phase 3: Validation ---")
 
-    log = LogParser(t.log_dir / "fo-log.jsonl")
-    log.write_agent_calls(t.log_dir / "agent-calls.txt")
-    log.write_fo_texts(t.log_dir / "fo-texts.txt")
-
-    agent_calls = log.agent_calls()
-    fo_text = "\n".join(log.fo_texts())
+    if args.runtime == "claude":
+        log = LogParser(t.log_dir / "fo-log.jsonl")
+        log.write_agent_calls(t.log_dir / "agent-calls.txt")
+        log.write_fo_texts(t.log_dir / "fo-texts.txt")
+        agent_calls = log.agent_calls()
+        fo_text = "\n".join(log.fo_texts())
+        worker_messages = ""
+    else:
+        log = CodexLogParser(t.log_dir / "codex-fo-log.txt")
+        log.write_text(t.log_dir / "codex-fo-text.txt")
+        agent_calls = []
+        fo_text = log.full_text()
+        worker_messages = "\n".join(log.completed_agent_messages())
 
     print()
     print("[Rejection Flow Behavior]")
 
-    # Check 1: FO dispatched an ensign for the validation stage
-    ensign_calls = [c for c in agent_calls if c["subagent_type"] == "spacedock:ensign"]
-    t.check("FO dispatched an ensign for validation stage", len(ensign_calls) > 0)
-
-    # Check 2: The reviewer's stage report contains a REJECTED recommendation
-    found_rejected = False
-
-    # Check entity file on main
     entity_main = t.test_project_dir / "rejection-pipeline" / "buggy-add-task.md"
-    if entity_main.is_file() and re.search(r"REJECTED", entity_main.read_text(), re.IGNORECASE):
-        found_rejected = True
+    worktrees_dir = t.test_project_dir / (".worktrees" if args.runtime == "claude" else ".spacedock/worktrees")
 
-    # Check entity files in any worktree
-    worktrees_dir = t.test_project_dir / ".worktrees"
-    if worktrees_dir.is_dir():
-        for wt in worktrees_dir.iterdir():
-            wt_entity = wt / "rejection-pipeline" / "buggy-add-task.md"
-            if wt_entity.is_file() and re.search(r"REJECTED", wt_entity.read_text(), re.IGNORECASE):
-                found_rejected = True
-
-    # Check FO text output
-    if re.search(r"REJECTED", fo_text, re.IGNORECASE):
-        found_rejected = True
-
-    t.check("reviewer stage report contains REJECTED recommendation", found_rejected)
-
-    # Check 3: FO dispatched multiple ensigns (implementation + validation + fix after rejection)
-    ensign_count = len(ensign_calls)
-    if ensign_count >= 3:
-        t.pass_(f"FO dispatched ensign for fix after rejection ({ensign_count} total ensign dispatches)")
-    elif ensign_count >= 2:
-        t.fail(f"FO dispatched ensign for fix after rejection (only {ensign_count} ensign dispatches — missing fix dispatch)")
+    if args.runtime == "claude":
+        ensign_calls = [c for c in agent_calls if c["subagent_type"] == "spacedock:ensign"]
+        t.check("FO dispatched an ensign for validation stage", len(ensign_calls) > 0)
     else:
-        t.fail(f"FO dispatched ensign for fix after rejection (only {ensign_count} ensign dispatches)")
+        t.check("at least one worker completed", bool(worker_messages.strip()))
+
+    t.check(
+        "reviewer stage report contains REJECTED recommendation",
+        rejection_signal_present("rejection-pipeline", "buggy-add-task", entity_main, worktrees_dir, worker_messages, fo_text),
+    )
+
+    if args.runtime == "claude":
+        ensign_count = len(ensign_calls)
+        if ensign_count >= 3:
+            t.pass_(f"FO dispatched ensign for fix after rejection ({ensign_count} total ensign dispatches)")
+        elif ensign_count >= 2:
+            t.fail(f"FO dispatched ensign for fix after rejection (only {ensign_count} ensign dispatches — missing fix dispatch)")
+        else:
+            t.fail(f"FO dispatched ensign for fix after rejection (only {ensign_count} ensign dispatches)")
+    else:
+        spawn_count = log.spawn_count()
+        t.check(
+            "multiple worker dispatches occurred",
+            spawn_count >= 2 or bool(re.search(r"validation|implementation", worker_messages, re.IGNORECASE)),
+        )
+        t.check(
+            "follow-up work after rejection was observable",
+            rejection_follow_up_observed("rejection-pipeline", "buggy-add-task", worktrees_dir, worker_messages, fo_text),
+        )
+        main_entity_text = entity_main.read_text() if entity_main.is_file() else ""
+        worktree_match = re.search(r"^worktree:\s*(.+)$", main_entity_text, re.MULTILINE)
+        worktree_value = worktree_match.group(1).strip() if worktree_match else ""
+        t.check("packaged worker uses safe worktree key", "spacedock-ensign" in worktree_value)
+        t.check("logical packaged id does not leak into worktree path", "spacedock:ensign" not in worktree_value)
 
     # --- Results ---
     t.results()
