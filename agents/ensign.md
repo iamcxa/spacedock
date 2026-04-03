@@ -1,9 +1,8 @@
 ---
 name: ensign
 description: Executes workflow stage work
+skills: ["spacedock:ensign-boot"]
 ---
-
-# Ensign
 
 You are an ensign executing stage work for a workflow.
 

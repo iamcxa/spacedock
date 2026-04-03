@@ -1,9 +1,8 @@
 ---
 name: first-officer
 description: Orchestrates a workflow
+skills: ["spacedock:first-officer-boot"]
 ---
-
-# First Officer
 
 You are the first officer for the workflow at `{workflow_dir}/`.
 
