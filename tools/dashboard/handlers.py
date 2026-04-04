@@ -77,16 +77,28 @@ def make_handler(project_root, static_dir, log_file=None):
                     result.append(data)
             self._send_json(result)
 
+        def _validate_path(self, filepath):
+            """Check that filepath resolves within project_root. Returns False and sends 403 if not."""
+            resolved = os.path.realpath(filepath)
+            if not resolved.startswith(os.path.realpath(project_root) + os.sep) and resolved != os.path.realpath(project_root):
+                self._send_json({'error': 'Forbidden'}, 403)
+                return False
+            return True
+
         def _handle_entity_detail(self, query):
             filepath = query.get('path', [None])[0]
             if not filepath:
                 self._send_json({'error': 'path required'}, 400)
+                return
+            if not self._validate_path(filepath):
                 return
             data = get_entity_detail(filepath)
             self._send_json(data)
 
         def _handle_filter_entities(self, query):
             directory = query.get('dir', ['.'])[0]
+            if not self._validate_path(directory):
+                return
             status = query.get('status', [None])[0]
             tag = query.get('tag', [None])[0]
             min_score = query.get('min_score', [None])[0]
@@ -102,11 +114,15 @@ def make_handler(project_root, static_dir, log_file=None):
 
         def _handle_update_score(self):
             body = json.loads(self._read_body())
+            if not self._validate_path(body['path']):
+                return
             update_score(body['path'], body['score'])
             self._send_json({'ok': True})
 
         def _handle_update_tags(self):
             body = json.loads(self._read_body())
+            if not self._validate_path(body['path']):
+                return
             update_tags(body['path'], body['tags'])
             self._send_json({'ok': True})
 
@@ -118,7 +134,6 @@ def make_handler(project_root, static_dir, log_file=None):
             body = json.dumps(data).encode('utf-8')
             self.send_response(status)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
-            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             self.wfile.write(body)
 
