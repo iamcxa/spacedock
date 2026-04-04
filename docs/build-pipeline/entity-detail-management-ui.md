@@ -1,13 +1,13 @@
 ---
 id: 002
 title: Entity Detail & Management UI
-status: pr-ship
+status: pr-draft
 source: commission seed
 started: 2026-04-04T02:55:00Z
 completed:
 verdict:
 score: 0.8
-worktree: .worktrees/ensign-entity-detail-management-ui
+worktree:
 issue:
 pr:
 intent: feature
