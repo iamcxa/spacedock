@@ -262,3 +262,20 @@ Executed the full 8-task implementation plan for Entity Detail & Management UI. 
 ### Summary
 
 Quality gate PASSED. All 53 tests pass (20 new, 33 existing) with zero failures and zero regressions. Python syntax checks clean on all 3 new files. Frontend files (2 HTML, 1 JS, 1 CSS) have no syntax issues — all delimiters balanced, HTML tags properly closed. Frontmatter roundtrip verified safe: score and tag updates via the API layer preserve entity body content and unmodified frontmatter fields. The implementation is ready for review.
+
+## Stage Report: e2e
+
+- [x] Web server starts and serves entity detail pages on localhost
+  Server started on port 8080 via `python3 web/server.py`, confirmed serving dashboard (/) and detail (/detail) pages with 200 status
+- [x] UI mapping created (or documented why browser mapping wasn't possible)
+  Browser mapping created at `.claude/e2e/mappings/spacedock.yaml` — 2 pages (dashboard, detail), 40+ elements mapped via agent-browser interactive exploration
+- [x] E2E flow generated from acceptance criteria
+  Flow generated at `.claude/e2e/flows/entity-detail-management.yaml` — 19 steps covering all 7 acceptance criteria, v2 format with mapping reference
+- [x] E2E tests executed with results
+  All 19 steps PASS in browser verification via agent-browser. Score adjustment (slider to 0.75, persisted via API), tag editing (add/remove, persisted as comma-separated flat string), filtering (min_score=0.95 filters correctly), back navigation — all verified. API persistence confirmed via curl. 9 screenshots saved.
+- [x] Any issues or limitations documented
+  One minor finding: agent-browser `click @ref` on the `<a>` back link did not trigger navigation; required `eval` with `.click()` JS call. All other interactions worked via standard agent-browser commands. No functional issues found in the application itself.
+
+### Summary
+
+Full browser E2E testing completed for Entity Detail & Management UI. Started the web server on localhost:8080, created a UI mapping with agent-browser covering both dashboard and detail pages (40+ elements), generated a 19-step E2E flow from the 7 acceptance criteria, and executed all steps successfully in a real browser. Key verifications: entity row click navigates to detail view with rendered markdown, stage reports display with checklist formatting (checkmarks, item text, evidence detail, summary), metadata panel shows all frontmatter fields, score adjustment persists to file via API, tag editing with add/remove persists as comma-separated flat strings, filtering by min_score correctly hides/shows entities, and back navigation returns to dashboard. Report and 9 screenshots saved to `.claude/e2e/reports/20260404-132237-verify/`.

@@ -1,0 +1,137 @@
+name: entity-detail-management
+description: "Verify entity detail view, stage reports, metadata, tag editing, score adjustment, filtering, and back navigation"
+tags: [acceptance, feature-002]
+mapping: spacedock
+
+steps:
+  - id: load-dashboard
+    action: "Navigate to dashboard at /"
+    expect:
+      - "heading_title is visible"
+      - "input_workflow_dir is visible"
+      - "button_load is visible"
+    screenshot: true
+
+  - id: enter-workflow-dir
+    action: "Fill input_workflow_dir with 'tests/fixtures/gated-pipeline'"
+    expect:
+      - "input_workflow_dir contains 'tests/fixtures/gated-pipeline'"
+
+  - id: load-entities
+    action: "Click button_load"
+    expect:
+      - "entity_row is visible"
+    screenshot: true
+
+  - id: click-entity-row
+    action: "Click the first entity_row to navigate to detail view"
+    expect:
+      - "link_back is visible"
+      - "text_entity_title is visible"
+      - "section_entity_body is visible"
+    screenshot: true
+
+  - id: verify-markdown-body
+    action: "Verify section_entity_body contains rendered markdown content"
+    expect:
+      - "section_entity_body contains text"
+      - "section_entity_body is visible"
+
+  - id: verify-stage-reports
+    action: "Verify stage report sections are rendered with checklist formatting"
+    expect:
+      - "stage_report_card is visible"
+      - "stage_report_heading is visible"
+      - "checklist is visible"
+      - "checklist_item_done is visible"
+    screenshot: true
+
+  - id: verify-checklist-detail
+    action: "Verify checklist items have text and evidence detail"
+    expect:
+      - "checklist_item_text is visible"
+      - "checklist_item_detail is visible"
+      - "stage_summary is visible"
+
+  - id: verify-metadata-panel
+    action: "Verify metadata panel shows all frontmatter fields"
+    expect:
+      - "heading_metadata is visible"
+      - "metadata_fields is visible"
+      - "metadata_key is visible"
+      - "metadata_value is visible"
+    screenshot: true
+
+  - id: verify-score-controls
+    action: "Verify score adjustment controls are present"
+    expect:
+      - "heading_score is visible"
+      - "slider_score is visible"
+      - "text_score_display is visible"
+      - "button_score_save is visible"
+
+  - id: adjust-score
+    action: "Set slider_score to 0.75 and click button_score_save"
+    expect:
+      - "text_score_display shows '0.75'"
+    screenshot: true
+
+  - id: verify-tag-controls
+    action: "Verify tag editing controls are present"
+    expect:
+      - "heading_tags is visible"
+      - "container_tag_chips is visible"
+      - "input_tag is visible"
+      - "button_tag_add is visible"
+
+  - id: add-tag
+    action: "Fill input_tag with 'test-tag' and click button_tag_add"
+    expect:
+      - "tag_chip is visible"
+      - "tag_chip contains 'test-tag'"
+    screenshot: true
+
+  - id: add-second-tag
+    action: "Fill input_tag with 'priority' and click button_tag_add"
+    expect:
+      - "tag_chip contains 'priority'"
+
+  - id: remove-tag
+    action: "Click button_tag_remove on the 'test-tag' chip"
+    expect:
+      - "tag_chip does not contain 'test-tag'"
+    screenshot: true
+
+  - id: back-navigation
+    action: "Click link_back to return to dashboard"
+    expect:
+      - "heading_title is visible"
+      - "input_workflow_dir is visible"
+    screenshot: true
+
+  - id: verify-filters-present
+    action: "Verify filter controls are visible on dashboard"
+    expect:
+      - "select_filter_status is visible"
+      - "input_filter_min_score is visible"
+      - "input_filter_max_score is visible"
+      - "input_filter_tag is visible"
+      - "button_filter_apply is visible"
+      - "button_filter_clear is visible"
+
+  - id: reload-entities-for-filter
+    action: "Fill input_workflow_dir with 'tests/fixtures/gated-pipeline' and click button_load"
+    expect:
+      - "entity_row is visible"
+
+  - id: filter-by-min-score
+    action: "Fill input_filter_min_score with '0.95' and click button_filter_apply"
+    expect:
+      - "empty_message is visible or entity_row count changes"
+    screenshot: true
+
+  - id: clear-filters
+    action: "Click button_filter_clear"
+    expect:
+      - "entity_row is visible"
+    screenshot: true
