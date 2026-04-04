@@ -1,7 +1,7 @@
 ---
 id: 004
 title: Dashboard Persistent Daemon
-status: quality
+status: pr-draft
 source: brainstorming session
 started: 2026-04-04T08:53:00Z
 completed:
