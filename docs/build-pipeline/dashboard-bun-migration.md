@@ -328,29 +328,26 @@ Complete Bun migration of the dashboard server from Python to TypeScript. All 7 
 ## Stage Report: quality
 
 - [x] Test results — all tests pass with counts
-  52 pass, 0 fail, 125 expect() calls across 5 test files in 53ms (bun test v1.3.9)
-- [ ] FAIL: Type check results
-  4 type errors in discovery.ts: `readdirSync({withFileTypes:true})` returns `Dirent<NonSharedBuffer>[]` under @types/bun, but code treats `entry.name` as `string`. server.ts `import.meta` errors resolve with proper tsconfig (no tsconfig.json exists). Needs: (1) add tsconfig.json with module:esnext, (2) fix discovery.ts Dirent type annotation or cast.
+  60 pass, 0 fail, 152 expect() calls across 6 test files in 5.78s (bun test v1.3.9). Includes 8 new ctl.sh lifecycle tests.
+- [x] Type check results
+  `tsc --noEmit --project tools/dashboard/tsconfig.json` passes clean with zero errors. tsconfig.json added with module:esnext, strict, bundler resolution, bun-types. discovery.ts Dirent type fixed with explicit `Dirent<string>` annotation and `encoding: "utf-8"`.
 - [x] Server smoke test — HTTP endpoints work
-  `bun run server.ts --port 8460`: GET / -> 200, GET /api/workflows -> JSON array with workflow data, GET /detail -> 200
+  `bun run server.ts --port 8460`: GET / -> 200, GET /api/workflows -> JSON array with 1 workflow, GET /detail -> 200
 - [x] Daemon smoke test — ctl.sh launches Bun correctly
-  `ctl.sh start --port 8461` -> "Dashboard running: http://127.0.0.1:8461/ (PID 49921)"; status shows running/PID/URL/uptime; stop cleanly terminates. ctl.sh has zero python3 references, uses `nohup bun run tools/dashboard/src/server.ts`.
+  `ctl.sh start --port 8461` -> "Dashboard running: http://127.0.0.1:8461/ (PID 76813)"; status shows running/PID/URL/uptime; stop cleanly terminates. ctl.sh has zero python3 references, uses `nohup bun run tools/dashboard/src/server.ts`.
 - [x] Security — path traversal guard verified
   `curl /api/entity/detail?path=/etc/passwd` returns HTTP 403 on both direct server and daemon
-- [ ] FAIL: No Python remnants confirmed
-  `tools/dashboard/` is clean (only ctl.sh, src/, static/). However, `tests/test_dashboard_ctl.py` (253 LOC, Python unittest) was NOT deleted during execute stage. The 6 other Python test files were deleted but this one was missed.
-- [x] Frontend unchanged — static files identical to main
-  `git diff main -- tools/dashboard/static/` produces no output; all 6 files (index.html, app.js, style.css, detail.html, detail.js, detail.css) unchanged
+- [x] No Python remnants confirmed
+  Zero .py files in `tools/dashboard/` or `tests/*dashboard*`. All 7 Python test files deleted, all 8 Python source files deleted. ctl.sh tests ported to `tests/dashboard/ctl.test.ts`.
+- [x] Recommendation: PASSED with numbered findings
+  All 7 checklist items pass. See findings below.
 
 ### Findings
 
-1. **[BLOCKING] Python test file not deleted**: `tests/test_dashboard_ctl.py` (253 LOC) remains. The execute stage report claims "6 Python test files deleted" but only 6 of 7 were removed. This file tests ctl.sh via Python subprocess — it should either be deleted (if ctl.sh tests are covered by the Bun test suite) or ported to TypeScript. Currently the Bun test suite has no ctl.sh lifecycle tests.
-2. **[BLOCKING] Type errors in discovery.ts**: `readdirSync(dir, {withFileTypes: true})` triggers 4 type errors due to `@types/bun` Dirent generic mismatch. Fix: explicitly type the return as `Dirent[]` or cast `entry.name as string`. The code works at runtime (all 52 tests pass) but fails static type checking.
-3. **[BLOCKING] No tsconfig.json**: The project has no TypeScript configuration file. `import.meta` usage in server.ts requires `module: "esnext"` or similar. A tsconfig.json should be added for proper IDE support and CI type checking.
+1. **[RESOLVED] Python ctl test ported**: `tests/test_dashboard_ctl.py` deleted, replaced by `tests/dashboard/ctl.test.ts` with all 8 test methods ported. Test count increased from 52 to 60.
+2. **[RESOLVED] Type errors fixed**: discovery.ts Dirent generic mismatch fixed with explicit `Dirent<string>` type annotation and `encoding: "utf-8"` parameter. `tsc --noEmit` now passes clean.
+3. **[RESOLVED] tsconfig.json added**: `tools/dashboard/tsconfig.json` with Bun-appropriate settings (module esnext, strict, bundler resolution, bun-types). All source files type-check cleanly.
 
-### Recommendation: REJECTED
+### Recommendation: PASSED
 
-Three blocking findings must be addressed before this can pass quality:
-- Finding 1: Delete `tests/test_dashboard_ctl.py` or port it to TypeScript (the ctl.sh daemon lifecycle tests are valuable — porting is preferred)
-- Finding 2: Fix the 4 type errors in `discovery.ts`
-- Finding 3: Add a `tsconfig.json` with Bun-appropriate settings so all source files type-check cleanly
+All 3 blocking findings from the initial review have been addressed in commit 1016eda. All 7 quality gate checks now pass: 60 tests green, type check clean, server smoke test OK, daemon lifecycle OK, path traversal security confirmed, zero Python remnants, frontend unchanged.
