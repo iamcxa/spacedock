@@ -14,6 +14,7 @@ This file captures the shared first-officer semantics. Keep it aligned with `age
 4. Discover mod hooks by scanning `{workflow_dir}/_mods/*.md` for `## Hook:` sections. Register `startup`, `idle`, and `merge` hooks in alphabetical order by mod filename.
 5. Run startup hooks before normal dispatch.
 6. Detect orphaned worktree entities by checking `status --where "worktree !="` and report anomalies rather than auto-redispatching.
+6.5. Check dashboard — run `tools/dashboard/ctl.sh status --root {project_root}`. If not running, prompt captain: "Dashboard is not running. Start it? (http://localhost:8420/)" Wait for captain response. Yes — run `tools/dashboard/ctl.sh start --root {project_root}`. No — skip.
 7. Run `status --next` to identify dispatchable entities.
 
 ## Status Viewer
