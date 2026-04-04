@@ -5,6 +5,7 @@ Follows the same flat key:value parsing as the existing codebase parsers
 scripts/test_lib.py). Tags are stored as comma-separated flat strings
 in frontmatter — NOT YAML list syntax.
 """
+import re
 
 
 def split_frontmatter(text):
@@ -103,3 +104,69 @@ def update_entity_tags(text, tags):
     """
     tags_str = ','.join(t.strip() for t in tags if t.strip())
     return update_frontmatter_fields(text, {'tags': tags_str})
+
+
+def extract_stage_reports(text):
+    """Extract structured stage reports from entity markdown.
+
+    Parses the Stage Report Protocol format defined in
+    references/ensign-shared-core.md:30-55:
+
+        ## Stage Report: {stage_name}
+
+        - [x] {item text}
+          {evidence}
+        - [ ] SKIP: {item text}
+          {rationale}
+        - [ ] FAIL: {item text}
+          {details}
+
+        ### Summary
+
+        {summary text}
+    """
+    _, body = split_frontmatter(text)
+    reports = []
+    pattern = r'^## Stage Report: (.+)$'
+    sections = re.split(pattern, body, flags=re.MULTILINE)
+    # sections[0] is text before first report, then alternating: stage_name, section_body
+    for i in range(1, len(sections), 2):
+        stage_name = sections[i].strip()
+        section_body = sections[i + 1] if i + 1 < len(sections) else ''
+        items = []
+        summary = ''
+        # Extract summary
+        summary_match = re.split(r'^### Summary\s*$', section_body, flags=re.MULTILINE)
+        checklist_text = summary_match[0]
+        if len(summary_match) > 1:
+            summary = summary_match[1].strip()
+        # Parse checklist items
+        item_pattern = r'^- \[(x| )\] ((?:SKIP: |FAIL: )?)(.+)$'
+        lines = checklist_text.splitlines()
+        for j, line in enumerate(lines):
+            m = re.match(item_pattern, line)
+            if m:
+                checked, prefix, item_text = m.groups()
+                if checked == 'x':
+                    status = 'done'
+                elif prefix.startswith('SKIP'):
+                    status = 'skip'
+                elif prefix.startswith('FAIL'):
+                    status = 'fail'
+                else:
+                    status = 'pending'
+                # Look for indented detail on next line
+                detail = ''
+                if j + 1 < len(lines) and lines[j + 1].startswith('  '):
+                    detail = lines[j + 1].strip()
+                items.append({
+                    'status': status,
+                    'text': item_text.strip(),
+                    'detail': detail,
+                })
+        reports.append({
+            'stage': stage_name,
+            'items': items,
+            'summary': summary,
+        })
+    return reports
