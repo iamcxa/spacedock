@@ -327,3 +327,111 @@ describe("Dashboard Server", () => {
     expect(msg.data.seq).toBeGreaterThan(0);
   });
 });
+
+describe("Event Pipeline Integration", () => {
+  let tmpDir: string;
+  let server: ReturnType<typeof import("../../tools/dashboard/src/server").createServer> extends Promise<infer T> ? T : never;
+  let baseUrl: string;
+
+  beforeAll(async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "event-int-test-"));
+    const wfDir = join(tmpDir, "docs", "build-pipeline");
+    mkdirSync(wfDir, { recursive: true });
+    writeFileSync(join(wfDir, "README.md"), "---\ncommissioned-by: spacedock@v1\n---\n");
+
+    const staticDir = join(tmpDir, "static");
+    mkdirSync(staticDir);
+    writeFileSync(join(staticDir, "index.html"), "<html></html>");
+
+    const { createServer } = await import("../../tools/dashboard/src/server");
+    const srv = createServer({ port: 0, projectRoot: tmpDir, staticDir });
+    baseUrl = `http://localhost:${srv.port}`;
+    server = srv;
+  });
+
+  afterAll(() => {
+    server?.stop();
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test("POST /api/events -> WebSocket broadcast -> multiple clients receive in order", async () => {
+    const ws1 = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+    const ws2 = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+
+    await Promise.all([
+      new Promise<void>((r) => { ws1.onopen = () => r(); }),
+      new Promise<void>((r) => { ws2.onopen = () => r(); }),
+    ]);
+
+    // Skip replay messages
+    const skipReplay = (ws: WebSocket) => new Promise<void>((r) => {
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data as string);
+        if (msg.type === "replay") r();
+      };
+      setTimeout(r, 500);
+    });
+    await Promise.all([skipReplay(ws1), skipReplay(ws2)]);
+
+    // Collect live events from both clients
+    const msgs1: any[] = [];
+    const msgs2: any[] = [];
+    const got1 = new Promise<void>((r) => {
+      ws1.onmessage = (ev) => { msgs1.push(JSON.parse(ev.data as string)); if (msgs1.length === 2) r(); };
+      setTimeout(r, 2000);
+    });
+    const got2 = new Promise<void>((r) => {
+      ws2.onmessage = (ev) => { msgs2.push(JSON.parse(ev.data as string)); if (msgs2.length === 2) r(); };
+      setTimeout(r, 2000);
+    });
+
+    // POST two events
+    await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "dispatch", entity: "int-a", stage: "plan", agent: "e1", timestamp: "2026-04-04T12:00:00Z" }),
+    });
+    await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "completion", entity: "int-a", stage: "plan", agent: "e1", timestamp: "2026-04-04T12:01:00Z" }),
+    });
+
+    await Promise.all([got1, got2]);
+    ws1.close();
+    ws2.close();
+
+    // Both clients received both events in order
+    expect(msgs1.length).toBe(2);
+    expect(msgs2.length).toBe(2);
+    expect(msgs1[0].data.event.type).toBe("dispatch");
+    expect(msgs1[1].data.event.type).toBe("completion");
+    expect(msgs1[1].data.seq).toBeGreaterThan(msgs1[0].data.seq);
+  });
+
+  test("reconnecting client receives replay of missed events", async () => {
+    // POST an event while no WS clients are connected
+    await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "gate", entity: "int-b", stage: "quality", agent: "e2", timestamp: "2026-04-04T13:00:00Z" }),
+    });
+
+    // Connect a new client -- should receive replay including the missed event
+    const ws = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+    const replay = await new Promise<any>((resolve) => {
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data as string);
+        if (msg.type === "replay") resolve(msg);
+      };
+      setTimeout(() => resolve(null), 1000);
+    });
+    ws.close();
+
+    expect(replay).not.toBeNull();
+    expect(replay.events.length).toBeGreaterThan(0);
+    const gateEvent = replay.events.find((e: any) => e.event.entity === "int-b");
+    expect(gateEvent).toBeDefined();
+    expect(gateEvent.event.type).toBe("gate");
+  });
+});
