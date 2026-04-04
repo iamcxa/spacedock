@@ -284,3 +284,87 @@ Implemented all 4 plan tasks with TDD discipline across 4 atomic commits. Key de
 ### Summary
 
 All quality gate checks passed. Tests cover the new functionality (8 ctl.sh tests, 3 new handler/serve tests) and existing tests show no regressions. Both Python files compile cleanly, ctl.sh has correct bash syntax and shebang. The live daemon lifecycle smoke test confirmed start/status/stop all work correctly on port 8450 with proper PID management and cleanup.
+
+## Supplementary Quality: Security & Coverage
+
+### Security Findings
+
+**MEDIUM — Arbitrary file read via `/api/entity/detail` (handlers.py:80-86)**
+The `_handle_entity_detail` handler takes a `path` query parameter from the HTTP request and passes it directly to `get_entity_detail(filepath)` which calls `open(filepath)` (api.py:23). No path validation or containment check is applied. An attacker with network access to the server could read any file readable by the process owner, e.g. `GET /api/entity/detail?path=/etc/passwd`. This contrasts with `_serve_static` (handlers.py:125-128) which correctly uses `os.path.realpath()` + `startswith()` to prevent traversal.
+
+**MEDIUM — Arbitrary file write via `/api/entity/score` and `/api/entity/tags` (handlers.py:103-111)**
+The `_handle_update_score` and `_handle_update_tags` POST handlers take `body['path']` from user-supplied JSON and pass it directly to `update_score(filepath, ...)` and `update_tags(filepath, ...)` (api.py:31-37, 40-51). These functions `open(filepath)` for read and then `open(filepath, 'w')` for write with no path validation. An attacker could overwrite arbitrary files (the file content would be corrupted by the frontmatter update logic, but the write itself is unrestricted).
+
+**MEDIUM — Arbitrary directory scan via `/api/entities` (handlers.py:88-101)**
+The `_handle_filter_entities` handler takes a `dir` query parameter (defaults to `.`) and passes it to `filter_entities(directory, ...)` which calls `glob.glob(os.path.join(directory, '*.md'))` (api.py:59). An attacker could enumerate `.md` files in any directory on the filesystem.
+
+**Mitigation context for MEDIUM findings above**: The server binds exclusively to `127.0.0.1` (serve.py:43), so these endpoints are only reachable from the local machine. For a single-user local development tool, the practical risk is LOW — the user already has full filesystem access. However, if any browser-based XSS or CSRF attack targets `localhost:8420`, these endpoints could be exploited. The `Access-Control-Allow-Origin: *` CORS header (handlers.py:121) means any website can make requests to these endpoints from the browser. This elevates the effective risk to MEDIUM because a malicious webpage could read/write files through the dashboard.
+
+**INFO — CORS wildcard on all JSON responses (handlers.py:121)**
+`Access-Control-Allow-Origin: *` is set on every JSON response via `_send_json`. This allows any origin to make cross-origin requests to the dashboard API. Combined with the path traversal issues above, this means a malicious website visited in the same browser could interact with the dashboard API. For a localhost dev tool without sensitive data, this is low concern on its own but amplifies the path traversal findings.
+
+**INFO — PID/state files use default umask (ctl.sh:159-162)**
+State files (pid, port, root) under `~/.spacedock/dashboard/{hash}/` are created with default umask (typically 022, yielding 644). On a single-user dev machine this is fine. On a shared system, other users could read the PID/port, though they cannot write to the directory. No action needed for the target use case.
+
+**INFO — No SIGTERM handler in serve.py (serve.py:53-57)**
+`serve_forever()` only catches `KeyboardInterrupt` (SIGINT). SIGTERM (sent by `ctl.sh stop`) terminates the process at the OS level without calling `server.shutdown()`. This is acceptable — the OS reclaims all resources — but means no graceful connection draining. Confirmed by research (CLAIM-2, CLAIM-7).
+
+**PASS — Shell script security (ctl.sh)**
+- All variables are properly double-quoted throughout the script (no word-splitting or glob expansion risks)
+- No use of `eval`, no backtick command substitution (uses `$()` consistently)
+- `set -euo pipefail` at top (line 4) with proper `|| true` / `2>/dev/null` for expected failures
+- Argument parsing uses a whitelist `case` statement (lines 32-49) — no injection via command arguments
+- PID file operations use standard `cat`/`kill -0` patterns with proper error handling
+- `nohup` redirection (`> /dev/null 2>&1 &`) is correct for daemon backgrounding
+- No temp file races — state directory is per-user under `$HOME`
+
+**PASS — Server bind address (serve.py:43)**
+Server binds to `127.0.0.1`, not `0.0.0.0`. Not exposed to the network.
+
+**PASS — Static file path traversal guard (handlers.py:125-128)**
+`_serve_static` uses `os.path.realpath()` and verifies the resolved path starts with `os.path.realpath(static_dir)`. This correctly prevents directory traversal via `../` in URL paths.
+
+**PASS — Log message content (handlers.py:146-153)**
+`log_message` writes client IP (always 127.0.0.1 for localhost), timestamp, and HTTP request line. No sensitive data (headers, cookies, request bodies) is logged.
+
+### Code Coverage Assessment
+
+**Test results: 29 passed, 0 failures** (pytest tests/test_dashboard_handlers.py tests/test_dashboard_discovery.py tests/test_dashboard_parsing.py tests/test_dashboard_ctl.py -v --tb=short)
+
+**ctl.sh subcommand coverage (tests/test_dashboard_ctl.py — 8 tests):**
+- `start` — covered: PID file creation, health check, idempotent start, port auto-selection, log rotation, stale PID detection
+- `stop` — covered: PID file cleanup, process termination
+- `status` — covered: running state output (PID, URL)
+- `restart` — NOT tested directly (no `test_restart` test case)
+- `logs` — NOT tested directly (no `test_logs` test case)
+- `status --all` — NOT tested directly (no test for `do_status_all`)
+- `--help` / usage — NOT tested
+
+**handlers.py coverage (tests/test_dashboard_handlers.py — 7 tests):**
+- `_serve_static` — covered: index.html serving, 404 for unknown paths
+- `/api/workflows` — covered: JSON response, stages inclusion
+- `log_message` — covered: suppressed by default, writes to file when log_file set
+- `--log-file` argparse — covered: via subprocess --help check
+- `/api/entity/detail` — NOT tested in handler tests (only indirectly via api.py)
+- `/api/entity/score` (POST) — NOT tested via HTTP
+- `/api/entity/tags` (POST) — NOT tested via HTTP
+- `/api/entities` (filter) — NOT tested via HTTP
+- `do_POST` routing — NOT tested
+- Path traversal guard — NOT tested (no test verifying `../` is rejected)
+- 403 Forbidden response — NOT tested
+
+**Untested code paths summary:**
+1. `ctl.sh`: `do_restart` (line 313-316), `do_logs` (lines 300-311), `do_status_all` (lines 260-298), `usage` (lines 16-29), SIGKILL fallback (lines 216-218)
+2. `handlers.py`: `do_POST` routing, `_handle_entity_detail`, `_handle_filter_entities`, `_handle_update_score`, `_handle_update_tags`, 403 Forbidden from `_serve_static`
+3. `serve.py`: banner written to log file (lines 48-50), full `main()` startup flow
+
+### Overall Recommendation
+
+**PASS (with advisory)**
+
+No CRITICAL or HIGH severity issues found. The three MEDIUM findings (arbitrary file read/write/scan via API endpoints) are mitigated by the 127.0.0.1 binding but amplified by the CORS wildcard header. For a local development tool this is acceptable — these are pre-existing patterns in handlers.py (the API endpoints existed before this feature), not introduced by the daemon feature itself. The daemon feature (ctl.sh, --log-file support, SKILL.md) is clean.
+
+**Advisory for future hardening** (not blocking):
+- Add path validation to `/api/entity/detail`, `/api/entity/score`, `/api/entity/tags`, and `/api/entities` — confine paths to `project_root`
+- Consider restricting CORS to `null` or same-origin only
+- Add tests for `ctl.sh restart`, `ctl.sh logs`, and `ctl.sh status --all`
