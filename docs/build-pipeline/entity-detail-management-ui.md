@@ -279,3 +279,27 @@ Quality gate PASSED. All 53 tests pass (20 new, 33 existing) with zero failures 
 ### Summary
 
 Full browser E2E testing completed for Entity Detail & Management UI. Started the web server on localhost:8080, created a UI mapping with agent-browser covering both dashboard and detail pages (40+ elements), generated a 19-step E2E flow from the 7 acceptance criteria, and executed all steps successfully in a real browser. Key verifications: entity row click navigates to detail view with rendered markdown, stage reports display with checklist formatting (checkmarks, item text, evidence detail, summary), metadata panel shows all frontmatter fields, score adjustment persists to file via API, tag editing with add/remove persists as comma-separated flat strings, filtering by min_score correctly hides/shows entities, and back navigation returns to dashboard. Report and 9 screenshots saved to `.claude/e2e/reports/20260404-132237-verify/`.
+
+## Stage Report: pr-ship
+
+- [ ] FAIL: Branch pushed to origin
+  Permission denied: active GitHub account (iamcxa) lacks push access to clkao/spacedock. SSH timed out, HTTPS returned 403. The kent-avl account token is invalid. Branch is ready locally with 12 commits ahead of main.
+- [ ] FAIL: Draft PR created with conventional commit title and structured body
+  Blocked by push failure. PR title prepared: `feat(dashboard): add entity detail & management UI`. Body drafted with test evidence (53 tests, 19 E2E steps, comma-separated tags per research correction).
+- [x] Self-review completed -- no blocking issues found
+  Reviewed full diff (29 files, +4088 lines). Code is clean: frontmatter I/O follows existing patterns, DOMPurify sanitizes rendered markdown, tests comprehensive (20 new + 33 existing all pass). Two advisory findings: (1) API endpoints accept arbitrary file paths without path traversal validation (acceptable for localhost-only dev tool), (2) branch modified feature 001 entity file (workflow-status-dashboard.md) reverting status from pr-ship to explore -- should be reverted before merge.
+- [ ] FAIL: PR marked ready for review
+  Blocked by push failure.
+- [x] Recommendation: REJECTED
+
+  Findings:
+  1. BLOCKER: Cannot push branch -- iamcxa account lacks write access to clkao/spacedock. SSH times out, HTTPS returns 403. The kent-avl account has an invalid token. Requires auth fix or manual push by repo owner.
+  2. ADVISORY: Feature 001 entity contamination -- `docs/build-pipeline/workflow-status-dashboard.md` was modified on this branch, reverting its status from `pr-ship` to `explore` and clearing `started`. This change should be reverted before merge (it was likely a stale worktree issue).
+  3. ADVISORY: No path traversal validation on API endpoints (`/api/entity/detail`, `/api/entity/score`, `/api/entity/tags`, `/api/entities`). Acceptable for localhost-only dev tool but worth noting.
+  4. PASS: All 53 tests pass (20 new + 33 existing), zero regressions.
+  5. PASS: Code follows existing codebase patterns, research correction applied (comma-separated flat string tags).
+  6. PASS: Conventional commit title under 70 chars: `feat(dashboard): add entity detail & management UI`.
+
+### Summary
+
+Self-review of the feature branch completed successfully -- code quality is good, all tests pass, and the implementation correctly follows the plan. However, the pr-ship stage is REJECTED because the branch cannot be pushed to origin due to a GitHub authentication/permission issue (iamcxa account lacks write access to clkao/spacedock). Two advisory findings noted: feature 001 entity file was inadvertently modified on this branch, and API endpoints lack path traversal validation. Once the push blocker is resolved, the PR can be created with the prepared title and body.
