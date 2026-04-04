@@ -41,10 +41,10 @@ If user provides a different project, resolve its root path.
 
 ### Step 2 — Locate Build Pipeline
 
-Find the workflow directory. Try in order:
+Find the workflow directory. Try sources in order, use the first match:
 
-1. `{project_root}/docs/build-pipeline/README.md`
-2. `~/Project/spacedock/docs/build-pipeline/README.md`
+1. `{project_root}/` — search for `README.md` files with `commissioned-by: spacedock@*` frontmatter
+2. `~/.claude/workflows/` — user-scoped workflows (cross-project pipelines)
 
 If found, read the README frontmatter to confirm `commissioned-by: spacedock@*`. Store as `{workflow_dir}`.
 
