@@ -283,17 +283,17 @@ CLAIM-10: [type: domain-rule] "Agent-side telemetry must go through dispatch/fin
 
 ## Stage Report: plan
 
-- [x] Formal plan document created via `Skill: "superpowers:writing-plans"` and saved to `docs/superpowers/specs/`
-  Saved to `docs/superpowers/plans/2026-04-04-observability-integration.md` (plans subdirectory per skill convention)
+- [x] Formal plan document created via `Skill: "superpowers:writing-plans"` and saved to `docs/superpowers/plans/`
+  Re-planned for Bun/TypeScript architecture. Saved to `docs/superpowers/plans/2026-04-04-observability-integration.md` (overwrote previous Python-based plan)
 - [x] Plan has concrete file paths for all new and modified files
-  14 files mapped in File Structure table: 4 new files (telemetry.py, test_telemetry.py, test_telemetry_codex.py, requirements-optional.txt), 10 modified files with exact paths and line references
-- [x] Plan uses test-first ordering (tests before implementation code)
+  14 files mapped in File Structure table: 3 new TS files (telemetry.ts, telemetry.test.ts, telemetry-codex.test.ts), 2 modified Python scripts, 6 modified TS/HTML/JS files with exact paths
+- [x] Plan uses test-first ordering
   All 8 tasks follow TDD: write failing test -> verify failure -> implement -> verify pass -> commit
-- [x] Plan incorporates research corrections (Sentry manual wrap, env-var guard, PostHog custom events)
-  Correction 1: Sentry manual `sentry_wrap` decorator on do_GET/do_POST (Task 2-3). Correction 2: env-var-check-before-import guard in telemetry.py init() (Task 1). Correction 3: PostHog capture() for custom workflow events in codex scripts (Task 5). Privacy: metadata-only properties verified in quality gate 4.
-- [x] Plan addresses dependency management and opt-in configuration
-  `requirements-optional.txt` created in Task 7 listing posthog and sentry-sdk only. Langfuse removed from scope. All integrations no-op via env var gating — zero impact when unconfigured.
+- [x] Plan uses npm packages (posthog-node, @sentry/bun)
+  Task 2 installs via `bun add posthog-node @sentry/bun`. No requirements.txt — dashboard is now a Bun project with package.json
+- [x] Plan addresses env-var gating and privacy (metadata only)
+  telemetry.ts uses env-var-check-before-require guard (POSTHOG_API_KEY, SENTRY_DSN). All captureEvent calls send only metadata: slug, stage, score, tag_count, verdict. Never entity body content. Quality Gates section enumerates all 5 privacy/safety guarantees.
 
 ### Summary
 
-Created an 8-task TDD implementation plan for PostHog + Sentry integration (Langfuse removed from scope per team-lead directive). The plan introduces a single `telemetry.py` module as the gating layer — all SDK imports are behind env var checks, never imported when unconfigured. Server-side: Sentry captures handler errors via a decorator (no auto-instrumentation exists for BaseHTTPRequestHandler); PostHog tracks entity mutations. Agent-side: codex dispatch/finalize scripts emit workflow lifecycle events. Client-side: optional PostHog JS loaded conditionally via `/api/config` endpoint. Quality gates verify no-op behavior, privacy (metadata only), and backward compatibility.
+Re-planned the observability integration for the Bun/TypeScript dashboard architecture (previous Python-based plan was invalid after migration). 8-task TDD plan: Task 1 creates `telemetry.ts` with env-var-gated `require()` for posthog-node and @sentry/bun. Task 2 installs npm deps. Task 3 wraps Bun.serve route handlers with try/catch + Sentry (no auto-instrumentation). Task 4 adds `/api/config` endpoint. Task 5 adds PostHog events for API mutations. Task 6 adds frontend PostHog JS + status indicator. Task 7 adds lightweight Python PostHog calls to codex scripts. Task 8 is integration verification. All research corrections incorporated: manual Sentry wrapping, env-var-before-import guard, metadata-only privacy.
