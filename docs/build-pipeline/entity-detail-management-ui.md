@@ -139,3 +139,84 @@ Feature 002 depends on all of the above and extends:
 ### Summary
 
 Deep exploration of the Spacedock codebase found 16 files relevant to feature 002 across domain parsing, workflow schema, entity examples, and configuration layers. Three independent stdlib-only YAML frontmatter parsers exist (in status, codex_prepare_dispatch, test_lib) plus a canonical write-back pattern in update_frontmatter_fields(). No web UI, frontend framework, or markdown rendering infrastructure exists — feature 002 depends entirely on feature 001 establishing the web server foundation. The Stage Report Protocol in ensign-shared-core.md defines the exact checklist format the detail view must parse and render.
+
+## Research Report
+
+**Claims analyzed**: 5
+**Recommendation**: PROCEED (with 1 correction noted)
+
+### Technical Claims
+
+CLAIM-1: [type: project-convention] "update_frontmatter_fields() can be adapted for web-driven frontmatter writes (score adjustment, tag addition) without data loss or format corruption"
+CLAIM-2: [type: library-api] "Markdown-to-HTML rendering can be done client-side in the browser (e.g., marked.js, markdown-it) without requiring a Python-side rendering dependency"
+CLAIM-3: [type: domain-rule] "The Stage Report Protocol format is stable and consistent across all entity examples in the codebase"
+CLAIM-4: [type: framework] "YAML frontmatter can safely support custom tags/classification fields beyond the standard schema without breaking existing parsers"
+CLAIM-5: [type: project-convention] "Feature 002 can be built as a pure extension of feature 001's web server (same server, additional routes/views)"
+
+### Verified (4 claims)
+
+- CLAIM-1: HIGH — update_frontmatter_fields() is safe for web-driven flat field writes
+  Explorer: Two identical implementations found at `scripts/codex_prepare_dispatch.py:61-80` and `scripts/codex_finalize_terminal_entity.py:43-61`. The function operates on raw text (string in, string out): splits frontmatter from body via `---` delimiters, iterates frontmatter lines, replaces matching keys, appends new keys, then reassembles with body lines intact. Used in production for `status`, `started`, `worktree`, `completed`, `verdict` field updates. Body content (including stage reports, markdown prose) is preserved verbatim via the `body_lines` variable. For flat scalar updates like `score: 0.85`, this is safe and proven.
+
+- CLAIM-2: HIGH — Client-side markdown rendering is the correct approach
+  Explorer: Confirmed no markdown-to-HTML rendering exists anywhere in the codebase. All current tools are CLI/Python (`skills/commission/bin/status`, `scripts/codex_prepare_dispatch.py`, `scripts/test_lib.py`). The `.claude-plugin/plugin.json` (v0.9.0) has no web UI dependencies. Both marked.js and markdown-it are mature, well-documented libraries for client-side rendering with zero server-side dependency. The Stage Report Protocol's checklist format (`- [x]`, `- [ ] SKIP:`) is standard GitHub-Flavored Markdown that both libraries handle natively.
+
+- CLAIM-3: HIGH — Stage Report Protocol is stable and consistent
+  Explorer: Searched 44 files containing `## Stage Report:` across the codebase. The canonical format defined in `references/ensign-shared-core.md:30-55` is consistently followed: `## Stage Report: {stage_name}` heading, `- [x]` for completed items with indented evidence, `- [ ] SKIP:` with rationale, `- [ ] FAIL:` with details, and `### Summary` subsection. Verified across test fixtures (`gate-test-entity.md`, `buggy-add-task.md`, `format-test-entity.md`) and 30+ archived plan entities in `docs/plans/_archive/`. All use identical structure. The protocol document also specifies overwrite-on-redo semantics ("if redoing a stage after rejection, overwrite the existing report").
+
+- CLAIM-5: HIGH — Feature 002 can extend feature 001's server
+  Explorer: Feature 001 (`docs/build-pipeline/workflow-status-dashboard.md`) is at `explore` stage — no server infrastructure exists yet. Its spec says "Web UI served on localhost (configurable port)" and "Read-only initially." `AGENTS.md` confirms "New web UI code goes in a new directory" — no restriction against sharing a server process. Feature 002's spec explicitly says "Extend the workflow dashboard" and the rejected alternative was "Separate detail app with its own server (rejected: fragmented UX, two ports to manage)." Both features are in the same build pipeline (`docs/build-pipeline/`), confirming they are designed as incremental extensions.
+
+### Corrected (1 claim)
+
+- CLAIM-4: MEDIUM CORRECTION — Custom tags field requires flat value format, not YAML list syntax
+  Explorer: All 3 frontmatter parsers use flat key:value parsing only:
+  - `skills/commission/bin/status:parse_frontmatter()` (line 44-63): iterates lines, splits on first `:`, stores key/value. Only processes non-indented lines (`if not line[0].isspace()`).
+  - `scripts/codex_prepare_dispatch.py:parse_frontmatter_map()` (line 50-58): splits on first `:`, stores key/value. Skips lines without `:`.
+  - `scripts/test_lib.py:read_entity_frontmatter()` (line 743-757): identical pattern — splits on first `:`, stores key/value.
+  
+  **Impact**: Adding a flat field like `tags: urgent,triage,finance` works safely with all 3 parsers — they will store it as the string `"urgent,triage,finance"`. However, YAML list syntax (`tags:\n  - urgent\n  - triage`) would BREAK parsing: the status script skips indented lines entirely, and the other two parsers would either miss the list items or misparse subsequent fields.
+  
+  **Fix**: The plan must specify that tags are stored as a comma-separated flat string in frontmatter (e.g., `tags: urgent,triage,finance`), NOT as a YAML list. The web UI should split on commas for display/editing. This is consistent with how other fields like `score` and `verdict` are stored as flat scalars. The `update_frontmatter_fields()` function handles this format correctly.
+
+### Unverifiable (0 claims)
+
+None — all claims verified from codebase evidence.
+
+### Recommendation Criteria
+
+**PROCEED** — The single correction (CLAIM-4: tag storage format) is a data format constraint, not a control flow or architectural change. The plan's intent (adding tags to frontmatter) is valid; only the storage format needs to be specified as comma-separated flat string rather than YAML list. This is a minor design detail that can be addressed in the plan stage without changing the approach or architecture.
+
+## Stage Report: research
+
+- [x] Claims extracted from spec and explore results (5 claims)
+  5 technical claims extracted covering frontmatter write-back, markdown rendering, stage report consistency, custom field support, and server architecture
+- [x] Per-claim verification with evidence from codebase sources
+  All 5 claims verified against actual source code: update_frontmatter_fields() in 2 files, 3 frontmatter parsers, 44 files with stage reports, entity schema in SKILL.md, feature 001 entity status
+- [x] Cross-referenced synthesis with confidence levels
+  4 claims HIGH confidence (verified), 1 claim MEDIUM correction (tags format constraint). 0 unverifiable.
+- [x] Corrections for incorrect assumptions with cited sources
+  CLAIM-4 corrected: custom tags must use comma-separated flat string format, not YAML list syntax, due to all 3 parsers using flat key:value parsing only. Specific parser line numbers cited.
+- [x] Research report written to entity file
+  Full research report with per-claim evidence, correction details, and PROCEED recommendation written above
+
+### Summary
+
+Verified 5 technical claims from the brainstorming spec and explore findings. 4 claims confirmed with HIGH confidence from codebase evidence (frontmatter write-back safety, client-side markdown rendering, Stage Report Protocol consistency across 44 files, server extension architecture). 1 claim corrected at MEDIUM severity: custom tags/classification fields must use comma-separated flat string format rather than YAML list syntax, because all 3 independent frontmatter parsers only handle flat key:value pairs. Recommendation: PROCEED — the correction is a minor data format constraint addressable in the plan stage.
+
+## Stage Report: plan
+
+- [x] Formal plan document created via `Skill: "superpowers:writing-plans"` and saved to `docs/superpowers/specs/` in the worktree
+  Saved to `docs/superpowers/specs/2026-04-04-entity-detail-management-ui.md` with 8 tasks, test-first ordering, complete code blocks
+- [x] Plan has concrete file paths for all new and modified files
+  File structure table lists 10 files (7 create, 3 modify) with exact paths under `web/` and `tests/`
+- [x] Plan uses test-first ordering (tests before implementation code)
+  Tasks 1-3 each follow write-failing-test -> verify-fail -> implement -> verify-pass -> commit sequence
+- [x] Plan incorporates the research correction about tags format (comma-separated flat string, not YAML list)
+  Documented in plan header ("Research correction applied"), enforced in `parse_tags()` and `update_entity_tags()` implementations, tested in `TestParseEntity` and `TestUpdateTags`
+- [x] Plan includes quality gate steps (type-check, tests, lint)
+  Task 8 runs full test suite, regression check against existing tests, frontmatter roundtrip verification with real fixture, and py_compile syntax check
+
+### Summary
+
+Created a formal 8-task implementation plan for Entity Detail & Management UI (feature 002). The plan extends feature 001's dashboard with entity detail views (rendered markdown via marked.js + DOMPurify), stage report visualization, metadata panel, and management actions (tag editing with comma-separated flat strings, score adjustment via slider). All 7 acceptance criteria from the spec are covered with concrete file paths, complete code blocks, and test-first ordering. The critical research correction about tags format is applied throughout the data layer.
