@@ -351,3 +351,20 @@ All 38 tests pass (18 from feature 001 + 20 from feature 002), zero failures, ze
 ### Summary
 
 Found and fixed the integration bug preventing click-to-detail navigation. The root cause was that the merge of feature 002 into feature 001's server did not wire up entity row click handlers in the dashboard's `app.js`, and `scan_entities()` in `parsing.py` did not include the entity file `path` needed for the detail page URL. Two-line fix: added `entity['path'] = filepath` in `parsing.py` and added a click handler with cursor styling in `app.js`. All 38 tests pass after the fix. Committed as `fix(dashboard): wire entity row click-to-detail navigation`.
+
+## Stage Report: style-unification
+
+- [x] Read both CSS files (style.css and detail.css) to understand full scope
+  style.css uses dark theme (#0d1117 bg, #161b22 cards, #21262d borders, #c9d1d9 text, monospace font); detail.css used light theme (#f8f9fa bg, #fff cards, #ddd borders, sans-serif font)
+- [x] Read both HTML files (index.html and detail.html) to understand structure
+  index.html uses style.css; detail.html uses detail.css. Both are standalone pages served by the same dashboard server.
+- [x] Rewrite detail.css to use dark theme design tokens from style.css
+  Applied all design tokens: body (#0d1117 bg, monospace font), top-bar (#161b22 bg with border), cards/panels (#161b22 bg, #21262d borders), markdown content (dark code blocks #0d1117/#1c2128, light text), tag chips (#1c2128 bg, #58a6ff text), form inputs (#0d1117 bg), buttons (#58a6ff bg), filter-bar (#161b22 bg)
+- [x] Check detail.js for inline style conflicts
+  No inline styles or class manipulations in detail.js -- all styling via CSS classes, no conflicts
+- [x] Verify server serves updated CSS
+  Dashboard server on port 8421 serves updated detail.css (200 status), content confirmed matching dark theme version
+
+### Summary
+
+Rewrote detail.css to use the dashboard's dark theme design language. Changed 75 lines across all major components: body background/font, top-bar, entity-body cards, markdown content styles (headings, code blocks, blockquotes, links), stage report cards, checklist items, sidebar panels, score controls, tag chips, form inputs, buttons, and filter bar. All design tokens now match style.css (#0d1117 background, #161b22 cards, #21262d borders, #c9d1d9/#f0f6fc/#8b949e text hierarchy, #58a6ff accent, monospace font). No changes needed in detail.js or HTML files.
