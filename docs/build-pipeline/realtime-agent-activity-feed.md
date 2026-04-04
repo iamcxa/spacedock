@@ -252,3 +252,20 @@ CLAIM-10: [type: architecture] In-memory ring buffer vs file-based JSON Lines fo
 ### Summary
 
 Re-planned for Bun/TypeScript architecture (previous Python-based plan invalidated by dashboard migration). 6-task TDD plan: (1) event data model + ring buffer with tests, (2) WebSocket handler + POST /api/events route in server.ts with tests, (3) frontend activity feed with manual JS reconnection (exponential backoff), (4) FO lifecycle event emission instructions, (5) integration tests for full pipeline, (6) final verification. Zero external dependencies -- Bun's built-in WebSocket replaces the Python websockets library, and single-threaded event loop eliminates all threading complexity from the previous plan.
+
+## Stage Report: execute
+
+- [x] All plan tasks implemented with commits on the feature branch
+  5 atomic commits: event model+buffer, WebSocket+REST endpoint, frontend activity feed, FO event emission docs, integration tests
+- [x] TDD discipline followed
+  Tasks 1 and 2: failing tests written first (EventBuffer not found, /api/events 404, WebSocket upgrade failed), then implementation made them pass. Task 5: integration tests added after server implementation.
+- [x] Atomic commits using `{type}(scope): {description}` format
+  feat(dashboard): add event data model and ring buffer with tests; feat(dashboard): add WebSocket handler and POST /api/events endpoint; feat(dashboard): add activity feed UI with WebSocket client and reconnection; docs(fo): add event emission instructions at lifecycle injection points; test(dashboard): add full event pipeline integration tests
+- [x] Bun built-in WebSocket used (no external deps)
+  Bun.serve() websocket handler with server.publish("activity", data) pub/sub, same port as HTTP, zero external dependencies added
+- [x] All tests passing (`bun test`)
+  76 tests pass across 7 files (6 EventBuffer unit tests, 21 server tests including 8 new WebSocket/event tests, 2 integration tests, plus existing suite)
+
+### Summary
+
+Implemented real-time agent activity feed using Bun's built-in WebSocket support. The architecture is FO -> REST POST /api/events -> EventBuffer (ring buffer, capacity 500) -> server.publish("activity") -> WebSocket clients. Frontend activity.js connects with manual exponential backoff reconnection and renders events in a dark-themed sidebar panel. FO shared core updated with event emission instructions at all 6 lifecycle injection points (dispatch, completion, gate, feedback, merge, idle). All work done with zero external dependencies -- Bun handles HTTP and WebSocket on the same port natively.
