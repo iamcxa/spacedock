@@ -9,11 +9,23 @@
 <body>
     <header>
         <h1>Spacedock Dashboard</h1>
-        <span id="refresh-indicator" class="indicator">Auto-refresh: ON</span>
+        <div class="header-indicators">
+            <span id="ws-status" class="indicator paused">Connecting...</span>
+            <span id="refresh-indicator" class="indicator">Auto-refresh: ON</span>
+        </div>
     </header>
-    <main id="workflows-container">
-        <p class="loading">Loading workflows...</p>
-    </main>
+    <div class="dashboard-layout">
+        <main id="workflows-container">
+            <p class="loading">Loading workflows...</p>
+        </main>
+        <aside id="activity-panel">
+            <h3>Activity Feed</h3>
+            <div id="activity-feed">
+                <p class="empty-state">No activity yet.</p>
+            </div>
+        </aside>
+    </div>
     <script src="app.js"></script>
+    <script src="activity.js"></script>
 </body>
 </html>

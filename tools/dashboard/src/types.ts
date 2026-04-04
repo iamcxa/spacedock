@@ -69,3 +69,21 @@ export interface FilterOptions {
   min_score?: number | null;
   max_score?: number | null;
 }
+
+// --- Activity Feed Events ---
+
+export type AgentEventType = "dispatch" | "completion" | "gate" | "feedback" | "merge" | "idle";
+
+export interface AgentEvent {
+  type: AgentEventType;
+  entity: string;
+  stage: string;
+  agent: string;
+  timestamp: string; // ISO 8601
+  detail?: string;
+}
+
+export interface SequencedEvent {
+  seq: number;
+  event: AgentEvent;
+}
