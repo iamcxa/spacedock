@@ -7,7 +7,7 @@ started:
 completed:
 verdict:
 score: 0.9
-worktree:
+worktree: .worktrees/ensign-dashboard-persistent-daemon
 issue:
 pr:
 intent: feature
