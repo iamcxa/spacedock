@@ -1,9 +1,9 @@
 ---
 id: 006
 title: Dashboard Bun Migration — Python to self-contained TypeScript
-status: explore
+status: research
 source: brainstorming session
-started:
+started: 2026-04-04T11:32:00Z
 completed:
 verdict:
 score: 0.95
