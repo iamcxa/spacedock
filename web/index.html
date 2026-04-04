@@ -87,7 +87,28 @@
             <button id="load-btn" class="btn">Load</button>
         </div>
 
-        <div id="filter-section"></div>
+        <div class="filter-bar" id="filter-section">
+            <label>
+                Stage:
+                <select id="filter-status">
+                    <option value="">All</option>
+                </select>
+            </label>
+            <label>
+                Min Score:
+                <input type="number" id="filter-min-score" min="0" max="1" step="0.05" value="" placeholder="0.0">
+            </label>
+            <label>
+                Max Score:
+                <input type="number" id="filter-max-score" min="0" max="1" step="0.05" value="" placeholder="1.0">
+            </label>
+            <label>
+                Tag:
+                <input type="text" id="filter-tag" placeholder="Filter by tag...">
+            </label>
+            <button id="filter-apply" class="btn">Apply</button>
+            <button id="filter-clear" class="btn btn-secondary">Clear</button>
+        </div>
 
         <div class="entity-table-container">
             <table>
@@ -182,6 +203,38 @@
 
     document.getElementById('load-btn').addEventListener('click', function() {
         currentWorkflowDir = document.getElementById('workflow-dir-input').value.trim();
+        loadEntities();
+    });
+
+    // Filter controls
+    document.getElementById('filter-apply').addEventListener('click', function() {
+        var filterParams = new URLSearchParams();
+        filterParams.set('dir', currentWorkflowDir);
+
+        var status = document.getElementById('filter-status').value;
+        if (status) filterParams.set('status', status);
+
+        var minScore = document.getElementById('filter-min-score').value;
+        if (minScore) filterParams.set('min_score', minScore);
+
+        var maxScore = document.getElementById('filter-max-score').value;
+        if (maxScore) filterParams.set('max_score', maxScore);
+
+        var tag = document.getElementById('filter-tag').value.trim();
+        if (tag) filterParams.set('tag', tag);
+
+        fetch('/api/entities?' + filterParams.toString())
+            .then(function(res) { return res.json(); })
+            .then(function(entities) {
+                renderEntityTable(entities);
+            });
+    });
+
+    document.getElementById('filter-clear').addEventListener('click', function() {
+        document.getElementById('filter-status').value = '';
+        document.getElementById('filter-min-score').value = '';
+        document.getElementById('filter-max-score').value = '';
+        document.getElementById('filter-tag').value = '';
         loadEntities();
     });
     </script>
