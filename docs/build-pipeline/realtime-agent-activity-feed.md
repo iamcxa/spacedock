@@ -238,17 +238,17 @@ CLAIM-10: [type: architecture] In-memory ring buffer vs file-based JSON Lines fo
 
 ## Stage Report: plan
 
-- [x] Formal plan document created via `Skill: "superpowers:writing-plans"` and saved to `docs/superpowers/specs/`
-  Saved to `docs/superpowers/plans/2026-04-04-realtime-agent-activity-feed.md` (plans directory per skill convention)
+- [x] Formal plan document created via `Skill: "superpowers:writing-plans"` and saved to `docs/superpowers/plans/`
+  Saved to `docs/superpowers/plans/2026-04-04-realtime-agent-activity-feed.md` (re-planned for Bun/TypeScript architecture)
 - [x] Plan has concrete file paths for all new and modified files
-  12-file file structure table with exact paths; each task lists Create/Modify with full paths
-- [x] Plan uses test-first ordering (tests before implementation code)
-  Tasks 2, 3, 4 each write failing tests first, then implement, then verify pass
-- [x] Plan incorporates all research corrections (JS reconnect, thread-safe broadcast, REST->WS architecture)
-  JS reconnect: Task 6 activity.js has exponential backoff (500ms base, 2x, cap 30s, jitter, 10 retries); Thread-safe broadcast: Task 3 uses asyncio.run_coroutine_threadsafe() wrapper; Architecture: FO -> REST POST /api/events -> broadcast -> WS -> Browser throughout
-- [x] Plan addresses dependency management for first external package
-  Task 1 creates requirements.txt with websockets>=15.0; serve.py gracefully degrades if not installed (REST-only mode)
+  9-file file structure table with exact paths; each task lists Create/Modify with full paths (events.ts, server.ts, types.ts, activity.js, index.html, style.css, FO reference, 2 test files)
+- [x] Plan uses test-first ordering
+  Task 1: write failing EventBuffer tests then implement; Task 2: write failing WebSocket + REST tests then implement server changes; Task 5: integration test suite
+- [x] Plan leverages Bun's built-in WebSocket (no external deps)
+  Bun.serve() websocket handler with pub/sub (server.publish("activity", data)), same port as HTTP, no threading, no external library
+- [x] Plan addresses FO event emission via REST POST
+  Task 4: adds ## Event Emission section to first-officer-shared-core.md with curl POST instructions at 6 lifecycle injection points (dispatch, completion, gate, feedback, merge, idle)
 
 ### Summary
 
-Formal 8-task TDD plan created for the real-time agent activity feed. The plan is structured in layers: dependency management (Task 1), event data model with ring buffer (Task 2), WebSocket server thread (Task 3), REST event endpoint (Task 4), server wiring (Task 5), frontend activity feed with manual reconnection (Task 6), FO lifecycle event emission instructions (Task 7), and integration testing (Task 8). All three research corrections are incorporated: manual JS WebSocket reconnection with exponential backoff, thread-safe broadcast via run_coroutine_threadsafe(), and the full REST-to-WebSocket bridge architecture. The websockets library is handled as an optional dependency with graceful degradation.
+Re-planned for Bun/TypeScript architecture (previous Python-based plan invalidated by dashboard migration). 6-task TDD plan: (1) event data model + ring buffer with tests, (2) WebSocket handler + POST /api/events route in server.ts with tests, (3) frontend activity feed with manual JS reconnection (exponential backoff), (4) FO lifecycle event emission instructions, (5) integration tests for full pipeline, (6) final verification. Zero external dependencies -- Bun's built-in WebSocket replaces the Python websockets library, and single-threaded event loop eliminates all threading complexity from the previous plan.

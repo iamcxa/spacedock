@@ -4,17 +4,20 @@
 
 **Goal:** Stream agent lifecycle events (dispatch, completion, gate, feedback) from the First Officer to the dashboard UI in real-time via WebSocket, so the captain sees a live activity feed of what each agent is working on.
 
-**Architecture:** The FO (an AI agent, not a Python process) emits events via `curl -X POST /api/events` to the dashboard server. The dashboard server runs a `websockets` asyncio server in a background thread alongside the existing `ThreadingHTTPServer`. The REST event endpoint bridges to WebSocket by scheduling broadcasts via `asyncio.run_coroutine_threadsafe()`. Browser JS opens a WebSocket connection with manual reconnection (exponential backoff) and renders events in a live feed panel.
+**Architecture:** The FO (an AI agent, not a code process) emits events via `curl -X POST /api/events` to the Bun dashboard server. The server uses Bun's built-in WebSocket support (`Bun.serve()` with `websocket` handler) on the same port -- no external library, no separate thread. The REST endpoint receives events, stores them in an in-memory ring buffer with sequence numbers, and broadcasts via `server.publish(topic, data)`. Browser JS opens a WebSocket connection with manual reconnection (exponential backoff) and renders events in a live activity feed panel.
 
-**Tech Stack:** Python 3 (`websockets` library -- first external dependency), asyncio, stdlib `http.server`, vanilla JavaScript WebSocket API.
+**Tech Stack:** Bun 1.3.9, TypeScript, `bun:test` (Jest-compatible), Bun built-in WebSocket (pub/sub), vanilla JavaScript WebSocket API.
 
 **Research corrections incorporated:**
-1. JavaScript WebSocket has NO auto-reconnect -- must implement manually with exponential backoff (~20-30 LOC)
-2. `websockets.broadcast()` is NOT thread-safe -- must call via `asyncio.run_coroutine_threadsafe()` from HTTP handler thread
+1. JavaScript WebSocket has NO auto-reconnect -- must implement manually with exponential backoff (~30 LOC)
+2. Bun's built-in WebSocket uses pub/sub (`server.publish()`) for broadcast -- no thread-safety issues (single-threaded event loop)
 3. Architecture: FO -> REST POST `/api/events` -> Dashboard server -> WebSocket broadcast -> Browser
 
-**First external dependency:**
-The `websockets` library is the first non-stdlib Python dependency in this project. This plan adds a `requirements.txt` at the project root with installation instructions. The dependency is optional -- the dashboard starts without it (WebSocket feature disabled, REST-only mode).
+**Key difference from previous Python plan:**
+- No `websockets` library needed (Bun has built-in WebSocket)
+- No asyncio background thread (Bun is single-threaded event loop, handles HTTP + WS on same port)
+- No `requirements.txt` (zero external deps needed)
+- No `run_coroutine_threadsafe()` threading hack (Bun pub/sub is synchronous and safe)
 
 ---
 
@@ -22,896 +25,568 @@ The `websockets` library is the first non-stdlib Python dependency in this proje
 
 | Action | Path | Responsibility |
 |--------|------|----------------|
-| Create | `requirements.txt` | First external dependency declaration (`websockets>=15.0`) |
-| Create | `tools/dashboard/websocket_server.py` | Asyncio WebSocket server thread: start, broadcast, event buffer, client management |
-| Create | `tools/dashboard/events.py` | Event data model, in-memory ring buffer, sequence numbering |
-| Modify | `tools/dashboard/handlers.py` | Add `POST /api/events` route, wire broadcast via WS server reference |
-| Modify | `tools/dashboard/serve.py` | Start WebSocket thread alongside HTTP server, add `--ws-port` argument |
+| Create | `tools/dashboard/src/events.ts` | Event types, in-memory ring buffer, sequence numbering |
+| Modify | `tools/dashboard/src/types.ts` | Add event-related type exports |
+| Modify | `tools/dashboard/src/server.ts` | Add WebSocket handler, `POST /api/events` route, wire event buffer + broadcast |
 | Create | `tools/dashboard/static/activity.js` | WebSocket client: connect, reconnect with backoff, render activity feed |
-| Modify | `tools/dashboard/static/index.html` | Add activity feed panel and `activity.js` script tag |
+| Modify | `tools/dashboard/static/index.html` | Add activity feed section and `activity.js` script tag |
 | Modify | `tools/dashboard/static/style.css` | Activity feed panel styling (dark theme consistent) |
 | Modify | `references/first-officer-shared-core.md` | Add event emission instructions at 6 lifecycle injection points |
-| Create | `tests/test_events.py` | Unit tests for event buffer, sequence numbering |
-| Create | `tests/test_websocket_server.py` | Integration tests for WebSocket server thread + broadcast |
-| Modify | `tests/test_dashboard_handlers.py` | Add tests for `POST /api/events` endpoint |
+| Create | `tests/dashboard/events.test.ts` | Unit tests for event buffer, sequence numbering |
+| Modify | `tests/dashboard/server.test.ts` | Add tests for WebSocket + `POST /api/events` endpoint |
 
 ---
 
-## Task 1: Dependency Management -- requirements.txt
+## Task 1: Event Data Model and Ring Buffer
 
 **Files:**
-- Create: `requirements.txt`
+- Create: `tools/dashboard/src/events.ts`
+- Modify: `tools/dashboard/src/types.ts`
+- Create: `tests/dashboard/events.test.ts`
 
-This is the first external Python dependency in the project. Keep it minimal.
+The event model and ring buffer are pure data structures with no server dependencies. Test-first.
 
-- [ ] **Step 1: Create `requirements.txt`**
+- [ ] **Step 1: Add event types to `types.ts`**
 
+  Append to `tools/dashboard/src/types.ts`:
+
+  ```typescript
+  // --- Activity Feed Events ---
+
+  export type AgentEventType = "dispatch" | "completion" | "gate" | "feedback" | "merge" | "idle";
+
+  export interface AgentEvent {
+    type: AgentEventType;
+    entity: string;
+    stage: string;
+    agent: string;
+    timestamp: string; // ISO 8601
+    detail?: string;
+  }
+
+  export interface SequencedEvent {
+    seq: number;
+    event: AgentEvent;
+  }
   ```
-  websockets>=15.0
+
+- [ ] **Step 2: Write failing tests for `EventBuffer`**
+
+  Create `tests/dashboard/events.test.ts`:
+
+  ```typescript
+  import { describe, test, expect } from "bun:test";
+  import { EventBuffer } from "../../tools/dashboard/src/events";
+
+  describe("EventBuffer", () => {
+    test("stores events and assigns incrementing sequence numbers", () => {
+      const buf = new EventBuffer(100);
+      const e1 = buf.push({
+        type: "dispatch",
+        entity: "feat-a",
+        stage: "execute",
+        agent: "ensign-feat-a-execute",
+        timestamp: "2026-04-04T10:00:00Z",
+      });
+      const e2 = buf.push({
+        type: "completion",
+        entity: "feat-a",
+        stage: "execute",
+        agent: "ensign-feat-a-execute",
+        timestamp: "2026-04-04T10:05:00Z",
+      });
+      expect(e1.seq).toBe(1);
+      expect(e2.seq).toBe(2);
+      expect(e1.event.type).toBe("dispatch");
+    });
+
+    test("getSince returns events after given sequence number", () => {
+      const buf = new EventBuffer(100);
+      buf.push({ type: "dispatch", entity: "a", stage: "plan", agent: "e1", timestamp: "2026-04-04T10:00:00Z" });
+      buf.push({ type: "completion", entity: "a", stage: "plan", agent: "e1", timestamp: "2026-04-04T10:01:00Z" });
+      buf.push({ type: "dispatch", entity: "b", stage: "plan", agent: "e2", timestamp: "2026-04-04T10:02:00Z" });
+
+      const after1 = buf.getSince(1);
+      expect(after1.length).toBe(2);
+      expect(after1[0].seq).toBe(2);
+      expect(after1[1].seq).toBe(3);
+
+      const after0 = buf.getSince(0);
+      expect(after0.length).toBe(3);
+    });
+
+    test("getSince returns empty array when no events after seq", () => {
+      const buf = new EventBuffer(100);
+      buf.push({ type: "dispatch", entity: "a", stage: "plan", agent: "e1", timestamp: "2026-04-04T10:00:00Z" });
+      const result = buf.getSince(1);
+      expect(result.length).toBe(0);
+    });
+
+    test("ring buffer evicts oldest events when capacity exceeded", () => {
+      const buf = new EventBuffer(3);
+      buf.push({ type: "dispatch", entity: "a", stage: "plan", agent: "e1", timestamp: "t1" });
+      buf.push({ type: "dispatch", entity: "b", stage: "plan", agent: "e2", timestamp: "t2" });
+      buf.push({ type: "dispatch", entity: "c", stage: "plan", agent: "e3", timestamp: "t3" });
+      buf.push({ type: "dispatch", entity: "d", stage: "plan", agent: "e4", timestamp: "t4" }); // evicts "a"
+
+      const all = buf.getSince(0);
+      expect(all.length).toBe(3);
+      expect(all[0].event.entity).toBe("b");
+      expect(all[2].event.entity).toBe("d");
+      // seq numbers are still monotonic even after eviction
+      expect(all[0].seq).toBe(2);
+      expect(all[2].seq).toBe(4);
+    });
+
+    test("getAll returns all buffered events", () => {
+      const buf = new EventBuffer(100);
+      buf.push({ type: "dispatch", entity: "a", stage: "plan", agent: "e1", timestamp: "t1" });
+      buf.push({ type: "gate", entity: "a", stage: "plan", agent: "e1", timestamp: "t2" });
+      const all = buf.getAll();
+      expect(all.length).toBe(2);
+      expect(all[0].seq).toBe(1);
+    });
+
+    test("validates event type", () => {
+      const buf = new EventBuffer(100);
+      expect(() => {
+        buf.push({ type: "invalid" as any, entity: "a", stage: "s", agent: "e", timestamp: "t" });
+      }).toThrow();
+    });
+  });
   ```
 
-- [ ] **Step 2: Verify installation**
-
-  Run: `pip3 install -r requirements.txt`
-  Expected: `websockets` installs (or "already satisfied" if present).
-
-- [ ] **Step 3: Verify import works**
-
-  Run: `python3 -c "import websockets; print(websockets.__version__)"`
-  Expected: prints version (15.x).
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Run tests to verify they fail**
 
   ```bash
-  git add requirements.txt
-  git commit -m "feat: add requirements.txt with websockets dependency"
+  cd /Users/kent/Project/spacedock && bun test tests/dashboard/events.test.ts
   ```
 
----
+  Expected: FAIL -- `EventBuffer` not found.
 
-## Task 2: Event Data Model and Ring Buffer -- events.py
+- [ ] **Step 4: Implement `EventBuffer`**
 
-**Files:**
-- Create: `tools/dashboard/events.py`
-- Create: `tests/test_events.py`
+  Create `tools/dashboard/src/events.ts`:
 
-The event buffer stores events in memory with sequence numbers. Clients reconnect with `?since=N` and replay missed events. Buffer is bounded (default 500 events) -- oldest are dropped when full.
+  ```typescript
+  import type { AgentEvent, AgentEventType, SequencedEvent } from "./types";
 
-- [ ] **Step 1: Write tests for EventBuffer**
+  const VALID_EVENT_TYPES: Set<string> = new Set<string>([
+    "dispatch", "completion", "gate", "feedback", "merge", "idle",
+  ]);
 
-  Create `tests/test_events.py`:
+  export class EventBuffer {
+    private buffer: SequencedEvent[] = [];
+    private nextSeq = 1;
+    private readonly capacity: number;
 
-  ```python
-  """Tests for event buffer and sequence numbering."""
+    constructor(capacity: number) {
+      this.capacity = capacity;
+    }
 
-  import unittest
-
-  from tools.dashboard.events import EventBuffer, make_event
-
-
-  class TestMakeEvent(unittest.TestCase):
-      """Test event creation."""
-
-      def test_make_event_includes_all_fields(self):
-          event = make_event(
-              event_type="dispatch",
-              entity="dashboard-persistent-daemon",
-              stage="execute",
-              agent="ensign",
-          )
-          self.assertEqual(event["type"], "dispatch")
-          self.assertEqual(event["entity"], "dashboard-persistent-daemon")
-          self.assertEqual(event["stage"], "execute")
-          self.assertEqual(event["agent"], "ensign")
-          self.assertIn("timestamp", event)
-
-      def test_make_event_optional_message(self):
-          event = make_event(
-              event_type="gate",
-              entity="feat-x",
-              stage="quality",
-              agent="ensign",
-              message="3 done, 0 skipped, 0 failed",
-          )
-          self.assertEqual(event["message"], "3 done, 0 skipped, 0 failed")
-
-      def test_make_event_without_message(self):
-          event = make_event(
-              event_type="dispatch",
-              entity="feat-x",
-              stage="execute",
-              agent="ensign",
-          )
-          self.assertNotIn("message", event)
-
-
-  class TestEventBuffer(unittest.TestCase):
-      """Test ring buffer with sequence numbers."""
-
-      def test_append_assigns_sequential_ids(self):
-          buf = EventBuffer(max_size=10)
-          e1 = make_event("dispatch", "a", "execute", "ensign")
-          e2 = make_event("completion", "a", "execute", "ensign")
-          buf.append(e1)
-          buf.append(e2)
-          events = buf.since(0)
-          self.assertEqual(len(events), 2)
-          self.assertEqual(events[0]["seq"], 1)
-          self.assertEqual(events[1]["seq"], 2)
-
-      def test_since_returns_events_after_seq(self):
-          buf = EventBuffer(max_size=10)
-          for i in range(5):
-              buf.append(make_event("dispatch", "e%d" % i, "plan", "ensign"))
-          events = buf.since(3)
-          self.assertEqual(len(events), 2)
-          self.assertEqual(events[0]["seq"], 4)
-          self.assertEqual(events[1]["seq"], 5)
-
-      def test_since_zero_returns_all(self):
-          buf = EventBuffer(max_size=10)
-          buf.append(make_event("dispatch", "a", "plan", "ensign"))
-          buf.append(make_event("dispatch", "b", "plan", "ensign"))
-          events = buf.since(0)
-          self.assertEqual(len(events), 2)
-
-      def test_ring_buffer_drops_oldest(self):
-          buf = EventBuffer(max_size=3)
-          for i in range(5):
-              buf.append(make_event("dispatch", "e%d" % i, "plan", "ensign"))
-          events = buf.since(0)
-          self.assertEqual(len(events), 3)
-          self.assertEqual(events[0]["seq"], 3)
-          self.assertEqual(events[2]["seq"], 5)
-
-      def test_empty_buffer_returns_empty(self):
-          buf = EventBuffer(max_size=10)
-          events = buf.since(0)
-          self.assertEqual(events, [])
-
-      def test_all_returns_copy(self):
-          buf = EventBuffer(max_size=10)
-          buf.append(make_event("dispatch", "a", "plan", "ensign"))
-          all_events = buf.all()
-          self.assertEqual(len(all_events), 1)
-          all_events.clear()
-          self.assertEqual(len(buf.all()), 1)
-
-
-  if __name__ == "__main__":
-      unittest.main()
-  ```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-  Run: `python3 -m pytest tests/test_events.py -v`
-  Expected: ImportError -- `tools.dashboard.events` does not exist yet.
-
-- [ ] **Step 3: Implement events.py**
-
-  Create `tools/dashboard/events.py`:
-
-  ```python
-  """Event data model and in-memory ring buffer for activity feed.
-
-  Events are structured dicts with sequence numbers assigned by the buffer.
-  The buffer is bounded -- oldest events are dropped when full.
-  Clients reconnect with ?since=N to replay missed events.
-  """
-
-  import threading
-  import time
-
-
-  def make_event(event_type, entity, stage, agent, message=None):
-      """Create a structured event dict.
-
-      Args:
-          event_type: One of "dispatch", "completion", "gate", "feedback".
-          entity: Entity slug (e.g., "dashboard-persistent-daemon").
-          stage: Stage name (e.g., "execute", "quality").
-          agent: Agent identifier (e.g., "ensign").
-          message: Optional human-readable detail.
-
-      Returns:
-          Dict with type, entity, stage, agent, timestamp, and optional message.
-      """
-      event = {
-          "type": event_type,
-          "entity": entity,
-          "stage": stage,
-          "agent": agent,
-          "timestamp": time.time(),
+    push(event: AgentEvent): SequencedEvent {
+      if (!VALID_EVENT_TYPES.has(event.type)) {
+        throw new Error(`Invalid event type: ${event.type}`);
       }
-      if message is not None:
-          event["message"] = message
-      return event
+      const entry: SequencedEvent = { seq: this.nextSeq++, event };
+      this.buffer.push(entry);
+      if (this.buffer.length > this.capacity) {
+        this.buffer.shift();
+      }
+      return entry;
+    }
 
+    getSince(afterSeq: number): SequencedEvent[] {
+      return this.buffer.filter((e) => e.seq > afterSeq);
+    }
 
-  class EventBuffer:
-      """Thread-safe bounded ring buffer with sequence numbers.
-
-      Each appended event gets a monotonically increasing seq number.
-      since(N) returns all events with seq > N.
-      """
-
-      def __init__(self, max_size=500):
-          self._events = []
-          self._seq = 0
-          self._max_size = max_size
-          self._lock = threading.Lock()
-
-      def append(self, event):
-          """Add an event and assign it a sequence number.
-
-          Returns the assigned sequence number.
-          """
-          with self._lock:
-              self._seq += 1
-              event["seq"] = self._seq
-              self._events.append(event)
-              if len(self._events) > self._max_size:
-                  self._events = self._events[-self._max_size:]
-              return self._seq
-
-      def since(self, seq):
-          """Return events with seq > the given value.
-
-          Args:
-              seq: Return events after this sequence number. 0 returns all.
-
-          Returns:
-              List of event dicts (copies safe for mutation).
-          """
-          with self._lock:
-              return [e for e in self._events if e["seq"] > seq]
-
-      def all(self):
-          """Return a copy of all buffered events."""
-          with self._lock:
-              return list(self._events)
+    getAll(): SequencedEvent[] {
+      return this.buffer.slice();
+    }
+  }
   ```
 
-- [ ] **Step 4: Run tests to verify they pass**
-
-  Run: `python3 -m pytest tests/test_events.py -v`
-  Expected: all 7 tests PASS.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Run tests to verify they pass**
 
   ```bash
-  git add tools/dashboard/events.py tests/test_events.py
-  git commit -m "feat: event data model and ring buffer for activity feed"
+  cd /Users/kent/Project/spacedock && bun test tests/dashboard/events.test.ts
+  ```
+
+  Expected: 6 tests PASS.
+
+- [ ] **Step 6: Commit**
+
+  ```bash
+  git add tools/dashboard/src/events.ts tools/dashboard/src/types.ts tests/dashboard/events.test.ts
+  git commit -m "feat(dashboard): add event data model and ring buffer with tests"
   ```
 
 ---
 
-## Task 3: WebSocket Server Thread -- websocket_server.py
+## Task 2: WebSocket Handler in Bun Server
 
 **Files:**
-- Create: `tools/dashboard/websocket_server.py`
-- Create: `tests/test_websocket_server.py`
+- Modify: `tools/dashboard/src/server.ts`
+- Modify: `tests/dashboard/server.test.ts`
 
-Runs a `websockets` asyncio server in a daemon thread. Provides `broadcast()` callable from any thread (HTTP handler) via `asyncio.run_coroutine_threadsafe()`. Manages connected clients set. On new connection, replays buffered events since client's `?since=N` query parameter.
+Add WebSocket upgrade support to the existing `Bun.serve()` call. Bun handles HTTP and WebSocket on the same port natively. Clients connect to `ws://host:port/ws/activity` and receive events via pub/sub topic `"activity"`.
 
-- [ ] **Step 1: Write tests for WebSocket server**
+- [ ] **Step 1: Write failing WebSocket tests**
 
-  Create `tests/test_websocket_server.py`:
+  Append to `tests/dashboard/server.test.ts`:
 
-  ```python
-  """Tests for WebSocket server thread and broadcast."""
+  ```typescript
+  test("WebSocket upgrade on /ws/activity succeeds", async () => {
+    const ws = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+    const opened = await new Promise<boolean>((resolve) => {
+      ws.onopen = () => resolve(true);
+      ws.onerror = () => resolve(false);
+    });
+    expect(opened).toBe(true);
+    ws.close();
+  });
 
-  import asyncio
-  import json
-  import threading
-  import time
-  import unittest
+  test("WebSocket receives replay of buffered events on connect", async () => {
+    // POST an event first
+    await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "dispatch",
+        entity: "feat-a",
+        stage: "execute",
+        agent: "ensign-feat-a-execute",
+        timestamp: "2026-04-04T10:00:00Z",
+      }),
+    });
 
-  try:
-      import websockets
-      from websockets.asyncio.client import connect
-      HAS_WEBSOCKETS = True
-  except ImportError:
-      HAS_WEBSOCKETS = False
+    // Connect WebSocket -- should receive replay
+    const ws = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+    const messages: string[] = [];
+    const done = new Promise<void>((resolve) => {
+      ws.onmessage = (ev) => {
+        messages.push(ev.data as string);
+        // Replay comes as a single "replay" message
+        const parsed = JSON.parse(ev.data as string);
+        if (parsed.type === "replay") resolve();
+      };
+      setTimeout(resolve, 1000); // timeout fallback
+    });
+    await done;
+    ws.close();
 
-  from tools.dashboard.events import EventBuffer, make_event
+    expect(messages.length).toBeGreaterThanOrEqual(1);
+    const replay = JSON.parse(messages[0]);
+    expect(replay.type).toBe("replay");
+    expect(Array.isArray(replay.events)).toBe(true);
+  });
 
+  test("WebSocket receives live events after POST /api/events", async () => {
+    const ws = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+    await new Promise<void>((resolve) => { ws.onopen = () => resolve(); });
 
-  @unittest.skipUnless(HAS_WEBSOCKETS, "websockets not installed")
-  class TestWebSocketServer(unittest.TestCase):
-      """Integration tests for the WebSocket server thread."""
+    // Skip the initial replay message
+    const liveMessages: string[] = [];
+    let replayDone = false;
+    const gotLive = new Promise<void>((resolve) => {
+      ws.onmessage = (ev) => {
+        const parsed = JSON.parse(ev.data as string);
+        if (parsed.type === "replay") {
+          replayDone = true;
+          return;
+        }
+        if (replayDone) {
+          liveMessages.push(ev.data as string);
+          resolve();
+        }
+      };
+      setTimeout(resolve, 2000);
+    });
 
-      def setUp(self):
-          from tools.dashboard.websocket_server import start_ws_server
-          self.buffer = EventBuffer(max_size=100)
-          self.ws_server, self.ws_loop, self.ws_port = start_ws_server(
-              host="127.0.0.1",
-              port=0,
-              event_buffer=self.buffer,
-          )
+    // POST a new event after connection is established
+    await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "completion",
+        entity: "feat-b",
+        stage: "plan",
+        agent: "ensign-feat-b-plan",
+        timestamp: "2026-04-04T10:10:00Z",
+      }),
+    });
 
-      def tearDown(self):
-          self.ws_server.close()
-          asyncio.run_coroutine_threadsafe(
-              self.ws_server.wait_closed(), self.ws_loop
-          ).result(timeout=5)
+    await gotLive;
+    ws.close();
 
-      def _run_async(self, coro):
-          """Run an async coroutine from the test thread."""
-          loop = asyncio.new_event_loop()
-          try:
-              return loop.run_until_complete(coro)
-          finally:
-              loop.close()
-
-      def test_client_connects(self):
-          async def check():
-              async with connect("ws://127.0.0.1:%d" % self.ws_port) as ws:
-                  self.assertTrue(ws.open)
-          self._run_async(check())
-
-      def test_broadcast_delivers_event(self):
-          from tools.dashboard.websocket_server import broadcast_event
-          async def check():
-              async with connect("ws://127.0.0.1:%d" % self.ws_port) as ws:
-                  event = make_event("dispatch", "feat-x", "execute", "ensign")
-                  broadcast_event(self.ws_loop, event, self.buffer)
-                  msg = await asyncio.wait_for(ws.recv(), timeout=3)
-                  data = json.loads(msg)
-                  self.assertEqual(data["type"], "dispatch")
-                  self.assertEqual(data["entity"], "feat-x")
-                  self.assertIn("seq", data)
-          self._run_async(check())
-
-      def test_replay_on_connect_with_since(self):
-          from tools.dashboard.websocket_server import broadcast_event
-          # Pre-populate buffer with events
-          for i in range(3):
-              event = make_event("dispatch", "e%d" % i, "plan", "ensign")
-              self.buffer.append(event)
-
-          async def check():
-              async with connect("ws://127.0.0.1:%d?since=1" % self.ws_port) as ws:
-                  # Should receive events 2 and 3 (seq > 1)
-                  msgs = []
-                  for _ in range(2):
-                      msg = await asyncio.wait_for(ws.recv(), timeout=3)
-                      msgs.append(json.loads(msg))
-                  seqs = [m["seq"] for m in msgs]
-                  self.assertEqual(seqs, [2, 3])
-          self._run_async(check())
-
-      def test_replay_on_connect_without_since(self):
-          # Pre-populate buffer
-          for i in range(2):
-              event = make_event("dispatch", "e%d" % i, "plan", "ensign")
-              self.buffer.append(event)
-
-          async def check():
-              async with connect("ws://127.0.0.1:%d" % self.ws_port) as ws:
-                  # Should receive all 2 events
-                  msgs = []
-                  for _ in range(2):
-                      msg = await asyncio.wait_for(ws.recv(), timeout=3)
-                      msgs.append(json.loads(msg))
-                  self.assertEqual(len(msgs), 2)
-          self._run_async(check())
-
-      def test_multiple_clients_receive_broadcast(self):
-          from tools.dashboard.websocket_server import broadcast_event
-          async def check():
-              async with connect("ws://127.0.0.1:%d" % self.ws_port) as ws1:
-                  async with connect("ws://127.0.0.1:%d" % self.ws_port) as ws2:
-                      event = make_event("completion", "feat-y", "quality", "ensign")
-                      broadcast_event(self.ws_loop, event, self.buffer)
-                      msg1 = await asyncio.wait_for(ws1.recv(), timeout=3)
-                      msg2 = await asyncio.wait_for(ws2.recv(), timeout=3)
-                      self.assertEqual(json.loads(msg1)["entity"], "feat-y")
-                      self.assertEqual(json.loads(msg2)["entity"], "feat-y")
-          self._run_async(check())
-
-
-  if __name__ == "__main__":
-      unittest.main()
+    expect(liveMessages.length).toBeGreaterThanOrEqual(1);
+    const msg = JSON.parse(liveMessages[0]);
+    expect(msg.type).toBe("event");
+    expect(msg.data.event.entity).toBe("feat-b");
+    expect(msg.data.seq).toBeGreaterThan(0);
+  });
   ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **Step 2: Write failing test for `POST /api/events`**
 
-  Run: `python3 -m pytest tests/test_websocket_server.py -v`
-  Expected: ImportError -- `tools.dashboard.websocket_server` does not exist.
+  Append to `tests/dashboard/server.test.ts`:
 
-- [ ] **Step 3: Implement websocket_server.py**
+  ```typescript
+  test("POST /api/events accepts valid event", async () => {
+    const res = await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "dispatch",
+        entity: "feat-c",
+        stage: "plan",
+        agent: "ensign-feat-c-plan",
+        timestamp: "2026-04-04T11:00:00Z",
+      }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+    expect(typeof data.seq).toBe("number");
+  });
 
-  Create `tools/dashboard/websocket_server.py`:
+  test("POST /api/events rejects invalid event type", async () => {
+    const res = await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "invalid",
+        entity: "feat-c",
+        stage: "plan",
+        agent: "e",
+        timestamp: "t",
+      }),
+    });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBeDefined();
+  });
 
-  ```python
-  """WebSocket server for real-time event broadcasting.
+  test("POST /api/events rejects missing fields", async () => {
+    const res = await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "dispatch" }),
+    });
+    expect(res.status).toBe(400);
+  });
 
-  Runs a websockets asyncio server in a daemon thread alongside the
-  existing ThreadingHTTPServer. HTTP handlers call broadcast_event()
-  to push events to all connected WebSocket clients.
+  test("GET /api/events returns buffered events", async () => {
+    const res = await fetch(`${baseUrl}/api/events`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(Array.isArray(data.events)).toBe(true);
+    expect(data.events.length).toBeGreaterThan(0);
+    expect(typeof data.events[0].seq).toBe("number");
+  });
 
-  Thread safety: broadcast_event() uses asyncio.run_coroutine_threadsafe()
-  to schedule the broadcast on the WebSocket event loop. websockets.broadcast()
-  is NOT thread-safe and must only be called from the asyncio thread.
-  """
+  test("GET /api/events?since=N returns events after N", async () => {
+    const allRes = await fetch(`${baseUrl}/api/events`);
+    const allData = await allRes.json();
+    const lastSeq = allData.events[allData.events.length - 1].seq;
 
-  import asyncio
-  import json
-  import threading
-  import urllib.parse
-
-  try:
-      import websockets
-      from websockets import broadcast
-      HAS_WEBSOCKETS = True
-  except ImportError:
-      HAS_WEBSOCKETS = False
-
-
-  # Module-level set of connected clients, managed by the asyncio thread only.
-  _connected = set()
-
-
-  def start_ws_server(host="127.0.0.1", port=8421, event_buffer=None):
-      """Start a WebSocket server in a background daemon thread.
-
-      Args:
-          host: Bind address.
-          port: Port number. Use 0 for auto-select.
-          event_buffer: EventBuffer instance for replay on reconnect.
-
-      Returns:
-          Tuple of (server, loop, actual_port).
-          - server: the websockets server (call server.close() to shut down)
-          - loop: the asyncio event loop (for scheduling broadcasts)
-          - actual_port: the port the server is listening on
-      """
-      if not HAS_WEBSOCKETS:
-          raise RuntimeError("websockets library not installed. Run: pip install websockets")
-
-      loop = asyncio.new_event_loop()
-      started = threading.Event()
-      result = {}
-
-      async def handler(ws):
-          _connected.add(ws)
-          try:
-              # Replay buffered events on connect
-              if event_buffer is not None:
-                  query = urllib.parse.urlparse(ws.request.path).query
-                  params = urllib.parse.parse_qs(query)
-                  since = int(params.get("since", [0])[0])
-                  for event in event_buffer.since(since):
-                      await ws.send(json.dumps(event))
-              # Keep connection open, ignore incoming messages
-              async for _ in ws:
-                  pass
-          finally:
-              _connected.discard(ws)
-
-      async def run():
-          server = await websockets.serve(handler, host, port)
-          actual_port = server.sockets[0].getsockname()[1]
-          result["server"] = server
-          result["port"] = actual_port
-          started.set()
-          await asyncio.Future()  # run forever
-
-      def thread_target():
-          asyncio.set_event_loop(loop)
-          loop.run_until_complete(run())
-
-      t = threading.Thread(target=thread_target, daemon=True)
-      t.start()
-      started.wait(timeout=10)
-
-      return result["server"], loop, result["port"]
-
-
-  def broadcast_event(ws_loop, event, event_buffer):
-      """Broadcast an event to all connected WebSocket clients.
-
-      Thread-safe: can be called from any thread (e.g., HTTP handler thread).
-      The broadcast is scheduled on the WebSocket event loop via
-      asyncio.run_coroutine_threadsafe().
-
-      Args:
-          ws_loop: The asyncio event loop running the WebSocket server.
-          event: Event dict to broadcast. Will be appended to event_buffer
-                 (which assigns a seq number) and then JSON-serialized.
-          event_buffer: EventBuffer instance.
-      """
-      seq = event_buffer.append(event)
-
-      async def _do_broadcast():
-          if _connected:
-              data = json.dumps(event)
-              broadcast(_connected, data)
-
-      future = asyncio.run_coroutine_threadsafe(_do_broadcast(), ws_loop)
-      future.result(timeout=5)
+    const res = await fetch(`${baseUrl}/api/events?since=${lastSeq}`);
+    const data = await res.json();
+    expect(data.events.length).toBe(0);
+  });
   ```
 
-- [ ] **Step 4: Run tests to verify they pass**
-
-  Run: `python3 -m pytest tests/test_websocket_server.py -v`
-  Expected: all 5 tests PASS.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 3: Run tests to verify they fail**
 
   ```bash
-  git add tools/dashboard/websocket_server.py tests/test_websocket_server.py
-  git commit -m "feat: WebSocket server thread with broadcast and replay"
+  cd /Users/kent/Project/spacedock && bun test tests/dashboard/server.test.ts
+  ```
+
+  Expected: FAIL -- `/api/events` route not found, WebSocket not configured.
+
+- [ ] **Step 4: Add WebSocket and event endpoint to `server.ts`**
+
+  Modify `tools/dashboard/src/server.ts` -- add imports, event buffer, routes, and WebSocket handler:
+
+  ```typescript
+  // Add to imports at top:
+  import { EventBuffer } from "./events";
+  import type { AgentEvent } from "./types";
+
+  // Inside createServer(), before the Bun.serve() call, add:
+  const eventBuffer = new EventBuffer(500);
+
+  // Add to the routes object:
+  "/api/events": {
+    GET: (req) => {
+      const url = new URL(req.url);
+      const sinceStr = url.searchParams.get("since");
+      const since = sinceStr ? parseInt(sinceStr, 10) : 0;
+      const events = since > 0 ? eventBuffer.getSince(since) : eventBuffer.getAll();
+      logRequest(req, 200);
+      return jsonResponse({ events });
+    },
+    POST: async (req) => {
+      const body = await req.json() as Record<string, unknown>;
+      // Validate required fields
+      const required = ["type", "entity", "stage", "agent", "timestamp"];
+      for (const field of required) {
+        if (!body[field]) {
+          logRequest(req, 400);
+          return jsonResponse({ error: `Missing required field: ${field}` }, 400);
+        }
+      }
+      try {
+        const entry = eventBuffer.push(body as unknown as AgentEvent);
+        // Broadcast to all WebSocket subscribers
+        server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+        logRequest(req, 200);
+        return jsonResponse({ ok: true, seq: entry.seq });
+      } catch (e: any) {
+        logRequest(req, 400);
+        return jsonResponse({ error: e.message }, 400);
+      }
+    },
+  },
+
+  // Add websocket handler to Bun.serve() options (alongside routes and fetch):
+  websocket: {
+    open(ws) {
+      ws.subscribe("activity");
+      // Send replay of all buffered events
+      const events = eventBuffer.getAll();
+      ws.send(JSON.stringify({ type: "replay", events }));
+    },
+    message(_ws, _message) {
+      // Client-to-server messages not used yet (future: gate approval)
+    },
+    close(ws) {
+      ws.unsubscribe("activity");
+    },
+  },
+
+  // In the fetch() fallback handler, add WebSocket upgrade before static file serving:
+  // Handle WebSocket upgrade
+  if (pathname === "/ws/activity") {
+    const upgraded = server.upgrade(req);
+    if (upgraded) return undefined as any;
+    logRequest(req, 400);
+    return new Response("WebSocket upgrade failed", { status: 400 });
+  }
+  ```
+
+  The key structural change: `Bun.serve()` now includes a `websocket` property and the `fetch` handler attempts WebSocket upgrade for `/ws/activity` path. The `server` variable must be accessible in route handlers for `server.publish()` -- since `Bun.serve()` returns the server, and routes are defined inline, the publish calls reference the outer `server` variable.
+
+  Full updated `createServer` function:
+
+  ```typescript
+  export function createServer(opts: ServerOptions) {
+    const { projectRoot, logFile } = opts;
+    const staticDir = opts.staticDir ?? join(dirname(import.meta.dir), "static");
+    const eventBuffer = new EventBuffer(500);
+
+    function logRequest(req: Request, status: number) {
+      if (!logFile) return;
+      const now = new Date().toISOString();
+      const line = `${now} - ${req.method} ${new URL(req.url).pathname} ${status}\n`;
+      appendFileSync(logFile, line);
+    }
+
+    const server = Bun.serve({
+      port: opts.port,
+      routes: {
+        // ... (all existing routes unchanged) ...
+
+        "/api/events": {
+          GET: (req) => {
+            const url = new URL(req.url);
+            const sinceStr = url.searchParams.get("since");
+            const since = sinceStr ? parseInt(sinceStr, 10) : 0;
+            const events = since > 0 ? eventBuffer.getSince(since) : eventBuffer.getAll();
+            logRequest(req, 200);
+            return jsonResponse({ events });
+          },
+          POST: async (req) => {
+            const body = await req.json() as Record<string, unknown>;
+            const required = ["type", "entity", "stage", "agent", "timestamp"];
+            for (const field of required) {
+              if (!body[field]) {
+                logRequest(req, 400);
+                return jsonResponse({ error: `Missing required field: ${field}` }, 400);
+              }
+            }
+            try {
+              const entry = eventBuffer.push(body as unknown as AgentEvent);
+              server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+              logRequest(req, 200);
+              return jsonResponse({ ok: true, seq: entry.seq });
+            } catch (e: any) {
+              logRequest(req, 400);
+              return jsonResponse({ error: e.message }, 400);
+            }
+          },
+        },
+      },
+      websocket: {
+        open(ws) {
+          ws.subscribe("activity");
+          const events = eventBuffer.getAll();
+          ws.send(JSON.stringify({ type: "replay", events }));
+        },
+        message(_ws, _message) {
+          // Reserved for future bidirectional communication (gate approval)
+        },
+        close(ws) {
+          ws.unsubscribe("activity");
+        },
+      },
+      fetch(req) {
+        const url = new URL(req.url);
+        const pathname = url.pathname;
+
+        // Handle WebSocket upgrade
+        if (pathname === "/ws/activity") {
+          const upgraded = server.upgrade(req);
+          if (upgraded) return undefined as any;
+          logRequest(req, 400);
+          return new Response("WebSocket upgrade failed", { status: 400 });
+        }
+
+        // ... (rest of existing static file serving unchanged) ...
+      },
+    });
+
+    return server;
+  }
+  ```
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+  ```bash
+  cd /Users/kent/Project/spacedock && bun test tests/dashboard/server.test.ts
+  ```
+
+  Expected: All tests PASS (existing + new WebSocket + event endpoint tests).
+
+- [ ] **Step 6: Commit**
+
+  ```bash
+  git add tools/dashboard/src/server.ts tests/dashboard/server.test.ts
+  git commit -m "feat(dashboard): add WebSocket handler and POST /api/events endpoint"
   ```
 
 ---
 
-## Task 4: REST Event Endpoint -- handlers.py Modification
-
-**Files:**
-- Modify: `tools/dashboard/handlers.py`
-- Modify: `tests/test_dashboard_handlers.py`
-
-Add `POST /api/events` route that accepts a structured event, stores it in the buffer, and broadcasts via WebSocket. Also add `GET /api/events?since=N` for polling fallback.
-
-- [ ] **Step 1: Write tests for the event endpoint**
-
-  Add to `tests/test_dashboard_handlers.py`:
-
-  ```python
-  class TestEventEndpoint(unittest.TestCase):
-      """Test POST /api/events and GET /api/events."""
-
-      def setUp(self):
-          self.tmpdir = tempfile.mkdtemp()
-          wf_dir = os.path.join(self.tmpdir, 'my-workflow')
-          os.makedirs(wf_dir)
-          with open(os.path.join(wf_dir, 'README.md'), 'w') as f:
-              f.write(README_CONTENT)
-
-          self.static_dir = tempfile.mkdtemp()
-          with open(os.path.join(self.static_dir, 'index.html'), 'w') as f:
-              f.write('<html><body>Dashboard</body></html>')
-
-          from tools.dashboard.events import EventBuffer
-          self.event_buffer = EventBuffer(max_size=100)
-
-          handler_class = make_handler(
-              project_root=self.tmpdir,
-              static_dir=self.static_dir,
-              event_buffer=self.event_buffer,
-          )
-          self.server = ThreadingHTTPServer(('127.0.0.1', 0), handler_class)
-          self.port = self.server.server_address[1]
-          self.thread = threading.Thread(target=self.server.serve_forever)
-          self.thread.daemon = True
-          self.thread.start()
-
-      def tearDown(self):
-          self.server.shutdown()
-          self.thread.join(timeout=5)
-          shutil.rmtree(self.tmpdir)
-          shutil.rmtree(self.static_dir)
-
-      def _post(self, path, data):
-          url = 'http://127.0.0.1:%d%s' % (self.port, path)
-          body = json.dumps(data).encode('utf-8')
-          req = urllib.request.Request(url, data=body, method='POST')
-          req.add_header('Content-Type', 'application/json')
-          with urllib.request.urlopen(req) as resp:
-              return resp.status, json.loads(resp.read())
-
-      def _get(self, path):
-          url = 'http://127.0.0.1:%d%s' % (self.port, path)
-          req = urllib.request.Request(url)
-          with urllib.request.urlopen(req) as resp:
-              return resp.status, json.loads(resp.read())
-
-      def test_post_event_returns_ok(self):
-          status, data = self._post('/api/events', {
-              'type': 'dispatch',
-              'entity': 'feat-x',
-              'stage': 'execute',
-              'agent': 'ensign',
-          })
-          self.assertEqual(status, 200)
-          self.assertTrue(data['ok'])
-          self.assertIn('seq', data)
-
-      def test_post_event_stores_in_buffer(self):
-          self._post('/api/events', {
-              'type': 'dispatch',
-              'entity': 'feat-x',
-              'stage': 'execute',
-              'agent': 'ensign',
-          })
-          events = self.event_buffer.all()
-          self.assertEqual(len(events), 1)
-          self.assertEqual(events[0]['entity'], 'feat-x')
-
-      def test_post_event_rejects_missing_type(self):
-          try:
-              self._post('/api/events', {
-                  'entity': 'feat-x',
-                  'stage': 'execute',
-                  'agent': 'ensign',
-              })
-              self.fail('Expected 400')
-          except urllib.error.HTTPError as e:
-              self.assertEqual(e.code, 400)
-
-      def test_get_events_returns_buffered(self):
-          self._post('/api/events', {
-              'type': 'dispatch',
-              'entity': 'feat-x',
-              'stage': 'execute',
-              'agent': 'ensign',
-          })
-          self._post('/api/events', {
-              'type': 'completion',
-              'entity': 'feat-x',
-              'stage': 'execute',
-              'agent': 'ensign',
-          })
-          status, data = self._get('/api/events')
-          self.assertEqual(status, 200)
-          self.assertEqual(len(data), 2)
-
-      def test_get_events_since_filters(self):
-          self._post('/api/events', {
-              'type': 'dispatch',
-              'entity': 'a',
-              'stage': 'plan',
-              'agent': 'ensign',
-          })
-          self._post('/api/events', {
-              'type': 'dispatch',
-              'entity': 'b',
-              'stage': 'plan',
-              'agent': 'ensign',
-          })
-          status, data = self._get('/api/events?since=1')
-          self.assertEqual(len(data), 1)
-          self.assertEqual(data[0]['entity'], 'b')
-  ```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-  Run: `python3 -m pytest tests/test_dashboard_handlers.py::TestEventEndpoint -v`
-  Expected: TypeError -- `make_handler()` does not accept `event_buffer` yet.
-
-- [ ] **Step 3: Modify handlers.py to add event_buffer parameter and event routes**
-
-  In `tools/dashboard/handlers.py`, change the `make_handler` signature:
-
-  ```python
-  def make_handler(project_root, static_dir, log_file=None, event_buffer=None, ws_broadcast=None):
-  ```
-
-  Add to `do_GET` routing (after the `/api/entities` branch):
-
-  ```python
-  elif path == '/api/events':
-      self._handle_get_events(query)
-  ```
-
-  Add to `do_POST` routing (after the `/api/entity/tags` branch):
-
-  ```python
-  elif path == '/api/events':
-      self._handle_post_event()
-  ```
-
-  Add handler methods inside `DashboardHandler`:
-
-  ```python
-  def _handle_post_event(self):
-      if event_buffer is None:
-          self._send_json({'error': 'Events not enabled'}, 503)
-          return
-      body = json.loads(self._read_body())
-      required = ('type', 'entity', 'stage', 'agent')
-      for field in required:
-          if field not in body:
-              self._send_json({'error': 'Missing field: %s' % field}, 400)
-              return
-      from tools.dashboard.events import make_event
-      event = make_event(
-          event_type=body['type'],
-          entity=body['entity'],
-          stage=body['stage'],
-          agent=body['agent'],
-          message=body.get('message'),
-      )
-      seq = event_buffer.append(event)
-      if ws_broadcast is not None:
-          ws_broadcast(event)
-      self._send_json({'ok': True, 'seq': seq})
-
-  def _handle_get_events(self, query):
-      if event_buffer is None:
-          self._send_json({'error': 'Events not enabled'}, 503)
-          return
-      since = int(query.get('since', [0])[0])
-      events = event_buffer.since(since)
-      self._send_json(events)
-  ```
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-  Run: `python3 -m pytest tests/test_dashboard_handlers.py -v`
-  Expected: all tests pass (existing + new TestEventEndpoint tests).
-
-- [ ] **Step 5: Commit**
-
-  ```bash
-  git add tools/dashboard/handlers.py tests/test_dashboard_handlers.py
-  git commit -m "feat: REST event endpoint (POST/GET /api/events)"
-  ```
-
----
-
-## Task 5: Wire WebSocket into Dashboard Server -- serve.py Modification
-
-**Files:**
-- Modify: `tools/dashboard/serve.py`
-
-Start the WebSocket server thread alongside the HTTP server. Pass the event buffer and a broadcast callback to `make_handler()`. Add `--ws-port` argument. Gracefully degrade if `websockets` is not installed.
-
-- [ ] **Step 1: Write test for serve.py --ws-port argument**
-
-  Add to `tests/test_dashboard_handlers.py` `TestServeArgparse` class:
-
-  ```python
-  def test_serve_accepts_ws_port_arg(self):
-      """--ws-port is accepted by argparse without error."""
-      import subprocess
-      import sys
-      result = subprocess.run(
-          [sys.executable, '-m', 'tools.dashboard.serve', '--help'],
-          capture_output=True, text=True,
-          cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-      )
-      self.assertIn('--ws-port', result.stdout)
-  ```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-  Run: `python3 -m pytest tests/test_dashboard_handlers.py::TestServeArgparse::test_serve_accepts_ws_port_arg -v`
-  Expected: FAIL -- `--ws-port` not in help output.
-
-- [ ] **Step 3: Modify serve.py**
-
-  In `tools/dashboard/serve.py`:
-
-  ```python
-  #!/usr/bin/env python3
-  """Spacedock Workflow Status Dashboard -- local development server.
-
-  Usage:
-      python3 -m tools.dashboard.serve [--port PORT] [--ws-port WS_PORT] [--root PROJECT_ROOT]
-
-  Serves a web dashboard at http://localhost:PORT that displays all
-  Spacedock workflows discovered under PROJECT_ROOT.
-
-  If the websockets library is installed, a WebSocket server starts on
-  WS_PORT (default: HTTP_PORT + 1) for real-time event streaming.
-  """
-
-  import argparse
-  import os
-  import subprocess
-  import sys
-  from datetime import datetime
-  from http.server import ThreadingHTTPServer
-
-  from tools.dashboard.events import EventBuffer
-  from tools.dashboard.handlers import make_handler
-
-  try:
-      from tools.dashboard.websocket_server import start_ws_server, broadcast_event, HAS_WEBSOCKETS
-  except ImportError:
-      HAS_WEBSOCKETS = False
-
-
-  def main():
-      parser = argparse.ArgumentParser(description='Spacedock Workflow Status Dashboard')
-      parser.add_argument('--port', type=int, default=8420, help='Port to serve on (default: 8420)')
-      parser.add_argument('--ws-port', type=int, default=None, help='WebSocket port (default: HTTP port + 1)')
-      parser.add_argument('--root', default=None, help='Project root to scan (default: git toplevel or cwd)')
-      parser.add_argument('--log-file', default=None, help='Write access logs to this file')
-      args = parser.parse_args()
-
-      project_root = args.root
-      if project_root is None:
-          try:
-              result = subprocess.run(
-                  ['git', 'rev-parse', '--show-toplevel'],
-                  capture_output=True, text=True, check=True,
-              )
-              project_root = result.stdout.strip()
-          except (subprocess.CalledProcessError, FileNotFoundError):
-              project_root = os.getcwd()
-
-      project_root = os.path.abspath(project_root)
-      static_dir = os.path.join(os.path.dirname(__file__), 'static')
-
-      event_buffer = EventBuffer(max_size=500)
-      ws_broadcast = None
-      ws_loop = None
-      ws_port = args.ws_port or (args.port + 1)
-
-      if HAS_WEBSOCKETS:
-          try:
-              ws_server, ws_loop, actual_ws_port = start_ws_server(
-                  host='127.0.0.1',
-                  port=ws_port,
-                  event_buffer=event_buffer,
-              )
-              ws_port = actual_ws_port
-
-              def ws_broadcast(event):
-                  broadcast_event(ws_loop, event, event_buffer)
-
-              ws_msg = ' | WebSocket: ws://127.0.0.1:%d/' % ws_port
-          except Exception as e:
-              ws_msg = ' | WebSocket: failed to start (%s)' % e
-      else:
-          ws_msg = ' | WebSocket: disabled (pip install websockets)'
-
-      handler_class = make_handler(
-          project_root=project_root,
-          static_dir=static_dir,
-          log_file=args.log_file,
-          event_buffer=event_buffer,
-          ws_broadcast=ws_broadcast,
-      )
-      server = ThreadingHTTPServer(('127.0.0.1', args.port), handler_class)
-
-      banner = '[%s] Spacedock Dashboard started on http://127.0.0.1:%d/ (root: %s)%s' % (
-          datetime.now().strftime('%Y-%m-%d %H:%M:%S'), args.port, project_root, ws_msg)
-      print(banner)
-      if args.log_file:
-          with open(args.log_file, 'a') as f:
-              f.write(banner + '\n')
-      print('Press Ctrl+C to stop.')
-
-      try:
-          server.serve_forever()
-      except KeyboardInterrupt:
-          print('\nShutting down.')
-          server.shutdown()
-
-
-  if __name__ == '__main__':
-      main()
-  ```
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-  Run: `python3 -m pytest tests/test_dashboard_handlers.py -v`
-  Expected: all tests pass.
-
-- [ ] **Step 5: Commit**
-
-  ```bash
-  git add tools/dashboard/serve.py
-  git commit -m "feat: wire WebSocket server into dashboard startup"
-  ```
-
----
-
-## Task 6: Frontend Activity Feed -- activity.js, index.html, style.css
+## Task 3: Frontend Activity Feed -- WebSocket Client with Reconnection
 
 **Files:**
 - Create: `tools/dashboard/static/activity.js`
 - Modify: `tools/dashboard/static/index.html`
 - Modify: `tools/dashboard/static/style.css`
 
-WebSocket client with manual reconnection (exponential backoff), event rendering in an activity feed panel on the dashboard page.
+The frontend connects to the WebSocket, receives events, and renders them in a live activity feed panel. Manual reconnection with exponential backoff is required (browser WebSocket API has no auto-reconnect).
 
-- [ ] **Step 1: Create activity.js with WebSocket client and reconnection**
+- [ ] **Step 1: Create `activity.js` with WebSocket client**
 
   Create `tools/dashboard/static/activity.js`:
 
@@ -919,185 +594,153 @@ WebSocket client with manual reconnection (exponential backoff), event rendering
   (function () {
     "use strict";
 
-    var WS_RECONNECT_BASE = 500;
-    var WS_RECONNECT_MAX = 30000;
-    var WS_MAX_RETRIES = 10;
-    var MAX_FEED_ITEMS = 100;
-
     var feedContainer = document.getElementById("activity-feed");
-    var wsIndicator = document.getElementById("ws-indicator");
-    var ws = null;
+    var statusIndicator = document.getElementById("ws-status");
     var lastSeq = 0;
+    var ws = null;
     var retryCount = 0;
-    var retryTimer = null;
+    var maxRetries = 10;
+    var baseDelay = 500;  // ms
+    var maxDelay = 30000; // ms
 
     function getWsUrl() {
-      // WebSocket port is HTTP port + 1 by convention
-      var httpPort = parseInt(window.location.port, 10) || 8420;
-      return "ws://127.0.0.1:" + (httpPort + 1) + "/?since=" + lastSeq;
+      var loc = window.location;
+      var proto = loc.protocol === "https:" ? "wss:" : "ws:";
+      return proto + "//" + loc.host + "/ws/activity";
     }
 
-    function setStatus(status) {
-      if (!wsIndicator) return;
-      if (status === "connected") {
-        wsIndicator.textContent = "Live";
-        wsIndicator.className = "indicator";
-      } else if (status === "reconnecting") {
-        wsIndicator.textContent = "Reconnecting...";
-        wsIndicator.className = "indicator paused";
-      } else {
-        wsIndicator.textContent = "Disconnected";
-        wsIndicator.className = "indicator disconnected";
-      }
+    function setStatus(state) {
+      if (!statusIndicator) return;
+      statusIndicator.textContent = state === "connected" ? "Live" : state === "connecting" ? "Connecting..." : "Disconnected";
+      statusIndicator.className = "indicator" + (state === "connected" ? "" : " paused");
     }
 
     function connect() {
-      if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
-        return;
-      }
-      try {
-        ws = new WebSocket(getWsUrl());
-      } catch (e) {
-        scheduleReconnect();
-        return;
-      }
+      setStatus("connecting");
+      ws = new WebSocket(getWsUrl());
 
       ws.onopen = function () {
         retryCount = 0;
         setStatus("connected");
       };
 
-      ws.onmessage = function (evt) {
-        try {
-          var event = JSON.parse(evt.data);
-          if (event.seq && event.seq > lastSeq) {
-            lastSeq = event.seq;
+      ws.onmessage = function (ev) {
+        var msg = JSON.parse(ev.data);
+        if (msg.type === "replay") {
+          // Initial replay -- render all buffered events
+          if (msg.events && msg.events.length > 0) {
+            msg.events.forEach(function (entry) {
+              renderEvent(entry);
+              if (entry.seq > lastSeq) lastSeq = entry.seq;
+            });
           }
-          renderEvent(event);
-        } catch (e) {
-          // ignore malformed messages
+        } else if (msg.type === "event") {
+          // Live event
+          renderEvent(msg.data);
+          if (msg.data.seq > lastSeq) lastSeq = msg.data.seq;
         }
       };
 
       ws.onclose = function () {
-        setStatus("reconnecting");
+        setStatus("disconnected");
         scheduleReconnect();
       };
 
       ws.onerror = function () {
-        // onclose will fire after onerror
+        // onclose will fire after onerror -- reconnect handled there
       };
     }
 
     function scheduleReconnect() {
-      if (retryCount >= WS_MAX_RETRIES) {
+      if (retryCount >= maxRetries) {
         setStatus("disconnected");
         return;
       }
-      var delay = Math.min(
-        WS_RECONNECT_BASE * Math.pow(2, retryCount),
-        WS_RECONNECT_MAX
-      );
+      var delay = Math.min(baseDelay * Math.pow(2, retryCount), maxDelay);
       // Add jitter: +/- 25%
       delay = delay * (0.75 + Math.random() * 0.5);
       retryCount++;
-      retryTimer = setTimeout(connect, delay);
+      setTimeout(connect, delay);
     }
 
-    function eventTypeColor(type) {
+    function statusColor(type) {
       var colors = {
         dispatch: "#58a6ff",
         completion: "#3fb950",
         gate: "#f0883e",
         feedback: "#d2a8ff",
+        merge: "#79c0ff",
+        idle: "#8b949e",
       };
       return colors[type] || "#8b949e";
     }
 
-    function formatTime(timestamp) {
-      var d = new Date(timestamp * 1000);
-      var h = String(d.getHours()).padStart(2, "0");
-      var m = String(d.getMinutes()).padStart(2, "0");
-      var s = String(d.getSeconds()).padStart(2, "0");
-      return h + ":" + m + ":" + s;
+    function timeAgo(isoStr) {
+      var diff = Date.now() - new Date(isoStr).getTime();
+      if (diff < 60000) return Math.floor(diff / 1000) + "s ago";
+      if (diff < 3600000) return Math.floor(diff / 60000) + "m ago";
+      return Math.floor(diff / 3600000) + "h ago";
     }
 
-    function renderEvent(event) {
+    function renderEvent(entry) {
       if (!feedContainer) return;
+      var e = entry.event;
 
       var item = document.createElement("div");
-      item.className = "feed-item";
+      item.className = "activity-item";
 
       var badge = document.createElement("span");
-      badge.className = "feed-badge";
-      badge.style.background = eventTypeColor(event.type) + "22";
-      badge.style.color = eventTypeColor(event.type);
-      badge.textContent = event.type;
+      badge.className = "activity-badge";
+      badge.style.background = statusColor(e.type) + "22";
+      badge.style.color = statusColor(e.type);
+      badge.textContent = e.type;
 
-      var entity = document.createElement("span");
-      entity.className = "feed-entity";
-      entity.textContent = event.entity;
-
-      var stage = document.createElement("span");
-      stage.className = "feed-stage";
-      stage.textContent = event.stage;
-
-      var agent = document.createElement("span");
-      agent.className = "feed-agent";
-      agent.textContent = event.agent;
+      var info = document.createElement("span");
+      info.className = "activity-info";
+      info.textContent = e.agent + " \u2192 " + e.entity + " @ " + e.stage;
 
       var time = document.createElement("span");
-      time.className = "feed-time";
-      time.textContent = formatTime(event.timestamp);
+      time.className = "activity-time";
+      time.textContent = timeAgo(e.timestamp);
 
-      item.appendChild(time);
       item.appendChild(badge);
-      item.appendChild(entity);
-      item.appendChild(stage);
-      item.appendChild(agent);
+      item.appendChild(info);
+      item.appendChild(time);
 
-      if (event.message) {
-        var msg = document.createElement("span");
-        msg.className = "feed-message";
-        msg.textContent = event.message;
-        item.appendChild(msg);
+      if (e.detail) {
+        var detail = document.createElement("div");
+        detail.className = "activity-detail";
+        detail.textContent = e.detail;
+        item.appendChild(detail);
       }
 
-      // Newest at top
+      // Prepend newest at top
       feedContainer.insertBefore(item, feedContainer.firstChild);
 
-      // Trim old items
-      while (feedContainer.children.length > MAX_FEED_ITEMS) {
+      // Cap visible items at 100
+      while (feedContainer.children.length > 100) {
         feedContainer.removeChild(feedContainer.lastChild);
       }
     }
 
-    // Bootstrap: try to load existing events via REST, then connect WebSocket
-    fetch("/api/events?since=0")
-      .then(function (res) { return res.json(); })
-      .then(function (events) {
-        events.forEach(function (e) {
-          if (e.seq && e.seq > lastSeq) {
-            lastSeq = e.seq;
-          }
-          renderEvent(e);
-        });
-        // Reverse so newest is on top (REST returns oldest-first)
-        if (feedContainer) {
-          var items = Array.from(feedContainer.children);
-          items.reverse().forEach(function (item) {
-            feedContainer.appendChild(item);
-          });
-        }
-      })
-      .catch(function () { /* events endpoint not available yet */ })
-      .finally(function () { connect(); });
+    // Remove the "No activity yet" placeholder on first event
+    var emptyState = feedContainer ? feedContainer.querySelector(".empty-state") : null;
+    var origRender = renderEvent;
+    renderEvent = function (entry) {
+      if (emptyState && emptyState.parentNode) {
+        emptyState.parentNode.removeChild(emptyState);
+        emptyState = null;
+      }
+      origRender(entry);
+    };
+
+    connect();
   })();
   ```
 
-- [ ] **Step 2: Modify index.html to add activity feed panel**
+- [ ] **Step 2: Add activity feed section to `index.html`**
 
-  In `tools/dashboard/static/index.html`, add the activity feed section and script:
+  Modify `tools/dashboard/static/index.html` -- add an activity feed section between `</header>` and `<main>`, and add the script tag:
 
   ```html
   <!DOCTYPE html>
@@ -1112,7 +755,7 @@ WebSocket client with manual reconnection (exponential backoff), event rendering
       <header>
           <h1>Spacedock Dashboard</h1>
           <div class="header-indicators">
-              <span id="ws-indicator" class="indicator paused">Connecting...</span>
+              <span id="ws-status" class="indicator paused">Connecting...</span>
               <span id="refresh-indicator" class="indicator">Auto-refresh: ON</span>
           </div>
       </header>
@@ -1122,7 +765,9 @@ WebSocket client with manual reconnection (exponential backoff), event rendering
           </main>
           <aside id="activity-panel">
               <h3>Activity Feed</h3>
-              <div id="activity-feed"></div>
+              <div id="activity-feed">
+                  <p class="empty-state">No activity yet.</p>
+              </div>
           </aside>
       </div>
       <script src="app.js"></script>
@@ -1131,12 +776,18 @@ WebSocket client with manual reconnection (exponential backoff), event rendering
   </html>
   ```
 
-- [ ] **Step 3: Add activity feed styles to style.css**
+- [ ] **Step 3: Add activity feed styles to `style.css`**
 
   Append to `tools/dashboard/static/style.css`:
 
   ```css
   /* --- Activity Feed --- */
+
+  .header-indicators {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+  }
 
   .dashboard-layout {
       display: grid;
@@ -1144,25 +795,10 @@ WebSocket client with manual reconnection (exponential backoff), event rendering
       gap: 1.5rem;
   }
 
-  @media (max-width: 900px) {
-      .dashboard-layout {
-          grid-template-columns: 1fr;
-      }
-  }
-
-  .header-indicators {
-      display: flex;
-      gap: 0.5rem;
-  }
-
-  .indicator.disconnected { background: #3d1f1f; color: #d73a49; }
-
   #activity-panel {
-      background: #161b22;
-      border: 1px solid #21262d;
-      border-radius: 8px;
-      padding: 1rem;
-      max-height: calc(100vh - 6rem);
+      position: sticky;
+      top: 1.5rem;
+      max-height: calc(100vh - 5rem);
       overflow-y: auto;
   }
 
@@ -1174,202 +810,344 @@ WebSocket client with manual reconnection (exponential backoff), event rendering
       border-bottom: 1px solid #21262d;
   }
 
-  .feed-item {
+  .activity-item {
+      padding: 0.5rem;
+      border-bottom: 1px solid #21262d;
+      font-size: 0.8rem;
       display: flex;
       flex-wrap: wrap;
-      gap: 0.35rem;
-      align-items: center;
-      padding: 0.4rem 0;
-      border-bottom: 1px solid #21262d;
-      font-size: 0.75rem;
+      gap: 0.4rem;
+      align-items: baseline;
   }
 
-  .feed-item:last-child { border-bottom: none; }
+  .activity-item:first-child {
+      animation: fadeIn 0.3s ease-in;
+  }
 
-  .feed-badge {
+  @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+  }
+
+  .activity-badge {
       display: inline-block;
-      font-size: 0.65rem;
-      padding: 0.1rem 0.3rem;
-      border-radius: 3px;
-      font-weight: 500;
-      text-transform: uppercase;
-  }
-
-  .feed-entity {
-      color: #58a6ff;
-      font-weight: 500;
-  }
-
-  .feed-stage {
-      color: #8b949e;
-  }
-
-  .feed-agent {
-      color: #8b949e;
-      font-style: italic;
-  }
-
-  .feed-time {
-      color: #484f58;
-      font-family: monospace;
       font-size: 0.7rem;
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      font-weight: 600;
+      text-transform: uppercase;
+      flex-shrink: 0;
   }
 
-  .feed-message {
+  .activity-info {
+      color: #c9d1d9;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+  }
+
+  .activity-time {
+      color: #8b949e;
+      font-size: 0.7rem;
+      flex-shrink: 0;
+  }
+
+  .activity-detail {
       width: 100%;
       color: #8b949e;
-      font-size: 0.7rem;
-      padding-left: 3.5rem;
+      font-size: 0.75rem;
+      padding-left: 0.5rem;
+      margin-top: 0.15rem;
+  }
+
+  /* Responsive: stack on narrow screens */
+  @media (max-width: 768px) {
+      .dashboard-layout {
+          grid-template-columns: 1fr;
+      }
+      #activity-panel {
+          position: static;
+          max-height: 300px;
+      }
   }
   ```
 
-- [ ] **Step 4: Verify static files load correctly**
+- [ ] **Step 4: Verify manually (no automated test for CSS/HTML -- visual check)**
 
-  Start the dashboard manually:
+  Start the server and open in browser to verify the layout renders correctly:
   ```bash
-  python3 -m tools.dashboard.serve --port 8420 --root .
+  cd /Users/kent/Project/spacedock && bun run tools/dashboard/src/server.ts --port 8420
+  # Open http://localhost:8420/ -- verify activity panel appears on the right
+  # POST a test event:
+  # curl -X POST http://localhost:8420/api/events -H 'Content-Type: application/json' -d '{"type":"dispatch","entity":"test","stage":"plan","agent":"ensign-test","timestamp":"2026-04-04T10:00:00Z"}'
+  # Verify it appears in the feed
   ```
-  Open `http://127.0.0.1:8420/` in a browser. Verify:
-  - Activity feed panel appears on the right side
-  - WebSocket indicator shows "Live" (if websockets installed) or "Reconnecting..." (graceful)
-  - Existing workflow table still renders correctly
 
 - [ ] **Step 5: Commit**
 
   ```bash
   git add tools/dashboard/static/activity.js tools/dashboard/static/index.html tools/dashboard/static/style.css
-  git commit -m "feat: frontend activity feed with WebSocket client and reconnection"
+  git commit -m "feat(dashboard): add activity feed UI with WebSocket client and reconnection"
   ```
 
 ---
 
-## Task 7: FO Event Emission -- first-officer-shared-core.md
+## Task 4: FO Lifecycle Event Emission Instructions
 
 **Files:**
 - Modify: `references/first-officer-shared-core.md`
 
-Add event emission instructions at 6 lifecycle injection points. FO emits events by calling `curl -s -X POST` to the dashboard server's `/api/events` endpoint via the Bash tool.
+The FO is an AI agent that emits events by running `curl` via the Bash tool. Add event emission instructions at each lifecycle injection point identified in the explore stage.
 
 - [ ] **Step 1: Add event emission section to FO shared core**
 
-  In `references/first-officer-shared-core.md`, add a new section after `## Mod Hook Convention` and before `## Clarification and Communication`:
+  Add a new `## Event Emission` section to `references/first-officer-shared-core.md`, after the `## Status Viewer` section:
 
   ```markdown
-  ## Activity Feed Events
+  ## Event Emission
 
-  When the dashboard is running, emit structured events at lifecycle boundaries. Use the Bash tool to POST to the dashboard event endpoint. If the dashboard is not running, skip silently (curl will fail and that is fine).
+  The dashboard displays a real-time activity feed. Emit structured events at lifecycle boundaries by POSTing to the dashboard server. Determine the dashboard port from the same startup check (default 8420).
 
   Event format:
   ```
-  curl -s -X POST http://127.0.0.1:{dashboard_port}/api/events \
+  curl -s -X POST http://localhost:${DASHBOARD_PORT}/api/events \
     -H 'Content-Type: application/json' \
-    -d '{"type":"{event_type}","entity":"{slug}","stage":"{stage}","agent":"{agent}","message":"{detail}"}'
+    -d '{"type":"<TYPE>","entity":"<SLUG>","stage":"<STAGE>","agent":"<WORKER_KEY>-<SLUG>-<STAGE>","timestamp":"<ISO8601>","detail":"<OPTIONAL>"}'
   ```
 
-  Emit events at these lifecycle points:
+  Event types and injection points:
 
-  1. **Dispatch** (Dispatch step 6, after commit): `type: "dispatch"`, message: "entering {stage}"
-  2. **Completion** (Completion step 2, after reviewing stage report): `type: "completion"`, message: "{N} done, {N} skipped, {N} failed"
-  3. **Gate presentation** (when presenting to captain): `type: "gate"`, message: "awaiting captain review"
-  4. **Gate resolution** (after captain approves/rejects): `type: "gate"`, message: "approved" or "rejected"
-  5. **Feedback rejection** (Feedback step 4, routing back): `type: "feedback"`, message: "cycle {N}: routing to {target_stage}"
-  6. **Merge/cleanup** (Merge step 4, after setting verdict): `type: "completion"`, message: "verdict: {verdict}"
+  | Type | When | Detail field |
+  |------|------|-------------|
+  | `dispatch` | After step 6 (commit state transition) | "Entering {stage}" |
+  | `completion` | After step 2 of Completion (stage report reviewed) | "{N} done, {N} skipped, {N} failed" |
+  | `gate` | When presenting gate to captain | "Awaiting captain approval" |
+  | `feedback` | When bouncing entity back to feedback-to stage | "Rejected: {reason summary}" |
+  | `merge` | After successful merge/cleanup | "Merged to main" |
+  | `idle` | When no entities are dispatchable and idle hooks run | "No dispatchable entities" |
 
-  The dashboard port is read from `~/.spacedock/dashboard/{project_hash}/port`. If the port file does not exist, the dashboard is not running and events should not be emitted.
-
-  Resolve the dashboard port once at startup (step 6.5) and reuse it for all event calls. Do not look it up on every event.
+  Rules:
+  - Emit events only when the dashboard is running (startup check passed or was explicitly started).
+  - If the `curl` POST fails (server unreachable), log a warning but do not block the workflow. Events are best-effort.
+  - Use `$(date -u +%Y-%m-%dT%H:%M:%SZ)` for the timestamp.
+  - The `agent` field uses the `worker_key-slug-stage` convention (e.g., `ensign-feat-a-execute`).
   ```
 
-- [ ] **Step 2: Add dashboard port resolution to startup step 6.5**
+- [ ] **Step 2: Add dispatch event instruction inline**
 
-  Modify the existing step 6.5 in `references/first-officer-shared-core.md` to also capture the port:
+  In the `## Dispatch` section, after step 6 ("Commit the state transition"), add:
 
   ```markdown
-  6.5. Check dashboard — run `tools/dashboard/ctl.sh status --root {project_root}`. If not running, prompt captain: "Dashboard is not running. Start it? (http://localhost:8420/)" Wait for captain response. Yes — run `tools/dashboard/ctl.sh start --root {project_root}`. No — skip.
-       After dashboard check, resolve the event port: read the port file at `~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)/port`. Store this as `dashboard_port` for event emission. If the file does not exist, set `dashboard_port` to empty (events disabled).
+  6.5. Emit dispatch event: `curl -s -X POST http://localhost:${DASHBOARD_PORT}/api/events -H 'Content-Type: application/json' -d "{\"type\":\"dispatch\",\"entity\":\"${SLUG}\",\"stage\":\"${NEXT_STAGE}\",\"agent\":\"${WORKER_KEY}-${SLUG}-${NEXT_STAGE}\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"detail\":\"Entering ${NEXT_STAGE}\"}"` (skip if dashboard not running).
   ```
+
+- [ ] **Step 3: Add completion event instruction inline**
+
+  In the `## Completion and Gates` section, after step 3 ("If checklist items are missing, send the worker back"), add:
+
+  ```markdown
+  3.5. Emit completion event with the checklist count summary as detail (skip if dashboard not running).
+  ```
+
+  After the gate presentation logic, add:
+
+  ```markdown
+  If the stage is gated:
+  - Emit gate event with detail "Awaiting captain approval" (skip if dashboard not running).
+  ```
+
+- [ ] **Step 4: Add feedback/merge event instructions inline**
+
+  In the `## Feedback Rejection Flow` section, add after the rejection bounce step:
+
+  ```markdown
+  Emit feedback event with detail summarizing the rejection reason (skip if dashboard not running).
+  ```
+
+  In the `## Merge and Cleanup` section (or equivalent), add:
+
+  ```markdown
+  After successful merge, emit merge event with detail "Merged to main" (skip if dashboard not running).
+  ```
+
+- [ ] **Step 5: Commit**
+
+  ```bash
+  git add references/first-officer-shared-core.md
+  git commit -m "docs(fo): add event emission instructions at lifecycle injection points"
+  ```
+
+---
+
+## Task 5: Integration Test -- Full Event Pipeline
+
+**Files:**
+- Modify: `tests/dashboard/server.test.ts`
+
+End-to-end test: POST an event via REST, verify it arrives on a connected WebSocket client. This validates the full pipeline: REST -> EventBuffer -> publish -> WebSocket.
+
+- [ ] **Step 1: Write integration test**
+
+  Add a new `describe` block to `tests/dashboard/server.test.ts`:
+
+  ```typescript
+  describe("Event Pipeline Integration", () => {
+    test("POST /api/events -> WebSocket broadcast -> client receives in order", async () => {
+      // Connect two WebSocket clients
+      const ws1 = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+      const ws2 = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+
+      await Promise.all([
+        new Promise<void>((r) => { ws1.onopen = () => r(); }),
+        new Promise<void>((r) => { ws2.onopen = () => r(); }),
+      ]);
+
+      // Skip replay messages
+      const skip = (ws: WebSocket) => new Promise<void>((r) => {
+        ws.onmessage = (ev) => {
+          const msg = JSON.parse(ev.data as string);
+          if (msg.type === "replay") r();
+        };
+        setTimeout(r, 500);
+      });
+      await Promise.all([skip(ws1), skip(ws2)]);
+
+      // Collect live events from both clients
+      const msgs1: any[] = [];
+      const msgs2: any[] = [];
+      const got1 = new Promise<void>((r) => {
+        ws1.onmessage = (ev) => { msgs1.push(JSON.parse(ev.data as string)); if (msgs1.length === 2) r(); };
+        setTimeout(r, 2000);
+      });
+      const got2 = new Promise<void>((r) => {
+        ws2.onmessage = (ev) => { msgs2.push(JSON.parse(ev.data as string)); if (msgs2.length === 2) r(); };
+        setTimeout(r, 2000);
+      });
+
+      // POST two events
+      await fetch(`${baseUrl}/api/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "dispatch", entity: "int-a", stage: "plan", agent: "e1", timestamp: "2026-04-04T12:00:00Z" }),
+      });
+      await fetch(`${baseUrl}/api/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "completion", entity: "int-a", stage: "plan", agent: "e1", timestamp: "2026-04-04T12:01:00Z" }),
+      });
+
+      await Promise.all([got1, got2]);
+      ws1.close();
+      ws2.close();
+
+      // Both clients received both events in order
+      expect(msgs1.length).toBe(2);
+      expect(msgs2.length).toBe(2);
+      expect(msgs1[0].data.event.type).toBe("dispatch");
+      expect(msgs1[1].data.event.type).toBe("completion");
+      expect(msgs1[1].data.seq).toBeGreaterThan(msgs1[0].data.seq);
+    });
+
+    test("reconnecting client receives replay of missed events", async () => {
+      // POST an event while no WS clients are connected
+      await fetch(`${baseUrl}/api/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "gate", entity: "int-b", stage: "quality", agent: "e2", timestamp: "2026-04-04T13:00:00Z" }),
+      });
+
+      // Connect a new client -- should receive replay including the missed event
+      const ws = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+      const replay = await new Promise<any>((resolve) => {
+        ws.onmessage = (ev) => {
+          const msg = JSON.parse(ev.data as string);
+          if (msg.type === "replay") resolve(msg);
+        };
+        setTimeout(() => resolve(null), 1000);
+      });
+      ws.close();
+
+      expect(replay).not.toBeNull();
+      expect(replay.events.length).toBeGreaterThan(0);
+      const gateEvent = replay.events.find((e: any) => e.event.entity === "int-b");
+      expect(gateEvent).toBeDefined();
+      expect(gateEvent.event.type).toBe("gate");
+    });
+  });
+  ```
+
+- [ ] **Step 2: Run all tests**
+
+  ```bash
+  cd /Users/kent/Project/spacedock && bun test tests/dashboard/
+  ```
+
+  Expected: All tests PASS -- events.test.ts (6 tests) + server.test.ts (existing + new WebSocket + event + integration tests).
 
 - [ ] **Step 3: Commit**
 
   ```bash
-  git add references/first-officer-shared-core.md
-  git commit -m "feat: add activity feed event emission to FO lifecycle"
+  git add tests/dashboard/server.test.ts
+  git commit -m "test(dashboard): add full event pipeline integration tests"
   ```
 
 ---
 
-## Task 8: Full Integration Test
+## Task 6: Run All Tests and Final Verification
 
-**Files:**
-- No new files. Run existing tests and manual verification.
+**Files:** None (verification only)
 
-- [ ] **Step 1: Run full test suite**
-
-  ```bash
-  python3 -m pytest tests/ -v
-  ```
-
-  Expected: all tests pass, no regressions.
-
-- [ ] **Step 2: Manual end-to-end smoke test**
-
-  1. Start dashboard:
-     ```bash
-     tools/dashboard/ctl.sh start --root .
-     ```
-
-  2. Open `http://127.0.0.1:8420/` in browser. Verify activity feed panel appears.
-
-  3. Post a test event:
-     ```bash
-     curl -s -X POST http://127.0.0.1:8420/api/events \
-       -H 'Content-Type: application/json' \
-       -d '{"type":"dispatch","entity":"test-entity","stage":"execute","agent":"ensign","message":"entering execute"}'
-     ```
-
-  4. Verify the event appears in the activity feed panel in real-time.
-
-  5. Refresh the page. Verify the event is replayed from the buffer.
-
-  6. Stop dashboard:
-     ```bash
-     tools/dashboard/ctl.sh stop
-     ```
-
-- [ ] **Step 3: Verify graceful degradation without websockets**
+- [ ] **Step 1: Run the full dashboard test suite**
 
   ```bash
-  python3 -c "
-  import sys
-  # Temporarily hide websockets
-  sys.modules['websockets'] = None
-  from tools.dashboard.serve import main
-  print('serve.py imports without error when websockets unavailable')
-  "
+  cd /Users/kent/Project/spacedock && bun test tests/dashboard/
   ```
 
-  Expected: no ImportError. The server starts in REST-only mode.
+  Expected: All tests pass. No regressions in existing tests.
 
-- [ ] **Step 4: Final commit**
+- [ ] **Step 2: Verify no TypeScript errors**
 
+  ```bash
+  cd /Users/kent/Project/spacedock && bunx tsc --noEmit tools/dashboard/src/events.ts tools/dashboard/src/server.ts tools/dashboard/src/types.ts 2>&1 || true
+  ```
+
+- [ ] **Step 3: Smoke test -- start server, POST event, verify WebSocket delivery**
+
+  ```bash
+  # Terminal 1: Start server
+  bun run tools/dashboard/src/server.ts --port 8499
+
+  # Terminal 2: Connect WebSocket and POST event
+  # (use websocat or browser devtools)
+  curl -s -X POST http://localhost:8499/api/events \
+    -H 'Content-Type: application/json' \
+    -d '{"type":"dispatch","entity":"test-entity","stage":"execute","agent":"ensign-test-execute","timestamp":"2026-04-04T15:00:00Z","detail":"Entering execute"}'
+  # Should return: {"ok":true,"seq":1}
+
+  curl -s http://localhost:8499/api/events
+  # Should return: {"events":[{"seq":1,"event":{...}}]}
+  ```
+
+- [ ] **Step 4: Final commit with all changes**
+
+  If any loose changes remain:
   ```bash
   git add -A
-  git commit -m "test: integration tests and smoke test verification"
+  git commit -m "feat(dashboard): real-time agent activity feed -- WebSocket event streaming"
   ```
 
 ---
 
-## Quality Gates
+## Spec Coverage Verification
 
-These gates must pass before the feature is considered complete:
-
-1. **Unit tests pass:** `python3 -m pytest tests/ -v` -- all tests green
-2. **WebSocket server starts:** Dashboard banner shows `WebSocket: ws://127.0.0.1:8421/`
-3. **Event POST works:** `curl -X POST /api/events` returns `{"ok": true, "seq": N}`
-4. **Event GET works:** `GET /api/events?since=0` returns buffered events
-5. **WebSocket receives broadcast:** Browser console shows events arriving via WebSocket
-6. **Reconnection works:** Kill and restart the dashboard -- browser reconnects and replays missed events
-7. **Graceful degradation:** Without `websockets` installed, dashboard starts in REST-only mode with clear message
-8. **No regressions:** All existing dashboard tests continue to pass
-9. **FO instructions updated:** `references/first-officer-shared-core.md` has event emission at 6 lifecycle points
-10. **Dependency documented:** `requirements.txt` exists with `websockets>=15.0`
+| Acceptance Criterion | Task |
+|---------------------|------|
+| FO emits structured events: `{type, entity, stage, agent, timestamp}` | Task 1 (types), Task 4 (FO instructions) |
+| WebSocket server starts alongside FO, configurable port | Task 2 (same port as HTTP -- Bun built-in) |
+| Dashboard UI connects via WebSocket, renders live activity feed | Task 3 (activity.js + index.html) |
+| Activity feed shows: agent name, entity title, current stage, elapsed time | Task 3 (renderEvent function) |
+| Reconnection handling: UI reconnects and replays missed events | Task 3 (exponential backoff), Task 2 (replay on connect) |
+| Gate pending events highlighted in UI with approve/reject buttons | Stretch goal -- not implemented in this plan (event type renders with distinct color) |
+| Multiple concurrent workflows visible in single feed | Task 3 (all events render in one feed, agent field includes context) |
