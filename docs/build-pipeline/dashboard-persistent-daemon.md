@@ -9,7 +9,7 @@ verdict:
 score: 0.9
 worktree: .worktrees/ensign-dashboard-persistent-daemon
 issue:
-pr:
+pr: "iamcxa/spacedock#2"
 intent: feature
 scale: Medium
 project: spacedock
