@@ -303,3 +303,32 @@ Full browser E2E testing completed for Entity Detail & Management UI. Started th
 ### Summary
 
 Self-review of the feature branch completed successfully -- code quality is good, all tests pass, and the implementation correctly follows the plan. However, the pr-ship stage is REJECTED because the branch cannot be pushed to origin due to a GitHub authentication/permission issue (iamcxa account lacks write access to clkao/spacedock). Two advisory findings noted: feature 001 entity file was inadvertently modified on this branch, and API endpoints lack path traversal validation. Once the push blocker is resolved, the PR can be created with the prepared title and body.
+
+## Integration: Merge into Dashboard Server
+
+Feature 002 (`web/`) has been integrated into feature 001 (`tools/dashboard/`), producing a single unified application.
+
+### Changes Made
+
+1. **Moved data modules**: `web/frontmatter_io.py` and `web/api.py` to `tools/dashboard/frontmatter_io.py` and `tools/dashboard/api.py`. Updated `api.py` imports to use relative imports (`from .frontmatter_io import ...`).
+
+2. **Merged routes into unified handler**: `tools/dashboard/handlers.py` now serves all API routes from both features:
+   - `GET /api/workflows` (from feature 001)
+   - `GET /api/entity/detail?path=...` (from feature 002)
+   - `GET /api/entities?dir=...` (from feature 002)
+   - `POST /api/entity/score` (from feature 002)
+   - `POST /api/entity/tags` (from feature 002)
+   - `GET /detail` serves entity detail HTML page (from feature 002)
+   - `GET /` serves dashboard (from feature 001)
+
+3. **Moved frontend assets**: `web/detail.html`, `web/static/detail.css`, `web/static/detail.js` to `tools/dashboard/static/`. Updated asset URLs in `detail.html` from `/static/detail.css` to `/detail.css` (matching the integrated server's static file serving pattern).
+
+4. **Updated tests**: Replaced `sys.path.insert(0, ...)` hacks in `tests/test_frontmatter_io.py`, `tests/test_api.py`, `tests/test_detail_rendering.py` with proper `from tools.dashboard.*` imports.
+
+5. **Deleted `web/` directory**: All 7 files removed (server.py, api.py, frontmatter_io.py, detail.html, index.html, static/detail.css, static/detail.js).
+
+6. **Deleted `web/index.html`**: Duplicate of feature 001's dashboard, not needed.
+
+### Test Results
+
+All 38 tests pass (18 from feature 001 + 20 from feature 002), zero failures, zero regressions.
