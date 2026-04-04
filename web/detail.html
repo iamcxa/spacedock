@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entity Detail</title>
+    <link rel="stylesheet" href="/static/detail.css">
+</head>
+<body>
+    <nav class="top-bar">
+        <a href="/" class="back-link">&larr; Back to Dashboard</a>
+        <span id="entity-title" class="nav-title"></span>
+    </nav>
+
+    <div class="detail-layout">
+        <main class="detail-main">
+            <section id="entity-body" class="entity-body">
+                <!-- Rendered markdown body inserted here by JS -->
+            </section>
+
+            <section id="stage-reports" class="stage-reports">
+                <!-- Stage report sections inserted here by JS -->
+            </section>
+        </main>
+
+        <aside class="detail-sidebar">
+            <section class="metadata-panel">
+                <h3>Metadata</h3>
+                <dl id="metadata-fields">
+                    <!-- Frontmatter key-value pairs inserted here by JS -->
+                </dl>
+            </section>
+
+            <section class="management-panel">
+                <h3>Score</h3>
+                <div class="score-control">
+                    <input type="range" id="score-slider" min="0" max="1" step="0.05" value="0">
+                    <span id="score-display">0.00</span>
+                    <button id="score-save" class="btn btn-small">Save</button>
+                </div>
+
+                <h3>Tags</h3>
+                <div class="tag-editor">
+                    <div id="tag-chips" class="tag-chips">
+                        <!-- Tag chips inserted here by JS -->
+                    </div>
+                    <div class="tag-input-row">
+                        <input type="text" id="tag-input" placeholder="Add tag..." class="tag-input">
+                        <button id="tag-add" class="btn btn-small">Add</button>
+                    </div>
+                </div>
+            </section>
+        </aside>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+    <script src="/static/detail.js"></script>
+</body>
+</html>
