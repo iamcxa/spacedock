@@ -1,9 +1,9 @@
 ---
 id: 007
 title: Dashboard as Channel Plugin — Interactive Workflow Control
-status: explore
+status: research
 source: brainstorming session
-started:
+started: 2026-04-05T01:22:00Z
 completed:
 verdict:
 score: 0.95
