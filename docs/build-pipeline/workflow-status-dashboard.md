@@ -288,3 +288,27 @@ All quality gate checks pass. 18 dashboard tests and 33 regression tests all gre
 ### Summary
 
 All acceptance criteria verified through browser + API testing. The dashboard serves on localhost:8420, discovers 8 Spacedock workflows with diverse stage configurations (backlog/work/done, backlog/ideation/implementation/validation/done, etc.), displays entity tables with all required fields (id, title, status, score, source), supports column sorting via click handlers, and auto-refreshes via 5-second client-side polling. UI mapping (20 elements) and E2E flow (11 steps) created for future regression testing.
+
+## Stage Report: pr-ship
+
+- [x] Branch pushed to origin
+  Pushed to fork `iamcxa/spacedock` (upstream `clkao/spacedock` requires collaborator access); branch `ensign/workflow-status-dashboard` with 10 commits ahead of main
+- [x] Draft PR created with conventional commit title and structured body
+  PR #31 at https://github.com/clkao/spacedock/pull/31 -- title: `feat(dashboard): add workflow status dashboard` (49 chars, conventional commit format); body includes summary, test evidence (18+33 tests, E2E verified, 8 workflows), and usage instructions
+- [x] Self-review completed -- no blocking issues found
+  Reviewed full diff (17 files, ~2900 lines): path traversal protection in handlers.py, clean module separation (parsing/discovery/handlers/serve), DOM-based rendering (no innerHTML), stdlib-only Python, all tests pass (18 dashboard + 33 regression)
+- [x] PR marked ready for review
+  `gh pr ready 31` executed successfully -- PR status changed from draft to ready for review
+- [x] Recommendation: PASSED with numbered findings
+
+### Findings
+
+1. Branch pushed successfully via fork (`iamcxa/spacedock`) since the active SSH key (`iamcxa`) does not have push access to `clkao/spacedock`. PR correctly targets `clkao/spacedock:main` from `iamcxa:ensign/workflow-status-dashboard`.
+2. PR title `feat(dashboard): add workflow status dashboard` is 49 characters, well under 70-char limit, follows conventional commit format.
+3. PR body includes structured sections: Summary (3 bullets), What's included (backend/frontend/tests/E2E breakdown), Test evidence (18+33 tests, py_compile, JS validation), and Usage instructions.
+4. Self-review of the full diff found no blocking issues: security (path traversal guard), code quality (clean separation of concerns, no innerHTML, proper error handling), and test coverage (18 tests across 3 layers) are all adequate.
+5. All 51 tests pass (18 dashboard + 33 regression) with no new warnings introduced.
+
+### Summary
+
+Created PR #31 (https://github.com/clkao/spacedock/pull/31) from fork `iamcxa:ensign/workflow-status-dashboard` to `clkao:main`. Branch was pushed to a fork because the active GitHub SSH key does not have direct push access to the upstream repo. PR uses conventional commit title, includes comprehensive test evidence in the body, and passed self-review with no blocking issues found. PR marked ready for captain review.
