@@ -142,6 +142,7 @@ def scan_entities(directory):
         fields = parse_frontmatter(filepath)
         entity = {k: v for k, v in fields.items()}
         entity['slug'] = slug
+        entity['path'] = filepath
         for key in ('id', 'status', 'title', 'score', 'source', 'worktree'):
             entity.setdefault(key, '')
         entities.append(entity)

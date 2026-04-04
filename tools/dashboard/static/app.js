@@ -126,6 +126,12 @@
         var tbody = document.createElement("tbody");
         sorted.forEach(function (e) {
           var row = document.createElement("tr");
+          if (e.path) {
+            row.style.cursor = "pointer";
+            row.addEventListener("click", function () {
+              window.location.href = "/detail?path=" + encodeURIComponent(e.path);
+            });
+          }
           columns.forEach(function (col) {
             var val = e[col] || "";
             var td = document.createElement("td");
