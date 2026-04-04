@@ -10,7 +10,7 @@ import os
 
 from tools.dashboard.parsing import parse_frontmatter, parse_stages_block, scan_entities
 
-IGNORED_DIRS = {'.git', '.worktrees', 'node_modules', 'vendor', 'dist', 'build', '__pycache__'}
+IGNORED_DIRS = {'.git', '.worktrees', 'node_modules', 'vendor', 'dist', 'build', '__pycache__', 'tests'}
 
 
 def discover_workflows(root):

@@ -1,0 +1,236 @@
+app: spacedock
+base_url: http://127.0.0.1:8080
+framework: vanilla-js
+auth:
+  type: none
+mapped_at: "2026-04-04T13:15:00Z"
+
+pages:
+  dashboard:
+    path: /
+    title: Spacedock Workflow Dashboard
+    elements:
+      heading_title:
+        selector: "h1"
+        role: heading
+        text: "Spacedock Workflow Dashboard"
+      input_workflow_dir:
+        selector: "#workflow-dir-input"
+        role: textbox
+        label: "Workflow directory"
+        placeholder: "e.g., docs/plans"
+      button_load:
+        selector: "#load-btn"
+        role: button
+        text: "Load"
+      select_filter_status:
+        selector: "#filter-status"
+        role: combobox
+        label: "Stage"
+      input_filter_min_score:
+        selector: "#filter-min-score"
+        role: spinbutton
+        label: "Min Score"
+      input_filter_max_score:
+        selector: "#filter-max-score"
+        role: spinbutton
+        label: "Max Score"
+      input_filter_tag:
+        selector: "#filter-tag"
+        role: textbox
+        label: "Tag"
+        placeholder: "Filter by tag..."
+      button_filter_apply:
+        selector: "#filter-apply"
+        role: button
+        text: "Apply"
+      button_filter_clear:
+        selector: "#filter-clear"
+        role: button
+        text: "Clear"
+      table_entities:
+        selector: "table"
+        role: table
+      header_id:
+        selector: "th:nth-child(1)"
+        role: columnheader
+        text: "ID"
+      header_title:
+        selector: "th:nth-child(2)"
+        role: columnheader
+        text: "TITLE"
+      header_status:
+        selector: "th:nth-child(3)"
+        role: columnheader
+        text: "STATUS"
+      header_score:
+        selector: "th:nth-child(4)"
+        role: columnheader
+        text: "SCORE"
+      header_tags:
+        selector: "th:nth-child(5)"
+        role: columnheader
+        text: "TAGS"
+      header_source:
+        selector: "th:nth-child(6)"
+        role: columnheader
+        text: "SOURCE"
+      entity_row:
+        selector: "tr.entity-row"
+        role: row
+        dynamic: true
+        notes: "Clickable row — navigates to /detail?path=<filepath>"
+      empty_message:
+        selector: "#entity-tbody td"
+        role: cell
+        text: "Enter a workflow directory and click Load."
+
+  detail:
+    path: /detail
+    title: Entity Detail
+    query_params:
+      path: "entity file path (required)"
+    elements:
+      link_back:
+        selector: "a.back-link"
+        role: link
+        text: "← Back to Dashboard"
+        navigates_to: /
+      text_entity_title:
+        selector: "#entity-title"
+        role: generic
+        notes: "Entity title shown in top nav bar"
+      section_entity_body:
+        selector: "#entity-body"
+        role: generic
+        notes: "Rendered markdown body (via marked.js + DOMPurify)"
+      section_stage_reports:
+        selector: "#stage-reports"
+        role: generic
+        notes: "Container for stage report cards"
+      stage_report_card:
+        selector: ".stage-report-card"
+        role: generic
+        dynamic: true
+        notes: "One card per ## Stage Report: {stage} section"
+      stage_report_heading:
+        selector: ".stage-report-card h3"
+        role: heading
+        dynamic: true
+        text_pattern: "Stage Report: {stage}"
+      checklist:
+        selector: ".checklist"
+        role: list
+        dynamic: true
+      checklist_item_done:
+        selector: ".checklist-item.done"
+        role: listitem
+        notes: "Completed checklist item with checkmark icon"
+      checklist_item_skip:
+        selector: ".checklist-item.skip"
+        role: listitem
+        notes: "Skipped checklist item with dash icon"
+      checklist_item_fail:
+        selector: ".checklist-item.fail"
+        role: listitem
+        notes: "Failed checklist item with X icon"
+      checklist_item_text:
+        selector: ".item-text"
+        role: generic
+        notes: "Main text of checklist item"
+      checklist_item_detail:
+        selector: ".item-detail"
+        role: generic
+        notes: "Evidence/rationale line under checklist item"
+      stage_summary:
+        selector: ".stage-summary"
+        role: generic
+        notes: "Summary text at bottom of stage report card"
+      heading_metadata:
+        selector: ".metadata-panel h3"
+        role: heading
+        text: "Metadata"
+      metadata_fields:
+        selector: "#metadata-fields"
+        role: DescriptionList
+        notes: "dt/dd pairs for all frontmatter fields except tags"
+      metadata_key:
+        selector: "#metadata-fields dt"
+        role: term
+        dynamic: true
+      metadata_value:
+        selector: "#metadata-fields dd"
+        role: definition
+        dynamic: true
+      heading_score:
+        selector: ".management-panel h3:first-of-type"
+        role: heading
+        text: "Score"
+      slider_score:
+        selector: "#score-slider"
+        role: slider
+        min: 0
+        max: 1
+        step: 0.05
+      text_score_display:
+        selector: "#score-display"
+        role: generic
+        notes: "Shows current score value (e.g., '0.90')"
+      button_score_save:
+        selector: "#score-save"
+        role: button
+        text: "Save"
+      heading_tags:
+        selector: ".management-panel h3:nth-of-type(2)"
+        role: heading
+        text: "Tags"
+      container_tag_chips:
+        selector: "#tag-chips"
+        role: generic
+        notes: "Container for tag chip elements"
+      tag_chip:
+        selector: ".tag-chip"
+        role: generic
+        dynamic: true
+        notes: "Individual tag chip with remove button"
+      button_tag_remove:
+        selector: ".remove-tag"
+        role: button
+        dynamic: true
+        notes: "Remove button (x) on individual tag chip"
+      input_tag:
+        selector: "#tag-input"
+        role: textbox
+        placeholder: "Add tag..."
+      button_tag_add:
+        selector: "#tag-add"
+        role: button
+        text: "Add"
+
+api_endpoints:
+  get_entity_detail:
+    method: GET
+    path: /api/entity/detail
+    params:
+      path: "entity file path"
+    returns: "JSON with frontmatter, tags, body, stage_reports, filepath"
+  get_entities:
+    method: GET
+    path: /api/entities
+    params:
+      dir: "workflow directory"
+      status: "filter by status (optional)"
+      tag: "filter by tag (optional)"
+      min_score: "minimum score (optional)"
+      max_score: "maximum score (optional)"
+    returns: "JSON array of entity objects"
+  post_score:
+    method: POST
+    path: /api/entity/score
+    body: '{"path": "<filepath>", "score": <number>}'
+    returns: '{"ok": true}'
+  post_tags:
+    method: POST
+    path: /api/entity/tags
+    body: '{"path": "<filepath>", "tags": ["tag1", "tag2"]}'
+    returns: '{"ok": true}'
