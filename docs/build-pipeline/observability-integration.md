@@ -316,3 +316,19 @@ Re-planned the observability integration for the Bun/TypeScript dashboard archit
 ### Summary
 
 Implemented full observability integration across 7 atomic commits. Core telemetry module (`tools/dashboard/src/telemetry.ts`) gates PostHog and Sentry behind env var checks with silent no-op when unconfigured. Server route handlers wrapped with try/catch + Sentry captureException (Bun.serve has no auto-instrumentation). API mutations emit PostHog events with metadata only. Frontend conditionally loads PostHog JS via `/api/config` endpoint with memory-only persistence. Codex Python scripts get standalone `_emit_telemetry` helper guarded by env var + try/except import. All 70 tests pass, privacy verified (metadata only, never entity body content).
+
+## Stage Report: quality
+
+- [x] Test results — all tests pass with counts
+  70 tests pass, 0 fail, 164 expect() calls across 7 test files (telemetry, server, api, discovery, parsing, frontmatter-io, ctl)
+- [x] No-op verification — server works without telemetry env vars
+  Server starts cleanly on port 8471 without POSTHOG_API_KEY/SENTRY_DSN. GET / returns 200, GET /api/workflows returns 200 with valid workflow data, GET /api/config returns {"posthog":null} confirming telemetry disabled.
+- [x] Privacy audit — metadata only confirmed
+  Audited all 6 telemetry emission points: telemetry.ts captureEvent (caller-controlled properties), api.ts score_updated (slug, new_score), api.ts tags_updated (slug, tag_count), detail.js score_saved (score number), detail.js tag_added/tag_removed (event name only), codex_prepare_dispatch.py entity_dispatched (slug, stage, agent_id), codex_finalize_terminal_entity.py entity_completed (slug, verdict, hook_count). No entity body content, no file paths, no tag values sent. Frontend uses memory-only persistence. Sentry configured with sendDefaultPii:false.
+- [x] Security — path traversal guard verified
+  Tested 6 attack vectors against live server: relative traversal (../../../etc/passwd -> 403), URL-encoded traversal (%2e%2e -> 403), absolute path (/etc/passwd -> 403), static file traversal (-> 404), POST /api/entity/score with /etc/passwd (-> 403), POST /api/entity/tags with /etc/passwd (-> 403). validatePath() using realpathSync + startsWith guard is intact.
+- [x] Recommendation: PASSED
+
+### Summary
+
+All quality checks pass. The observability integration is well-implemented with proper env-var gating (telemetryInit is true no-op without keys), strict metadata-only privacy across all telemetry paths, and no regressions to existing dashboard functionality. Path traversal guards remain intact across all API endpoints including the new /api/config route. Test coverage includes dedicated telemetry guard tests and /api/config endpoint test.
