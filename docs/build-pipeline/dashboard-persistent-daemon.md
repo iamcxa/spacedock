@@ -1,9 +1,9 @@
 ---
 id: 004
 title: Dashboard Persistent Daemon
-status: explore
+status: research
 source: brainstorming session
-started:
+started: 2026-04-04T08:53:00Z
 completed:
 verdict:
 score: 0.9
