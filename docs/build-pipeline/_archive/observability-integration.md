@@ -1,13 +1,13 @@
 ---
 id: 005
 title: Observability Integration (PostHog/Sentry)
-status: quality
+status: shipped
 source: brainstorming session
 started: 2026-04-04T10:56:00Z
-completed:
-verdict:
+completed: 2026-04-04T15:04:00Z
+verdict: PASSED
 score: 0.7
-worktree: .worktrees/ensign-observability-integration
+worktree:
 issue:
 pr:
 intent: feature
