@@ -28,6 +28,34 @@ python3 {spacedock_plugin_dir}/skills/commission/bin/status --workflow-dir {work
 
 Use this for all `status` calls: `--next`, `--where "pr !="`, `--where "worktree !="`, etc.
 
+## Event Emission
+
+The dashboard displays a real-time activity feed. Emit structured events at lifecycle boundaries by POSTing to the dashboard server. Determine the dashboard port from the same startup check (default 8420).
+
+Event format:
+```
+curl -s -X POST http://localhost:${DASHBOARD_PORT}/api/events \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"<TYPE>","entity":"<SLUG>","stage":"<STAGE>","agent":"<WORKER_KEY>-<SLUG>-<STAGE>","timestamp":"<ISO8601>","detail":"<OPTIONAL>"}'
+```
+
+Event types and injection points:
+
+| Type | When | Detail field |
+|------|------|-------------|
+| `dispatch` | After step 6 (commit state transition) | "Entering {stage}" |
+| `completion` | After step 2 of Completion (stage report reviewed) | "{N} done, {N} skipped, {N} failed" |
+| `gate` | When presenting gate to captain | "Awaiting captain approval" |
+| `feedback` | When bouncing entity back to feedback-to stage | "Rejected: {reason summary}" |
+| `merge` | After successful merge/cleanup | "Merged to main" |
+| `idle` | When no entities are dispatchable and idle hooks run | "No dispatchable entities" |
+
+Rules:
+- Emit events only when the dashboard is running (startup check passed or was explicitly started).
+- If the `curl` POST fails (server unreachable), log a warning but do not block the workflow. Events are best-effort.
+- Use `$(date -u +%Y-%m-%dT%H:%M:%SZ)` for the timestamp.
+- The `agent` field uses the `worker_key-slug-stage` convention (e.g., `ensign-feat-a-execute`).
+
 ## Single-Entity Mode
 
 When the user names a specific entity and asks to process it through the workflow, switch into single-entity mode.
@@ -60,6 +88,7 @@ For each entity reported by `status --next`:
    - set `worktree: .worktrees/{worker_key}-{slug}` for worktree stages
    - set `started:` when the entity first moves beyond the initial stage
 6. Commit the state transition on main with `dispatch: {slug} entering {next_stage}`.
+6.5. Emit dispatch event: `curl -s -X POST http://localhost:${DASHBOARD_PORT}/api/events -H 'Content-Type: application/json' -d "{\"type\":\"dispatch\",\"entity\":\"${SLUG}\",\"stage\":\"${NEXT_STAGE}\",\"agent\":\"${WORKER_KEY}-${SLUG}-${NEXT_STAGE}\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"detail\":\"Entering ${NEXT_STAGE}\"}"` (skip if dashboard not running).
 7. Create the worktree on first dispatch to a worktree stage.
 8. Dispatch a fresh worker using the runtime-specific mechanism. The worker assignment must include:
    - entity identity and title
@@ -80,6 +109,7 @@ When a worker completes:
 1. Read the entity file.
 2. Review the `## Stage Report` section against the checklist. Every dispatched checklist item must be represented as DONE, SKIPPED, or FAILED.
 3. If checklist items are missing, send the worker back once to repair the report.
+3.5. Emit completion event with the checklist count summary as detail (skip if dashboard not running).
 4. Check whether the completed stage is gated.
 
 The checklist review should produce an explicit count summary in the form:
@@ -91,6 +121,7 @@ If the stage is not gated:
 - if the next stage has `feedback-to` pointing at the current stage, keep the current worker available for potential follow-up
 
 If the stage is gated:
+- emit gate event with detail "Awaiting captain approval" (skip if dashboard not running)
 - never self-approve
 - present the stage report to the human operator
 - keep the worker alive while waiting at the gate
@@ -104,6 +135,7 @@ When a feedback stage recommends REJECTED:
 2. Track feedback cycles in a `### Feedback Cycles` section in the entity body.
 3. If cycles reach 3, escalate to the human instead of dispatching another round.
 4. Route the findings back to the target stage in the same worktree.
+4.5. Emit feedback event with detail summarizing the rejection reason (skip if dashboard not running).
 5. Re-run the reviewer after fixes.
 6. Re-enter the normal gate flow with the updated result.
 
@@ -116,6 +148,7 @@ When an entity reaches its terminal stage:
 1. Run registered merge hooks before any local merge, archival, or status advancement.
 2. If a merge hook created or set a `pr` field, report the PR-pending state and do not local-merge.
 3. If no merge hook handled the merge, perform the default local merge from the stage worktree branch.
+3.5. After successful merge, emit merge event with detail "Merged to main" (skip if dashboard not running).
 4. Set `completed:` and `verdict:` in frontmatter and clear `worktree:`.
 5. Archive the entity into `{workflow_dir}/_archive/`.
 6. Remove the worktree and delete the temporary branch after successful merge or deliberate discard.
