@@ -305,3 +305,22 @@ None — all claims verified with at least 2 sources.
 ### Summary
 
 Created a 7-task bottom-up migration plan: types.ts (shared interfaces) -> parsing.ts -> discovery.ts -> frontmatter-io.ts -> api.ts -> server.ts -> ctl.sh update + Python cleanup. Each task follows strict TDD ordering. All 6 research corrections incorporated: routes API, Bun.file MIME auto-detect, manual recursive walk for IGNORED_DIRS pruning, fs.realpathSync for path traversal, URL.searchParams for query parsing, bun:test imports. Plan includes 10 quality gates covering tests, smoke tests, security, and backward compatibility.
+
+## Stage Report: execute
+
+- [x] All 7 plan tasks implemented with commits on the feature branch
+  7 atomic commits: types.ts, parsing.ts, discovery.ts, frontmatter-io.ts, api.ts, server.ts, cleanup+ctl.sh
+- [x] TDD discipline followed — tests written before implementation code
+  Every module: tests written first, verified they fail (red), implementation written, verified they pass (green)
+- [x] Atomic commits using `{type}(scope): {description}` format
+  All commits use feat(dashboard): prefix with descriptive messages
+- [x] All research findings applied (Bun.serve routes, Bun.file, manual walk, realpathSync)
+  routes object in Bun.serve(), Bun.file() auto MIME, manual walkDir for IGNORED_DIRS pruning, fs.realpathSync for path traversal guard, URL.searchParams for query parsing, bun:test imports
+- [x] All tests passing at completion (`bun test`)
+  52 tests pass across 5 files (parsing 8, discovery 7, frontmatter-io 16, api 8, server 13) in 52ms
+- [x] Python files deleted, ctl.sh updated
+  8 Python source files and 6 Python test files deleted; ctl.sh line 152 changed from python3 to bun run; 0 python3 references remain
+
+### Summary
+
+Complete Bun migration of the dashboard server from Python to TypeScript. All 7 plan tasks executed with strict TDD discipline across 7 atomic commits. The migration produces 6 TypeScript source files under tools/dashboard/src/ (types.ts, parsing.ts, discovery.ts, frontmatter-io.ts, api.ts, server.ts) and 5 test files under tests/dashboard/. All 52 tests pass. Key research findings applied: Bun.serve() routes API, Bun.file() auto MIME detection, manual recursive walk for IGNORED_DIRS pruning, fs.realpathSync() for path traversal security, URL.searchParams for query parsing. Python source and test files removed, ctl.sh updated to launch bun run.
