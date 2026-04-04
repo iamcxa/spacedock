@@ -1,13 +1,13 @@
 ---
 id: 006
 title: Dashboard Bun Migration — Python to self-contained TypeScript
-status: pr-draft
+status: shipped
 source: brainstorming session
 started: 2026-04-04T11:32:00Z
-completed:
-verdict:
+completed: 2026-04-04T12:40:00Z
+verdict: PASSED
 score: 0.95
-worktree: .worktrees/ensign-dashboard-bun-migration
+worktree:
 issue:
 pr:
 intent: feature
