@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@sentry/bun": "^10.46.0",
+    "posthog-node": "^5.28.8"
+  }
+}

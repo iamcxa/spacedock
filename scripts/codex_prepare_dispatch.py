@@ -5,11 +5,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+
+def _emit_telemetry(event_name: str, properties: dict) -> None:
+    """Emit a PostHog event if configured. Silent no-op otherwise."""
+    api_key = os.environ.get("POSTHOG_API_KEY")
+    if not api_key:
+        return
+    try:
+        import posthog
+        posthog.project_api_key = api_key
+        posthog.host = os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com")
+        posthog.capture("spacedock-agent", event_name, properties)
+    except Exception:
+        pass  # Telemetry must never block the workflow
 
 
 @dataclass
@@ -300,6 +315,11 @@ def main() -> int:
     }
     payload["spawn_message"] = build_worker_prompt(payload)
     print(json.dumps(payload, indent=2))
+    _emit_telemetry("entity_dispatched", {
+        "slug": args.entity_slug,
+        "stage": stage_name,
+        "agent_id": dispatch_agent_id,
+    })
     return 0
 
 

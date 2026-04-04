@@ -5,6 +5,7 @@ import { discoverWorkflows, aggregateWorkflow } from "./discovery";
 import { getEntityDetail, updateScore, updateTags, filterEntities } from "./api";
 import { EventBuffer } from "./events";
 import type { AgentEvent } from "./types";
+import { telemetryInit, captureException, getPosthogJsConfig } from "./telemetry";
 
 interface ServerOptions {
   port: number;
@@ -35,6 +36,8 @@ export function createServer(opts: ServerOptions) {
   const staticDir = opts.staticDir ?? join(dirname(import.meta.dir), "static");
   const eventBuffer = new EventBuffer(500);
 
+  telemetryInit();
+
   function logRequest(req: Request, status: number) {
     if (!logFile) return;
     const now = new Date().toISOString();
@@ -47,12 +50,18 @@ export function createServer(opts: ServerOptions) {
     routes: {
       "/api/workflows": {
         GET: (req) => {
-          const workflows = discoverWorkflows(projectRoot);
-          const result = workflows
-            .map((wf) => aggregateWorkflow(wf.dir))
-            .filter((d): d is NonNullable<typeof d> => d !== null);
-          logRequest(req, 200);
-          return jsonResponse(result);
+          try {
+            const workflows = discoverWorkflows(projectRoot);
+            const result = workflows
+              .map((wf) => aggregateWorkflow(wf.dir))
+              .filter((d): d is NonNullable<typeof d> => d !== null);
+            logRequest(req, 200);
+            return jsonResponse(result);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
         },
       },
       "/api/entity/detail": {
@@ -67,9 +76,15 @@ export function createServer(opts: ServerOptions) {
             logRequest(req, 403);
             return jsonResponse({ error: "Forbidden" }, 403);
           }
-          const data = getEntityDetail(filepath);
-          logRequest(req, 200);
-          return jsonResponse(data);
+          try {
+            const data = getEntityDetail(filepath);
+            logRequest(req, 200);
+            return jsonResponse(data);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
         },
       },
       "/api/entities": {
@@ -80,42 +95,67 @@ export function createServer(opts: ServerOptions) {
             logRequest(req, 403);
             return jsonResponse({ error: "Forbidden" }, 403);
           }
-          const status = url.searchParams.get("status") ?? undefined;
-          const tag = url.searchParams.get("tag") ?? undefined;
-          const minScoreStr = url.searchParams.get("min_score");
-          const maxScoreStr = url.searchParams.get("max_score");
-          const results = filterEntities(directory, {
-            status: status || null,
-            tag: tag || null,
-            min_score: minScoreStr ? parseFloat(minScoreStr) : null,
-            max_score: maxScoreStr ? parseFloat(maxScoreStr) : null,
-          });
-          logRequest(req, 200);
-          return jsonResponse(results);
+          try {
+            const status = url.searchParams.get("status") ?? undefined;
+            const tag = url.searchParams.get("tag") ?? undefined;
+            const minScoreStr = url.searchParams.get("min_score");
+            const maxScoreStr = url.searchParams.get("max_score");
+            const results = filterEntities(directory, {
+              status: status || null,
+              tag: tag || null,
+              min_score: minScoreStr ? parseFloat(minScoreStr) : null,
+              max_score: maxScoreStr ? parseFloat(maxScoreStr) : null,
+            });
+            logRequest(req, 200);
+            return jsonResponse(results);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
         },
       },
       "/api/entity/score": {
         POST: async (req) => {
-          const body = await req.json() as { path: string; score: number };
-          if (!validatePath(body.path, projectRoot)) {
-            logRequest(req, 403);
-            return jsonResponse({ error: "Forbidden" }, 403);
+          try {
+            const body = await req.json() as { path: string; score: number };
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            updateScore(body.path, body.score);
+            logRequest(req, 200);
+            return jsonResponse({ ok: true });
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
           }
-          updateScore(body.path, body.score);
-          logRequest(req, 200);
-          return jsonResponse({ ok: true });
         },
       },
       "/api/entity/tags": {
         POST: async (req) => {
-          const body = await req.json() as { path: string; tags: string[] };
-          if (!validatePath(body.path, projectRoot)) {
-            logRequest(req, 403);
-            return jsonResponse({ error: "Forbidden" }, 403);
+          try {
+            const body = await req.json() as { path: string; tags: string[] };
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            updateTags(body.path, body.tags);
+            logRequest(req, 200);
+            return jsonResponse({ ok: true });
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
           }
-          updateTags(body.path, body.tags);
+        },
+      },
+      "/api/config": {
+        GET: (req) => {
+          const posthog = getPosthogJsConfig();
           logRequest(req, 200);
-          return jsonResponse({ ok: true });
+          return jsonResponse({ posthog });
         },
       },
       "/api/events": {
@@ -180,44 +220,50 @@ export function createServer(opts: ServerOptions) {
       },
     },
     fetch(req) {
-      // Fallback handler for static files and unmatched routes
-      const url = new URL(req.url);
-      const pathname = url.pathname;
+      try {
+        // Fallback handler for static files and unmatched routes
+        const url = new URL(req.url);
+        const pathname = url.pathname;
 
-      // Handle WebSocket upgrade
-      if (pathname === "/ws/activity") {
-        const upgraded = server.upgrade(req);
-        if (upgraded) return undefined as any;
-        logRequest(req, 400);
-        return new Response("WebSocket upgrade failed", { status: 400 });
-      }
+        // Handle WebSocket upgrade
+        if (pathname === "/ws/activity") {
+          const upgraded = server.upgrade(req);
+          if (upgraded) return undefined as any;
+          logRequest(req, 400);
+          return new Response("WebSocket upgrade failed", { status: 400 });
+        }
 
-      // Serve static files
-      const filename = pathname.slice(1); // remove leading /
-      if (filename) {
-        const filepath = resolve(staticDir, filename);
-        const realStaticDir = realpathSync(staticDir);
-        try {
-          const realFilepath = realpathSync(filepath);
-          if (!realFilepath.startsWith(realStaticDir)) {
-            logRequest(req, 403);
-            return new Response("Forbidden", { status: 403 });
+        // Serve static files
+        const filename = pathname.slice(1); // remove leading /
+        if (filename) {
+          const filepath = resolve(staticDir, filename);
+          const realStaticDir = realpathSync(staticDir);
+          try {
+            const realFilepath = realpathSync(filepath);
+            if (!realFilepath.startsWith(realStaticDir)) {
+              logRequest(req, 403);
+              return new Response("Forbidden", { status: 403 });
+            }
+          } catch {
+            logRequest(req, 404);
+            return new Response("Not Found", { status: 404 });
           }
-        } catch {
-          logRequest(req, 404);
-          return new Response("Not Found", { status: 404 });
+          if (existsSync(filepath)) {
+            logRequest(req, 200);
+            return new Response(Bun.file(filepath));
+          }
         }
-        if (existsSync(filepath)) {
-          logRequest(req, 200);
-          return new Response(Bun.file(filepath));
-        }
-      }
 
-      logRequest(req, 404);
-      if (req.method === "POST") {
-        return jsonResponse({ error: "Not found" }, 404);
+        logRequest(req, 404);
+        if (req.method === "POST") {
+          return jsonResponse({ error: "Not found" }, 404);
+        }
+        return new Response("Not Found", { status: 404 });
+      } catch (err) {
+        captureException(err instanceof Error ? err : new Error(String(err)));
+        logRequest(req, 500);
+        return jsonResponse({ error: "Internal server error" }, 500);
       }
-      return new Response("Not Found", { status: 404 });
     },
   });
 

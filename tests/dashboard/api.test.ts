@@ -1,8 +1,9 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { getEntityDetail, updateScore, updateTags, filterEntities } from "../../tools/dashboard/src/api";
+import * as telemetry from "../../tools/dashboard/src/telemetry";
 
 const sampleEntity = [
   "---",
@@ -132,5 +133,47 @@ describe("filterEntities", () => {
     const results = filterEntities(tmpDir, { status: "plan", tag: "urgent", min_score: 0.9 });
     expect(results.length).toBe(1);
     expect(results[0].frontmatter.id).toBe("003");
+  });
+});
+
+describe("API Telemetry Events", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "api-tel-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test("updateScore emits score_updated event", () => {
+    const filepath = join(tmpDir, "test-entity.md");
+    writeFileSync(filepath, "---\ntitle: Test Entity\nscore: 0.5\ntags:\n---\n\nBody text.\n");
+    const spy = spyOn(telemetry, "captureEvent");
+    try {
+      updateScore(filepath, 0.9);
+      expect(spy).toHaveBeenCalledWith("score_updated", {
+        slug: "test-entity",
+        new_score: 0.9,
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("updateTags emits tags_updated event", () => {
+    const filepath = join(tmpDir, "test-entity.md");
+    writeFileSync(filepath, "---\ntitle: Test Entity\nscore: 0.5\ntags:\n---\n\nBody text.\n");
+    const spy = spyOn(telemetry, "captureEvent");
+    try {
+      updateTags(filepath, ["urgent", "backend"]);
+      expect(spy).toHaveBeenCalledWith("tags_updated", {
+        slug: "test-entity",
+        tag_count: 2,
+      });
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

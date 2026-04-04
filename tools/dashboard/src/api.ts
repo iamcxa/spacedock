@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, basename } from "node:path";
+import { captureEvent } from "./telemetry";
 import {
   parseEntity,
   extractStageReports,
@@ -22,12 +23,16 @@ export function updateScore(filepath: string, newScore: number): void {
   const text = readFileSync(filepath, "utf-8");
   const updated = updateEntityScore(text, newScore);
   writeFileSync(filepath, updated);
+  const slug = basename(filepath).replace(/\.md$/, "");
+  captureEvent("score_updated", { slug, new_score: newScore });
 }
 
 export function updateTags(filepath: string, tags: string[]): void {
   const text = readFileSync(filepath, "utf-8");
   const updated = updateEntityTags(text, tags);
   writeFileSync(filepath, updated);
+  const slug = basename(filepath).replace(/\.md$/, "");
+  captureEvent("tags_updated", { slug, tag_count: tags.length });
 }
 
 function scanEntitiesDetailed(directory: string): EntityDetail[] {
