@@ -1,7 +1,7 @@
 ---
 id: 002
 title: Entity Detail & Management UI
-status: research
+status: plan
 source: commission seed
 started: 2026-04-04T02:55:00Z
 completed:
