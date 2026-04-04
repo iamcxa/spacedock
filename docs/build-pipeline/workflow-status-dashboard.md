@@ -1,7 +1,7 @@
 ---
 id: 001
 title: Workflow Status Dashboard
-status: execute
+status: quality
 source: commission seed
 started: 2026-04-04T02:54:00Z
 completed:
