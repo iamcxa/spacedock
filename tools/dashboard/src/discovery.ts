@@ -1,4 +1,4 @@
-import { readdirSync, existsSync } from "node:fs";
+import { readdirSync, existsSync, type Dirent } from "node:fs";
 import { join, basename } from "node:path";
 import { parseFrontmatter, parseStagesBlock, scanEntities } from "./parsing";
 import type { Workflow, WorkflowData } from "./types";
@@ -16,9 +16,9 @@ function walkDir(
   dir: string,
   callback: (dirPath: string, filenames: string[]) => void
 ): void {
-  let entries: ReturnType<typeof readdirSync>;
+  let entries: Dirent<string>[];
   try {
-    entries = readdirSync(dir, { withFileTypes: true });
+    entries = readdirSync(dir, { withFileTypes: true, encoding: "utf-8" }) as Dirent<string>[];
   } catch {
     return;
   }
