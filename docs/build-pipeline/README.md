@@ -61,6 +61,12 @@ A development pipeline that takes a brainstormed idea through codebase explorati
 
 Features enter this workflow with a completed brainstorming spec (produced by `/build` skill's interactive Phase I). The spec contains the approach, alternatives considered, guardrails, and acceptance criteria. From here, the pipeline is fully autonomous — the first officer dispatches ensigns through each stage, only escalating to the captain at quality and pr-review gates when issues arise.
 
+## Context Lake Protocol
+
+See [CONTEXT-LAKE-PROTOCOL.md](./_docs/CONTEXT-LAKE-PROTOCOL.md) for the full specification of how ensigns use the context lake MCP tools (`store_insight`, `search_insights`, `invalidate_stale`) for cross-stage knowledge transfer.
+
+**Quick summary:** Explore stores file-level insights (`source: read`), research/execute overwrite with verified knowledge (`source: manual`). Every ensign searches `file_path` exact match (freshness 30 days) before starting work. Content uses 5 lightweight tags: `[purpose]`, `[pattern]`, `[gotcha]`, `[correction]`, `[decision]`.
+
 ## Model Dispatch
 
 Each stage specifies a `model:` property in the frontmatter. The first officer reads this and passes it to `Agent(model=...)` at dispatch time. If a stage has no `model:` property, the agent inherits the parent's model (typically the user's default from settings).
