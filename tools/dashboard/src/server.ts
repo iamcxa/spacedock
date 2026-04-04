@@ -3,6 +3,8 @@ import { join, resolve, sep, dirname } from "node:path";
 import { parseArgs } from "node:util";
 import { discoverWorkflows, aggregateWorkflow } from "./discovery";
 import { getEntityDetail, updateScore, updateTags, filterEntities } from "./api";
+import { EventBuffer } from "./events";
+import type { AgentEvent } from "./types";
 
 interface ServerOptions {
   port: number;
@@ -31,6 +33,7 @@ function jsonResponse(data: unknown, status = 200): Response {
 export function createServer(opts: ServerOptions) {
   const { projectRoot, logFile } = opts;
   const staticDir = opts.staticDir ?? join(dirname(import.meta.dir), "static");
+  const eventBuffer = new EventBuffer(500);
 
   function logRequest(req: Request, status: number) {
     if (!logFile) return;
@@ -115,6 +118,35 @@ export function createServer(opts: ServerOptions) {
           return jsonResponse({ ok: true });
         },
       },
+      "/api/events": {
+        GET: (req) => {
+          const url = new URL(req.url);
+          const sinceStr = url.searchParams.get("since");
+          const since = sinceStr ? parseInt(sinceStr, 10) : 0;
+          const events = since > 0 ? eventBuffer.getSince(since) : eventBuffer.getAll();
+          logRequest(req, 200);
+          return jsonResponse({ events });
+        },
+        POST: async (req) => {
+          const body = await req.json() as Record<string, unknown>;
+          const required = ["type", "entity", "stage", "agent", "timestamp"];
+          for (const field of required) {
+            if (!body[field]) {
+              logRequest(req, 400);
+              return jsonResponse({ error: `Missing required field: ${field}` }, 400);
+            }
+          }
+          try {
+            const entry = eventBuffer.push(body as unknown as AgentEvent);
+            server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+            logRequest(req, 200);
+            return jsonResponse({ ok: true, seq: entry.seq });
+          } catch (e: any) {
+            logRequest(req, 400);
+            return jsonResponse({ error: e.message }, 400);
+          }
+        },
+      },
       "/detail": {
         GET: (req) => {
           const filepath = join(staticDir, "detail.html");
@@ -134,10 +166,31 @@ export function createServer(opts: ServerOptions) {
         },
       },
     },
+    websocket: {
+      open(ws) {
+        ws.subscribe("activity");
+        const events = eventBuffer.getAll();
+        ws.send(JSON.stringify({ type: "replay", events }));
+      },
+      message(_ws, _message) {
+        // Reserved for future bidirectional communication (gate approval)
+      },
+      close(ws) {
+        ws.unsubscribe("activity");
+      },
+    },
     fetch(req) {
       // Fallback handler for static files and unmatched routes
       const url = new URL(req.url);
       const pathname = url.pathname;
+
+      // Handle WebSocket upgrade
+      if (pathname === "/ws/activity") {
+        const upgraded = server.upgrade(req);
+        if (upgraded) return undefined as any;
+        logRequest(req, 400);
+        return new Response("WebSocket upgrade failed", { status: 400 });
+      }
 
       // Serve static files
       const filename = pathname.slice(1); // remove leading /

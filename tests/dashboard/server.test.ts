@@ -160,4 +160,170 @@ describe("Dashboard Server", () => {
     const res = await fetch(`${baseUrl}/api/unknown`, { method: "POST" });
     expect(res.status).toBe(404);
   });
+
+  // --- WebSocket and Event Endpoint Tests ---
+
+  test("POST /api/events accepts valid event", async () => {
+    const res = await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "dispatch",
+        entity: "feat-c",
+        stage: "plan",
+        agent: "ensign-feat-c-plan",
+        timestamp: "2026-04-04T11:00:00Z",
+      }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+    expect(typeof data.seq).toBe("number");
+  });
+
+  test("POST /api/events rejects invalid event type", async () => {
+    const res = await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "invalid",
+        entity: "feat-c",
+        stage: "plan",
+        agent: "e",
+        timestamp: "t",
+      }),
+    });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBeDefined();
+  });
+
+  test("POST /api/events rejects missing fields", async () => {
+    const res = await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "dispatch" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("GET /api/events returns buffered events", async () => {
+    // Ensure at least one event exists
+    await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "dispatch",
+        entity: "get-test",
+        stage: "plan",
+        agent: "e1",
+        timestamp: "2026-04-04T10:00:00Z",
+      }),
+    });
+    const res = await fetch(`${baseUrl}/api/events`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(Array.isArray(data.events)).toBe(true);
+    expect(data.events.length).toBeGreaterThan(0);
+    expect(typeof data.events[0].seq).toBe("number");
+  });
+
+  test("GET /api/events?since=N returns events after N", async () => {
+    const allRes = await fetch(`${baseUrl}/api/events`);
+    const allData = await allRes.json();
+    const lastSeq = allData.events[allData.events.length - 1].seq;
+
+    const res = await fetch(`${baseUrl}/api/events?since=${lastSeq}`);
+    const data = await res.json();
+    expect(data.events.length).toBe(0);
+  });
+
+  test("WebSocket upgrade on /ws/activity succeeds", async () => {
+    const ws = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+    const opened = await new Promise<boolean>((resolve) => {
+      ws.onopen = () => resolve(true);
+      ws.onerror = () => resolve(false);
+    });
+    expect(opened).toBe(true);
+    ws.close();
+  });
+
+  test("WebSocket receives replay of buffered events on connect", async () => {
+    // POST an event first
+    await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "dispatch",
+        entity: "replay-test",
+        stage: "execute",
+        agent: "ensign-replay-test-execute",
+        timestamp: "2026-04-04T10:00:00Z",
+      }),
+    });
+
+    // Connect WebSocket -- should receive replay
+    const ws = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+    const messages: string[] = [];
+    const done = new Promise<void>((resolve) => {
+      ws.onmessage = (ev) => {
+        messages.push(ev.data as string);
+        const parsed = JSON.parse(ev.data as string);
+        if (parsed.type === "replay") resolve();
+      };
+      setTimeout(resolve, 1000);
+    });
+    await done;
+    ws.close();
+
+    expect(messages.length).toBeGreaterThanOrEqual(1);
+    const replay = JSON.parse(messages[0]);
+    expect(replay.type).toBe("replay");
+    expect(Array.isArray(replay.events)).toBe(true);
+  });
+
+  test("WebSocket receives live events after POST /api/events", async () => {
+    const ws = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+    await new Promise<void>((resolve) => { ws.onopen = () => resolve(); });
+
+    // Skip the initial replay message
+    const liveMessages: string[] = [];
+    let replayDone = false;
+    const gotLive = new Promise<void>((resolve) => {
+      ws.onmessage = (ev) => {
+        const parsed = JSON.parse(ev.data as string);
+        if (parsed.type === "replay") {
+          replayDone = true;
+          return;
+        }
+        if (replayDone) {
+          liveMessages.push(ev.data as string);
+          resolve();
+        }
+      };
+      setTimeout(resolve, 2000);
+    });
+
+    // POST a new event after connection is established
+    await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "completion",
+        entity: "live-test",
+        stage: "plan",
+        agent: "ensign-live-test-plan",
+        timestamp: "2026-04-04T10:10:00Z",
+      }),
+    });
+
+    await gotLive;
+    ws.close();
+
+    expect(liveMessages.length).toBeGreaterThanOrEqual(1);
+    const msg = JSON.parse(liveMessages[0]);
+    expect(msg.type).toBe("event");
+    expect(msg.data.event.entity).toBe("live-test");
+    expect(msg.data.seq).toBeGreaterThan(0);
+  });
 });
