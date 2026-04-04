@@ -7,7 +7,7 @@ that the server serializes to JSON responses.
 import glob
 import os
 
-from frontmatter_io import (
+from .frontmatter_io import (
     extract_stage_reports,
     parse_entity,
     update_entity_score,

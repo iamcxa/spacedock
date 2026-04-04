@@ -1,12 +1,8 @@
-import os
-import sys
 import tempfile
 import textwrap
 import unittest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'web'))
-
-from frontmatter_io import parse_entity, update_entity_score, update_entity_tags
+from tools.dashboard.frontmatter_io import parse_entity, update_entity_score, update_entity_tags
 
 
 class TestParseEntity(unittest.TestCase):

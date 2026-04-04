@@ -1,13 +1,10 @@
 import json
 import os
-import sys
 import tempfile
 import textwrap
 import unittest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'web'))
-
-from api import get_entity_detail, update_score, update_tags, filter_entities
+from tools.dashboard.api import get_entity_detail, update_score, update_tags, filter_entities
 
 
 SAMPLE_ENTITY = textwrap.dedent("""\

@@ -1,11 +1,7 @@
-import os
-import sys
 import textwrap
 import unittest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'web'))
-
-from frontmatter_io import parse_entity, extract_stage_reports
+from tools.dashboard.frontmatter_io import parse_entity, extract_stage_reports
 
 
 class TestExtractStageReports(unittest.TestCase):
