@@ -1,6 +1,8 @@
 ---
 name: ensign
-description: Executes workflow stage work
+description: Execute workflow stage work as a dispatched worker. Use when the first officer dispatches a stage — reads the assignment checklist, performs the work, and writes a stage report with checklist completion status.
+model: inherit
+color: cyan
 skills: ["spacedock:ensign"]
 ---
 

@@ -1,6 +1,8 @@
 ---
 name: first-officer
-description: Orchestrates a workflow
+description: Orchestrate a Spacedock workflow by reading entity state, dispatching ensign workers, managing approval gates, and advancing entities through stages. Use when running or resuming a workflow pipeline.
+model: inherit
+color: blue
 skills: ["spacedock:first-officer"]
 ---
 

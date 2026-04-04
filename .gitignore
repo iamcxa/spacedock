@@ -5,3 +5,4 @@ testflight-*/
 __pycache__/
 *.pyc
 .spacedock/
+node_modules/
