@@ -180,3 +180,128 @@ RATIONALE:    Captain identified that Python was a historical choice, not optima
 ### Summary
 
 Complete exploration of all 22 files involved in the dashboard Bun migration. The Python codebase is 726 LOC across 6 modules with clean separation: parsing/discovery (domain), frontmatter_io (contract), api (service), handlers+serve (router/server). All 55 test methods across 7 test files were catalogued. The only ctl.sh change is line 152 (python3 to bun run). Scale confirmed as Medium with no surprises.
+
+## Technical Claims
+
+CLAIM-1: [type: library-api] "Bun.serve() can handle HTTP routes (GET/POST) with URL parsing and request body reading, replacing Python's BaseHTTPRequestHandler"
+CLAIM-2: [type: library-api] "Bun.serve() supports WebSocket on the same port as HTTP (future feature 003 benefit)"
+CLAIM-3: [type: library-api] "Bun.file() can serve static files with automatic MIME type detection, replacing Python's manual static serving"
+CLAIM-4: [type: library-api] "Bun file system API can read/write files for frontmatter parsing — Bun.file().text() or Node.js fs.readFileSync()"
+CLAIM-5: [type: library-api] "Bun.Glob can replace Python's glob.glob() for entity scanning with scan/scanSync methods"
+CLAIM-6: [type: framework] "fs.readdirSync with recursive option can replace Python's os.walk() for discover_workflows()"
+CLAIM-7: [type: library-api] "Bun.spawnSync() can run git rev-parse --show-toplevel and capture stdout, replacing Python's subprocess.run()"
+CLAIM-8: [type: library-api] "path.resolve() + fs.realpathSync() + startsWith can replace Python's os.path.realpath() for path traversal guard"
+CLAIM-9: [type: framework] "bun test is Jest-compatible (describe, it, expect) for porting 55 Python test methods"
+CLAIM-10: [type: framework] "util.parseArgs can replace Python's argparse for CLI arguments (--port, --root, --log-file)"
+CLAIM-11: [type: version] "Bun 1.3.9 supports all needed APIs: Bun.serve(), Bun.file(), Bun.Glob, Bun.spawnSync(), bun test"
+CLAIM-12: [type: framework] "nohup bun run tools/dashboard/src/server.ts & works as daemon pattern in ctl.sh"
+CLAIM-13: [type: library-api] "Bun.serve() route matching handles query string parsing for GET endpoints"
+
+## Research Report
+
+**Claims analyzed**: 13
+**Recommendation**: PROCEED
+
+### Verified (12 claims)
+
+- CLAIM-1: HIGH — Bun.serve() routes API with per-method handlers (GET/POST)
+  Web: Bun docs confirm routes API with static routes, dynamic routes (:id), wildcard routes, per-method objects ({GET: fn, POST: fn}). Available since Bun 1.2.3. Request body via `await req.json()` (standard Fetch API Request object).
+  Explorer: No existing Bun usage in codebase (greenfield migration).
+  Note: The `routes` API (introduced 1.2.3) is the modern replacement for the older `fetch`-only handler. Bun 1.3.9 >> 1.2.3.
+
+- CLAIM-2: HIGH — WebSocket + HTTP on same port in Bun.serve()
+  Web: GitHub issues #17871 and #18314 confirm this works at runtime. Type definitions were fixed in @types/bun 1.2.6 (merged March 2025). Pattern: `Bun.serve({ routes: {...}, websocket: {...} })`.
+  Note: Bun 1.3.9 includes the fix. WebSocket upgrade via `server.upgrade(req)` in a route handler.
+
+- CLAIM-3: HIGH — Bun.file() serves static files with auto MIME type
+  Web: Bun docs confirm `Bun.file(path)` returns a BunFile that auto-detects Content-Type from extension. Pattern: `return new Response(Bun.file(filepath))`. Detects .html, .css, .js, .json, .png, .svg, etc.
+  Note: Eliminates the need for the manual MIME_TYPES dict in Python handlers.py.
+
+- CLAIM-4: HIGH — File read/write for frontmatter parsing
+  Web: Bun.file(path).text() returns Promise<string>. For sync: Node.js fs.readFileSync/writeFileSync fully supported.
+  Note: For parsing.ts (line-by-line parsing), `Bun.file(path).text()` then `.split('\n')` is idiomatic. For frontmatter_io.ts (read + modify + write), `fs.readFileSync` + `fs.writeFileSync` is simpler.
+
+- CLAIM-5: HIGH — Bun.Glob replaces Python glob.glob()
+  Web: Bun docs confirm `new Glob("*.md")` with `.scanSync({cwd: directory})` returns iterator of matching files. Supports *, **, ?, [ab], {a,b}, ! patterns. Also supports Node.js fs.glob()/fs.globSync().
+  Note: `scan_entities` uses `glob.glob(os.path.join(directory, '*.md'))` — direct equivalent is `new Glob("*.md").scanSync({cwd: directory})`.
+
+- CLAIM-6: HIGH (with note) — fs.readdirSync recursive replaces os.walk()
+  Web: Bun supports Node.js `fs.readdirSync(path, {recursive: true})`. However, combining `recursive: true` with `withFileTypes: true` has known issues in Node.js ecosystem.
+  Note: Python's os.walk() yields (dirpath, dirnames, filenames) with dirnames pruning for IGNORED_DIRS. fs.readdirSync({recursive:true}) returns flat list without pruning ability. Two approaches: (a) manual recursive walk function matching os.walk behavior, or (b) use Bun.Glob with `**\/README.md` pattern. Approach (b) is simpler but doesn't allow IGNORED_DIRS pruning mid-walk. Approach (a) is a faithful port. Either works.
+
+- CLAIM-7: HIGH — Bun.spawnSync() captures stdout for git commands
+  Web: Bun docs confirm `Bun.spawnSync(["git", "rev-parse", "--show-toplevel"])` returns object with `.stdout` (Buffer). Access via `.stdout.toString().trim()`. Also has `.exitCode`.
+  Note: Direct equivalent of Python's `subprocess.run([...], capture_output=True, text=True, check=True)`.
+
+- CLAIM-8: HIGH — path.resolve + fs.realpathSync for path traversal guard
+  Web: Bun supports Node.js `fs.realpathSync()` for resolving symlinks to canonical paths, and `path.resolve()` for path normalization. Both fully Node.js compatible.
+  Explorer: Python code uses `os.path.realpath(filepath)` + `startsWith(os.path.realpath(project_root) + os.sep)` — direct port: `fs.realpathSync(filepath)` + `startsWith(fs.realpathSync(projectRoot) + path.sep)`.
+  Note: `Bun.resolveSync()` is for module resolution, NOT filesystem path resolution. Use `fs.realpathSync()` instead.
+
+- CLAIM-9: HIGH — bun test Jest compatibility for porting tests
+  Web: Bun docs confirm built-in test runner with Jest-like API: `describe`, `test`/`it`, `expect`, `beforeEach`/`afterEach`/`beforeAll`/`afterAll`, `mock`/`jest.fn()`, snapshot testing. Imports from `bun:test`. File patterns: *.test.{ts,tsx,js,jsx}, *_test.*, *.spec.*.
+  Note: 55 Python test methods (pytest style) port to `test("name", () => {...})`. Python `unittest.mock.patch` maps to `jest.fn()` / `mock()`.
+
+- CLAIM-10: HIGH — util.parseArgs for CLI arguments
+  Web: Bun supports Node.js `util.parseArgs()` with options config for boolean/string types, strict mode, positionals. Replaces argparse.
+  Note: Python uses `--port`, `--root`, `--log-file` — all map to parseArgs options with `type: "string"`.
+
+- CLAIM-11: HIGH — Bun 1.3.9 supports all needed APIs
+  Web: Bun 1.3 released October 2025. Routes API since 1.2.3 (early 2025). Bun.Glob since 1.0.14 (late 2023). bun test since 1.0. Bun.spawnSync since 1.0. 1.3.9 is a patch release with 23 bug fixes.
+  Verified: `bun --version` returns 1.3.9 on this machine. All APIs are well-established, not experimental.
+
+- CLAIM-12: HIGH — nohup bun run daemon pattern
+  Web: `nohup bun run server.ts > /dev/null 2>&1 &` is standard Unix daemon pattern, works identically to nohup with any process. PM2 is recommended for production but nohup is fine for local dev tooling.
+  Explorer: ctl.sh line 152 currently uses `nohup python3 -m tools.dashboard.serve \` — changing to `nohup bun run tools/dashboard/src/server.ts \` is a direct substitution. PID capture ($!) works the same.
+
+### Corrected (1 claim)
+
+- CLAIM-13: MEDIUM CORRECTION — Query string parsing not built into routes API
+  Web: Bun.serve() routes match paths (e.g., "/api/entity/detail") but don't parse query strings automatically. The route handler receives a standard Request object — use `new URL(req.url).searchParams` to parse query parameters.
+  Explorer: Python uses `urllib.parse.parse_qs(parsed.query)` which returns dict of lists. TypeScript equivalent: `new URL(req.url).searchParams` which returns URLSearchParams (use `.get()` for single values).
+  **Fix**: This is not a plan error — it's standard web API usage. The plan already implies using Request objects. Just note that query parsing uses `URL.searchParams`, not any Bun-specific API.
+
+### Unverifiable (0 claims)
+
+None — all claims verified with at least 2 sources.
+
+### Recommendation Criteria
+
+- PROCEED: The 1 correction is minor (standard web API for query parsing, not an architectural issue). All 12 other claims verified at HIGH confidence. Bun 1.3.9 is well past the minimum version for all needed features. The migration path is clean with no API surprises.
+
+### Key Notes for Plan/Execute Stage
+
+1. **Routes API** (not fetch-only): Use the modern `routes` object in Bun.serve() with per-method handlers, not the older fetch-only pattern. This gives cleaner code than the Python BaseHTTPRequestHandler.
+2. **Static files**: `Bun.file()` auto-detects MIME types — no need to port the MIME_TYPES dict.
+3. **os.walk replacement**: For discover_workflows(), recommend a manual recursive walk function (not fs.readdirSync recursive) to preserve IGNORED_DIRS pruning behavior that os.walk supports via dirnames mutation.
+4. **Path security**: Use `fs.realpathSync()` (not `Bun.resolveSync()`) for the path traversal guard.
+5. **WebSocket + routes**: Works at runtime in Bun 1.3.9. Types are fixed in @types/bun >= 1.2.6.
+6. **Test porting**: Import from `bun:test`, use `describe`/`test`/`expect`. File naming: `*.test.ts`.
+
+## Stage Report: research
+
+- [x] Claims extracted from plan (13 claims)
+- [x] Explorer verification: codebase cross-checked for existing patterns and conventions
+- [x] Web research: Bun official docs, GitHub issues, blog posts, community resources
+- [x] Cross-reference synthesis completed with confidence levels
+- [x] Research report written to entity
+- [x] 1 correction identified (minor: query string parsing via standard URL API)
+- [x] All 12 remaining claims verified at HIGH confidence
+- [x] Key implementation notes documented for plan/execute stages
+
+## Stage Report: plan
+
+- [x] Formal plan document created via `Skill: "superpowers:writing-plans"` and saved to `docs/superpowers/specs/`
+  Saved to docs/superpowers/specs/2026-04-04-dashboard-bun-migration-plan.md (7 tasks, ~55 steps)
+- [x] Plan has concrete file paths for all new, modified, and deleted files
+  File Structure table covers 6 create, 5 test create, 1 modify (ctl.sh:152), 8 Python delete, 6 Python test delete
+- [x] Plan uses test-first ordering (tests before implementation code)
+  Every task writes tests first (Step 1), verifies failure (Step 2), then implements (Step 3), verifies pass (Step 4)
+- [x] Plan incorporates research findings (Bun.serve routes, Bun.file MIME, manual walk, realpathSync)
+  Task 3 uses manual walkDir (not fs.readdirSync recursive); Task 6 uses routes object, Bun.file(), fs.realpathSync(), URL.searchParams
+- [x] Plan includes quality gate steps and backward compatibility verification
+  10 quality gates including ctl.sh tests, manual smoke test, daemon smoke test, path traversal security, static files unchanged
+
+### Summary
+
+Created a 7-task bottom-up migration plan: types.ts (shared interfaces) -> parsing.ts -> discovery.ts -> frontmatter-io.ts -> api.ts -> server.ts -> ctl.sh update + Python cleanup. Each task follows strict TDD ordering. All 6 research corrections incorporated: routes API, Bun.file MIME auto-detect, manual recursive walk for IGNORED_DIRS pruning, fs.realpathSync for path traversal, URL.searchParams for query parsing, bun:test imports. Plan includes 10 quality gates covering tests, smoke tests, security, and backward compatibility.
