@@ -160,4 +160,15 @@ describe("Dashboard Server", () => {
     const res = await fetch(`${baseUrl}/api/unknown`, { method: "POST" });
     expect(res.status).toBe(404);
   });
+
+  test("route handler error returns 500 and does not crash server", async () => {
+    const badFile = join(tmpDir, "docs", "build-pipeline", "bad-entity.md");
+    writeFileSync(badFile, "not valid frontmatter at all");
+    const res = await fetch(
+      `${baseUrl}/api/entity/detail?path=${encodeURIComponent(badFile)}`
+    );
+    expect(res.status).toBe(500);
+    const data = await res.json();
+    expect(data.error).toBeDefined();
+  });
 });
