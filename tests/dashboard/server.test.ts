@@ -161,6 +161,14 @@ describe("Dashboard Server", () => {
     expect(res.status).toBe(404);
   });
 
+  test("GET /api/config returns posthog config shape", async () => {
+    const res = await fetch(`${baseUrl}/api/config`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    const data = await res.json();
+    expect("posthog" in data).toBe(true);
+  });
+
   test("route handler error returns 500 and does not crash server", async () => {
     const badFile = join(tmpDir, "docs", "build-pipeline", "bad-entity.md");
     writeFileSync(badFile, "not valid frontmatter at all");

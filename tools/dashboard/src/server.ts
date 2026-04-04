@@ -148,6 +148,13 @@ export function createServer(opts: ServerOptions) {
           }
         },
       },
+      "/api/config": {
+        GET: (req) => {
+          const posthog = getPosthogJsConfig();
+          logRequest(req, 200);
+          return jsonResponse({ posthog });
+        },
+      },
       "/detail": {
         GET: (req) => {
           const filepath = join(staticDir, "detail.html");
