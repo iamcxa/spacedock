@@ -1,9 +1,9 @@
 ---
 id: 001
 title: Workflow Status Dashboard
-status: explore
+status: research
 source: commission seed
-started:
+started: 2026-04-04T02:54:00Z
 completed:
 verdict:
 score: 0.9
