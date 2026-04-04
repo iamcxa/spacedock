@@ -6,7 +6,7 @@ source: commission seed
 started: 2026-04-04T10:56:00Z
 completed:
 verdict:
-score: 0.7
+score: 0.8
 worktree: .worktrees/ensign-realtime-agent-activity-feed
 issue:
 pr:
@@ -269,3 +269,19 @@ Re-planned for Bun/TypeScript architecture (previous Python-based plan invalidat
 ### Summary
 
 Implemented real-time agent activity feed using Bun's built-in WebSocket support. The architecture is FO -> REST POST /api/events -> EventBuffer (ring buffer, capacity 500) -> server.publish("activity") -> WebSocket clients. Frontend activity.js connects with manual exponential backoff reconnection and renders events in a dark-themed sidebar panel. FO shared core updated with event emission instructions at all 6 lifecycle injection points (dispatch, completion, gate, feedback, merge, idle). All work done with zero external dependencies -- Bun handles HTTP and WebSocket on the same port natively.
+
+## Stage Report: quality
+
+- [x] Test results -- all tests pass with counts
+  76 tests pass, 0 fail, 196 expect() calls across 7 files (events.test.ts, server.test.ts, plus 5 existing test files). Ran in 6.27s.
+- [x] Smoke test -- event POST + retrieval works
+  POST /api/events with valid payload returns {"ok":true,"seq":1}. GET /api/events returns posted events. GET /api/events?since=1 correctly filters replay. Validation rejects missing fields (400) and invalid event types (400).
+- [x] Security -- path traversal guard verified
+  curl http://localhost:8470/api/entity/detail?path=/etc/passwd returns HTTP 403 Forbidden.
+- [x] No regressions confirmed
+  All existing endpoints verified: GET /api/workflows (200, returns workflow data), GET /api/entity/detail (200, returns entity frontmatter+body), POST /api/entity/score (200, updates score), GET / (200, serves index.html). Static file serving intact.
+- [x] Recommendation: PASSED
+
+### Summary
+
+All quality checks pass. 76 tests green with no failures. Smoke test confirmed the full event pipeline: POST /api/events -> EventBuffer storage -> GET /api/events retrieval, including sequence-based replay via ?since=N parameter. Path traversal security guard correctly returns 403. All pre-existing dashboard functionality (workflows, entity detail, score/tag updates, static serving) works without regressions. Implementation is clean -- EventBuffer ring buffer, Bun built-in WebSocket pub/sub, frontend with exponential backoff reconnection -- zero external dependencies added.
