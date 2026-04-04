@@ -7,7 +7,7 @@ started:
 completed:
 verdict:
 score: 0.95
-worktree:
+worktree: .worktrees/ensign-dashboard-channel-plugin
 issue:
 pr:
 intent: feature
