@@ -1,9 +1,9 @@
 ---
 id: 002
 title: Entity Detail & Management UI
-status: explore
+status: research
 source: commission seed
-started:
+started: 2026-04-04T02:55:00Z
 completed:
 verdict:
 score: 0.8
