@@ -297,3 +297,22 @@ CLAIM-10: [type: domain-rule] "Agent-side telemetry must go through dispatch/fin
 ### Summary
 
 Re-planned the observability integration for the Bun/TypeScript dashboard architecture (previous Python-based plan was invalid after migration). 8-task TDD plan: Task 1 creates `telemetry.ts` with env-var-gated `require()` for posthog-node and @sentry/bun. Task 2 installs npm deps. Task 3 wraps Bun.serve route handlers with try/catch + Sentry (no auto-instrumentation). Task 4 adds `/api/config` endpoint. Task 5 adds PostHog events for API mutations. Task 6 adds frontend PostHog JS + status indicator. Task 7 adds lightweight Python PostHog calls to codex scripts. Task 8 is integration verification. All research corrections incorporated: manual Sentry wrapping, env-var-before-import guard, metadata-only privacy.
+
+## Stage Report: execute
+
+- [x] All plan tasks implemented with commits on the feature branch
+  7 atomic commits: telemetry module, deps install, Sentry error capture, /api/config, PostHog mutation events, frontend JS integration, codex script telemetry
+- [x] TDD discipline followed
+  Tests written before implementation for Tasks 1, 3, 4, 5. Tests verified failing before implementation, then passing after. Tasks 6-7 are frontend/script changes verified via smoke tests.
+- [x] Atomic commits using `{type}(scope): {description}` format
+  All 7 commits follow convention: feat(telemetry), deps(dashboard), feat(dashboard), feat(scripts)
+- [x] npm packages installed (posthog-node, @sentry/bun)
+  posthog-node@5.28.8 and @sentry/bun@10.46.0 installed via `bun add`, 80 packages total
+- [x] Env-var gating and privacy (metadata only) verified
+  telemetryInit() is no-op without POSTHOG_API_KEY/SENTRY_DSN. All captureEvent calls send only: slug, score, tag_count, stage, verdict, agent_id. Frontend sends only score (number) and event names. No entity body content in any telemetry path.
+- [x] All tests passing (`bun test`)
+  70 tests pass across 7 files (telemetry, server, api, discovery, parsing, frontmatter-io, ctl)
+
+### Summary
+
+Implemented full observability integration across 7 atomic commits. Core telemetry module (`tools/dashboard/src/telemetry.ts`) gates PostHog and Sentry behind env var checks with silent no-op when unconfigured. Server route handlers wrapped with try/catch + Sentry captureException (Bun.serve has no auto-instrumentation). API mutations emit PostHog events with metadata only. Frontend conditionally loads PostHog JS via `/api/config` endpoint with memory-only persistence. Codex Python scripts get standalone `_emit_telemetry` helper guarded by env var + try/except import. All 70 tests pass, privacy verified (metadata only, never entity body content).
