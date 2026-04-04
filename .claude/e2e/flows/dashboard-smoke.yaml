@@ -1,0 +1,86 @@
+name: dashboard-smoke
+description: "Verify Spacedock Dashboard serves on localhost, displays workflows with stage pipelines and entity tables, supports column sorting, and auto-refreshes"
+tags: [smoke, acceptance]
+mapping: spacedock-dashboard
+
+steps:
+  - id: verify-server-responds
+    action: "Navigate to the dashboard at base_url"
+    expect:
+      - "page_heading is visible"
+      - "page_heading contains 'Spacedock Dashboard'"
+    screenshot: true
+
+  - id: verify-auto-refresh-indicator
+    action: "Check the auto-refresh indicator"
+    expect:
+      - "refresh_indicator is visible"
+      - "refresh_indicator contains 'Auto-refresh: ON'"
+    screenshot: false
+
+  - id: verify-workflows-loaded
+    action: "Wait for workflows to load in the container"
+    expect:
+      - "workflows_container is visible"
+      - "workflow_card is visible"
+      - "loading_message is not visible"
+    screenshot: true
+
+  - id: verify-workflow-card-structure
+    action: "Check the first workflow card has name, meta, and stage pipeline"
+    expect:
+      - "workflow_name is visible"
+      - "workflow_meta is visible"
+      - "stage_pipeline is visible"
+      - "stage_chip is visible"
+    screenshot: true
+
+  - id: verify-stage-counts
+    action: "Check stage chips show entity counts"
+    expect:
+      - "stage_chip_count is visible"
+    screenshot: false
+
+  - id: verify-entity-table
+    action: "Check entity table is rendered with correct columns"
+    expect:
+      - "entity_table is visible"
+      - "column_header_id is visible"
+      - "column_header_slug is visible"
+      - "column_header_status is visible"
+      - "column_header_title is visible"
+      - "column_header_score is visible"
+      - "column_header_source is visible"
+    screenshot: true
+
+  - id: verify-entity-rows
+    action: "Check entity rows are populated with data"
+    expect:
+      - "entity_row is visible"
+      - "status_badge is visible"
+    screenshot: false
+
+  - id: test-column-sort
+    action: "Click the STATUS column header to sort entities"
+    expect:
+      - "column_header_status is visible"
+    screenshot: true
+
+  - id: verify-multiple-workflows
+    action: "Scroll down to verify multiple workflow cards are rendered"
+    expect:
+      - "workflow_card count is greater than 1"
+    screenshot: true
+
+  - id: verify-api-endpoint
+    action: "Execute external: curl -s http://127.0.0.1:8420/api/workflows"
+    expect:
+      - "Verify external: response is valid JSON array"
+      - "Verify external: response contains workflow objects with 'name', 'stages', 'entities' fields"
+    screenshot: false
+
+  - id: verify-generic-stages
+    action: "Execute external: curl -s http://127.0.0.1:8420/api/workflows | python3 -c \"import json,sys; data=json.load(sys.stdin); stages={s['name'] for w in data for s in w['stages']}; print('Stages found:', sorted(stages)); assert len(stages) > 3, 'Expected diverse stage names'\""
+    expect:
+      - "Verify external: exit code 0 — multiple different stage names found (not hardcoded)"
+    screenshot: false

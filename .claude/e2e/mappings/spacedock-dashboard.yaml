@@ -1,0 +1,107 @@
+app: spacedock-dashboard
+base_url: http://127.0.0.1:8420
+auth:
+  type: none
+framework: vanilla-js
+mapped_at: 2026-04-04
+
+pages:
+  dashboard:
+    path: /
+    title: Spacedock Dashboard
+    elements:
+      page_heading:
+        selector: header h1
+        type: heading
+        description: Main dashboard title "Spacedock Dashboard"
+      refresh_indicator:
+        selector: "#refresh-indicator"
+        type: text
+        description: Auto-refresh status indicator showing "Auto-refresh: ON"
+      workflows_container:
+        selector: "#workflows-container"
+        type: container
+        description: Main container for all workflow cards
+      workflow_card:
+        selector: .workflow-card
+        type: container
+        description: Individual workflow card (repeating)
+      workflow_name:
+        selector: .workflow-card h2
+        type: heading
+        description: Workflow name heading within a card
+      workflow_meta:
+        selector: .workflow-meta
+        type: text
+        description: Entity label and count summary (e.g. "tasks . 1 total")
+      stage_pipeline:
+        selector: .stage-pipeline
+        type: container
+        description: Stage pipeline chip bar showing stage names and entity counts
+      stage_chip:
+        selector: .stage-chip
+        type: badge
+        description: Individual stage chip with name and count
+      stage_chip_count:
+        selector: .stage-chip .count
+        type: text
+        description: Entity count within a stage chip
+      entity_table:
+        selector: .workflow-card table
+        type: table
+        description: Sortable entity table within a workflow card
+      column_header_id:
+        selector: "th[data-col='id']"
+        type: column-header
+        description: Sortable ID column header
+        interaction: click to sort
+      column_header_slug:
+        selector: "th[data-col='slug']"
+        type: column-header
+        description: Sortable SLUG column header
+        interaction: click to sort
+      column_header_status:
+        selector: "th[data-col='status']"
+        type: column-header
+        description: Sortable STATUS column header
+        interaction: click to sort
+      column_header_title:
+        selector: "th[data-col='title']"
+        type: column-header
+        description: Sortable TITLE column header
+        interaction: click to sort
+      column_header_score:
+        selector: "th[data-col='score']"
+        type: column-header
+        description: Sortable SCORE column header
+        interaction: click to sort
+      column_header_source:
+        selector: "th[data-col='source']"
+        type: column-header
+        description: Sortable SOURCE column header
+        interaction: click to sort
+      status_badge:
+        selector: .status-badge
+        type: badge
+        description: Color-coded status badge in table cells
+      entity_row:
+        selector: .workflow-card tbody tr
+        type: table-row
+        description: Individual entity data row
+      loading_message:
+        selector: .loading
+        type: text
+        description: Loading/error message shown during data fetch
+      empty_state:
+        selector: .empty-state
+        type: text
+        description: Empty state message when no workflows found
+
+api_endpoints:
+  workflows:
+    method: GET
+    path: /api/workflows
+    description: Returns JSON array of all discovered workflows with entities
+    response_format: application/json
+
+dialogs: {}
