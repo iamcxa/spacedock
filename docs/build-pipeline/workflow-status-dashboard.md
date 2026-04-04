@@ -126,3 +126,106 @@ RATIONALE:    Web UI allows rich layout (tables, filters, color-coded stages), p
 ### Summary
 
 Deep exploration of the Spacedock codebase confirms this is a pure Python 3 stdlib + markdown project with no existing web infrastructure. The critical reusable asset is `skills/commission/bin/status` which contains all YAML frontmatter parsing, stage metadata extraction, and entity scanning logic. The workflow discovery algorithm is documented in `references/first-officer-shared-core.md` (search for README.md with `commissioned-by: spacedock@` frontmatter). Scale confirmed as Medium: the data layer is well-established and reusable, but web server, frontend, and auto-refresh are all greenfield. Entity 002 (entity-detail-management-ui) depends on this dashboard as its foundation.
+
+## Technical Claims
+
+CLAIM-1: [type: library-api] "Python 3 http.server stdlib can serve both static files AND dynamic JSON API endpoints via custom BaseHTTPRequestHandler subclass"
+CLAIM-2: [type: project-convention] "parse_frontmatter() / parse_stages_block() / scan_entities() from skills/commission/bin/status can be imported/adapted for the dashboard backend"
+CLAIM-3: [type: framework] "Server-Sent Events (SSE) can be implemented with Python stdlib http.server (long-lived connections, text/event-stream)"
+CLAIM-4: [type: framework] "Client-side polling via JS setInterval + fetch() is a viable auto-refresh alternative without any JS framework"
+CLAIM-5: [type: domain-rule] "Workflow discovery algorithm (recursive search for commissioned-by: spacedock@ in README.md frontmatter, ignoring .git/.worktrees/node_modules/vendor/dist/build/__pycache__) is complete and correct"
+CLAIM-6: [type: project-convention] "No existing web infrastructure means dashboard can freely choose tech stack"
+CLAIM-7: [type: library-api] "parse_frontmatter() handles all entity fields correctly: id, title, status, score, source, started, completed, verdict, worktree, issue, pr"
+CLAIM-8: [type: domain-rule] "scan_entities() globs *.md excluding README.md, which is sufficient for finding all entities"
+CLAIM-9: [type: project-convention] "The project is Python 3 stdlib only, and this constraint should apply to the dashboard"
+
+## Research Report
+
+**Claims analyzed**: 9
+**Recommendation**: PROCEED
+
+### Verified (6 claims)
+
+- CLAIM-1: CONFIRMED -- HIGH -- Python `http.server.BaseHTTPRequestHandler` supports custom `do_GET()`/`do_POST()` methods with path-based routing, `send_response()`, `send_header()`, `end_headers()`, and `wfile.write()` for JSON responses. `ThreadingHTTPServer` (available since Python 3.7, confirmed present in Python 3.11.14 on this system) handles concurrent connections. Official Python docs confirm this pattern. Not recommended for production, but perfectly adequate for a localhost dev dashboard.
+  Explorer: `http.server.ThreadingHTTPServer` confirmed available; `BaseHTTPRequestHandler` subclassing verified with working code
+  Web: Python official docs (docs.python.org/3/library/http.server.html) confirm the full API; multiple community examples demonstrate JSON API + static file serving pattern
+
+- CLAIM-4: CONFIRMED -- HIGH -- Vanilla JS `setInterval` + `fetch()` is a standard, well-supported browser pattern for polling. No framework needed. Works in all modern browsers.
+  Explorer: No existing JS in the project, so no conflicts
+  Web: Standard browser API, universally supported
+
+- CLAIM-6: CONFIRMED -- HIGH -- Zero web infrastructure exists in the project (no package.json, no JS/TS/HTML, no HTTP server, no web frameworks). The dashboard is fully greenfield for web tech choices.
+  Explorer: Verified via file listing -- no web files found anywhere in the project
+
+- CLAIM-7: CONFIRMED -- HIGH -- `parse_frontmatter()` correctly parses all entity fields including id, title, status, score, source, started, completed, verdict, worktree, issue, pr, intent, scale, project. Tested against `docs/build-pipeline/workflow-status-dashboard.md` -- returned 14 fields correctly.
+  Explorer: Direct execution test confirmed all fields parsed with correct values
+
+- CLAIM-8: CONFIRMED -- HIGH -- `scan_entities()` globs `*.md` and excludes `README.md`. This is sufficient because all entity files are `*.md` files in the workflow directory. Archive entities are handled separately via `--archived` flag scanning `_archive/` subdirectory.
+  Explorer: Tested on `docs/build-pipeline/` (2 entities found) and `docs/plans/` (10 entities found) -- all correct
+
+- CLAIM-9: CONFIRMED -- HIGH -- The project is consistently Python 3 stdlib only. The status script header explicitly states "constraints: Python 3 stdlib only (no PyYAML)". `plugin.json` declares no dependencies. All existing Python code uses only `glob`, `os`, `sys` imports.
+  Explorer: Confirmed via grep -- "Python 3 stdlib only" appears in status script and multiple plan docs
+  **Note**: The dashboard MAY introduce JS/HTML/CSS for the frontend -- this is new territory not covered by the Python-only constraint. The stdlib constraint applies to the Python server, not the frontend assets.
+
+### Corrected (3 claims)
+
+- CLAIM-2: CORRECTION (MINOR) -- HIGH -- The status script (`skills/commission/bin/status`) has no `.py` extension and cannot be imported via standard `import` or `importlib.util.spec_from_file_location()`. However, the functions CAN be loaded via `types.ModuleType` + `exec()` pattern, or more practically, the relevant functions (`parse_frontmatter`, `parse_stages_block`, `scan_entities`) should be **copied and adapted** into a new dashboard module rather than imported from the script.
+  Explorer: `importlib.util.spec_from_file_location('status', ...)` returns `None`. The `exec()` workaround works but is not clean for production code. The functions are small (~120 lines total) and self-contained.
+  **Fix**: Copy the 3 core functions into the dashboard's Python module rather than trying to import from the extensionless script. This is a minor implementation detail, not an architectural change.
+
+- CLAIM-3: CONFIRMED WITH CAVEATS -- MEDIUM -- SSE is technically possible with Python `http.server` but has practical limitations. The handler can set `Content-Type: text/event-stream`, write `data: ...\n\n` chunks to `wfile`, and flush. However: (a) each SSE client ties up a thread in `ThreadingHTTPServer`, (b) Python's `http.server` was not designed for long-lived connections, (c) no built-in keep-alive or reconnection support. For a localhost dev dashboard with 1-2 browser tabs, this works fine. But **client-side polling (CLAIM-4) is simpler, more robust, and recommended** for this use case.
+  Explorer: `BaseHTTPRequestHandler` has `send_header`, `end_headers`, `wfile` -- all needed for SSE
+  Web: Most SSE examples use Flask/FastAPI, not stdlib. No stdlib SSE examples found -- suggesting it is uncommon.
+  **Recommendation**: Use client-side polling (`setInterval` + `fetch()`) as the primary auto-refresh mechanism. SSE is a viable stretch goal but adds complexity for minimal benefit in a local dashboard.
+
+- CLAIM-5: CORRECTION (MINOR) -- HIGH -- The workflow discovery algorithm is mostly correct but has a nuance: not all workflow directories in the codebase have `commissioned-by: spacedock@` in their README. Specifically, `tests/fixtures/gated-pipeline/` and `tests/fixtures/multi-stage-pipeline/` are valid workflow directories with stages and entities but lack `commissioned-by`. Also, `docs/build-pipeline/` (where this very entity lives) has NO README.md at all. The algorithm correctly finds 8 workflows (7 test fixtures + docs/plans), but the dashboard should be aware that:
+  (a) The current working workflow (`docs/build-pipeline/`) will not be discovered until it gets a README with `commissioned-by`
+  (b) Some test fixtures intentionally lack `commissioned-by` -- this is by design, not a bug
+  Explorer: Tested discovery algorithm -- found 8 workflows. `docs/build-pipeline/` missing README.md entirely. `gated-pipeline` and `multi-stage-pipeline` have README but no `commissioned-by`.
+  **Fix**: Document this behavior. The dashboard should follow the same discovery algorithm as `first-officer-shared-core.md` defines. Workflows without `commissioned-by` are intentionally excluded.
+
+### Recommendation Criteria
+
+- 3 corrections, all minor: import mechanism (copy functions), SSE caveats (prefer polling), discovery nuance (document behavior)
+- 0 corrections affect control flow, data model, or architecture
+- All corrections are implementation details, not architectural changes
+
+**Recommendation: PROCEED** -- all core assumptions are valid. Minor corrections are implementation-level adjustments that do not change the overall approach.
+
+## Stage Report: research
+
+- [x] Technical claims extracted from spec and explore results (9 claims)
+  CLAIM-1 through CLAIM-9 covering: http.server API capabilities, status script importability, SSE feasibility, JS polling viability, workflow discovery correctness, greenfield web stack, parse_frontmatter field coverage, scan_entities sufficiency, stdlib-only constraint
+- [x] Per-claim verification with evidence from codebase, library docs, and/or web sources
+  Explorer: direct Python execution tests on parse_frontmatter, scan_entities, http.server module; grep for stdlib constraints; workflow discovery algorithm tested against full codebase (found 8 workflows)
+  Library docs: Python official docs (docs.python.org/3/library/http.server.html) confirmed BaseHTTPRequestHandler API, ThreadingHTTPServer availability, custom routing pattern
+  Web: searched for http.server JSON API patterns, SSE with stdlib, production limitations; confirmed community patterns and stdlib SSE limitations
+- [x] Cross-referenced synthesis with confidence levels (HIGH/MEDIUM/NONE) for each claim
+  6 claims HIGH confidence CONFIRMED, 2 claims HIGH confidence with MINOR CORRECTION, 1 claim MEDIUM confidence CONFIRMED WITH CAVEATS
+- [x] Corrections for any incorrect assumptions, with cited sources
+  CLAIM-2: status script not importable (no .py extension) -- copy functions instead (verified via importlib.util test)
+  CLAIM-3: SSE possible but impractical vs polling -- prefer setInterval+fetch (web search: no stdlib SSE examples found)
+  CLAIM-5: discovery algorithm correct but docs/build-pipeline/ lacks README.md (verified via os.walk test)
+- [x] Verified patterns and corrections cached to context lake
+  3 insights stored: status script import limitation, research completion summary, discovery algorithm verification
+
+### Summary
+
+All 9 technical claims from the brainstorming spec and explore findings have been verified through multi-source evidence (codebase execution, official Python docs, web research). 6 claims fully confirmed at HIGH confidence. 3 minor corrections identified -- none affecting architecture or control flow: (1) status script functions should be copied not imported, (2) client-side polling preferred over SSE, (3) workflow discovery correct but docs/build-pipeline/ needs a README.md to be discoverable. Recommendation: PROCEED to planning.
+
+## Stage Report: plan
+
+- [x] Formal plan document created via `Skill: "superpowers:writing-plans"` and saved to `docs/superpowers/specs/` in the worktree
+  Saved to `docs/superpowers/specs/2026-04-04-workflow-status-dashboard.md` -- 6 tasks, TDD ordering, full code blocks
+- [x] Plan has concrete file paths for all new and modified files
+  File structure table lists 10 files: 7 new source files (`tools/dashboard/` + `tools/dashboard/static/`) and 3 new test files (`tests/test_dashboard_*.py`)
+- [x] Plan uses test-first ordering (tests before implementation code)
+  Tasks 1-3 each follow write-failing-test, verify-fail, implement, verify-pass, commit sequence
+- [x] Plan incorporates all 3 research corrections (copy functions, polling not SSE, discovery algorithm)
+  CLAIM-2: Task 1 copies parse_frontmatter/parse_stages_block/scan_entities into parsing.py; CLAIM-3: Task 4 uses setInterval+fetch with 5s poll; CLAIM-5: Task 2 implements first-officer-shared-core.md algorithm with IGNORED_DIRS set
+- [x] Plan includes quality gate steps (type-check, tests, lint)
+  Task 6 runs all dashboard tests, regression tests on existing status script, py_compile syntax check, JS delimiter balance check
+
+### Summary
+
+Formal implementation plan produced covering 6 tasks across 10 new files. The plan follows TDD ordering throughout (failing test first, then implementation). All 3 research corrections are incorporated: functions are copied not imported from the extensionless status script, client-side polling replaces SSE for auto-refresh, and workflow discovery follows the first-officer-shared-core.md algorithm. The architecture uses Python 3 stdlib ThreadingHTTPServer for the backend and vanilla HTML/CSS/JS for the frontend, consistent with the project's zero-dependency constraint.
