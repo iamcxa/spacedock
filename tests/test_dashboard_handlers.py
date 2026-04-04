@@ -106,5 +106,80 @@ class TestDashboardHandler(unittest.TestCase):
             self.assertEqual(e.code, 404)
 
 
+class TestLogFileSupport(unittest.TestCase):
+    """Test log_message writes to file when log_file is provided."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        wf_dir = os.path.join(self.tmpdir, 'my-workflow')
+        os.makedirs(wf_dir)
+        with open(os.path.join(wf_dir, 'README.md'), 'w') as f:
+            f.write(README_CONTENT)
+
+        self.static_dir = tempfile.mkdtemp()
+        with open(os.path.join(self.static_dir, 'index.html'), 'w') as f:
+            f.write('<html><body>Dashboard</body></html>')
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+        shutil.rmtree(self.static_dir)
+
+    def _start_server(self, log_file=None):
+        handler_class = make_handler(
+            project_root=self.tmpdir,
+            static_dir=self.static_dir,
+            log_file=log_file,
+        )
+        server = ThreadingHTTPServer(('127.0.0.1', 0), handler_class)
+        port = server.server_address[1]
+        thread = threading.Thread(target=server.serve_forever)
+        thread.daemon = True
+        thread.start()
+        return server, port, thread
+
+    def test_log_message_suppressed_by_default(self):
+        """Without log_file, log_message is a no-op (backward compatible)."""
+        log_path = os.path.join(self.tmpdir, 'test.log')
+        server, port, thread = self._start_server(log_file=None)
+        try:
+            url = 'http://127.0.0.1:%d/' % port
+            urllib.request.urlopen(url)
+            self.assertFalse(os.path.exists(log_path))
+        finally:
+            server.shutdown()
+            thread.join(timeout=5)
+
+    def test_log_message_writes_to_file(self):
+        """With log_file set, access logs are written to the file."""
+        log_path = os.path.join(self.tmpdir, 'test.log')
+        server, port, thread = self._start_server(log_file=log_path)
+        try:
+            url = 'http://127.0.0.1:%d/' % port
+            urllib.request.urlopen(url)
+            self.assertTrue(os.path.exists(log_path))
+            with open(log_path) as f:
+                content = f.read()
+            self.assertIn('GET', content)
+            self.assertIn('200', content)
+        finally:
+            server.shutdown()
+            thread.join(timeout=5)
+
+
+class TestServeArgparse(unittest.TestCase):
+    """Test serve.py argument parsing."""
+
+    def test_serve_accepts_log_file_arg(self):
+        """--log-file is accepted by argparse without error."""
+        import subprocess
+        import sys
+        result = subprocess.run(
+            [sys.executable, '-m', 'tools.dashboard.serve', '--help'],
+            capture_output=True, text=True,
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        )
+        self.assertIn('--log-file', result.stdout)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -34,7 +34,7 @@ MIME_TYPES = {
 }
 
 
-def make_handler(project_root, static_dir):
+def make_handler(project_root, static_dir, log_file=None):
     """Create a handler class bound to a specific project root and static dir."""
 
     class DashboardHandler(BaseHTTPRequestHandler):
@@ -144,6 +144,12 @@ def make_handler(project_root, static_dir):
             self.wfile.write(content)
 
         def log_message(self, format, *args):
-            pass
+            if log_file:
+                with open(log_file, 'a') as f:
+                    f.write("%s - - [%s] %s\n" % (
+                        self.address_string(),
+                        self.log_date_time_string(),
+                        format % args,
+                    ))
 
     return DashboardHandler
