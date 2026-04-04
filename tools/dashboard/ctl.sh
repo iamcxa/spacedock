@@ -149,7 +149,7 @@ do_start() {
     fi
 
     # Launch daemon
-    nohup python3 -m tools.dashboard.serve \
+    nohup bun run tools/dashboard/src/server.ts \
         --port "$selected_port" \
         --root "$ROOT" \
         --log-file "$LOG_FILE" \
