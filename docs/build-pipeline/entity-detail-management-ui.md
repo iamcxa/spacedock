@@ -332,3 +332,22 @@ Feature 002 (`web/`) has been integrated into feature 001 (`tools/dashboard/`), 
 ### Test Results
 
 All 38 tests pass (18 from feature 001 + 20 from feature 002), zero failures, zero regressions.
+
+## Stage Report: e2e-verify
+
+- [x] Dashboard loads with workflow cards and entity tables
+  Verified via curl and running server on localhost:8421 -- /api/workflows returns workflow data with entities
+- [x] Entity row click navigates to detail view
+  BUG FOUND AND FIXED: Entity rows had no click handler or link. Two root causes: (1) `scan_entities()` in `parsing.py` did not include `path` in entity data, (2) `app.js` rendered plain `<tr>` elements with no click handler. Fix: added `entity['path'] = filepath` to `scan_entities()` and added click handler on each row navigating to `/detail?path=<entity_path>`.
+- [x] Detail view renders entity data correctly
+  Verified `/detail` serves `detail.html`, `/api/entity/detail?path=...` returns structured data with frontmatter, body, and stage_reports. detail.js correctly reads `?path=` query parameter.
+- [x] Back navigation from detail to dashboard
+  detail.html includes `<a href="/" class="back-link">` in the nav bar
+- [x] All tests pass after fix
+  38 tests pass (all existing tests), zero failures, zero regressions after the fix commit
+- [ ] SKIP: Score adjustment and tag editing browser verification
+  Not tested in real browser -- server restart confirmed API roundtrip works, but no browser automation was used in this verification pass
+
+### Summary
+
+Found and fixed the integration bug preventing click-to-detail navigation. The root cause was that the merge of feature 002 into feature 001's server did not wire up entity row click handlers in the dashboard's `app.js`, and `scan_entities()` in `parsing.py` did not include the entity file `path` needed for the detail page URL. Two-line fix: added `entity['path'] = filepath` in `parsing.py` and added a click handler with cursor styling in `app.js`. All 38 tests pass after the fix. Committed as `fix(dashboard): wire entity row click-to-detail navigation`.
