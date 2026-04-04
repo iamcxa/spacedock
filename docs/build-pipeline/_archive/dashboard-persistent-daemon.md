@@ -1,13 +1,13 @@
 ---
 id: 004
 title: Dashboard Persistent Daemon
-status: pr-draft
+status: shipped
 source: brainstorming session
 started: 2026-04-04T08:53:00Z
-completed:
-verdict:
+completed: 2026-04-04T10:46:00Z
+verdict: PASSED
 score: 0.9
-worktree: .worktrees/ensign-dashboard-persistent-daemon
+worktree:
 issue:
 pr: "iamcxa/spacedock#2"
 intent: feature
