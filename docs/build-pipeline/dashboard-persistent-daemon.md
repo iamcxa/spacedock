@@ -365,6 +365,29 @@ Server binds to `127.0.0.1`, not `0.0.0.0`. Not exposed to the network.
 No CRITICAL or HIGH severity issues found. The three MEDIUM findings (arbitrary file read/write/scan via API endpoints) are mitigated by the 127.0.0.1 binding but amplified by the CORS wildcard header. For a local development tool this is acceptable — these are pre-existing patterns in handlers.py (the API endpoints existed before this feature), not introduced by the daemon feature itself. The daemon feature (ctl.sh, --log-file support, SKILL.md) is clean.
 
 **Advisory for future hardening** (not blocking):
-- Add path validation to `/api/entity/detail`, `/api/entity/score`, `/api/entity/tags`, and `/api/entities` — confine paths to `project_root`
-- Consider restricting CORS to `null` or same-origin only
+- ~~Add path validation to `/api/entity/detail`, `/api/entity/score`, `/api/entity/tags`, and `/api/entities` — confine paths to `project_root`~~ DONE
+- ~~Consider restricting CORS to `null` or same-origin only~~ DONE (removed entirely)
 - Add tests for `ctl.sh restart`, `ctl.sh logs`, and `ctl.sh status --all`
+
+## Stage Report: security-fix
+
+- [x] Add `_validate_path()` helper to handlers.py that checks `os.path.realpath()` against `project_root`
+  Added at handlers.py:80-86, uses `os.path.realpath(project_root) + os.sep` prefix check with exact-match fallback for root itself
+- [x] Apply path containment to `_handle_entity_detail` (arbitrary file read)
+  handlers.py:93 — returns 403 JSON for paths outside project_root
+- [x] Apply path containment to `_handle_filter_entities` (arbitrary directory scan)
+  handlers.py:100 — returns 403 JSON for directories outside project_root
+- [x] Apply path containment to `_handle_update_score` (arbitrary file write)
+  handlers.py:117 — returns 403 JSON for paths outside project_root
+- [x] Apply path containment to `_handle_update_tags` (arbitrary file write)
+  handlers.py:124 — returns 403 JSON for paths outside project_root
+- [x] Remove `Access-Control-Allow-Origin: *` CORS header from `_send_json`
+  handlers.py:133-138 — header line removed entirely (server is localhost-only)
+- [x] Add tests for path traversal rejection (absolute path, relative traversal, directory scan, POST endpoints)
+  8 new tests in TestPathTraversalGuard class: test_entity_detail_rejects_absolute_path_outside_root, test_entity_detail_rejects_relative_traversal, test_filter_entities_rejects_outside_dir, test_update_score_rejects_outside_path, test_update_tags_rejects_outside_path, test_entity_detail_allows_valid_path, test_filter_entities_allows_valid_dir, test_cors_header_not_present
+- [x] All tests pass with no regressions
+  108 passed, 0 failures (full suite: pytest tests/ -v --tb=short --ignore=tests/fixtures)
+
+### Summary
+
+Fixed three MEDIUM path traversal vulnerabilities and removed the CORS wildcard header. Added `_validate_path()` helper using the same `os.path.realpath()` + `startswith()` pattern already used in `_serve_static()`, applied to all four vulnerable API handlers. Removed `Access-Control-Allow-Origin: *` since the server binds to 127.0.0.1 only. Added 8 new tests covering both rejection of outside paths and acceptance of valid paths. Commit: 9d8bf8d.
