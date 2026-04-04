@@ -1,9 +1,9 @@
 ---
 id: 005
 title: Observability Integration (PostHog/Sentry/Langfuse)
-status: explore
+status: research
 source: brainstorming session
-started:
+started: 2026-04-04T10:56:00Z
 completed:
 verdict:
 score: 0.7
