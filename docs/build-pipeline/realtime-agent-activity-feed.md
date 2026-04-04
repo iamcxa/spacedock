@@ -7,7 +7,7 @@ started:
 completed:
 verdict:
 score: 0.7
-worktree:
+worktree: .worktrees/ensign-realtime-agent-activity-feed
 issue:
 pr:
 intent: feature

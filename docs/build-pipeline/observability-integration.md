@@ -7,7 +7,7 @@ started:
 completed:
 verdict:
 score: 0.7
-worktree:
+worktree: .worktrees/ensign-observability-integration
 issue:
 pr:
 intent: feature
