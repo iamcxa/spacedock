@@ -1,9 +1,9 @@
 ---
 id: 003
 title: Real-time Agent Activity Feed
-status: explore
+status: research
 source: commission seed
-started:
+started: 2026-04-04T10:56:00Z
 completed:
 verdict:
 score: 0.7
