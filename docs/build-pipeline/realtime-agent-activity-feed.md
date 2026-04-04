@@ -1,7 +1,7 @@
 ---
 id: 003
 title: Real-time Agent Activity Feed
-status: plan
+status: execute
 source: commission seed
 started: 2026-04-04T10:56:00Z
 completed:

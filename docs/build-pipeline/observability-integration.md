@@ -1,7 +1,7 @@
 ---
 id: 005
 title: Observability Integration (PostHog/Sentry)
-status: plan
+status: execute
 source: brainstorming session
 started: 2026-04-04T10:56:00Z
 completed:
