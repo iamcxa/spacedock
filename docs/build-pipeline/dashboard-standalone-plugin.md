@@ -37,3 +37,6 @@ RATIONALE:    Clean separation of concerns — spacedock core handles workflow o
 - Dashboard discovers workflows from any project (not hardcoded to spacedock repo)
 - Existing dashboard features work unchanged after extraction (entity table, detail view, activity feed, channel communication)
 - Dashboard plugin can be versioned and released independently from spacedock core
+- `/build` skill and its references moved from spacedock core into the dashboard plugin — build-pipeline workflow is owned by the dashboard plugin, not spacedock core
+- Spacedock core plugin remains focused on workflow engine (commission, first-officer, ensign, refit, status)
+- Build skill references (first-officer-shared-core.md, ensign-shared-core.md, etc.) relocated into dashboard plugin's references/
