@@ -1,5 +1,4 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { splitFrontmatter } from "./frontmatter-io";
 import type { Comment, Suggestion, CommentThread } from "./types";
 
 function sidecarPath(entityPath: string): string {
