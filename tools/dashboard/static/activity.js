@@ -348,7 +348,7 @@
 
   if (inputEl) {
     inputEl.addEventListener("keydown", function (ev) {
-      if (ev.key === "Enter" && !ev.shiftKey) {
+      if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
         ev.preventDefault();
         sendMessage();
       }
