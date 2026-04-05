@@ -327,6 +327,93 @@ describe("Dashboard Server", () => {
     expect(msg.data.seq).toBeGreaterThan(0);
   });
 
+  // --- Channel Send Endpoint Tests ---
+
+  test("POST /api/channel/send accepts message with content", async () => {
+    const res = await fetch(`${baseUrl}/api/channel/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: "Hello FO, approve the gate",
+        meta: { type: "message" },
+      }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+    expect(typeof data.seq).toBe("number");
+  });
+
+  test("POST /api/channel/send rejects empty content", async () => {
+    const res = await fetch(`${baseUrl}/api/channel/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "", meta: { type: "message" } }),
+    });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toContain("content");
+  });
+
+  test("POST /api/channel/send rejects missing content", async () => {
+    const res = await fetch(`${baseUrl}/api/channel/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ meta: { type: "message" } }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /api/channel/send broadcasts channel_message via WebSocket", async () => {
+    const ws = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+    await new Promise<void>((r) => { ws.onopen = () => r(); });
+
+    // Skip replay
+    await new Promise<void>((r) => {
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data as string);
+        if (msg.type === "replay") r();
+      };
+      setTimeout(r, 500);
+    });
+
+    const liveMessages: any[] = [];
+    const gotLive = new Promise<void>((r) => {
+      ws.onmessage = (ev) => {
+        liveMessages.push(JSON.parse(ev.data as string));
+        r();
+      };
+      setTimeout(r, 2000);
+    });
+
+    await fetch(`${baseUrl}/api/channel/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "ws-test-msg", meta: { type: "message" } }),
+    });
+
+    await gotLive;
+    ws.close();
+
+    expect(liveMessages.length).toBeGreaterThanOrEqual(1);
+    expect(liveMessages[0].data.event.type).toBe("channel_message");
+    expect(liveMessages[0].data.event.detail).toBe("ws-test-msg");
+  });
+
+  test("POST /api/channel/send with gate_approval meta type", async () => {
+    const res = await fetch(`${baseUrl}/api/channel/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: "approve",
+        meta: { type: "gate_approval", entity: "007", stage: "plan" },
+      }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+  });
+
   // --- Observability Tests ---
 
   test("GET /api/config returns posthog config shape", async () => {
