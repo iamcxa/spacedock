@@ -92,7 +92,7 @@
   // --- Drag-and-drop via Pointer Events ---
 
   function setupDragReorder(svgElement, editorState, onReorder) {
-    var dragging = null; // { idx, startX, startY, node }
+    var dragging = null; // { idx, originIdx, snapshotTaken }
 
     function screenToSVG(evt) {
       var ctm = svgElement.getScreenCTM();
@@ -111,7 +111,7 @@
 
       evt.preventDefault();
       svgElement.setPointerCapture(evt.pointerId);
-      dragging = { idx: idx, startX: screenToSVG(evt).x, originIdx: idx };
+      dragging = { idx: idx, originIdx: idx, snapshotTaken: false };
       nodeEl.classList.add("dragging");
     });
 
@@ -126,8 +126,11 @@
       targetIdx = Math.max(0, Math.min(targetIdx, editorState.stages.length - 1));
 
       if (targetIdx !== dragging.idx) {
-        // Move the stage in the array
-        editorState.snapshot();
+        // Take one snapshot at the start of the drag for undo
+        if (!dragging.snapshotTaken) {
+          editorState.snapshot();
+          dragging.snapshotTaken = true;
+        }
         var stage = editorState.stages.splice(dragging.idx, 1)[0];
         editorState.stages.splice(targetIdx, 0, stage);
         dragging.idx = targetIdx;

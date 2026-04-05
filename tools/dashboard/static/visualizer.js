@@ -12,7 +12,6 @@
   var NODE_W = 120;
   var NODE_H = 40;
   var NODE_GAP_X = 60;
-  var NODE_GAP_Y = 20;
   var DIAMOND_SIZE = 50;
   var BADGE_R = 10;
   var ARROW_SIZE = 6;

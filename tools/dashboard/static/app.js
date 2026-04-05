@@ -25,6 +25,7 @@
   var POLL_INTERVAL = 5000;
   var container = document.getElementById("workflows-container");
   var sortState = {};
+  var editorOpenCount = 0;
   var filterState = (function loadFilterState() {
     try {
       var raw = sessionStorage.getItem("dashboardFilterState");
@@ -187,11 +188,13 @@
           graphContainer.style.display = "";
           editBtn.textContent = "Edit Pipeline";
           editBtn.classList.remove("active");
+          editorOpenCount--;
         } else {
           graphContainer.style.display = "none";
           editorContainer.style.display = "";
           editBtn.textContent = "Exit Editor";
           editBtn.classList.add("active");
+          editorOpenCount++;
           // Initialize editor
           editorContainer.textContent = "";
           window.SpacedockEditor.createEditor(
@@ -284,5 +287,7 @@
   }
 
   fetchWorkflows();
-  setInterval(fetchWorkflows, POLL_INTERVAL);
+  setInterval(function () {
+    if (editorOpenCount === 0) fetchWorkflows();
+  }, POLL_INTERVAL);
 })();

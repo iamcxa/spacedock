@@ -252,6 +252,13 @@ export function createServer(opts: ServerOptions) {
               logRequest(req, 400);
               return jsonResponse({ error: "dir and stages[] required" }, 400);
             }
+            const invalidName = body.stages.find(
+              (s) => !s.name || typeof s.name !== "string" || !/^[a-z0-9][a-z0-9-]*$/.test(s.name)
+            );
+            if (invalidName) {
+              logRequest(req, 400);
+              return jsonResponse({ error: `Invalid stage name: ${invalidName.name ?? "(empty)"}` }, 400);
+            }
             if (!validatePath(body.dir, projectRoot)) {
               logRequest(req, 403);
               return jsonResponse({ error: "Forbidden" }, 403);
