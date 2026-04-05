@@ -3,5 +3,8 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@sentry/bun": "^10.46.0",
     "posthog-node": "^5.28.8"
+  },
+  "devDependencies": {
+    "bun-types": "^1.3.11"
   }
 }
