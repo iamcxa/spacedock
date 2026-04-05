@@ -441,3 +441,63 @@ All quality gates passed. No issues found. The implementation is ready for merge
 - Shell syntax valid
 - MIT-licensed MCP SDK dependency is compatible
 - No API contracts or migrations affected
+
+## Stage Report: pr-draft
+
+- [x] Branch pushed to origin — pushed to fork `iamcxa/spacedock` (origin `clkao/spacedock` SSH unreachable from this context; fork push succeeded)
+- [x] Draft PR created — [clkao/spacedock#32](https://github.com/clkao/spacedock/pull/32) with title `feat(dashboard): add channel plugin for interactive workflow control` (60 chars, under 70 limit)
+- [x] PR_NUMBER: 32 | PR_URL: https://github.com/clkao/spacedock/pull/32
+- [x] Self-review completed — no issues found:
+  - `channel.ts`: Zod schema for `setNotificationHandler`, try/catch around `mcp.notification()` for disconnected transport, clean Option C hybrid architecture
+  - `server.ts`: `onChannelMessage` callback correctly bridges without circular dependency, `publishEvent`/`broadcastChannelStatus` via `Object.assign` pattern
+  - Security: path traversal guard (`validatePath`) applied to all file-path endpoints; channel API only validates `content` + `meta` fields (browser-only surface)
+  - No hardcoded secrets, credentials, or port numbers in new files
+- [x] PR size noted: 17,785 insertions total (includes accumulated E2E screenshots + prior feature docs from branch history); feature-specific diff (dashboard source + tests) is ~5,258 lines. Captain acknowledged scope during planning.
+
+### Recommendation: PASSED
+
+Draft PR is ready for captain review. The PR title is conventional-commit compliant, body includes quality results (107 tests, 85.69% coverage), architecture notes, and test plan. PR size >1000 lines — captain was aware of scope.
+
+**Next stage**: captain review → merge.
+
+## Stage Report: pr-review
+
+### Self-review checklist
+
+- [x] All 16 changed files on the branch examined via `git diff main...HEAD`
+- [x] Full source files read for: channel.ts, server.ts, types.ts, events.ts, activity.js, index.html, style.css, ctl.sh, channel.test.ts, server.test.ts, events.test.ts, README.md, CHANGELOG.md, package.json, bun.lock
+- [x] Tests run: **107 pass**, 0 fail, 257 assertions (6.40s)
+- [x] Type check: `bunx tsc --noEmit` **PASS** (from tools/dashboard/)
+- [x] Shell syntax: `bash -n ctl.sh` **PASS**
+
+### Findings
+
+**SUGGESTION-1 (unused types):** `ChannelMessage`, `PermissionRequest`, and `PermissionVerdict` interfaces in `types.ts:92-107` are exported but never imported or referenced anywhere in the codebase (source files or tests). These are dead code. They may have been written for future use but currently add noise.
+- Classification: SUGGESTION
+- Action: Noted, not blocking. Could be removed or kept as documentation of the wire protocol. Captain decides.
+
+**ADVISORY-1 (renderPermissionResponse is a no-op):** `activity.js:311-316` — `renderPermissionResponse()` is a stub that does nothing except check `feedContainer`. The comment says it handles verdicts from other sources (e.g., terminal responded first), but no logic is implemented. This is acceptable for v1 since `sendPermissionVerdict()` already handles the local card resolution, and cross-source verdict rendering is a future enhancement.
+
+**ADVISORY-2 (redundant cast):** `channel.ts:58` — `behavior as "allow" | "deny"` is redundant because the ternary on line 57 already constrains the value. TypeScript infers `string` from the ternary (not the literal union), so the cast is technically needed for strict mode, but the code could be cleaner with `const behavior: "allow" | "deny" = ...`. Not a bug.
+
+**ADVISORY-3 (callback return type):** `server.ts:15` declares `onChannelMessage` as returning `void`, but `channel.ts:54` provides an `async` implementation (returns `Promise<void>`). This works correctly because: (a) TypeScript allows `Promise<void>` where `void` is expected in callback position, and (b) the async callback has its own try/catch, so unhandled rejections are not a concern. Not a bug.
+
+### Security review
+
+- **Path traversal**: `validatePath()` applied to all file-path endpoints (`/api/entity/detail`, `/api/entities`, `/api/entity/score`, `/api/entity/tags`). Static file serving also uses `realpathSync` to prevent directory traversal. New `/api/channel/send` endpoint does **not** accept file paths — only `content` (string) and `meta` (string dict). No path traversal risk.
+- **XSS**: Frontend uses `textContent` (not `innerHTML`) for all dynamic content rendering (chat bubbles, permission cards, event items). No XSS vector.
+- **Sender validation**: No sender allowlist implemented, but the entity spec explicitly notes "Sender allowlist deferred — dashboard runs on localhost only." Acceptable for v1.
+- **Hardcoded secrets**: None found. No API keys, tokens, or credentials in any file.
+- **MCP transport**: `console.error` used for banner in channel.ts (stdout reserved for MCP stdio). Correct.
+
+### Review summary
+
+| Category | Count |
+|----------|-------|
+| CODE (must fix) | 0 |
+| SUGGESTION (should fix) | 1 |
+| ADVISORY (note only) | 3 |
+
+### Recommendation: PASSED
+
+All changed files reviewed. Zero CODE-level issues found. The implementation correctly follows the hybrid architecture (Option C), MCP capability declarations match the verified Channels Reference API, backward compatibility is preserved (`bun server.ts` works standalone), tests cover critical paths (107 tests, 85.69% line coverage), and no security vulnerabilities identified. The one SUGGESTION (unused type interfaces) is cosmetic and non-blocking.
