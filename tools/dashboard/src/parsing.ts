@@ -122,6 +122,9 @@ export function parseStagesBlock(filepath: string): Stage[] | null {
     gate: (state.gate ?? "false").toLowerCase() === "true",
     terminal: (state.terminal ?? "false").toLowerCase() === "true",
     initial: (state.initial ?? "false").toLowerCase() === "true",
+    feedback_to: state["feedback-to"] ?? "",
+    conditional: (state.conditional ?? "false").toLowerCase() === "true",
+    model: state.model ?? "",
   }));
 }
 
