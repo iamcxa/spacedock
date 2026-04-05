@@ -1,7 +1,7 @@
 ---
 id: 012
 title: Dashboard Workflow Visualizer — Stage Pipeline Graph with Visual Editing
-status: explore
+status: research
 source: channel conversation
 started: 2026-04-05T19:00:00+08:00
 completed:
