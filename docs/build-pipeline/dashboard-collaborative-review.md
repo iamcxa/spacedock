@@ -3,11 +3,11 @@ id: 011
 title: Dashboard Collaborative Review — Inline Comments & Suggestions on Entity Files
 status: explore
 source: channel conversation
-started:
+started: 2026-04-05T19:00:00+08:00
 completed:
 verdict:
 score: 0.9
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-collaborative-review
 issue:
 pr:
 intent: feature
