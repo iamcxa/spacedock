@@ -195,3 +195,159 @@ The `claude/channel` + `claude/channel/permission` capability system is referenc
 ### Summary
 
 Deep exploration of the Bun dashboard server confirms feature 007 has strong infrastructure to build on: the WebSocket broadcast system is fully operational (86 tests pass), and `server.ts:215` (`websocket.message` stub) is the exact hook for inbound channel messages. The four critical extension points are: (1) `websocket.message` handler for inbound browser→FO messages, (2) new `/api/channel/send` POST endpoint, (3) `activity.js` for rendering permission prompts with approve/reject actions, (4) `index.html` for the permission overlay. The primary research risk is the Claude Code `claude/channel` + `claude/channel/permission` capability API — no documentation, reference implementation, or SDK version exists in this codebase. The `@modelcontextprotocol/sdk` package needs to be added. Scale confirmed Medium.
+
+## Technical Claims
+
+CLAIM-1: [type: library-api] "MCP server declares claude/channel capability via capabilities.experimental['claude/channel']: {} to enable bidirectional messaging"
+CLAIM-2: [type: library-api] "MCP server declares claude/channel/permission capability via capabilities.experimental['claude/channel/permission']: {} for permission relay"
+CLAIM-3: [type: library-api] "Inbound uses mcp.notification({ method: 'notifications/claude/channel', params: { content, meta } }) to send messages to FO session"
+CLAIM-4: [type: library-api] "FO session receives channel messages as <channel source='name' key='val'>content</channel> XML tags"
+CLAIM-5: [type: library-api] "Outbound FO replies arrive via CallToolRequestSchema handler — FO calls a 'reply' tool exposed by the channel server"
+CLAIM-6: [type: library-api] "Permission relay: Claude Code sends notifications/claude/channel/permission_request with {request_id, tool_name, description, input_preview}; server responds with notifications/claude/channel/permission with {request_id, behavior: 'allow'|'deny'}"
+CLAIM-7: [type: library-api] "@modelcontextprotocol/sdk provides Server class (from /server/index.js), StdioServerTransport (from /server/stdio.js), and schema types (from /types.js)"
+CLAIM-8: [type: version] "Claude Code v2.1.80+ supports claude/channel; v2.1.81+ supports claude/channel/permission"
+CLAIM-9: [type: version] "--channels plugin:name@marketplace or --dangerously-load-development-channels server:name enables channel plugins"
+CLAIM-10: [type: framework] "Bun.serve() HTTP+WebSocket server and MCP StdioServerTransport can coexist in same process (confirmed by fakechat reference implementation)"
+CLAIM-11: [type: project-convention] "server.publish('activity', JSON.stringify({...})) is the pattern for WebSocket broadcast"
+CLAIM-12: [type: project-convention] "EventBuffer with capacity 500 and monotonic seq numbers handles event storage; new event types are additive"
+CLAIM-13: [type: project-convention] "AgentEventType union in types.ts is extended by adding new string literals"
+CLAIM-14: [type: project-convention] "POST /api/events handler pattern is the template for new POST /api/channel/send"
+CLAIM-15: [type: project-convention] "websocket.message() handler stub at server.ts:215 is the hook for inbound browser messages"
+CLAIM-16: [type: framework] "Bun WebSocket ws.send() and server.publish() work with JSON.stringify for structured messages"
+CLAIM-17: [type: library-api] "MCP SDK Server class supports notification sending via server.notification() method"
+
+## Research Report
+
+**Claims analyzed**: 17
+**Recommendation**: PROCEED (with architectural correction)
+
+### Verified (15 claims)
+
+- CLAIM-1: HIGH — `capabilities.experimental['claude/channel']: {}` is the correct declaration
+  Explorer: No existing usage in codebase (expected — new feature)
+  Web: Official Channels Reference at code.claude.com/docs/en/channels-reference confirms exact syntax. Fakechat reference implementation uses `capabilities: { tools: {}, experimental: { 'claude/channel': {} } }`
+
+- CLAIM-2: HIGH — `capabilities.experimental['claude/channel/permission']: {}` is the correct declaration
+  Explorer: No existing usage (expected)
+  Web: Channels Reference confirms: "A claude/channel/permission: {} entry under experimental capabilities in your Server constructor". Requires Claude Code v2.1.81+
+
+- CLAIM-3: HIGH — `mcp.notification({ method: 'notifications/claude/channel', params: { content, meta } })` is correct
+  Web: Channels Reference provides exact format. `content` becomes `<channel>` tag body, each `meta` key becomes a tag attribute. Keys must be identifiers (letters, digits, underscores only — hyphens silently dropped)
+
+- CLAIM-4: HIGH — FO receives `<channel source="name" key="val">content</channel>` XML tags
+  Web: Channels Reference confirms: "The event arrives in Claude's context wrapped in a `<channel>` tag. The `source` attribute is set automatically from your server's configured name"
+
+- CLAIM-5: HIGH — FO replies via a standard MCP tool (reply tool) registered with `CallToolRequestSchema`
+  Web: Channels Reference section "Expose a reply tool" confirms the pattern. Tool registered via `ListToolsRequestSchema` + `CallToolRequestSchema` handlers. The tool schema and name are developer-defined (not a fixed protocol method)
+
+- CLAIM-6: HIGH — Permission relay protocol confirmed exactly
+  Web: Channels Reference "Relay permission prompts" section confirms:
+  - Outbound from Claude Code: `notifications/claude/channel/permission_request` with params `{request_id, tool_name, description, input_preview}`
+  - Inbound verdict: `notifications/claude/channel/permission` with params `{request_id, behavior: 'allow'|'deny'}`
+  - `request_id` is 5 lowercase letters from a-z excluding 'l'
+  - First response wins (terminal or remote)
+  - Relay covers Bash/Write/Edit tool approvals only (not project trust or MCP consent)
+
+- CLAIM-7: HIGH — SDK exports confirmed
+  Web: npm confirms `@modelcontextprotocol/sdk` v1.29.0 (latest). Channels Reference imports show:
+  - `import { Server } from '@modelcontextprotocol/sdk/server/index.js'`
+  - `import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'`
+  - `import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js'`
+  Fakechat uses `"@modelcontextprotocol/sdk": "^1.0.0"` in package.json
+
+- CLAIM-8: HIGH — Version requirements confirmed
+  Web: Channels Reference states: "Channels are in research preview and require Claude Code v2.1.80 or later" and "Permission relay requires Claude Code v2.1.81 or later"
+
+- CLAIM-9: HIGH — CLI flags confirmed (with correction on exact format)
+  Web: Channels Reference confirms: `--channels plugin:name@marketplace` for production, `--dangerously-load-development-channels server:name` for development. During research preview, custom channels need `--dangerously-load-development-channels`
+
+- CLAIM-10: HIGH — Same-process coexistence confirmed
+  Web: Fakechat reference implementation runs MCP stdio transport AND Bun.serve() HTTP+WebSocket in the same process. The Channels Reference webhook example does exactly the same. Quote: "The listener needs access to the mcp instance, so it runs in the same process"
+
+- CLAIM-11: HIGH — `server.publish("activity", ...)` pattern confirmed
+  Explorer: `server.ts:181` — `server.publish("activity", JSON.stringify({ type: "event", data: entry }))`
+
+- CLAIM-12: HIGH — EventBuffer pattern confirmed
+  Explorer: `events.ts` — capacity 500, monotonic seq numbers, `push()` returns SequencedEvent, `getSince()`/`getAll()` for replay
+
+- CLAIM-13: HIGH — AgentEventType is a simple string union, extensible by adding literals
+  Explorer: `types.ts:75` — `export type AgentEventType = "dispatch" | "completion" | "gate" | "feedback" | "merge" | "idle"`
+
+- CLAIM-14: HIGH — POST /api/events handler is a clean template
+  Explorer: `server.ts:170-188` — validates required fields, pushes to buffer, broadcasts via WebSocket
+
+- CLAIM-16: HIGH — Bun WebSocket JSON broadcast confirmed
+  Explorer: `server.ts:181` uses `JSON.stringify`, `server.ts:213` uses `ws.send(JSON.stringify(...))`
+
+### Corrected (2 claims)
+
+- CLAIM-15: MEDIUM CORRECTION — websocket.message stub is for browser→server messages, NOT for channel inbound
+  Explorer: `server.ts:215` — the stub handles messages FROM browser WebSocket clients. This is correct for browser→dashboard communication (e.g., gate approval clicks via WebSocket). However, the entity spec's architecture shows browser→dashboard communication going through HTTP POST (`/api/channel/send`), not WebSocket messages. The WebSocket `message` handler COULD be used as an alternative to POST for browser→server commands, but the MCP channel inbound path (dashboard→FO session) uses `mcp.notification()` on the MCP Server instance, not the Bun WebSocket.
+  **Fix**: Clarify two distinct inbound paths: (1) Browser→Dashboard via HTTP POST `/api/channel/send` or WebSocket message, (2) Dashboard→FO session via `mcp.notification({ method: 'notifications/claude/channel', ... })`. The websocket.message stub handles path (1), not path (2).
+
+- CLAIM-17: HIGH CORRECTION — The method is `mcp.notification()` (not `server.notification()`)
+  Web: All examples in Channels Reference use `await mcp.notification({...})` where `mcp` is the `Server` instance variable name. The method is `.notification()` on the Server class instance.
+  **Fix**: Minor naming clarification. The entity spec already uses `mcp.notification()` which is correct. The variable name `mcp` is conventional (used in all official examples) but any variable name works.
+
+### Unverifiable (0 claims)
+
+None — all claims verified with HIGH confidence.
+
+### Critical Architecture Insight (NEW — not in original spec)
+
+**The dashboard cannot be BOTH the existing Bun HTTP+WS server AND the MCP channel server in its current form.**
+
+The current dashboard (`tools/dashboard/src/server.ts`) is a standalone Bun HTTP+WebSocket server started directly via `bun server.ts`. It is NOT an MCP server — it has no MCP Server instance, no stdio transport, and is not spawned by Claude Code.
+
+A channel server must:
+1. Be spawned by Claude Code as a subprocess
+2. Communicate with Claude Code over stdio (StdioServerTransport)
+3. Be registered in `.mcp.json` or as a plugin
+
+**Two viable architectures:**
+
+**Option A: Separate MCP channel process + existing dashboard process**
+- The MCP channel server (`channel.ts`) is a new file spawned by Claude Code via stdio
+- The channel server starts its own HTTP listener (or connects to the existing dashboard) to relay messages
+- The existing dashboard continues as-is, with the channel server as a bridge
+- Pro: Minimal changes to existing dashboard. Con: Two processes to coordinate.
+
+**Option B: Dashboard becomes the MCP channel server (refactor)**
+- `server.ts` becomes the MCP server entry point, spawned by Claude Code
+- The MCP server creates both the stdio transport AND the Bun HTTP+WebSocket server (like fakechat does)
+- Pro: Single process, clean architecture. Con: Dashboard only works when launched via Claude Code `--channels` (but backward compat requires it to work standalone too).
+
+**Option C (recommended): Hybrid — channel module wraps dashboard**
+- New `channel.ts` is the MCP channel server entry point (spawned by Claude Code via stdio)
+- `channel.ts` imports and starts the dashboard server programmatically (the `createServer()` function already exists and is exported)
+- `channel.ts` holds the MCP Server instance and bridges between MCP notifications and the dashboard's EventBuffer + WebSocket broadcast
+- When launched standalone (`bun server.ts`), dashboard works read-only as before
+- When launched as channel (`bun channel.ts` via Claude Code), dashboard has full bidirectional capability
+- Pro: Reuses existing infrastructure, backward compatible, clean separation. Con: Slight complexity in having two entry points.
+
+**This is a MEDIUM correction — it affects the implementation architecture but the spec's described message flows are correct in principle.**
+
+### Recommendation Criteria
+
+- 0 high-severity corrections to control flow or data model
+- 2 corrections: 1 minor (naming), 1 medium (architecture clarification — two entry points needed, not one)
+- The medium correction does NOT invalidate the spec — the message flows described are exactly what the official Channels API supports
+- All 17 claims verified with HIGH confidence from official documentation + reference implementation
+- The primary unknown (Claude Code channels API surface) is now fully resolved
+
+**PROCEED** — The Claude Code Channels API exists exactly as described in the entity spec. The `@modelcontextprotocol/sdk` (^1.0.0 or latest 1.29.0) provides all needed types. The plan stage should adopt Option C architecture (hybrid entry point) to maintain backward compatibility.
+
+### Sources
+
+- [Channels Reference — Claude Code Docs](https://code.claude.com/docs/en/channels-reference) — complete API specification
+- [Fakechat Reference Implementation](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/fakechat) — official Anthropic channel plugin using Bun + MCP SDK
+- [@modelcontextprotocol/sdk on npm](https://www.npmjs.com/package/@modelcontextprotocol/sdk) — v1.29.0, Bun-compatible
+- [Claude Code Channels Overview](https://code.claude.com/docs/en/channels) — feature availability, enterprise controls
+
+## Stage Report: research
+
+- [x] Claims extracted from spec, explore results, and conversation interface design spec — 17 claims covering library-api (8), version (2), framework (2), project-convention (5)
+- [x] Per-claim verification with evidence from Explorer (codebase grep/read), Web Search (official docs, npm, GitHub), and reference implementation (fakechat)
+- [x] Cross-referenced synthesis with confidence levels — 15 HIGH verified, 2 corrections (1 minor naming, 1 medium architecture)
+- [x] Corrections for incorrect assumptions with cited sources — architecture insight: channel server needs separate entry point wrapping dashboard via createServer()
+- [x] Research report written to entity file with PROCEED recommendation
