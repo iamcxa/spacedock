@@ -1,7 +1,7 @@
 ---
 id: 008
 title: Dashboard as Standalone Plugin — Independent Packaging & Distribution
-status: explore
+status: research
 source: session discussion
 started: 2026-04-05T18:00:00+08:00
 completed:
