@@ -237,3 +237,319 @@ document.getElementById('tag-input').addEventListener('keydown', function(e) {
 // -- Initial load --
 
 loadEntity();
+
+// --- Collaborative Review: Text Selection + Comment System ---
+
+var commentTooltip = document.getElementById('comment-tooltip');
+var commentInput = document.getElementById('comment-input');
+var commentSubmitBtn = document.getElementById('comment-submit');
+var commentCancelBtn = document.getElementById('comment-cancel');
+var commentThreadsContainer = document.getElementById('comment-threads');
+
+var pendingSelection = null; // { text, sectionHeading, rect }
+
+// --- Text Selection Listener ---
+
+function getSelectionContext(range) {
+    // Walk up from range start to find nearest preceding h2/h3
+    var node = range.startContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+
+    // Walk backwards through siblings and up through parents
+    var heading = '';
+    var current = node;
+    while (current && current.id !== 'entity-body') {
+        // Check previous siblings for headings
+        var sibling = current.previousElementSibling;
+        while (sibling) {
+            var tag = sibling.tagName;
+            if (tag === 'H2' || tag === 'H3' || tag === 'H1') {
+                heading = sibling.textContent || '';
+                break;
+            }
+            sibling = sibling.previousElementSibling;
+        }
+        if (heading) break;
+        current = current.parentNode;
+    }
+    return '## ' + heading;
+}
+
+document.getElementById('entity-body').addEventListener('mouseup', function () {
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    var selectedText = sel.toString().trim();
+    if (!selectedText) return;
+
+    var range = sel.getRangeAt(0);
+    // Research correction #1: use getClientRects() for accurate multi-line positioning
+    var rects = range.getClientRects();
+    var rect = rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect();
+
+    var sectionHeading = getSelectionContext(range);
+
+    pendingSelection = {
+        text: selectedText,
+        sectionHeading: sectionHeading,
+    };
+
+    showCommentTooltip(rect);
+});
+
+function showCommentTooltip(rect) {
+    commentInput.value = '';
+    commentTooltip.style.display = '';
+    commentTooltip.style.top = (rect.bottom + window.scrollY + 8) + 'px';
+    commentTooltip.style.left = Math.max(8, rect.left + window.scrollX) + 'px';
+    commentInput.focus();
+}
+
+function hideCommentTooltip() {
+    commentTooltip.style.display = 'none';
+    pendingSelection = null;
+    window.getSelection().removeAllRanges();
+}
+
+// --- Comment Submission ---
+
+function submitComment() {
+    if (!pendingSelection || !entityPath) return;
+    var content = commentInput.value.trim();
+    if (!content) return;
+
+    apiFetch('/api/entity/comment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            path: entityPath,
+            selected_text: pendingSelection.text,
+            section_heading: pendingSelection.sectionHeading,
+            content: content,
+        }),
+    }).then(function (comment) {
+        hideCommentTooltip();
+        loadComments();
+        // Send comment to FO via channel
+        sendCommentToChannel(comment);
+    });
+}
+
+function sendCommentToChannel(comment) {
+    fetch('/api/channel/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            content: comment.content,
+            meta: {
+                type: 'comment',
+                entity_path: comment.entity_path,
+                section_heading: comment.section_heading,
+                selected_text: comment.selected_text,
+                comment_id: comment.id,
+            },
+        }),
+    });
+}
+
+commentSubmitBtn.addEventListener('click', submitComment);
+commentCancelBtn.addEventListener('click', hideCommentTooltip);
+commentInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        submitComment();
+    }
+    if (e.key === 'Escape') {
+        hideCommentTooltip();
+    }
+});
+
+// Close tooltip when clicking outside
+document.addEventListener('mousedown', function (e) {
+    if (commentTooltip.style.display !== 'none' && !commentTooltip.contains(e.target)) {
+        hideCommentTooltip();
+    }
+});
+
+// --- Comment Rendering in Sidebar ---
+
+function loadComments() {
+    if (!entityPath) return;
+    apiFetch('/api/entity/comments?path=' + encodeURIComponent(entityPath))
+        .then(function (thread) {
+            renderComments(thread);
+        });
+}
+
+function renderComments(thread) {
+    while (commentThreadsContainer.firstChild) commentThreadsContainer.removeChild(commentThreadsContainer.firstChild);
+
+    if (thread.comments.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = 'Select text to add a comment';
+        commentThreadsContainer.appendChild(empty);
+        return;
+    }
+
+    // Show unresolved comments first, then resolved
+    var sorted = thread.comments.slice().sort(function (a, b) {
+        if (a.resolved !== b.resolved) return a.resolved ? 1 : -1;
+        return new Date(b.timestamp) - new Date(a.timestamp);
+    });
+
+    sorted.forEach(function (comment) {
+        var card = document.createElement('div');
+        card.className = 'comment-card' + (comment.resolved ? ' resolved' : '');
+
+        var selectedText = document.createElement('div');
+        selectedText.className = 'comment-selected-text';
+        selectedText.textContent = '"' + comment.selected_text + '"';
+        card.appendChild(selectedText);
+
+        var content = document.createElement('div');
+        content.className = 'comment-content';
+        content.textContent = comment.content;
+        card.appendChild(content);
+
+        var meta = document.createElement('div');
+        meta.className = 'comment-meta';
+
+        var author = document.createElement('span');
+        author.textContent = comment.author + ' \u2022 ' + comment.section_heading.replace('## ', '');
+        meta.appendChild(author);
+
+        if (!comment.resolved) {
+            var resolveBtn = document.createElement('button');
+            resolveBtn.className = 'comment-resolve-btn';
+            resolveBtn.textContent = 'Resolve';
+            resolveBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                resolveCommentAction(comment.id);
+            });
+            meta.appendChild(resolveBtn);
+        }
+
+        card.appendChild(meta);
+
+        // Render suggestions linked to this comment
+        var linkedSuggestions = (thread.suggestions || []).filter(function (s) {
+            return s.comment_id === comment.id;
+        });
+        linkedSuggestions.forEach(function (suggestion) {
+            card.appendChild(renderSuggestionCard(suggestion));
+        });
+
+        commentThreadsContainer.appendChild(card);
+    });
+}
+
+function renderSuggestionCard(suggestion) {
+    var card = document.createElement('div');
+    card.className = 'suggestion-card';
+
+    var diff = document.createElement('div');
+    diff.className = 'suggestion-diff';
+
+    var del = document.createElement('span');
+    del.className = 'diff-del';
+    del.textContent = suggestion.diff_from;
+    diff.appendChild(del);
+
+    diff.appendChild(document.createTextNode(' \u2192 '));
+
+    var ins = document.createElement('span');
+    ins.className = 'diff-ins';
+    ins.textContent = suggestion.diff_to;
+    diff.appendChild(ins);
+
+    card.appendChild(diff);
+
+    if (suggestion.status === 'pending') {
+        var actions = document.createElement('div');
+        actions.className = 'suggestion-actions';
+
+        var acceptBtn = document.createElement('button');
+        acceptBtn.className = 'btn btn-small btn-accept';
+        acceptBtn.textContent = 'Accept';
+        acceptBtn.addEventListener('click', function () {
+            acceptSuggestionAction(suggestion.id);
+        });
+        actions.appendChild(acceptBtn);
+
+        var rejectBtn = document.createElement('button');
+        rejectBtn.className = 'btn btn-small btn-reject';
+        rejectBtn.textContent = 'Reject';
+        rejectBtn.addEventListener('click', function () {
+            rejectSuggestionAction(suggestion.id);
+        });
+        actions.appendChild(rejectBtn);
+
+        card.appendChild(actions);
+    } else {
+        var status = document.createElement('div');
+        status.className = 'comment-meta';
+        status.textContent = suggestion.status === 'accepted' ? '\u2713 Accepted' : '\u2717 Rejected';
+        card.appendChild(status);
+    }
+
+    return card;
+}
+
+// --- Comment/Suggestion Actions ---
+
+function resolveCommentAction(commentId) {
+    apiFetch('/api/entity/comment/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: entityPath, comment_id: commentId }),
+    }).then(function () {
+        loadComments();
+    });
+}
+
+function acceptSuggestionAction(suggestionId) {
+    apiFetch('/api/entity/suggestion/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: entityPath, suggestion_id: suggestionId }),
+    }).then(function () {
+        loadComments();
+        loadEntity(); // Re-render body with accepted changes
+    }).catch(function (err) {
+        if (err.message && err.message.indexOf('409') !== -1) {
+            alert('Conflict: The entity file was modified. Please reload and try again.');
+            loadEntity();
+            loadComments();
+        }
+    });
+}
+
+function rejectSuggestionAction(suggestionId) {
+    apiFetch('/api/entity/suggestion/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: entityPath, suggestion_id: suggestionId }),
+    }).then(function () {
+        loadComments();
+    });
+}
+
+// Override loadEntity to also load comments after entity data loads
+var _originalLoadEntity = loadEntity;
+loadEntity = function () {
+    if (!entityPath) return;
+    apiFetch('/api/entity/detail?path=' + encodeURIComponent(entityPath))
+        .then(function (data) {
+            document.getElementById('entity-title').textContent = data.frontmatter.title || '(untitled)';
+            document.title = (data.frontmatter.title || 'Entity') + ' \u2014 Spacedock';
+            renderMetadata(data.frontmatter);
+            renderBody(data.body);
+            renderStageReports(data.stage_reports);
+            renderTags(data.tags);
+            initScore(data.frontmatter.score || '0');
+            loadComments();
+        });
+};
+
+// Re-trigger with comments support
+loadEntity();
