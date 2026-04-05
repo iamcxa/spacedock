@@ -1,9 +1,9 @@
 ---
 id: 009
 title: Dashboard Entity Visibility — Show All Entities with Stage Filtering
-status: explore
+status: execute
 source: session discussion
-started:
+started: 2026-04-05T04:25:00Z
 completed:
 verdict:
 score: 0.9
