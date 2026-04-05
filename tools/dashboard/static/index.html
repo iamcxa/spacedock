@@ -11,6 +11,7 @@
         <h1>Spacedock Dashboard</h1>
         <div class="header-indicators">
             <span id="ws-status" class="indicator paused">Connecting...</span>
+            <span id="channel-status" class="indicator paused">Channel: disconnected</span>
             <span id="refresh-indicator" class="indicator">Auto-refresh: ON</span>
             <span id="telemetry-indicator" class="indicator" style="display:none"></span>
         </div>
@@ -23,6 +24,10 @@
             <h3>Activity Feed</h3>
             <div id="activity-feed">
                 <p class="empty-state">No activity yet.</p>
+            </div>
+            <div id="channel-input-bar">
+                <textarea id="channel-input" placeholder="No active session — launch with --channels to enable" disabled rows="1"></textarea>
+                <button id="channel-send-btn" disabled>Send</button>
             </div>
         </aside>
     </div>
