@@ -308,7 +308,11 @@ export function createServer(opts: ServerOptions) {
     return entry.seq;
   }
 
-  return Object.assign(server, { eventBuffer, publishEvent });
+  function broadcastChannelStatus(connected: boolean) {
+    server.publish("activity", JSON.stringify({ type: "channel_status", connected }));
+  }
+
+  return Object.assign(server, { eventBuffer, publishEvent, broadcastChannelStatus });
 }
 
 // CLI entry point -- only runs when executed directly

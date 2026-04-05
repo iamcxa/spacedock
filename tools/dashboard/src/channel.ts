@@ -168,6 +168,13 @@ if (import.meta.main) {
   const transport = new StdioServerTransport();
   await mcp.connect(transport);
 
+  // Notify browser clients that channel is now active
+  dashboard.broadcastChannelStatus(true);
+
+  mcp.onclose = () => {
+    dashboard.broadcastChannelStatus(false);
+  };
+
   const banner = `[${new Date().toISOString().slice(0, 19).replace("T", " ")}] Spacedock Channel started on http://127.0.0.1:${dashboard.port}/ (root: ${projectRoot})`;
   // Write to stderr (stdout is reserved for MCP stdio transport)
   console.error(banner);
