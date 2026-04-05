@@ -146,7 +146,11 @@
 
         var tbody = document.createElement("tbody");
         sorted.forEach(function (e) {
+          var isArchived = e.archived === "true" || e.status === "shipped";
           var row = document.createElement("tr");
+          if (isArchived) {
+            row.className = "entity-row--archived";
+          }
           if (e.path) {
             row.style.cursor = "pointer";
             row.addEventListener("click", function () {

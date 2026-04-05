@@ -104,6 +104,9 @@ tr:hover td { background: #1c2128; }
     font-weight: 500;
 }
 
+.entity-row--archived { opacity: 0.5; }
+.entity-row--archived .status-badge { background: #21262d !important; color: #8b949e !important; }
+
 .loading { color: #8b949e; text-align: center; padding: 2rem; }
 .empty-state { color: #8b949e; text-align: center; padding: 1rem; }
 
