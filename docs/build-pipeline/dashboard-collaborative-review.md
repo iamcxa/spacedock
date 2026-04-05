@@ -1,7 +1,7 @@
 ---
 id: 011
 title: Dashboard Collaborative Review — Inline Comments & Suggestions on Entity Files
-status: quality
+status: e2e
 source: channel conversation
 started: 2026-04-05T19:00:00+08:00
 completed:
