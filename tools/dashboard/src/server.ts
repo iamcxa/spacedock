@@ -1,11 +1,20 @@
-import { realpathSync, existsSync, appendFileSync } from "node:fs";
+import { realpathSync, existsSync, appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve, sep, dirname } from "node:path";
 import { parseArgs } from "node:util";
 import { discoverWorkflows, aggregateWorkflow } from "./discovery";
 import { getEntityDetail, updateScore, updateTags, filterEntities } from "./api";
+import {
+  getComments,
+  addComment,
+  addSuggestion,
+  resolveComment,
+  acceptSuggestion as acceptSuggestionAction,
+  rejectSuggestion as rejectSuggestionAction,
+} from "./comments";
 import { EventBuffer } from "./events";
-import type { AgentEvent, AgentEventType } from "./types";
+import type { AgentEvent, AgentEventType, Stage } from "./types";
 import { telemetryInit, captureException, getPosthogJsConfig } from "./telemetry";
+import { updateWorkflowStages } from "./frontmatter-io";
 
 interface ServerOptions {
   port: number;
@@ -152,6 +161,161 @@ export function createServer(opts: ServerOptions) {
           }
         },
       },
+      "/api/entity/comments": {
+        GET: (req) => {
+          const url = new URL(req.url);
+          const filepath = url.searchParams.get("path");
+          if (!filepath) {
+            logRequest(req, 400);
+            return jsonResponse({ error: "path required" }, 400);
+          }
+          if (!validatePath(filepath, projectRoot)) {
+            logRequest(req, 403);
+            return jsonResponse({ error: "Forbidden" }, 403);
+          }
+          try {
+            const thread = getComments(filepath);
+            logRequest(req, 200);
+            return jsonResponse(thread);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/comment": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as {
+              path: string;
+              selected_text: string;
+              section_heading: string;
+              content: string;
+            };
+            if (!body.path) return jsonResponse({ error: "Missing field: path" }, 400);
+            if (!body.selected_text) return jsonResponse({ error: "Missing field: selected_text" }, 400);
+            if (typeof body.section_heading !== "string") return jsonResponse({ error: "Missing field: section_heading" }, 400);
+            if (!body.content) return jsonResponse({ error: "Missing field: content" }, 400);
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const comment = addComment(body.path, {
+              selected_text: body.selected_text,
+              section_heading: body.section_heading,
+              content: body.content,
+            });
+            logRequest(req, 200);
+            return jsonResponse(comment);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/comment/resolve": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as { path: string; comment_id: string };
+            if (!body.path) return jsonResponse({ error: "Missing field: path" }, 400);
+            if (!body.comment_id) return jsonResponse({ error: "Missing field: comment_id" }, 400);
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const comment = resolveComment(body.path, body.comment_id);
+            logRequest(req, 200);
+            return jsonResponse(comment);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/suggestion": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as {
+              path: string;
+              comment_id: string;
+              diff_from: string;
+              diff_to: string;
+            };
+            if (!body.path) return jsonResponse({ error: "Missing field: path" }, 400);
+            if (!body.comment_id) return jsonResponse({ error: "Missing field: comment_id" }, 400);
+            if (!body.diff_from) return jsonResponse({ error: "Missing field: diff_from" }, 400);
+            if (!body.diff_to) return jsonResponse({ error: "Missing field: diff_to" }, 400);
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const suggestion = addSuggestion(body.path, {
+              comment_id: body.comment_id,
+              diff_from: body.diff_from,
+              diff_to: body.diff_to,
+            });
+            logRequest(req, 200);
+            return jsonResponse(suggestion);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/suggestion/accept": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as { path: string; comment_id: string; suggestion_id: string };
+            if (!body.path) return jsonResponse({ error: "Missing field: path" }, 400);
+            if (!body.comment_id) return jsonResponse({ error: "Missing field: comment_id" }, 400);
+            if (!body.suggestion_id) return jsonResponse({ error: "Missing field: suggestion_id" }, 400);
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const suggestion = acceptSuggestionAction(body.path, body.suggestion_id);
+            logRequest(req, 200);
+            return jsonResponse(suggestion);
+          } catch (err) {
+            if (err instanceof Error && err.message.includes("not found")) {
+              if (err.message.includes("Text not found in entity body")) {
+                logRequest(req, 409);
+                return jsonResponse({ error: "Conflict: " + err.message }, 409);
+              }
+              logRequest(req, 404);
+              return jsonResponse({ error: err.message }, 404);
+            }
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/suggestion/reject": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as { path: string; comment_id: string; suggestion_id: string };
+            if (!body.path) return jsonResponse({ error: "Missing field: path" }, 400);
+            if (!body.comment_id) return jsonResponse({ error: "Missing field: comment_id" }, 400);
+            if (!body.suggestion_id) return jsonResponse({ error: "Missing field: suggestion_id" }, 400);
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const suggestion = rejectSuggestionAction(body.path, body.suggestion_id);
+            logRequest(req, 200);
+            return jsonResponse(suggestion);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
       "/api/config": {
         GET: (req) => {
           const posthog = getPosthogJsConfig();
@@ -215,6 +379,81 @@ export function createServer(opts: ServerOptions) {
             }
             logRequest(req, 200);
             return jsonResponse({ ok: true, seq: entry.seq });
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/workflow/readme": {
+        GET: (req) => {
+          const url = new URL(req.url);
+          const dir = url.searchParams.get("dir");
+          if (!dir) {
+            logRequest(req, 400);
+            return jsonResponse({ error: "dir required" }, 400);
+          }
+          if (!validatePath(dir, projectRoot)) {
+            logRequest(req, 403);
+            return jsonResponse({ error: "Forbidden" }, 403);
+          }
+          const readmePath = join(dir, "README.md");
+          if (!existsSync(readmePath)) {
+            logRequest(req, 404);
+            return jsonResponse({ error: "README.md not found" }, 404);
+          }
+          logRequest(req, 200);
+          return jsonResponse({ path: readmePath });
+        },
+      },
+      "/api/workflow/stages": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as { dir: string; stages: Stage[] };
+            if (!body.dir || !Array.isArray(body.stages)) {
+              logRequest(req, 400);
+              return jsonResponse({ error: "dir and stages[] required" }, 400);
+            }
+            const invalidName = body.stages.find(
+              (s) => !s.name || typeof s.name !== "string" || !/^[a-z0-9][a-z0-9-]*$/.test(s.name)
+            );
+            if (invalidName) {
+              logRequest(req, 400);
+              return jsonResponse({ error: `Invalid stage name: ${invalidName.name ?? "(empty)"}` }, 400);
+            }
+            const stageNames = new Set(body.stages.map((s) => s.name));
+            const boolFields = ["gate", "terminal", "initial", "conditional", "worktree"] as const;
+            for (const s of body.stages) {
+              for (const bf of boolFields) {
+                if (bf in s && typeof s[bf] !== "boolean") {
+                  logRequest(req, 400);
+                  return jsonResponse({ error: `Stage '${s.name}': field '${bf}' must be a boolean` }, 400);
+                }
+              }
+              if (s.feedback_to && !stageNames.has(s.feedback_to)) {
+                logRequest(req, 400);
+                return jsonResponse({ error: `Stage '${s.name}': feedback_to target '${s.feedback_to}' does not exist` }, 400);
+              }
+              if ("concurrency" in s && (typeof s.concurrency !== "number" || s.concurrency <= 0)) {
+                logRequest(req, 400);
+                return jsonResponse({ error: `Stage '${s.name}': concurrency must be a number > 0` }, 400);
+              }
+            }
+            if (!validatePath(body.dir, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const readmePath = join(body.dir, "README.md");
+            if (!existsSync(readmePath)) {
+              logRequest(req, 404);
+              return jsonResponse({ error: "README.md not found" }, 404);
+            }
+            const text = readFileSync(readmePath, "utf-8");
+            const updated = updateWorkflowStages(text, body.stages);
+            writeFileSync(readmePath, updated);
+            logRequest(req, 200);
+            return jsonResponse({ ok: true });
           } catch (err) {
             captureException(err instanceof Error ? err : new Error(String(err)));
             logRequest(req, 500);

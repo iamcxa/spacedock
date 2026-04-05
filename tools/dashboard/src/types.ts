@@ -9,6 +9,9 @@ export interface Stage {
   gate: boolean;
   terminal: boolean;
   initial: boolean;
+  feedback_to: string;
+  conditional: boolean;
+  model: string;
 }
 
 export interface Entity {
@@ -73,7 +76,8 @@ export interface FilterOptions {
 // --- Activity Feed Events ---
 
 export type AgentEventType = "dispatch" | "completion" | "gate" | "feedback" | "merge" | "idle"
-  | "channel_message" | "channel_response" | "permission_request" | "permission_response";
+  | "channel_message" | "channel_response" | "permission_request" | "permission_response"
+  | "comment" | "suggestion";
 
 export interface AgentEvent {
   type: AgentEventType;
@@ -104,4 +108,38 @@ export interface PermissionRequest {
 export interface PermissionVerdict {
   request_id: string;
   behavior: "allow" | "deny";
+}
+
+// --- Collaborative Review Types ---
+
+export interface Comment {
+  id: string;
+  entity_path: string;
+  selected_text: string;
+  section_heading: string;
+  content: string;
+  author: "captain" | "fo";
+  timestamp: string; // ISO 8601
+  resolved: boolean;
+  thread: CommentReply[];
+}
+
+export interface CommentReply {
+  content: string;
+  author: "captain" | "fo";
+  timestamp: string;
+}
+
+export interface Suggestion {
+  id: string;
+  comment_id: string;
+  diff_from: string;
+  diff_to: string;
+  status: "pending" | "accepted" | "rejected";
+  timestamp: string;
+}
+
+export interface CommentThread {
+  comments: Comment[];
+  suggestions: Suggestion[];
 }

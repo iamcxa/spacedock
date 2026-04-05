@@ -306,3 +306,184 @@ body {
 }
 
 .btn-secondary:hover { background: #30363d; }
+
+/* --- Collaborative Review: Comments Panel --- */
+
+.comments-panel {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.comments-panel h3 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #8b949e;
+    margin-bottom: 0.75rem;
+}
+
+.comment-threads {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.comment-threads .empty-state {
+    color: #8b949e;
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+.comment-card {
+    border: 1px solid #21262d;
+    border-radius: 6px;
+    padding: 0.75rem;
+    background: #0d1117;
+    cursor: pointer;
+}
+
+.comment-card:hover {
+    border-color: #58a6ff;
+}
+
+.comment-card.resolved {
+    opacity: 0.5;
+}
+
+.comment-selected-text {
+    font-size: 0.8rem;
+    color: #8b949e;
+    border-left: 2px solid #58a6ff;
+    padding-left: 0.5rem;
+    margin-bottom: 0.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.comment-content {
+    font-size: 0.85rem;
+    color: #c9d1d9;
+    margin-bottom: 0.4rem;
+}
+
+.comment-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: #8b949e;
+}
+
+.comment-resolve-btn {
+    background: none;
+    border: 1px solid #21262d;
+    color: #8b949e;
+    border-radius: 4px;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.comment-resolve-btn:hover {
+    border-color: #3fb950;
+    color: #3fb950;
+}
+
+/* --- Comment Tooltip (floating) --- */
+
+.comment-tooltip {
+    position: fixed;
+    z-index: 1000;
+    background: #161b22;
+    border: 1px solid #58a6ff;
+    border-radius: 8px;
+    padding: 0.75rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    width: 280px;
+}
+
+.comment-textarea {
+    width: 100%;
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 4px;
+    color: #c9d1d9;
+    font-size: 0.85rem;
+    padding: 0.5rem;
+    resize: none;
+    font-family: inherit;
+}
+
+.comment-textarea::placeholder { color: #8b949e; }
+
+.tooltip-actions {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    justify-content: flex-end;
+}
+
+/* --- Suggestion Diff Highlights --- */
+
+.suggestion-card {
+    border: 1px solid #f0883e;
+    border-radius: 6px;
+    padding: 0.75rem;
+    background: #0d1117;
+    margin-top: 0.5rem;
+}
+
+.suggestion-diff {
+    font-size: 0.85rem;
+    font-family: monospace;
+    line-height: 1.6;
+    margin-bottom: 0.5rem;
+}
+
+.diff-del {
+    background: rgba(248, 81, 73, 0.15);
+    color: #f85149;
+    text-decoration: line-through;
+}
+
+.diff-ins {
+    background: rgba(63, 185, 80, 0.15);
+    color: #3fb950;
+}
+
+.suggestion-actions {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.suggestion-actions .btn-accept {
+    background: #238636;
+    color: #fff;
+}
+
+.suggestion-actions .btn-accept:hover {
+    background: #2ea043;
+}
+
+.suggestion-actions .btn-reject {
+    background: #21262d;
+    color: #f85149;
+}
+
+.suggestion-actions .btn-reject:hover {
+    background: #30363d;
+}
+
+/* --- Selection highlight in entity body --- */
+
+.entity-body .comment-highlight {
+    background: rgba(88, 166, 255, 0.15);
+    border-bottom: 2px solid #58a6ff;
+    cursor: pointer;
+}

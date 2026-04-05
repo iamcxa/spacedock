@@ -196,6 +196,24 @@
     removeEmptyState();
 
     var text = entry.event.detail || "";
+
+    // Check if FO response is a structured suggestion
+    var suggestion = null;
+    try {
+      var parsed = JSON.parse(text);
+      if (parsed && parsed.type === "suggestion" && parsed.comment_id) {
+        suggestion = parsed;
+      }
+    } catch (e) {
+      // Not JSON — render as normal chat bubble
+    }
+
+    if (suggestion) {
+      renderSuggestionBubble(entry, suggestion);
+      storeSuggestionFromChannel(suggestion);
+      return;
+    }
+
     var isLong = text.length > 100;
 
     var bubble = document.createElement("div");
@@ -225,6 +243,83 @@
 
     feedContainer.insertBefore(bubble, feedContainer.firstChild);
     capFeedItems();
+  }
+
+  function renderSuggestionBubble(entry, suggestion) {
+    var bubble = document.createElement("div");
+    bubble.className = "chat-bubble fo suggestion-bubble";
+
+    var header = document.createElement("div");
+    header.className = "bubble-content";
+    header.textContent = "Suggested edit:";
+    bubble.appendChild(header);
+
+    var diff = document.createElement("div");
+    diff.style.fontFamily = "monospace";
+    diff.style.fontSize = "0.85rem";
+    diff.style.margin = "0.5rem 0";
+
+    var del = document.createElement("span");
+    del.style.background = "rgba(248, 81, 73, 0.15)";
+    del.style.color = "#f85149";
+    del.style.textDecoration = "line-through";
+    del.textContent = suggestion.diff_from;
+    diff.appendChild(del);
+
+    diff.appendChild(document.createTextNode(" \u2192 "));
+
+    var ins = document.createElement("span");
+    ins.style.background = "rgba(63, 185, 80, 0.15)";
+    ins.style.color = "#3fb950";
+    ins.textContent = suggestion.diff_to;
+    diff.appendChild(ins);
+
+    bubble.appendChild(diff);
+
+    var time = document.createElement("span");
+    time.className = "bubble-time";
+    time.textContent = timeAgo(entry.event.timestamp);
+    bubble.appendChild(time);
+
+    feedContainer.insertBefore(bubble, feedContainer.firstChild);
+    capFeedItems();
+  }
+
+  function storeSuggestionFromChannel(suggestion) {
+    // Get entity path from URL params (detail page) or skip on dashboard page
+    var params = new URLSearchParams(window.location.search);
+    var entityPath = params.get("path");
+    if (!entityPath) return;
+
+    fetch("/api/entity/comment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: entityPath,
+        selected_text: suggestion.diff_from,
+        section_heading: "",
+        content: "AI suggested edit",
+      }),
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (comment) {
+        // Create the Suggestion record linked to the comment
+        return fetch("/api/entity/suggestion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            path: entityPath,
+            comment_id: comment.id,
+            diff_from: suggestion.diff_from,
+            diff_to: suggestion.diff_to,
+          }),
+        });
+      })
+      .then(function () {
+        // Trigger comment reload if on detail page
+        if (typeof loadComments === "function") loadComments();
+      })
+      .catch(function () { /* Best effort */ });
   }
 
   function renderPermissionRequest(entry) {
