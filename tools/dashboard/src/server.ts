@@ -3,6 +3,13 @@ import { join, resolve, sep, dirname } from "node:path";
 import { parseArgs } from "node:util";
 import { discoverWorkflows, aggregateWorkflow } from "./discovery";
 import { getEntityDetail, updateScore, updateTags, filterEntities } from "./api";
+import {
+  getComments,
+  addComment,
+  resolveComment,
+  acceptSuggestion as acceptSuggestionAction,
+  rejectSuggestion as rejectSuggestionAction,
+} from "./comments";
 import { EventBuffer } from "./events";
 import type { AgentEvent, AgentEventType } from "./types";
 import { telemetryInit, captureException, getPosthogJsConfig } from "./telemetry";
@@ -145,6 +152,114 @@ export function createServer(opts: ServerOptions) {
             updateTags(body.path, body.tags);
             logRequest(req, 200);
             return jsonResponse({ ok: true });
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/comments": {
+        GET: (req) => {
+          const url = new URL(req.url);
+          const filepath = url.searchParams.get("path");
+          if (!filepath) {
+            logRequest(req, 400);
+            return jsonResponse({ error: "path required" }, 400);
+          }
+          if (!validatePath(filepath, projectRoot)) {
+            logRequest(req, 403);
+            return jsonResponse({ error: "Forbidden" }, 403);
+          }
+          try {
+            const thread = getComments(filepath);
+            logRequest(req, 200);
+            return jsonResponse(thread);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/comment": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as {
+              path: string;
+              selected_text: string;
+              section_heading: string;
+              content: string;
+            };
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const comment = addComment(body.path, {
+              selected_text: body.selected_text,
+              section_heading: body.section_heading,
+              content: body.content,
+            });
+            logRequest(req, 200);
+            return jsonResponse(comment);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/comment/resolve": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as { path: string; comment_id: string };
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const comment = resolveComment(body.path, body.comment_id);
+            logRequest(req, 200);
+            return jsonResponse(comment);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/suggestion/accept": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as { path: string; suggestion_id: string };
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const suggestion = acceptSuggestionAction(body.path, body.suggestion_id);
+            logRequest(req, 200);
+            return jsonResponse(suggestion);
+          } catch (err) {
+            if (err instanceof Error && err.message.includes("not found")) {
+              logRequest(req, 409);
+              return jsonResponse({ error: "Conflict: " + err.message }, 409);
+            }
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/suggestion/reject": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as { path: string; suggestion_id: string };
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const suggestion = rejectSuggestionAction(body.path, body.suggestion_id);
+            logRequest(req, 200);
+            return jsonResponse(suggestion);
           } catch (err) {
             captureException(err instanceof Error ? err : new Error(String(err)));
             logRequest(req, 500);
