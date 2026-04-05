@@ -124,8 +124,32 @@
       var metaText = (wf.entity_label || wf.entity_type || "entity") + "s \u00B7 " + wf.entities.length + " total";
       card.appendChild(el("div", { className: "workflow-meta", textContent: metaText }));
 
-      var pipeline = el("div", { className: "stage-pipeline" });
+      // --- Pipeline Graph (wide screens) ---
+      var graphContainer = el("div", { className: "pipeline-graph-container" });
       var activeFilters = filterState[wfIdx] || new Set();
+
+      var svgGraph = window.SpacedockVisualizer.renderPipelineGraph(
+        wf.stages,
+        wf.entity_count_by_stage,
+        activeFilters,
+        function (stageName) {
+          if (!filterState[wfIdx]) filterState[wfIdx] = new Set();
+          if (filterState[wfIdx].has(stageName)) {
+            filterState[wfIdx].delete(stageName);
+          } else {
+            filterState[wfIdx].add(stageName);
+          }
+          saveFilterState();
+          fetchWorkflows();
+        }
+      );
+      if (svgGraph) {
+        graphContainer.appendChild(svgGraph);
+      }
+      card.appendChild(graphContainer);
+
+      // --- Chip row fallback (narrow screens, hidden via CSS on wide) ---
+      var pipeline = el("div", { className: "stage-pipeline" });
       wf.stages.forEach(function (stage) {
         var count = (wf.entity_count_by_stage || {})[stage.name] || 0;
         var isActive = activeFilters.has(stage.name);
@@ -147,6 +171,45 @@
         pipeline.appendChild(chip);
       });
       card.appendChild(pipeline);
+
+      // --- Edit Mode Toggle ---
+      var editorContainer = el("div", { className: "editor-container" });
+      editorContainer.style.display = "none";
+
+      var editBtn = el("button", {
+        className: "editor-btn",
+        textContent: "Edit Pipeline",
+      });
+      editBtn.addEventListener("click", function () {
+        var isEditing = editorContainer.style.display !== "none";
+        if (isEditing) {
+          editorContainer.style.display = "none";
+          graphContainer.style.display = "";
+          editBtn.textContent = "Edit Pipeline";
+          editBtn.classList.remove("active");
+        } else {
+          graphContainer.style.display = "none";
+          editorContainer.style.display = "";
+          editBtn.textContent = "Exit Editor";
+          editBtn.classList.add("active");
+          // Initialize editor
+          editorContainer.textContent = "";
+          window.SpacedockEditor.createEditor(
+            editorContainer,
+            wf.stages,
+            wf.entity_count_by_stage,
+            wf.dir,
+            function onSaved() {
+              // Refresh data after save
+              fetchWorkflows();
+            }
+          );
+        }
+      });
+
+      // Insert button before graph
+      card.insertBefore(editBtn, graphContainer);
+      card.appendChild(editorContainer);
 
       if (wf.entities.length > 0) {
         var filters = filterState[wfIdx] || new Set();
@@ -221,5 +284,7 @@
   }
 
   fetchWorkflows();
-  setInterval(fetchWorkflows, POLL_INTERVAL);
+  setInterval(function () {
+    if (!document.querySelector('.editor-container[style*="display: block"]')) fetchWorkflows();
+  }, POLL_INTERVAL);
 })();
