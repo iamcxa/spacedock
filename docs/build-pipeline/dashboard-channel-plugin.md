@@ -70,6 +70,16 @@ Claude Code needs tool approval (e.g., git push)
 - Dashboard works as read-only viewer when not launched with `--channels` (backward compatible)
 - Works alongside Telegram/Discord channels (captain can respond from any connected channel)
 
+### Conversation Interface (addendum — see `docs/superpowers/specs/2026-04-05-dashboard-conversation-interface.md`)
+
+- Captain can type freeform messages in the dashboard input bar and they arrive at the FO session via channel
+- FO responses render as chat bubbles in the activity feed (left-aligned, gray)
+- Captain messages render as chat bubbles (right-aligned, blue)
+- Long FO responses truncate with "Show more" expand
+- Conversation messages and workflow events interleave chronologically in the same feed
+- Messages survive browser refresh (EventBuffer replay) but clear on daemon restart
+- Input bar is disabled with hint text when no channel session is connected
+
 ## Explore Findings
 
 ### File List by Layer
