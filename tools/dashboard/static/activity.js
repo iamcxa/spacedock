@@ -3,12 +3,16 @@
 
   var feedContainer = document.getElementById("activity-feed");
   var statusIndicator = document.getElementById("ws-status");
+  var channelIndicator = document.getElementById("channel-status");
+  var inputEl = document.getElementById("channel-input");
+  var sendBtn = document.getElementById("channel-send-btn");
   var lastSeq = 0;
   var ws = null;
   var retryCount = 0;
   var maxRetries = 10;
-  var baseDelay = 500;  // ms
-  var maxDelay = 30000; // ms
+  var baseDelay = 500;
+  var maxDelay = 30000;
+  var channelConnected = false;
 
   function getWsUrl() {
     var loc = window.location;
@@ -20,6 +24,21 @@
     if (!statusIndicator) return;
     statusIndicator.textContent = state === "connected" ? "Live" : state === "connecting" ? "Connecting..." : "Disconnected";
     statusIndicator.className = "indicator" + (state === "connected" ? "" : " paused");
+  }
+
+  function setChannelStatus(connected) {
+    channelConnected = connected;
+    if (channelIndicator) {
+      channelIndicator.textContent = connected ? "Channel: connected" : "Channel: disconnected";
+      channelIndicator.className = "indicator " + (connected ? "channel-connected" : "channel-disconnected");
+    }
+    if (inputEl && sendBtn) {
+      inputEl.disabled = !connected;
+      sendBtn.disabled = !connected;
+      inputEl.placeholder = connected
+        ? "Message to FO..."
+        : "No active session \u2014 launch with --channels to enable";
+    }
   }
 
   function connect() {
@@ -36,13 +55,15 @@
       if (msg.type === "replay") {
         if (msg.events && msg.events.length > 0) {
           msg.events.forEach(function (entry) {
-            renderEvent(entry);
+            renderEntry(entry);
             if (entry.seq > lastSeq) lastSeq = entry.seq;
           });
         }
       } else if (msg.type === "event") {
-        renderEvent(msg.data);
+        renderEntry(msg.data);
         if (msg.data.seq > lastSeq) lastSeq = msg.data.seq;
+      } else if (msg.type === "channel_status") {
+        setChannelStatus(msg.connected);
       }
     };
 
@@ -51,9 +72,7 @@
       scheduleReconnect();
     };
 
-    ws.onerror = function () {
-      // onclose will fire after onerror -- reconnect handled there
-    };
+    ws.onerror = function () {};
   }
 
   function scheduleReconnect() {
@@ -62,7 +81,6 @@
       return;
     }
     var delay = Math.min(baseDelay * Math.pow(2, retryCount), maxDelay);
-    // Add jitter: +/- 25%
     delay = delay * (0.75 + Math.random() * 0.5);
     retryCount++;
     setTimeout(connect, delay);
@@ -87,13 +105,38 @@
     return Math.floor(diff / 3600000) + "h ago";
   }
 
+  function renderEntry(entry) {
+    var e = entry.event;
+    if (e.type === "channel_message") {
+      renderChannelMessage(entry);
+    } else if (e.type === "channel_response") {
+      renderChannelResponse(entry);
+    } else if (e.type === "permission_request") {
+      renderPermissionRequest(entry);
+    } else if (e.type === "permission_response") {
+      renderPermissionResponse(entry);
+    } else {
+      renderEvent(entry);
+    }
+  }
+
+  function removeEmptyState() {
+    if (!feedContainer) return;
+    var emptyState = feedContainer.querySelector(".empty-state");
+    if (emptyState) emptyState.remove();
+  }
+
+  function capFeedItems() {
+    if (!feedContainer) return;
+    while (feedContainer.children.length > 100) {
+      feedContainer.removeChild(feedContainer.lastChild);
+    }
+  }
+
   function renderEvent(entry) {
     if (!feedContainer) return;
     var e = entry.event;
-
-    // Remove empty state placeholder on first event
-    var emptyState = feedContainer.querySelector(".empty-state");
-    if (emptyState) emptyState.remove();
+    removeEmptyState();
 
     var item = document.createElement("div");
     item.className = "activity-item";
@@ -123,14 +166,206 @@
       item.appendChild(detail);
     }
 
-    // Prepend newest at top
     feedContainer.insertBefore(item, feedContainer.firstChild);
-
-    // Cap visible items at 100
-    while (feedContainer.children.length > 100) {
-      feedContainer.removeChild(feedContainer.lastChild);
-    }
+    capFeedItems();
   }
 
+  function renderChannelMessage(entry) {
+    if (!feedContainer) return;
+    removeEmptyState();
+
+    var bubble = document.createElement("div");
+    bubble.className = "chat-bubble captain";
+
+    var content = document.createElement("div");
+    content.className = "bubble-content";
+    content.textContent = entry.event.detail || "";
+    bubble.appendChild(content);
+
+    var time = document.createElement("span");
+    time.className = "bubble-time";
+    time.textContent = timeAgo(entry.event.timestamp);
+    bubble.appendChild(time);
+
+    feedContainer.insertBefore(bubble, feedContainer.firstChild);
+    capFeedItems();
+  }
+
+  function renderChannelResponse(entry) {
+    if (!feedContainer) return;
+    removeEmptyState();
+
+    var text = entry.event.detail || "";
+    var isLong = text.length > 100;
+
+    var bubble = document.createElement("div");
+    bubble.className = "chat-bubble fo" + (isLong ? " truncated" : "");
+
+    var content = document.createElement("div");
+    content.className = "bubble-content";
+    content.textContent = text;
+    bubble.appendChild(content);
+
+    if (isLong) {
+      var toggle = document.createElement("span");
+      toggle.className = "show-more";
+      toggle.textContent = "Show more \u2193";
+      toggle.addEventListener("click", function () {
+        var isTruncated = bubble.classList.contains("truncated");
+        bubble.classList.toggle("truncated");
+        toggle.textContent = isTruncated ? "Show less \u2191" : "Show more \u2193";
+      });
+      bubble.appendChild(toggle);
+    }
+
+    var time = document.createElement("span");
+    time.className = "bubble-time";
+    time.textContent = timeAgo(entry.event.timestamp);
+    bubble.appendChild(time);
+
+    feedContainer.insertBefore(bubble, feedContainer.firstChild);
+    capFeedItems();
+  }
+
+  function renderPermissionRequest(entry) {
+    if (!feedContainer) return;
+    removeEmptyState();
+
+    var params;
+    try {
+      params = JSON.parse(entry.event.detail || "{}");
+    } catch (e) {
+      params = { tool_name: "Unknown", description: entry.event.detail || "" };
+    }
+
+    var card = document.createElement("div");
+    card.className = "permission-card";
+    card.setAttribute("data-request-id", params.request_id || "");
+
+    var header = document.createElement("div");
+    header.className = "perm-header";
+    header.textContent = "Permission Request";
+    card.appendChild(header);
+
+    var tool = document.createElement("div");
+    tool.className = "perm-tool";
+    tool.textContent = params.tool_name + ": " + params.description;
+    card.appendChild(tool);
+
+    if (params.input_preview) {
+      var preview = document.createElement("div");
+      preview.className = "perm-preview";
+      preview.textContent = params.input_preview;
+      card.appendChild(preview);
+    }
+
+    var actions = document.createElement("div");
+    actions.className = "perm-actions";
+
+    var approveBtn = document.createElement("button");
+    approveBtn.className = "perm-btn approve";
+    approveBtn.textContent = "Approve";
+    approveBtn.addEventListener("click", function () {
+      sendPermissionVerdict(params.request_id, "allow", card);
+    });
+
+    var denyBtn = document.createElement("button");
+    denyBtn.className = "perm-btn deny";
+    denyBtn.textContent = "Reject";
+    denyBtn.addEventListener("click", function () {
+      sendPermissionVerdict(params.request_id, "deny", card);
+    });
+
+    actions.appendChild(approveBtn);
+    actions.appendChild(denyBtn);
+    card.appendChild(actions);
+
+    feedContainer.insertBefore(card, feedContainer.firstChild);
+    capFeedItems();
+  }
+
+  function sendPermissionVerdict(requestId, behavior, card) {
+    var buttons = card.querySelectorAll(".perm-btn");
+    buttons.forEach(function (btn) { btn.disabled = true; });
+
+    fetch("/api/channel/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: behavior,
+        meta: { type: "permission_response", request_id: requestId },
+      }),
+    })
+      .then(function () {
+        card.classList.add("resolved");
+        var verdict = document.createElement("div");
+        verdict.className = "perm-verdict";
+        verdict.textContent = behavior === "allow" ? "Approved" : "Rejected";
+        card.appendChild(verdict);
+      })
+      .catch(function () {
+        buttons.forEach(function (btn) { btn.disabled = false; });
+      });
+  }
+
+  function renderPermissionResponse(entry) {
+    // Find the matching permission card and mark it resolved
+    // Since we resolve cards in sendPermissionVerdict, this handles
+    // verdicts from other sources (e.g., terminal responded first).
+    if (!feedContainer) return;
+  }
+
+  // --- Input Bar ---
+
+  function sendMessage() {
+    if (!inputEl || !channelConnected) return;
+    var text = inputEl.value.trim();
+    if (!text) return;
+
+    inputEl.disabled = true;
+    sendBtn.disabled = true;
+
+    fetch("/api/channel/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: text, meta: { type: "message" } }),
+    })
+      .then(function () {
+        inputEl.value = "";
+        inputEl.style.height = "auto";
+      })
+      .catch(function () {
+        // Leave text in input so user can retry
+      })
+      .finally(function () {
+        if (channelConnected) {
+          inputEl.disabled = false;
+          sendBtn.disabled = false;
+          inputEl.focus();
+        }
+      });
+  }
+
+  if (inputEl) {
+    inputEl.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" && !ev.shiftKey) {
+        ev.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // Auto-resize textarea
+    inputEl.addEventListener("input", function () {
+      inputEl.style.height = "auto";
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 96) + "px";
+    });
+  }
+
+  if (sendBtn) {
+    sendBtn.addEventListener("click", sendMessage);
+  }
+
+  // Start disconnected — channel.ts will broadcast status when connected
+  setChannelStatus(false);
   connect();
 })();
