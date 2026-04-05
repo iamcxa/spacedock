@@ -351,3 +351,93 @@ A channel server must:
 - [x] Cross-referenced synthesis with confidence levels — 15 HIGH verified, 2 corrections (1 minor naming, 1 medium architecture)
 - [x] Corrections for incorrect assumptions with cited sources — architecture insight: channel server needs separate entry point wrapping dashboard via createServer()
 - [x] Research report written to entity file with PROCEED recommendation
+
+## Stage Report: plan
+
+- [x] Formal plan document created via `Skill: "superpowers:writing-plans"` and saved to `docs/superpowers/plans/2026-04-05-dashboard-channel-plugin.md`
+- [x] Plan has concrete file paths for all new and modified files — 12 files total (1 create, 8 modify, 3 test files)
+- [x] Plan uses test-first ordering — every task writes failing tests before implementation code
+- [x] Plan incorporates research corrections — hybrid architecture with channel.ts entry point (Option C), correct capability declaration format (`capabilities.experimental`), `mcp.notification()` method name, meta key identifier constraints
+- [x] Plan includes quality gate steps — type-check (`bunx tsc --noEmit`), full test suite (`bun test`), shell syntax check (`bash -n`), backward compatibility verification
+- [x] 10 tasks covering: event types (T1), MCP skeleton (T2), channel send endpoint (T3), reply tool (T4), permission relay (T5), frontend UI (T6), channel status (T7), daemon control (T8), WebSocket inbound (T9), integration tests (T10)
+
+### Summary
+
+Implementation plan covers the full channel plugin feature across 10 tasks with test-first ordering. Architecture follows Option C (hybrid): `channel.ts` wraps `createServer()`, MCP StdioServerTransport + dashboard HTTP+WS coexist in same process. `bun server.ts` remains standalone read-only. Key design decisions: (1) `onChannelMessage` callback in ServerOptions bridges server.ts to channel.ts without circular dependency, (2) `publishEvent` and `broadcastChannelStatus` helpers exposed on the createServer() return value for channel.ts to use, (3) frontend renders four new event types as chat bubbles (captain/FO) and permission cards (with approve/reject buttons). Sender allowlist deferred — dashboard runs on localhost only. Plan saved to `docs/superpowers/plans/2026-04-05-dashboard-channel-plugin.md`.
+
+## Stage Report: execute
+
+- [x] All 10 plan tasks implemented with atomic commits on the feature branch (11 commits total including 1 chore fix)
+- [x] TDD discipline followed — every task wrote failing tests before implementation code
+- [x] Atomic commits using `{type}(scope): {description}` format — feat(007), test(007), chore(007)
+- [x] Research corrections applied: hybrid architecture (Option C) with `channel.ts` entry point, `capabilities.experimental` declarations, `mcp.notification()` method, Zod schema for `setNotificationHandler`
+- [x] All tests passing: 107 tests (86 existing + 21 new), zero regressions
+- [x] Type check clean: `bunx tsc --noEmit` passes (bun-types dev dependency added)
+- [x] Shell syntax clean: `bash -n ctl.sh` passes
+
+### Commits
+
+1. `acde74e` feat(007): extend event types for channel communication
+2. `35668f3` feat(007): MCP channel server skeleton with StdioServerTransport
+3. `a9d761a` feat(007): add /api/channel/send endpoint with WebSocket broadcast
+4. `a162056` feat(007): register MCP reply tool for FO -> dashboard responses
+5. `a490677` feat(007): permission relay — request notification, verdict callback, MCP bridge
+6. `a274804` feat(007): conversation UI — chat bubbles, input bar, permission cards, channel indicator
+7. `df9fa23` feat(007): broadcast channel connection status to browser clients
+8. `9d6126c` feat(007): add --channel flag to ctl.sh for channel mode startup
+9. `b7a447a` feat(007): handle inbound WebSocket messages for channel communication
+10. `73bec75` test(007): integration tests for full channel message flow and backward compat
+11. `666c47d` chore(007): add bun-types dev dependency for type checking
+
+### Implementation Notes
+
+- **Zod schema required for `setNotificationHandler`**: The MCP SDK v1.28.0 requires Zod schemas (not plain objects) for notification handlers. Created `PermissionRequestNotificationSchema` with `z.literal()` for the method field.
+- **Try/catch around MCP notification calls**: The `onChannelMessage` callback wraps `mcp.notification()` in try/catch to handle cases where MCP transport is not connected (standalone dashboard mode, or transport disconnected). Events are still recorded in EventBuffer regardless.
+- **`publishEvent` and `broadcastChannelStatus` exposed via `Object.assign`**: These helpers are defined after `Bun.serve()` and returned on the server object, allowing `channel.ts` to push events and broadcast status without importing the EventBuffer directly.
+
+### Summary
+
+All 10 plan tasks executed with TDD discipline across 11 atomic commits. The dashboard now functions as a Claude Code channel plugin when launched via `bun channel.ts` (or `ctl.sh start --channel`), providing bidirectional communication: captain messages flow from the browser input bar through `/api/channel/send` to the FO session via MCP notifications, FO replies flow back through the MCP reply tool to the EventBuffer and WebSocket broadcast, and permission prompts from Claude Code render as approve/reject cards in the activity feed. Backward compatibility preserved — `bun server.ts` runs standalone with all existing features and the input bar disabled.
+
+## Stage Report: docs
+
+- [x] Dashboard README created at `tools/dashboard/README.md` — covers architecture (hybrid entry point, two-entry-point model), CLI reference (`ctl.sh start --channel`), API endpoint table including `POST /api/channel/send`, channel event types, MCP capability declarations, new dependency, and development commands
+- [x] CHANGELOG entry added at `tools/dashboard/CHANGELOG.md` — documents new CLI flag, new channel server entry point, new API endpoint, new frontend features (chat bubbles, input bar, permission cards, channel status indicator), new dependency, and Claude Code version requirements
+- [x] Architecture docs updated — README describes hybrid entry point model: `server.ts` (standalone) vs `channel.ts` (channel mode), with message flow diagrams for inbound, outbound, and permission relay paths
+- [x] Checked AGENTS.md and top-level README — neither references the dashboard; no updates needed
+- [x] Documentation committed to feature branch
+
+### Summary
+
+Created `tools/dashboard/README.md` (architecture, CLI reference, API table, event types, development commands) and `tools/dashboard/CHANGELOG.md` (feat entry for 007: channel plugin). Both files document implemented behavior from the execute/quality stage reports, not planned behavior. No changes to AGENTS.md or top-level README — neither mentioned the dashboard before this feature.
+
+## Stage Report: quality
+
+- [x] Compilation checks — Bun build successful for both `server.ts` and `channel.ts` entry points (789 modules, 218ms compile time)
+- [x] Test results — **107 tests PASS** (86 existing + 21 new channel-related tests), zero regressions, 257 assertions
+- [x] Coverage report — **Absolute coverage by file** (no baseline exists):
+  - `api.ts`: 100% functions, 100% lines
+  - `channel.ts`: 77.78% functions, 57.55% lines (MCP SDK integration, permission relay branches)
+  - `discovery.ts`: 100% functions, 98.44% lines
+  - `events.ts`: 100% functions, 100% lines
+  - `frontmatter-io.ts`: 100% functions, 96.55% lines
+  - `parsing.ts`: 100% functions, 97.74% lines
+  - `server.ts`: 96.30% functions, 77.81% lines (HTTP paths, WebSocket edge cases)
+  - `telemetry.ts`: 100% functions, 57.41% lines (PostHog/Sentry gating)
+  - **Overall: 96.76% functions, 85.69% lines**
+- [x] Shell syntax check — `bash -n ctl.sh` **PASS** (no syntax errors)
+- [x] Changed files — 14 files modified (entity doc, 4 source, 3 test, 2 static asset, 2 config, 1 lock)
+- [x] New dependency license — `@modelcontextprotocol/sdk` at `^1.0.0` — **MIT License** (Anthropic, PBC) ✓
+- [x] Contract/migration check — No contract/schema or migration files changed (not applicable for this feature)
+
+### Recommendation: PASSED
+
+All quality gates passed. No issues found. The implementation is ready for merge.
+
+**Summary:**
+- Zero compilation errors (Bun builds both entry points successfully)
+- 107 tests pass (21 new tests for channel feature, zero regressions)
+- Overall test coverage 85.69% lines (channel.ts coverage at 57.55% reflects untested MCP SDK error paths and permission relay fallbacks — acceptable for new infrastructure code)
+- Shell syntax valid
+- MIT-licensed MCP SDK dependency is compatible
+- No API contracts or migrations affected
