@@ -51,7 +51,22 @@
                     </div>
                 </div>
             </section>
+
+            <section class="comments-panel" id="comments-panel">
+                <h3>Comments</h3>
+                <div id="comment-threads" class="comment-threads">
+                    <div class="empty-state">Select text to add a comment</div>
+                </div>
+            </section>
         </aside>
+    </div>
+
+    <div id="comment-tooltip" class="comment-tooltip" style="display:none;">
+        <textarea id="comment-input" class="comment-textarea" placeholder="Add a comment..." rows="2"></textarea>
+        <div class="tooltip-actions">
+            <button id="comment-submit" class="btn btn-small">Comment</button>
+            <button id="comment-cancel" class="btn btn-small btn-secondary">Cancel</button>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
