@@ -3,11 +3,11 @@ id: 008
 title: Dashboard as Standalone Plugin — Independent Packaging & Distribution
 status: explore
 source: session discussion
-started:
+started: 2026-04-05T18:00:00+08:00
 completed:
 verdict:
 score: 0.85
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-standalone-plugin
 issue:
 pr:
 intent: feature
