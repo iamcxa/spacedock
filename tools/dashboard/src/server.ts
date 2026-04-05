@@ -1,11 +1,12 @@
-import { realpathSync, existsSync, appendFileSync } from "node:fs";
+import { realpathSync, existsSync, appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve, sep, dirname } from "node:path";
 import { parseArgs } from "node:util";
 import { discoverWorkflows, aggregateWorkflow } from "./discovery";
 import { getEntityDetail, updateScore, updateTags, filterEntities } from "./api";
 import { EventBuffer } from "./events";
-import type { AgentEvent, AgentEventType } from "./types";
+import type { AgentEvent, AgentEventType, Stage } from "./types";
 import { telemetryInit, captureException, getPosthogJsConfig } from "./telemetry";
+import { updateWorkflowStages } from "./frontmatter-io";
 
 interface ServerOptions {
   port: number;
@@ -215,6 +216,56 @@ export function createServer(opts: ServerOptions) {
             }
             logRequest(req, 200);
             return jsonResponse({ ok: true, seq: entry.seq });
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/workflow/readme": {
+        GET: (req) => {
+          const url = new URL(req.url);
+          const dir = url.searchParams.get("dir");
+          if (!dir) {
+            logRequest(req, 400);
+            return jsonResponse({ error: "dir required" }, 400);
+          }
+          if (!validatePath(dir, projectRoot)) {
+            logRequest(req, 403);
+            return jsonResponse({ error: "Forbidden" }, 403);
+          }
+          const readmePath = join(dir, "README.md");
+          if (!existsSync(readmePath)) {
+            logRequest(req, 404);
+            return jsonResponse({ error: "README.md not found" }, 404);
+          }
+          logRequest(req, 200);
+          return jsonResponse({ path: readmePath });
+        },
+      },
+      "/api/workflow/stages": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as { dir: string; stages: Stage[] };
+            if (!body.dir || !Array.isArray(body.stages)) {
+              logRequest(req, 400);
+              return jsonResponse({ error: "dir and stages[] required" }, 400);
+            }
+            if (!validatePath(body.dir, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const readmePath = join(body.dir, "README.md");
+            if (!existsSync(readmePath)) {
+              logRequest(req, 404);
+              return jsonResponse({ error: "README.md not found" }, 404);
+            }
+            const text = readFileSync(readmePath, "utf-8");
+            const updated = updateWorkflowStages(text, body.stages);
+            writeFileSync(readmePath, updated);
+            logRequest(req, 200);
+            return jsonResponse({ ok: true });
           } catch (err) {
             captureException(err instanceof Error ? err : new Error(String(err)));
             logRequest(req, 500);
