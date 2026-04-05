@@ -61,6 +61,15 @@ export function aggregateWorkflow(workflowDir: string): WorkflowData | null {
   const stages = parseStagesBlock(readmePath) ?? [];
   const entities = scanEntities(workflowDir);
 
+  const archiveDir = join(workflowDir, "_archive");
+  if (existsSync(archiveDir)) {
+    const archivedEntities = scanEntities(archiveDir);
+    for (const e of archivedEntities) {
+      e.archived = "true";
+      entities.push(e);
+    }
+  }
+
   const entityCountByStage: Record<string, number> = {};
   for (const e of entities) {
     const status = e.status;
