@@ -1,4 +1,4 @@
-import type { FrontmatterFields, ParsedEntity, StageReport, StageReportItem } from "./types";
+import type { FrontmatterFields, ParsedEntity, StageReport, StageReportItem, Stage } from "./types";
 
 export function splitFrontmatter(text: string): [FrontmatterFields, string] {
   const lines = text.split("\n");
@@ -139,4 +139,76 @@ export function extractStageReports(text: string): StageReport[] {
     reports.push({ stage: stageName, items, summary });
   }
   return reports;
+}
+
+export function updateWorkflowStages(text: string, stages: Stage[]): string {
+  const lines = text.split("\n");
+  if (!lines.length || lines[0].trim() !== "---") {
+    throw new Error("Missing YAML frontmatter");
+  }
+
+  // Find frontmatter end
+  let fmEnd: number | null = null;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === "---") {
+      fmEnd = i;
+      break;
+    }
+  }
+  if (fmEnd === null) {
+    throw new Error("Unterminated YAML frontmatter");
+  }
+
+  // Find the "states:" line and its extent within frontmatter
+  let statesStart: number | null = null;
+  let statesEnd: number | null = null;
+  let statesIndent = 0;
+
+  for (let i = 1; i < fmEnd; i++) {
+    const stripped = lines[i].trimStart();
+    if (stripped === "states:") {
+      statesStart = i;
+      statesIndent = lines[i].length - stripped.length;
+      break;
+    }
+  }
+
+  if (statesStart === null) {
+    throw new Error("No states: block found in frontmatter");
+  }
+
+  // Find where states block ends (next line at same or lower indent, or frontmatter end)
+  for (let i = statesStart + 1; i < fmEnd; i++) {
+    const stripped = lines[i].trimStart();
+    if (!stripped) continue;
+    const indent = lines[i].length - stripped.length;
+    if (indent <= statesIndent) {
+      statesEnd = i;
+      break;
+    }
+  }
+  if (statesEnd === null) {
+    statesEnd = fmEnd;
+  }
+
+  // Generate new states lines
+  const pad = " ".repeat(statesIndent + 2);
+  const propPad = " ".repeat(statesIndent + 4);
+  const newStatesLines: string[] = [lines[statesStart]]; // keep "    states:" line as-is
+
+  for (const stage of stages) {
+    newStatesLines.push(`${pad}- name: ${stage.name}`);
+    if (stage.initial) newStatesLines.push(`${propPad}initial: true`);
+    if (stage.terminal) newStatesLines.push(`${propPad}terminal: true`);
+    if (stage.gate) newStatesLines.push(`${propPad}gate: true`);
+    if (stage.conditional) newStatesLines.push(`${propPad}conditional: true`);
+    if (stage.feedback_to) newStatesLines.push(`${propPad}feedback-to: ${stage.feedback_to}`);
+    if (!stage.worktree) newStatesLines.push(`${propPad}worktree: false`);
+    if (stage.model) newStatesLines.push(`${propPad}model: ${stage.model}`);
+  }
+
+  // Splice: replace statesStart..statesEnd with new lines
+  const before = lines.slice(0, statesStart);
+  const after = lines.slice(statesEnd);
+  return [...before, ...newStatesLines, ...after].join("\n");
 }
