@@ -7,7 +7,7 @@ started:
 completed:
 verdict:
 score: 0.9
-worktree:
+worktree: .worktrees/ensign-dashboard-entity-visibility
 issue:
 pr:
 intent: feature
