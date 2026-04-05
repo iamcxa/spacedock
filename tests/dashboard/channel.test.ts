@@ -57,4 +57,46 @@ describe("Channel Server", () => {
     expect(serverInfo.name).toBe("spacedock-dashboard");
     result.dashboard.stop();
   });
+
+  test("MCP server has tools/list handler registered", async () => {
+    const { createChannelServer } = await import("../../tools/dashboard/src/channel");
+    const result = createChannelServer({
+      port: 0,
+      projectRoot: tmpDir,
+      staticDir: join(tmpDir, "static"),
+    });
+    const handler = (result.mcp as any)._requestHandlers?.get("tools/list");
+    expect(handler).toBeDefined();
+    result.dashboard.stop();
+  });
+
+  test("reply tool call pushes channel_response to EventBuffer", async () => {
+    const { createChannelServer } = await import("../../tools/dashboard/src/channel");
+    const result = createChannelServer({
+      port: 0,
+      projectRoot: tmpDir,
+      staticDir: join(tmpDir, "static"),
+    });
+
+    const handler = (result.mcp as any)._requestHandlers?.get("tools/call");
+    expect(handler).toBeDefined();
+
+    if (handler) {
+      await handler({
+        method: "tools/call",
+        params: {
+          name: "reply",
+          arguments: { content: "Gate approved, proceeding with plan stage" },
+        },
+      });
+    }
+
+    const events = result.dashboard.eventBuffer.getAll();
+    const responseEvents = events.filter((e: any) => e.event.type === "channel_response");
+    expect(responseEvents.length).toBeGreaterThanOrEqual(1);
+    expect(responseEvents[responseEvents.length - 1].event.detail).toBe(
+      "Gate approved, proceeding with plan stage"
+    );
+    result.dashboard.stop();
+  });
 });
