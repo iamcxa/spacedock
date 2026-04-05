@@ -414,6 +414,20 @@ describe("Dashboard Server", () => {
     expect(data.ok).toBe(true);
   });
 
+  test("POST /api/channel/send with permission_response meta type", async () => {
+    const res = await fetch(`${baseUrl}/api/channel/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: "allow",
+        meta: { type: "permission_response", request_id: "abcde" },
+      }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+  });
+
   // --- Observability Tests ---
 
   test("GET /api/config returns posthog config shape", async () => {

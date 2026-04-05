@@ -4,8 +4,19 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
 import { createServer } from "./server";
 import type { AgentEvent } from "./types";
+
+const PermissionRequestNotificationSchema = z.object({
+  method: z.literal("notifications/claude/channel/permission_request"),
+  params: z.object({
+    request_id: z.string(),
+    tool_name: z.string(),
+    description: z.string(),
+    input_preview: z.string().optional(),
+  }),
+});
 
 interface ChannelServerOptions {
   port: number;
@@ -28,11 +39,30 @@ export function createChannelServer(opts: ChannelServerOptions) {
     }
   );
 
+  async function sendPermissionVerdict(requestId: string, behavior: "allow" | "deny") {
+    await mcp.notification({
+      method: "notifications/claude/channel/permission",
+      params: { request_id: requestId, behavior },
+    });
+  }
+
   const dashboard = createServer({
     port: opts.port,
     projectRoot: opts.projectRoot,
     staticDir: opts.staticDir,
     logFile: opts.logFile,
+    onChannelMessage: async (content, meta) => {
+      if (meta?.type === "permission_response" && meta?.request_id) {
+        const behavior = content === "allow" ? "allow" : "deny";
+        await sendPermissionVerdict(meta.request_id, behavior as "allow" | "deny");
+      } else {
+        // Forward message to FO session via MCP channel notification
+        await mcp.notification({
+          method: "notifications/claude/channel",
+          params: { content, meta: meta ?? {} },
+        });
+      }
+    },
   });
 
   // Register the reply tool — FO calls this to send responses back to the browser
@@ -77,7 +107,24 @@ export function createChannelServer(opts: ChannelServerOptions) {
     return { content: [{ type: "text", text: `Unknown tool: ${request.params.name}` }], isError: true };
   });
 
-  return { mcp, dashboard };
+  // Permission relay: Claude Code -> dashboard -> captain -> Claude Code
+  mcp.setNotificationHandler(
+    PermissionRequestNotificationSchema,
+    async (notification) => {
+      const params = notification.params;
+      const event: AgentEvent = {
+        type: "permission_request",
+        entity: "",
+        stage: "",
+        agent: "claude",
+        timestamp: new Date().toISOString(),
+        detail: JSON.stringify(params),
+      };
+      dashboard.publishEvent(event);
+    }
+  );
+
+  return { mcp, dashboard, sendPermissionVerdict };
 }
 
 // CLI entry point — only runs when executed directly (spawned by Claude Code)

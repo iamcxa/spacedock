@@ -99,4 +99,49 @@ describe("Channel Server", () => {
     );
     result.dashboard.stop();
   });
+
+  test("permission_request notification pushes event to EventBuffer", async () => {
+    const { createChannelServer } = await import("../../tools/dashboard/src/channel");
+    const result = createChannelServer({
+      port: 0,
+      projectRoot: tmpDir,
+      staticDir: join(tmpDir, "static"),
+    });
+
+    const handler = (result.mcp as any)._notificationHandlers?.get(
+      "notifications/claude/channel/permission_request"
+    );
+    expect(handler).toBeDefined();
+
+    if (handler) {
+      await handler({
+        method: "notifications/claude/channel/permission_request",
+        params: {
+          request_id: "abcde",
+          tool_name: "Bash",
+          description: "Execute a shell command",
+          input_preview: "git push origin main",
+        },
+      });
+    }
+
+    const events = result.dashboard.eventBuffer.getAll();
+    const permEvents = events.filter((e: any) => e.event.type === "permission_request");
+    expect(permEvents.length).toBeGreaterThanOrEqual(1);
+    const last = permEvents[permEvents.length - 1].event;
+    expect(last.detail).toContain("abcde");
+    expect(last.detail).toContain("Bash");
+    result.dashboard.stop();
+  });
+
+  test("sendPermissionVerdict is returned from createChannelServer", async () => {
+    const { createChannelServer } = await import("../../tools/dashboard/src/channel");
+    const result = createChannelServer({
+      port: 0,
+      projectRoot: tmpDir,
+      staticDir: join(tmpDir, "static"),
+    });
+    expect(typeof result.sendPermissionVerdict).toBe("function");
+    result.dashboard.stop();
+  });
 });
