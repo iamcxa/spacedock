@@ -9,6 +9,9 @@ export interface Stage {
   gate: boolean;
   terminal: boolean;
   initial: boolean;
+  feedback_to: string;
+  conditional: boolean;
+  model: string;
 }
 
 export interface Entity {
