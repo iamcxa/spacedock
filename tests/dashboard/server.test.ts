@@ -556,4 +556,41 @@ describe("Event Pipeline Integration", () => {
     expect(gateEvent).toBeDefined();
     expect(gateEvent.event.type).toBe("gate");
   });
+
+  test("WebSocket message with channel_send type pushes event", async () => {
+    const ws = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
+    await new Promise<void>((r) => { ws.onopen = () => r(); });
+
+    // Skip replay
+    await new Promise<void>((r) => {
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data as string);
+        if (msg.type === "replay") r();
+      };
+      setTimeout(r, 500);
+    });
+
+    const liveMessages: any[] = [];
+    const gotLive = new Promise<void>((r) => {
+      ws.onmessage = (ev) => {
+        liveMessages.push(JSON.parse(ev.data as string));
+        r();
+      };
+      setTimeout(r, 2000);
+    });
+
+    // Send a channel message via WebSocket
+    ws.send(JSON.stringify({
+      type: "channel_send",
+      content: "ws-direct-msg",
+      meta: { type: "message" },
+    }));
+
+    await gotLive;
+    ws.close();
+
+    expect(liveMessages.length).toBeGreaterThanOrEqual(1);
+    expect(liveMessages[0].data.event.type).toBe("channel_message");
+    expect(liveMessages[0].data.event.detail).toBe("ws-direct-msg");
+  });
 });

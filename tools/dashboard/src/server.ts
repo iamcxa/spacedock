@@ -247,8 +247,35 @@ export function createServer(opts: ServerOptions) {
         const events = eventBuffer.getAll();
         ws.send(JSON.stringify({ type: "replay", events }));
       },
-      message(_ws, _message) {
-        // Reserved for future bidirectional communication (gate approval)
+      message(_ws, message) {
+        try {
+          const data = JSON.parse(String(message)) as {
+            type?: string;
+            content?: string;
+            meta?: Record<string, string>;
+          };
+          if (data.type === "channel_send" && data.content) {
+            const metaType = data.meta?.type;
+            const eventType: AgentEventType = metaType === "permission_response"
+              ? "permission_response"
+              : "channel_message";
+            const event: AgentEvent = {
+              type: eventType,
+              entity: data.meta?.entity ?? "",
+              stage: data.meta?.stage ?? "",
+              agent: "captain",
+              timestamp: new Date().toISOString(),
+              detail: data.content,
+            };
+            const entry = eventBuffer.push(event);
+            server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+            if (opts.onChannelMessage) {
+              opts.onChannelMessage(data.content, data.meta);
+            }
+          }
+        } catch {
+          // Ignore malformed messages
+        }
       },
       close(ws) {
         ws.unsubscribe("activity");
