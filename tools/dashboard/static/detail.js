@@ -223,6 +223,7 @@ function loadEntity() {
             renderStageReports(data.stage_reports);
             renderTags(data.tags);
             initScore(data.frontmatter.score || '0');
+            if (typeof loadComments === 'function') loadComments();
         });
 }
 
@@ -299,8 +300,8 @@ document.getElementById('entity-body').addEventListener('mouseup', function () {
 function showCommentTooltip(rect) {
     commentInput.value = '';
     commentTooltip.style.display = '';
-    commentTooltip.style.top = (rect.bottom + window.scrollY + 8) + 'px';
-    commentTooltip.style.left = Math.max(8, rect.left + window.scrollX) + 'px';
+    commentTooltip.style.top = (rect.bottom + 8) + 'px';
+    commentTooltip.style.left = Math.max(8, rect.left) + 'px';
     commentInput.focus();
 }
 
@@ -534,22 +535,3 @@ function rejectSuggestionAction(suggestionId) {
     });
 }
 
-// Override loadEntity to also load comments after entity data loads
-var _originalLoadEntity = loadEntity;
-loadEntity = function () {
-    if (!entityPath) return;
-    apiFetch('/api/entity/detail?path=' + encodeURIComponent(entityPath))
-        .then(function (data) {
-            document.getElementById('entity-title').textContent = data.frontmatter.title || '(untitled)';
-            document.title = (data.frontmatter.title || 'Entity') + ' \u2014 Spacedock';
-            renderMetadata(data.frontmatter);
-            renderBody(data.body);
-            renderStageReports(data.stage_reports);
-            renderTags(data.tags);
-            initScore(data.frontmatter.score || '0');
-            loadComments();
-        });
-};
-
-// Re-trigger with comments support
-loadEntity();
