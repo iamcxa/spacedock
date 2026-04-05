@@ -76,4 +76,60 @@ describe("EventBuffer", () => {
       buf.push({ type: "invalid" as any, entity: "a", stage: "s", agent: "e", timestamp: "t" });
     }).toThrow();
   });
+
+  test("push accepts channel_message event type", () => {
+    const buf = new EventBuffer(10);
+    const entry = buf.push({
+      type: "channel_message",
+      entity: "",
+      stage: "",
+      agent: "captain",
+      timestamp: "2026-04-05T10:00:00Z",
+      detail: "Hello FO",
+    });
+    expect(entry.seq).toBe(1);
+    expect(entry.event.type).toBe("channel_message");
+  });
+
+  test("push accepts channel_response event type", () => {
+    const buf = new EventBuffer(10);
+    const entry = buf.push({
+      type: "channel_response",
+      entity: "",
+      stage: "",
+      agent: "fo",
+      timestamp: "2026-04-05T10:01:00Z",
+      detail: "Acknowledged, scanning now",
+    });
+    expect(entry.seq).toBe(1);
+    expect(entry.event.type).toBe("channel_response");
+  });
+
+  test("push accepts permission_request event type", () => {
+    const buf = new EventBuffer(10);
+    const entry = buf.push({
+      type: "permission_request",
+      entity: "",
+      stage: "",
+      agent: "claude",
+      timestamp: "2026-04-05T10:02:00Z",
+      detail: "Bash: git push origin main",
+    });
+    expect(entry.seq).toBe(1);
+    expect(entry.event.type).toBe("permission_request");
+  });
+
+  test("push accepts permission_response event type", () => {
+    const buf = new EventBuffer(10);
+    const entry = buf.push({
+      type: "permission_response",
+      entity: "",
+      stage: "",
+      agent: "captain",
+      timestamp: "2026-04-05T10:03:00Z",
+      detail: "allow",
+    });
+    expect(entry.seq).toBe(1);
+    expect(entry.event.type).toBe("permission_response");
+  });
 });

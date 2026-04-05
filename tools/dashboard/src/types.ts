@@ -72,7 +72,8 @@ export interface FilterOptions {
 
 // --- Activity Feed Events ---
 
-export type AgentEventType = "dispatch" | "completion" | "gate" | "feedback" | "merge" | "idle";
+export type AgentEventType = "dispatch" | "completion" | "gate" | "feedback" | "merge" | "idle"
+  | "channel_message" | "channel_response" | "permission_request" | "permission_response";
 
 export interface AgentEvent {
   type: AgentEventType;
@@ -86,4 +87,21 @@ export interface AgentEvent {
 export interface SequencedEvent {
   seq: number;
   event: AgentEvent;
+}
+
+export interface ChannelMessage {
+  content: string;
+  meta?: Record<string, string>;
+}
+
+export interface PermissionRequest {
+  request_id: string;
+  tool_name: string;
+  description: string;
+  input_preview?: string;
+}
+
+export interface PermissionVerdict {
+  request_id: string;
+  behavior: "allow" | "deny";
 }
