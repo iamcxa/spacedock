@@ -1,7 +1,7 @@
 ---
 id: 007
 title: Dashboard as Channel Plugin — Interactive Workflow Control
-status: pr-draft
+status: pr-review
 source: brainstorming session
 started: 2026-04-05T01:22:00Z
 completed:
@@ -9,7 +9,7 @@ verdict:
 score: 0.95
 worktree: .worktrees/ensign-dashboard-channel-plugin
 issue:
-pr:
+pr: '#32'
 intent: feature
 scale: Medium
 project: spacedock
