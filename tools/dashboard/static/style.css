@@ -61,6 +61,12 @@ h1 { font-size: 1.5rem; color: #f0f6fc; }
     border-radius: 3px;
     background: #21262d;
     color: #8b949e;
+    cursor: pointer;
+}
+
+.stage-chip--active {
+    background: #58a6ff33;
+    border: 1px solid #58a6ff;
 }
 
 .stage-chip .count {
@@ -103,6 +109,9 @@ tr:hover td { background: #1c2128; }
     border-radius: 3px;
     font-weight: 500;
 }
+
+.entity-row--archived { opacity: 0.5; }
+.entity-row--archived .status-badge { background: #21262d !important; color: #8b949e !important; }
 
 .loading { color: #8b949e; text-align: center; padding: 2rem; }
 .empty-state { color: #8b949e; text-align: center; padding: 1rem; }

@@ -25,6 +25,26 @@
   var POLL_INTERVAL = 5000;
   var container = document.getElementById("workflows-container");
   var sortState = {};
+  var filterState = (function loadFilterState() {
+    try {
+      var raw = sessionStorage.getItem("dashboardFilterState");
+      if (!raw) return {};
+      var parsed = JSON.parse(raw);
+      var result = {};
+      Object.keys(parsed).forEach(function (k) {
+        result[k] = new Set(parsed[k]);
+      });
+      return result;
+    } catch (_) { return {}; }
+  })();
+
+  function saveFilterState() {
+    var serializable = {};
+    Object.keys(filterState).forEach(function (k) {
+      serializable[k] = Array.from(filterState[k]);
+    });
+    try { sessionStorage.setItem("dashboardFilterState", JSON.stringify(serializable)); } catch (_) {}
+  }
 
   function fetchWorkflows() {
     fetch("/api/workflows")
@@ -105,19 +125,36 @@
       card.appendChild(el("div", { className: "workflow-meta", textContent: metaText }));
 
       var pipeline = el("div", { className: "stage-pipeline" });
+      var activeFilters = filterState[wfIdx] || new Set();
       wf.stages.forEach(function (stage) {
         var count = (wf.entity_count_by_stage || {})[stage.name] || 0;
-        var chip = el("span", { className: "stage-chip" }, [
+        var isActive = activeFilters.has(stage.name);
+        var chipClass = "stage-chip" + (isActive ? " stage-chip--active" : "");
+        var chip = el("span", { className: chipClass }, [
           stage.name,
           el("span", { className: "count", textContent: String(count) })
         ]);
+        chip.addEventListener("click", function () {
+          if (!filterState[wfIdx]) filterState[wfIdx] = new Set();
+          if (filterState[wfIdx].has(stage.name)) {
+            filterState[wfIdx].delete(stage.name);
+          } else {
+            filterState[wfIdx].add(stage.name);
+          }
+          saveFilterState();
+          fetchWorkflows();
+        });
         pipeline.appendChild(chip);
       });
       card.appendChild(pipeline);
 
       if (wf.entities.length > 0) {
+        var filters = filterState[wfIdx] || new Set();
+        var filtered = filters.size > 0
+          ? wf.entities.filter(function (e) { return filters.has(e.status); })
+          : wf.entities;
         var sort = sortState[wfIdx] || { column: "id", asc: true };
-        var sorted = sortEntities(wf.entities, sort.column, sort.asc);
+        var sorted = sortEntities(filtered, sort.column, sort.asc);
         var columns = ["id", "slug", "status", "title", "score", "source"];
 
         var table = document.createElement("table");
@@ -146,7 +183,11 @@
 
         var tbody = document.createElement("tbody");
         sorted.forEach(function (e) {
+          var isArchived = e.archived === "true" || e.status === "shipped";
           var row = document.createElement("tr");
+          if (isArchived) {
+            row.className = "entity-row--archived";
+          }
           if (e.path) {
             row.style.cursor = "pointer";
             row.addEventListener("click", function () {
