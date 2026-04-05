@@ -26,9 +26,11 @@ stages:
     - name: execute
       model: opus
     - name: quality
-      gate: true
       feedback-to: execute
       model: haiku
+      # NOT a gate. Auto-advances when all checks pass.
+      # Escalates to captain ONLY for: security findings, breaking API,
+      # destructive migration, or 3 failed feedback rounds.
     - name: seeding
       model: sonnet
       # CONDITIONAL: only when e2e needs test data not yet present
@@ -60,6 +62,12 @@ stages:
 A development pipeline that takes a brainstormed idea through codebase exploration, technical research, planning, implementation, quality gates, E2E testing, and PR creation. Designed for use across projects: Spacedock, Carlove, Recce, and others.
 
 Features enter this workflow with a completed brainstorming spec (produced by `/build` skill's interactive Phase I). The spec contains the approach, alternatives considered, guardrails, and acceptance criteria. From here, the pipeline is fully autonomous — the first officer dispatches ensigns through each stage, only escalating to the captain at quality and pr-review gates when issues arise.
+
+## Context Lake Protocol
+
+See [CONTEXT-LAKE-PROTOCOL.md](./_docs/CONTEXT-LAKE-PROTOCOL.md) for the full specification of how ensigns use the context lake MCP tools (`store_insight`, `search_insights`, `invalidate_stale`) for cross-stage knowledge transfer.
+
+**Quick summary:** Explore stores file-level insights (`source: read`), research/execute overwrite with verified knowledge (`source: manual`). Every ensign searches `file_path` exact match (freshness 30 days) before starting work. Content uses 5 lightweight tags: `[purpose]`, `[pattern]`, `[gotcha]`, `[correction]`, `[decision]`.
 
 ## Model Dispatch
 
@@ -248,7 +256,7 @@ Implement the plan using Superpowers executing-plans skill with parallel worker 
 
 ### `quality`
 
-Run quality gate checks, security analysis, and engineering standards verification. This is an approval gate — the first officer presents results to the captain if checks fail after 3 feedback rounds with execute.
+Run quality gate checks, security analysis, and engineering standards verification. **Not a gate** — auto-advances when all checks pass. Escalates to captain only for exceptional situations (security findings, breaking API changes, destructive migrations, or 3 failed feedback rounds).
 
 - **Inputs:** Feature branch with implementation commits
 - **Outputs:**
@@ -398,13 +406,13 @@ Run quality gate checks, security analysis, and engineering standards verificati
   - **License Compliance** (conditional: when lockfile/deps changed):
     - New dependencies checked for license compatibility
     - Flag: GPL/AGPL in MIT-licensed project, unknown licenses, no license
-  - **Gate decision:**
-    - All checks pass + zero confirmed security findings → auto-advance
-    - Compilation/test failures → feedback-to: execute (max 3 rounds)
+  - **Advance decision:**
+    - All checks pass + zero confirmed security findings → **auto-advance** (no captain approval needed)
+    - Compilation/test failures → feedback-to: execute (max 3 rounds, then escalate)
     - Coverage delta beyond tolerance (default -2%) or new files with 0% coverage → feedback-to: execute (add tests for flagged files)
-    - Confirmed security findings → present to captain with severity assessment
-    - Breaking API change → present to captain (intentional or not?)
-    - Data-destructive migration → present to captain
+    - Confirmed security findings → **escalate to captain** with severity assessment
+    - Breaking API change → **escalate to captain** (intentional or not?)
+    - Data-destructive migration → **escalate to captain**
 - **Good:** All checks ran for affected scope, security scans completed, false positives filtered out, coverage maintained, breaking changes flagged
 - **Bad:** Only partial checks, skipping security scans, ignoring coverage drop, treating all findings as blockers without fp-check
 

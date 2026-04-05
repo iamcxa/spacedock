@@ -3,6 +3,14 @@ import { join, resolve, sep, dirname } from "node:path";
 import { parseArgs } from "node:util";
 import { discoverWorkflows, aggregateWorkflow } from "./discovery";
 import { getEntityDetail, updateScore, updateTags, filterEntities } from "./api";
+import {
+  getComments,
+  addComment,
+  addSuggestion,
+  resolveComment,
+  acceptSuggestion as acceptSuggestionAction,
+  rejectSuggestion as rejectSuggestionAction,
+} from "./comments";
 import { EventBuffer } from "./events";
 import type { AgentEvent, AgentEventType } from "./types";
 import { telemetryInit, captureException, getPosthogJsConfig } from "./telemetry";
@@ -152,6 +160,161 @@ export function createServer(opts: ServerOptions) {
           }
         },
       },
+      "/api/entity/comments": {
+        GET: (req) => {
+          const url = new URL(req.url);
+          const filepath = url.searchParams.get("path");
+          if (!filepath) {
+            logRequest(req, 400);
+            return jsonResponse({ error: "path required" }, 400);
+          }
+          if (!validatePath(filepath, projectRoot)) {
+            logRequest(req, 403);
+            return jsonResponse({ error: "Forbidden" }, 403);
+          }
+          try {
+            const thread = getComments(filepath);
+            logRequest(req, 200);
+            return jsonResponse(thread);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/comment": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as {
+              path: string;
+              selected_text: string;
+              section_heading: string;
+              content: string;
+            };
+            if (!body.path) return jsonResponse({ error: "Missing field: path" }, 400);
+            if (!body.selected_text) return jsonResponse({ error: "Missing field: selected_text" }, 400);
+            if (typeof body.section_heading !== "string") return jsonResponse({ error: "Missing field: section_heading" }, 400);
+            if (!body.content) return jsonResponse({ error: "Missing field: content" }, 400);
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const comment = addComment(body.path, {
+              selected_text: body.selected_text,
+              section_heading: body.section_heading,
+              content: body.content,
+            });
+            logRequest(req, 200);
+            return jsonResponse(comment);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/comment/resolve": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as { path: string; comment_id: string };
+            if (!body.path) return jsonResponse({ error: "Missing field: path" }, 400);
+            if (!body.comment_id) return jsonResponse({ error: "Missing field: comment_id" }, 400);
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const comment = resolveComment(body.path, body.comment_id);
+            logRequest(req, 200);
+            return jsonResponse(comment);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/suggestion": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as {
+              path: string;
+              comment_id: string;
+              diff_from: string;
+              diff_to: string;
+            };
+            if (!body.path) return jsonResponse({ error: "Missing field: path" }, 400);
+            if (!body.comment_id) return jsonResponse({ error: "Missing field: comment_id" }, 400);
+            if (!body.diff_from) return jsonResponse({ error: "Missing field: diff_from" }, 400);
+            if (!body.diff_to) return jsonResponse({ error: "Missing field: diff_to" }, 400);
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const suggestion = addSuggestion(body.path, {
+              comment_id: body.comment_id,
+              diff_from: body.diff_from,
+              diff_to: body.diff_to,
+            });
+            logRequest(req, 200);
+            return jsonResponse(suggestion);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/suggestion/accept": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as { path: string; comment_id: string; suggestion_id: string };
+            if (!body.path) return jsonResponse({ error: "Missing field: path" }, 400);
+            if (!body.comment_id) return jsonResponse({ error: "Missing field: comment_id" }, 400);
+            if (!body.suggestion_id) return jsonResponse({ error: "Missing field: suggestion_id" }, 400);
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const suggestion = acceptSuggestionAction(body.path, body.suggestion_id);
+            logRequest(req, 200);
+            return jsonResponse(suggestion);
+          } catch (err) {
+            if (err instanceof Error && err.message.includes("not found")) {
+              if (err.message.includes("Text not found in entity body")) {
+                logRequest(req, 409);
+                return jsonResponse({ error: "Conflict: " + err.message }, 409);
+              }
+              logRequest(req, 404);
+              return jsonResponse({ error: err.message }, 404);
+            }
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/suggestion/reject": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as { path: string; comment_id: string; suggestion_id: string };
+            if (!body.path) return jsonResponse({ error: "Missing field: path" }, 400);
+            if (!body.comment_id) return jsonResponse({ error: "Missing field: comment_id" }, 400);
+            if (!body.suggestion_id) return jsonResponse({ error: "Missing field: suggestion_id" }, 400);
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const suggestion = rejectSuggestionAction(body.path, body.suggestion_id);
+            logRequest(req, 200);
+            return jsonResponse(suggestion);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
       "/api/config": {
         GET: (req) => {
           const posthog = getPosthogJsConfig();
@@ -246,6 +409,7 @@ export function createServer(opts: ServerOptions) {
         ws.subscribe("activity");
         const events = eventBuffer.getAll();
         ws.send(JSON.stringify({ type: "replay", events }));
+        ws.send(JSON.stringify({ type: "channel_status", connected: channelConnected }));
       },
       message(_ws, message) {
         try {
@@ -335,7 +499,9 @@ export function createServer(opts: ServerOptions) {
     return entry.seq;
   }
 
+  let channelConnected = false;
   function broadcastChannelStatus(connected: boolean) {
+    channelConnected = connected;
     server.publish("activity", JSON.stringify({ type: "channel_status", connected }));
   }
 

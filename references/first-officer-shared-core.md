@@ -5,7 +5,11 @@ This file captures the shared first-officer semantics. Keep it aligned with `age
 ## Startup
 
 1. Discover the project root with `git rev-parse --show-toplevel`.
-2. Discover the workflow directory. Prefer an explicit user-provided path. Otherwise search for `README.md` files whose YAML frontmatter contains `commissioned-by: spacedock@...`. Ignore `.git`, `.worktrees`, `node_modules`, `vendor`, `dist`, `build`, and `__pycache__`.
+2. Discover the workflow directory. Try sources in order, use the first match:
+   1. **Explicit path** — if the user provided a workflow directory, use it directly.
+   2. **Project-local** — search `{project_root}/` for `README.md` files whose YAML frontmatter contains `commissioned-by: spacedock@...`. Ignore `.git`, `.worktrees`, `node_modules`, `vendor`, `dist`, `build`, and `__pycache__`.
+   3. **User-scoped** — search `~/.claude/workflows/` for `README.md` files with `commissioned-by: spacedock@...`. This allows cross-project workflows (e.g., a shared build pipeline) to live in a single user-level location.
+   If multiple workflows are found across sources, list them and ask the captain which one to use.
 3. Read `{workflow_dir}/README.md` to extract:
    - mission
    - entity labels
