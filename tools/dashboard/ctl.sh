@@ -12,6 +12,7 @@ PORT=""
 ROOT=""
 STATUS_ALL=false
 LOGS_FOLLOW=false
+CHANNEL_MODE=false
 
 usage() {
     echo "Usage: $(basename "$0") <start|stop|status|logs|restart> [options]"
@@ -19,6 +20,7 @@ usage() {
     echo "Options:"
     echo "  --port PORT    Port to serve on (default: 8420, auto-selects 8420-8429)"
     echo "  --root DIR     Project root (default: git toplevel or cwd)"
+    echo "  --channel      Launch in channel mode (MCP + dashboard, for Claude Code --channels)"
     echo "  --all          (status) Show all dashboard instances"
     echo "  --follow       (logs) Tail the log file"
     echo ""
@@ -38,6 +40,8 @@ while [[ $# -gt 0 ]]; do
             ROOT="$2"; shift 2 ;;
         --all)
             STATUS_ALL=true; shift ;;
+        --channel)
+            CHANNEL_MODE=true; shift ;;
         --follow)
             LOGS_FOLLOW=true; shift ;;
         -h|--help)
@@ -149,7 +153,12 @@ do_start() {
     fi
 
     # Launch daemon
-    nohup bun run tools/dashboard/src/server.ts \
+    local entry_script="tools/dashboard/src/server.ts"
+    if [[ "$CHANNEL_MODE" == "true" ]]; then
+        entry_script="tools/dashboard/src/channel.ts"
+    fi
+
+    nohup bun run "$entry_script" \
         --port "$selected_port" \
         --root "$ROOT" \
         --log-file "$LOG_FILE" \
@@ -166,7 +175,11 @@ do_start() {
     local max_attempts=6
     while [[ $attempts -lt $max_attempts ]]; do
         if curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${selected_port}/" 2>/dev/null | grep -q '200'; then
-            echo "Dashboard running: http://127.0.0.1:${selected_port}/ (PID: ${daemon_pid})"
+            local mode_label=""
+            if [[ "$CHANNEL_MODE" == "true" ]]; then
+                mode_label=" [channel mode]"
+            fi
+            echo "Dashboard running${mode_label}: http://127.0.0.1:${selected_port}/ (PID: ${daemon_pid})"
             return 0
         fi
         sleep 0.5

@@ -4,7 +4,7 @@ import { parseArgs } from "node:util";
 import { discoverWorkflows, aggregateWorkflow } from "./discovery";
 import { getEntityDetail, updateScore, updateTags, filterEntities } from "./api";
 import { EventBuffer } from "./events";
-import type { AgentEvent } from "./types";
+import type { AgentEvent, AgentEventType } from "./types";
 import { telemetryInit, captureException, getPosthogJsConfig } from "./telemetry";
 
 interface ServerOptions {
@@ -12,6 +12,7 @@ interface ServerOptions {
   projectRoot: string;
   staticDir?: string;
   logFile?: string;
+  onChannelMessage?: (content: string, meta?: Record<string, string>) => void;
 }
 
 function validatePath(filepath: string, projectRoot: string): boolean {
@@ -187,6 +188,40 @@ export function createServer(opts: ServerOptions) {
           }
         },
       },
+      "/api/channel/send": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as { content?: string; meta?: Record<string, string> };
+            if (!body.content) {
+              logRequest(req, 400);
+              return jsonResponse({ error: "Missing required field: content" }, 400);
+            }
+            const metaType = body.meta?.type;
+            const eventType: AgentEventType = metaType === "permission_response"
+              ? "permission_response"
+              : "channel_message";
+            const event: AgentEvent = {
+              type: eventType,
+              entity: body.meta?.entity ?? "",
+              stage: body.meta?.stage ?? "",
+              agent: "captain",
+              timestamp: new Date().toISOString(),
+              detail: body.content,
+            };
+            const entry = eventBuffer.push(event);
+            server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+            if (opts.onChannelMessage) {
+              opts.onChannelMessage(body.content, body.meta);
+            }
+            logRequest(req, 200);
+            return jsonResponse({ ok: true, seq: entry.seq });
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
       "/detail": {
         GET: (req) => {
           const filepath = join(staticDir, "detail.html");
@@ -212,8 +247,35 @@ export function createServer(opts: ServerOptions) {
         const events = eventBuffer.getAll();
         ws.send(JSON.stringify({ type: "replay", events }));
       },
-      message(_ws, _message) {
-        // Reserved for future bidirectional communication (gate approval)
+      message(_ws, message) {
+        try {
+          const data = JSON.parse(String(message)) as {
+            type?: string;
+            content?: string;
+            meta?: Record<string, string>;
+          };
+          if (data.type === "channel_send" && data.content) {
+            const metaType = data.meta?.type;
+            const eventType: AgentEventType = metaType === "permission_response"
+              ? "permission_response"
+              : "channel_message";
+            const event: AgentEvent = {
+              type: eventType,
+              entity: data.meta?.entity ?? "",
+              stage: data.meta?.stage ?? "",
+              agent: "captain",
+              timestamp: new Date().toISOString(),
+              detail: data.content,
+            };
+            const entry = eventBuffer.push(event);
+            server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+            if (opts.onChannelMessage) {
+              opts.onChannelMessage(data.content, data.meta);
+            }
+          }
+        } catch {
+          // Ignore malformed messages
+        }
       },
       close(ws) {
         ws.unsubscribe("activity");
@@ -267,7 +329,17 @@ export function createServer(opts: ServerOptions) {
     },
   });
 
-  return server;
+  function publishEvent(event: AgentEvent): number {
+    const entry = eventBuffer.push(event);
+    server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+    return entry.seq;
+  }
+
+  function broadcastChannelStatus(connected: boolean) {
+    server.publish("activity", JSON.stringify({ type: "channel_status", connected }));
+  }
+
+  return Object.assign(server, { eventBuffer, publishEvent, broadcastChannelStatus });
 }
 
 // CLI entry point -- only runs when executed directly
