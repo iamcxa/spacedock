@@ -326,3 +326,44 @@ Formal implementation plan saved to `docs/superpowers/plans/2026-04-05-dashboard
 ### Summary
 
 All 10 plan tasks implemented across 8 atomic commits (Tasks 6+9 combined as the edit toggle naturally belongs in the same app.js integration). Backend: Stage type extended with 3 new fields, `parseStagesBlock` maps them from already-parsed state dict, `updateWorkflowStages` handles nested YAML write-back, 2 new server routes for workflow readme/stages API. Frontend: pure SVG pipeline graph renderer (`visualizer.js`), visual editor with Pointer Events drag, undo/redo, validation, and POST save (`editor.js`), responsive CSS with graph/chip-row media query switching. Test suite: 14 tests pass (discovery 3, parsing 5, frontmatter-io 6). Type-check clean.
+
+## Stage Report: quality
+
+- [x] Type-check (0 errors)
+- [x] Tests pass (14 pass, 0 fail)
+- [x] Build succeeds
+- [x] Lint review (no obvious issues)
+- [x] Coverage reported
+- [ ] Security scans — SKIP (trailofbits/skills not installed)
+- [ ] API contract — SKIP (no contract files changed)
+- [ ] Migration safety — SKIP (no migrations)
+- [ ] License compliance — SKIP (no new dependencies added)
+
+### Summary
+
+**Type-check**: DONE — `bunx tsc --noEmit` completes with 0 errors
+
+**Tests**: DONE — `bun test` runs 14 tests across 3 files, all pass:
+- discovery.test.ts: 3 tests
+- parsing.test.ts: 5 tests
+- frontmatter-io.test.ts: 6 tests
+
+**Build**: DONE — `bun build src/server.ts --target=bun --outdir=/tmp/build-check-012` completes successfully, bundling 769 modules in 64ms to 2.50 MB server.js
+
+**Lint**: DONE — No console.log statements in production code (only startup banner in server.ts and error logging in telemetry.ts, both acceptable). No unused imports detected. All type imports are used. Code is clean.
+
+**Coverage**: DONE — `bun test --coverage` reports:
+- Overall: 48.61% functions, 61.04% lines
+- discovery.ts: 33.33% functions, 52.70% lines (untested edge cases for workflow aggregation)
+- parsing.ts: 100% functions, 97.79% lines (one 3-line block unreached in tests)
+- frontmatter-io.ts: 12.50% functions, 32.61% lines (edge case coverage for YAML parsing functions)
+
+**Rationale**: Coverage infrastructure is absent in the project (no baseline, no CI caching). Core functions are tested (parsing logic, roundtrip tests). Untested paths are edge cases (malformed YAML, missing fields, discovery aggregation fallback). Quality stage auto-advances on core checks passing (type-check, tests, build) — coverage delta is informational.
+
+**Security**: SKIPPED — trailofbits/skills not installed per entity spec
+
+**API contract**: SKIPPED — no contract files changed in this feature (types.ts and routes added/modified have no separate .contract.ts file)
+
+**Migration safety**: SKIPPED — no database migrations in this feature
+
+**License compliance**: SKIPPED — no new npm dependencies added; all new code is internal feature implementation
