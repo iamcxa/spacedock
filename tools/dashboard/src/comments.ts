@@ -97,6 +97,7 @@ export function applyBodyEdit(fileText: string, diffFrom: string, diffTo: string
   if (!bodyPart.includes(diffFrom)) {
     throw new Error("Text not found in entity body: diff_from text not found");
   }
+  // Intentionally replaces only the first occurrence — suggestion targets a specific text selection
   const newBody = bodyPart.replace(diffFrom, diffTo);
   return frontmatterPart + "\n" + newBody;
 }

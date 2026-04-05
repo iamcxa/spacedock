@@ -302,6 +302,19 @@
       }),
     })
       .then(function (res) { return res.json(); })
+      .then(function (comment) {
+        // Create the Suggestion record linked to the comment
+        return fetch("/api/entity/suggestion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            path: entityPath,
+            comment_id: comment.id,
+            diff_from: suggestion.diff_from,
+            diff_to: suggestion.diff_to,
+          }),
+        });
+      })
       .then(function () {
         // Trigger comment reload if on detail page
         if (typeof loadComments === "function") loadComments();
