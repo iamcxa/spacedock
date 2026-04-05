@@ -52,15 +52,19 @@ export function createChannelServer(opts: ChannelServerOptions) {
     staticDir: opts.staticDir,
     logFile: opts.logFile,
     onChannelMessage: async (content, meta) => {
-      if (meta?.type === "permission_response" && meta?.request_id) {
-        const behavior = content === "allow" ? "allow" : "deny";
-        await sendPermissionVerdict(meta.request_id, behavior as "allow" | "deny");
-      } else {
-        // Forward message to FO session via MCP channel notification
-        await mcp.notification({
-          method: "notifications/claude/channel",
-          params: { content, meta: meta ?? {} },
-        });
+      try {
+        if (meta?.type === "permission_response" && meta?.request_id) {
+          const behavior = content === "allow" ? "allow" : "deny";
+          await sendPermissionVerdict(meta.request_id, behavior as "allow" | "deny");
+        } else {
+          // Forward message to FO session via MCP channel notification
+          await mcp.notification({
+            method: "notifications/claude/channel",
+            params: { content, meta: meta ?? {} },
+          });
+        }
+      } catch {
+        // MCP transport not connected — message recorded in EventBuffer but not forwarded
       }
     },
   });
