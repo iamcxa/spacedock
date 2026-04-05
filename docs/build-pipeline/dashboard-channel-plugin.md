@@ -9,7 +9,7 @@ verdict:
 score: 0.95
 worktree: .worktrees/ensign-dashboard-channel-plugin
 issue:
-pr: '#32'
+pr: iamcxa/spacedock#3
 intent: feature
 scale: Medium
 project: spacedock
