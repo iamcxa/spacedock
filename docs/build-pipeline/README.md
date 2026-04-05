@@ -26,9 +26,11 @@ stages:
     - name: execute
       model: opus
     - name: quality
-      gate: true
       feedback-to: execute
       model: haiku
+      # NOT a gate. Auto-advances when all checks pass.
+      # Escalates to captain ONLY for: security findings, breaking API,
+      # destructive migration, or 3 failed feedback rounds.
     - name: seeding
       model: sonnet
       # CONDITIONAL: only when e2e needs test data not yet present
@@ -254,7 +256,7 @@ Implement the plan using Superpowers executing-plans skill with parallel worker 
 
 ### `quality`
 
-Run quality gate checks, security analysis, and engineering standards verification. This is an approval gate — the first officer presents results to the captain if checks fail after 3 feedback rounds with execute.
+Run quality gate checks, security analysis, and engineering standards verification. **Not a gate** — auto-advances when all checks pass. Escalates to captain only for exceptional situations (security findings, breaking API changes, destructive migrations, or 3 failed feedback rounds).
 
 - **Inputs:** Feature branch with implementation commits
 - **Outputs:**
@@ -404,13 +406,13 @@ Run quality gate checks, security analysis, and engineering standards verificati
   - **License Compliance** (conditional: when lockfile/deps changed):
     - New dependencies checked for license compatibility
     - Flag: GPL/AGPL in MIT-licensed project, unknown licenses, no license
-  - **Gate decision:**
-    - All checks pass + zero confirmed security findings → auto-advance
-    - Compilation/test failures → feedback-to: execute (max 3 rounds)
+  - **Advance decision:**
+    - All checks pass + zero confirmed security findings → **auto-advance** (no captain approval needed)
+    - Compilation/test failures → feedback-to: execute (max 3 rounds, then escalate)
     - Coverage delta beyond tolerance (default -2%) or new files with 0% coverage → feedback-to: execute (add tests for flagged files)
-    - Confirmed security findings → present to captain with severity assessment
-    - Breaking API change → present to captain (intentional or not?)
-    - Data-destructive migration → present to captain
+    - Confirmed security findings → **escalate to captain** with severity assessment
+    - Breaking API change → **escalate to captain** (intentional or not?)
+    - Data-destructive migration → **escalate to captain**
 - **Good:** All checks ran for affected scope, security scans completed, false positives filtered out, coverage maintained, breaking changes flagged
 - **Bad:** Only partial checks, skipping security scans, ignoring coverage drop, treating all findings as blockers without fp-check
 
