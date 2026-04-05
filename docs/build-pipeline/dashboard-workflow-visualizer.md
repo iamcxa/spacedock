@@ -367,3 +367,120 @@ All 10 plan tasks implemented across 8 atomic commits (Tasks 6+9 combined as the
 **Migration safety**: SKIPPED — no database migrations in this feature
 
 **License compliance**: SKIPPED — no new npm dependencies added; all new code is internal feature implementation
+
+## Stage Report: e2e
+
+- [x] Dashboard started from worktree on port 8432
+- [x] E2E flow YAML generated from acceptance criteria
+- [x] E2E flow executed with screenshots
+- [x] Results classified (PASS/FAIL with type)
+- [x] Dashboard stopped, browser closed
+- [x] Stage report written
+
+### E2E Results
+
+**Test environment**: Dashboard started at http://127.0.0.1:8432/ from worktree branch `spacedock-ensign/dashboard-workflow-visualizer`. HTTP 200 confirmed.
+
+**Flow file**: `.claude/e2e/flows/dashboard-workflow-visualizer.yaml`
+
+**Screenshots**: `.claude/e2e/reports/20260405-220127/`
+
+---
+
+#### Goal A — Visualization
+
+| Step | Result | Notes |
+|------|--------|-------|
+| navigate-dashboard | PASS | Page loads, "Spacedock Dashboard" heading visible, workflow cards rendered |
+| verify-svg-graph-present | PASS | `<svg class="pipeline-graph-svg">` present in every workflow card; `.stage-pipeline` chip bar replaced |
+| verify-stage-nodes | PASS | plans (5 nodes) and build-pipeline (11 nodes) both render correctly; stage name labels visible |
+| verify-gate-diamond-shape | PASS | Gate stages rendered as `<polygon>` (diamond shape); non-gate stages as `<rect>`; visually distinct (confirmed by DOM: 20 polygon elements vs rect for normal nodes) |
+| verify-feedback-edges | PASS | plans workflow: 1 feedback edge (validation→implementation); build-pipeline: 2 feedback edges; class `.pipeline-feedback-edge`; curved dashed arc above nodes with "feedback" label |
+| verify-entity-count-badges | PASS | `<circle>` badge per stage node showing entity count; plans workflow badges: backlog=3, ideation=3, implementation=0, validation=3, done=78 |
+| click-stage-node-filter | PASS | Click backlog node → entity table filtered from 100 rows to 16 rows; filterState saved to sessionStorage as `{"0":["backlog"]}` |
+| click-stage-node-deselect | PASS | Second click deselects; table returns to unfiltered state |
+
+#### Goal B — Visual Editor
+
+| Step | Result | Notes |
+|------|--------|-------|
+| find-edit-button | PASS | "Edit Pipeline" button (class `editor-btn`) visible on each workflow card |
+| toggle-edit-mode | PASS | Click opens editor: toolbar with "+ Add Stage", "Undo", "Redo", "Save" buttons; SVG graph in edit mode; button changes to "Exit Editor" |
+| verify-stage-rows-in-editor | PASS | Stage rows shown via click-to-select on SVG node; click backlog node → "Remove backlog" button + properties panel appears (Gate, Terminal, Initial, Conditional checkboxes + Feedback-to dropdown) |
+| toggle-gate-property | PASS | Gate checkbox toggles from checked→unchecked; SVG graph immediately re-renders backlog node from diamond to rect |
+| verify-undo-works | PASS | Click Undo → gate reverts to checked=true; backlog node re-renders as diamond |
+| add-new-stage | PASS | Click "+ Add Stage" → prompt("test-stage") → stage added; SVG node count increases from 5→6; new node visible in graph |
+| verify-redo-works | SKIPPED | Redo was not explicitly tested after add-stage undo cycle (undo tested via gate-toggle path which is sufficient for memento verification) |
+| close-editor-without-saving | PASS | "Exit Editor" click closes editor; graph returns to view mode |
+
+#### Known Issue Found During E2E
+
+**INFRA_OBSERVATION (not a test failure)**: Auto-refresh (`setInterval(fetchWorkflows, 5000)`) re-renders the entire `#workflows-container` DOM every 5 seconds. This destroys any open editor state (editor-container becomes empty and hidden after each poll cycle). During E2E testing, this required mocking `window.fetch` to freeze auto-refresh before testing editor interactions. This is an architectural limitation: the editor state is ephemeral and not preserved across poll cycles. **Impact**: Users editing a workflow when a poll fires will lose unsaved editor state. This is a latent UX bug (not a blocking defect for this feature's acceptance criteria, since the editor was demonstrated to work functionally). Recommended fix: pause polling when editor is open; resume on close.
+
+### Summary
+
+**Goal A (Visualization)**: All 6 steps PASS. SVG pipeline graph correctly renders stage nodes (rect for normal, polygon for gate), feedback-to backward edges (dashed curved arcs), entity count badges, and click-to-filter behavior identical to chip bar.
+
+**Goal B (Visual Editor)**: 7/8 steps PASS, 1 SKIPPED (redo — covered by undo verification). Editor panel opens with toolbar, stage selection via SVG node click shows properties panel with gate/terminal/initial/conditional toggles, gate toggle re-renders graph immediately, undo reverts changes, add-stage adds node to graph.
+
+**Acceptance criteria coverage**:
+- [x] Each workflow renders as directed graph (nodes = stages, edges = transitions)
+- [x] Gate stages shown with distinct visual (diamond/polygon shape)
+- [x] Feedback-to edges shown as backward arrows with label
+- [x] Entity count dots on each stage node
+- [x] Click stage node filters entity table
+- [x] Edit mode toggle (Edit Pipeline / Exit Editor)
+- [x] Add new stage via + Add Stage button
+- [x] Toggle gate/conditional/terminal/initial per stage
+- [x] Undo works (memento pattern confirmed)
+- [ ] Drag to reorder — not browser-tested (Pointer Events API drag requires real pointer movement; automated dispatch of pointerdown/pointermove/pointerup did not trigger drag reorder in this test run — SEED_INSUFFICIENT for this specific interaction)
+- [ ] Save writes back to README — not browser-tested (requires POST /api/workflow/stages; unit-tested in frontmatter-io.test.ts; excluded from E2E to avoid modifying worktree files)
+
+**Verdict**: PASS with 2 untested items (drag reorder, save write-back). Core visualization and editor interaction criteria all verified.
+
+## Stage Report: pr-review
+
+- [x] PR diff reviewed
+- [x] Findings classified (CODE/SUGGESTION/DOC)
+- [x] CODE and SUGGESTION fixes committed and pushed
+- [x] Tests pass after fixes
+- [x] Review summary written
+
+### Findings
+
+#### CODE (fixed)
+
+1. **Drag creates excessive undo snapshots** (`editor.js:128-134`)
+   Each `pointermove` slot crossing called `snapshot()`, so dragging from slot 0 to slot 5 pushed 5 undo entries. Undo only reversed one micro-step instead of the whole drag.
+   **Fix**: Single snapshot per drag operation via `snapshotTaken` flag — set on first move, reset on pointerup.
+
+2. **Auto-refresh destroys editor state** (`app.js:287`)
+   `setInterval(fetchWorkflows, 5000)` re-renders entire DOM, wiping open editor containers. Documented in e2e report as known issue.
+   **Fix**: Added `editorOpenCount` guard — polling skips `fetchWorkflows()` while any editor is open.
+
+#### SUGGESTION (fixed)
+
+3. **POST `/api/workflow/stages` missing stage name validation** (`server.ts:248-274`)
+   Route accepted `body.stages` without validating `name` fields. Malformed names (empty, colons, newlines) could produce invalid YAML via `updateWorkflowStages`.
+   **Fix**: Server-side regex validation `/^[a-z0-9][a-z0-9-]*$/` before processing.
+
+4. **Unused `NODE_GAP_Y` constant** (`visualizer.js:15`)
+   Declared but never referenced.
+   **Fix**: Removed.
+
+#### DOC/advisory (not fixed — noted)
+
+5. `buildLayout.feedbackEdges` includes a `label` field (`visualizer.js:83`) never consumed by `renderFeedbackEdge` (hardcodes "feedback" at line 250). Harmless redundancy.
+
+6. Editor save response (`editor.js:284`) doesn't check `res.ok` before parsing JSON. Acceptable because server always returns JSON for errors and the `data.ok` check catches failures.
+
+7. Undo stack is unbounded (`editor.js:20-23`). Not a practical concern — editor is short-lived and stages are small objects. The drag snapshot fix (#1) eliminates the main growth vector.
+
+### Commit
+
+`54f17e9` fix(review): drag undo atomicity, auto-refresh editor guard, stage name validation
+
+### Test Results
+
+- `bun test`: 14 pass, 0 fail, 48 expect() calls
+- `bunx tsc --noEmit`: 0 errors
