@@ -246,6 +246,7 @@ export function createServer(opts: ServerOptions) {
         ws.subscribe("activity");
         const events = eventBuffer.getAll();
         ws.send(JSON.stringify({ type: "replay", events }));
+        ws.send(JSON.stringify({ type: "channel_status", connected: channelConnected }));
       },
       message(_ws, message) {
         try {
@@ -335,7 +336,9 @@ export function createServer(opts: ServerOptions) {
     return entry.seq;
   }
 
+  let channelConnected = false;
   function broadcastChannelStatus(connected: boolean) {
+    channelConnected = connected;
     server.publish("activity", JSON.stringify({ type: "channel_status", connected }));
   }
 
