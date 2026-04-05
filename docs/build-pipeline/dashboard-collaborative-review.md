@@ -1,7 +1,7 @@
 ---
 id: 011
 title: Dashboard Collaborative Review — Inline Comments & Suggestions on Entity Files
-status: pr-draft
+status: pr-review
 source: channel conversation
 started: 2026-04-05T19:00:00+08:00
 completed:
@@ -9,7 +9,7 @@ verdict:
 score: 0.9
 worktree: .worktrees/spacedock-ensign-dashboard-collaborative-review
 issue:
-pr:
+pr: iamcxa/spacedock#4
 intent: feature
 scale: Medium
 project: spacedock
