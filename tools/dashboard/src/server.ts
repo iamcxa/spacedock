@@ -259,6 +259,24 @@ export function createServer(opts: ServerOptions) {
               logRequest(req, 400);
               return jsonResponse({ error: `Invalid stage name: ${invalidName.name ?? "(empty)"}` }, 400);
             }
+            const stageNames = new Set(body.stages.map((s) => s.name));
+            const boolFields = ["gate", "terminal", "initial", "conditional", "worktree"] as const;
+            for (const s of body.stages) {
+              for (const bf of boolFields) {
+                if (bf in s && typeof s[bf] !== "boolean") {
+                  logRequest(req, 400);
+                  return jsonResponse({ error: `Stage '${s.name}': field '${bf}' must be a boolean` }, 400);
+                }
+              }
+              if (s.feedback_to && !stageNames.has(s.feedback_to)) {
+                logRequest(req, 400);
+                return jsonResponse({ error: `Stage '${s.name}': feedback_to target '${s.feedback_to}' does not exist` }, 400);
+              }
+              if ("concurrency" in s && (typeof s.concurrency !== "number" || s.concurrency <= 0)) {
+                logRequest(req, 400);
+                return jsonResponse({ error: `Stage '${s.name}': concurrency must be a number > 0` }, 400);
+              }
+            }
             if (!validatePath(body.dir, projectRoot)) {
               logRequest(req, 403);
               return jsonResponse({ error: "Forbidden" }, 403);

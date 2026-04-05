@@ -121,8 +121,8 @@
       var pos = screenToSVG(evt);
 
       // Determine which slot the pointer is over
-      var nodeWidth = 120 + 60; // NODE_W + NODE_GAP_X
-      var targetIdx = Math.round((pos.x - 30) / nodeWidth); // 30 = PADDING
+      var nodeWidth = 120 + 60; // Must match visualizer.js NODE_W (120) + NODE_GAP_X (60)
+      var targetIdx = Math.round((pos.x - 30) / nodeWidth); // 30 must match visualizer.js PADDING
       targetIdx = Math.max(0, Math.min(targetIdx, editorState.stages.length - 1));
 
       if (targetIdx !== dragging.idx) {
