@@ -665,7 +665,7 @@ export function createServer(opts: ServerOptions) {
             return new Response("Share link not found or expired", { status: 403 });
           }
           const upgraded = server.upgrade(req, {
-            data: { shareToken: token, entityPaths: link.entityPaths },
+            data: { shareToken: token, entityPaths: link.entityPaths } as any,
           });
           if (upgraded) return undefined as any;
           logRequest(req, 400);
