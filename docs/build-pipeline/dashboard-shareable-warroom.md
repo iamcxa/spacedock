@@ -1,7 +1,7 @@
 ---
 id: 017
 title: Dashboard Auth + Shareable Access — 部署無關的認證與分享機制
-status: execute
+status: pr-review
 source: /build brainstorming (revised after plan rejection)
 started: 2026-04-06T09:45:00Z
 completed:
@@ -555,3 +555,20 @@ Body includes:
 2. Add loading state on Create button during fetch
 3. Show clear success feedback when link is created (e.g., highlight the generated URL)
 4. Add `.catch()` for network errors
+
+## Stage Report: execute (Feedback Cycle 1)
+
+1. [x] Add `res.ok` check and inline error message display for API errors — DONE (detail.js: `!res.ok` guard reads response text, throws Error with status code; displayed in `#share-error` div)
+2. [x] Add `.catch()` handler for network errors with user-visible feedback — DONE (detail.js: `.catch()` shows error message in `#share-error`, hides result area)
+3. [x] Add loading state (disable button + "Creating..." text) during fetch — DONE (detail.js: `submitBtn.disabled = true` + `textContent = "Creating..."` before fetch, restored in `.finally()`)
+4. [x] Show clear success feedback — highlight generated URL, auto-select for copy — DONE (detail.js: green outline on URL input, `.focus()` + `.select()` for instant copy, outline fades after 2s)
+5. [x] Verify fix by running existing tests (`cd tools/dashboard && bun test`) — DONE (54 pass, 0 fail, 127 expect() calls)
+6. [x] Commit with `fix(share): improve Create Share Link UX feedback and error handling` — DONE (commit 74fa438)
+7. [x] Push to remote branch — DONE
+
+### Additional fix
+- Replaced `alert("Password is required.")` with inline error message in `#share-error` div — consistent UX pattern (no browser alert dialogs)
+
+### Files changed
+- `tools/dashboard/static/detail.html` — Added `#share-error` div for inline error messages
+- `tools/dashboard/static/detail.js` — Rewrote share submit handler with error handling, loading state, success feedback
