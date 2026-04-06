@@ -28,7 +28,7 @@ export function getComments(entityPath: string): CommentThread {
 
 export function addComment(
   entityPath: string,
-  input: { selected_text: string; section_heading: string; content: string; author?: "captain" | "fo" }
+  input: { selected_text: string; section_heading: string; content: string; author?: "captain" | "fo" | "guest" }
 ): Comment {
   const thread = readSidecar(entityPath);
   const comment: Comment = {
