@@ -688,6 +688,103 @@ export function createServer(opts: ServerOptions) {
           return jsonResponse({ ok: true });
         }
 
+        // Scoped share entity routes: /api/share/:token/entity/...
+        const shareEntityMatch = pathname.match(/^\/api\/share\/([a-f0-9]+)\/entity\/(.+)$/);
+        if (shareEntityMatch) {
+          const token = shareEntityMatch[1];
+          const subRoute = shareEntityMatch[2];
+          const link = shareRegistry.get(token);
+          if (!link) {
+            logRequest(req, 404);
+            return jsonResponse({ error: "Share link not found or expired" }, 404);
+          }
+
+          if (subRoute === "detail" && req.method === "GET") {
+            const filepath = url.searchParams.get("path");
+            if (!filepath) {
+              logRequest(req, 400);
+              return jsonResponse({ error: "path required" }, 400);
+            }
+            if (!shareRegistry.isInScope(token, filepath)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Entity not in share scope" }, 403);
+            }
+            if (!validatePath(filepath, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            try {
+              const data = getEntityDetail(filepath);
+              logRequest(req, 200);
+              return jsonResponse(data);
+            } catch (err) {
+              captureException(err instanceof Error ? err : new Error(String(err)));
+              logRequest(req, 500);
+              return jsonResponse({ error: "Internal server error" }, 500);
+            }
+          }
+
+          if (subRoute === "comments" && req.method === "GET") {
+            const filepath = url.searchParams.get("path");
+            if (!filepath) {
+              logRequest(req, 400);
+              return jsonResponse({ error: "path required" }, 400);
+            }
+            if (!shareRegistry.isInScope(token, filepath)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Entity not in share scope" }, 403);
+            }
+            if (!validatePath(filepath, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            try {
+              const thread = getComments(filepath);
+              logRequest(req, 200);
+              return jsonResponse(thread);
+            } catch (err) {
+              captureException(err instanceof Error ? err : new Error(String(err)));
+              logRequest(req, 500);
+              return jsonResponse({ error: "Internal server error" }, 500);
+            }
+          }
+
+          if (subRoute === "comment" && req.method === "POST") {
+            try {
+              const body = await req.json() as {
+                path: string;
+                selected_text: string;
+                section_heading: string;
+                content: string;
+              };
+              if (!body.path || !body.selected_text || !body.content) {
+                logRequest(req, 400);
+                return jsonResponse({ error: "Missing required fields" }, 400);
+              }
+              if (!shareRegistry.isInScope(token, body.path)) {
+                logRequest(req, 403);
+                return jsonResponse({ error: "Entity not in share scope" }, 403);
+              }
+              if (!validatePath(body.path, projectRoot)) {
+                logRequest(req, 403);
+                return jsonResponse({ error: "Forbidden" }, 403);
+              }
+              const comment = addComment(body.path, {
+                selected_text: body.selected_text,
+                section_heading: body.section_heading,
+                content: body.content,
+                author: "guest",
+              });
+              logRequest(req, 200);
+              return jsonResponse(comment);
+            } catch (err) {
+              captureException(err instanceof Error ? err : new Error(String(err)));
+              logRequest(req, 500);
+              return jsonResponse({ error: "Internal server error" }, 500);
+            }
+          }
+        }
+
         // Serve static files
         const filename = pathname.slice(1); // remove leading /
         if (filename) {

@@ -202,3 +202,118 @@ describe("POST /api/share/:token/verify", () => {
     expect(verifyRes.status).toBe(404);
   });
 });
+
+describe("GET /api/share/:token/entity/detail", () => {
+  let shareToken: string;
+
+  beforeAll(async () => {
+    const res = await fetch(`${baseUrl}/api/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        password: "scope-test",
+        entityPaths: [ENTITY_PATH],
+        stages: [],
+        label: "Scoped Detail",
+        ttlHours: 24,
+      }),
+    });
+    const data = await res.json() as any;
+    shareToken = data.token;
+  });
+
+  test("returns entity detail for in-scope path", async () => {
+    const res = await fetch(
+      `${baseUrl}/api/share/${shareToken}/entity/detail?path=${encodeURIComponent(ENTITY_PATH)}`
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json() as any;
+    expect(data.frontmatter.id).toBe("001");
+  });
+
+  test("returns 403 for out-of-scope path", async () => {
+    const outOfScope = join(TMP, "docs/build-pipeline/other.md");
+    writeFileSync(outOfScope, "---\nid: 002\ntitle: Other\nstatus: plan\n---\n\nOther body.\n");
+    const res = await fetch(
+      `${baseUrl}/api/share/${shareToken}/entity/detail?path=${encodeURIComponent(outOfScope)}`
+    );
+    expect(res.status).toBe(403);
+  });
+
+  test("returns 404 for expired token", async () => {
+    const createRes = await fetch(`${baseUrl}/api/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        password: "expiry",
+        entityPaths: [ENTITY_PATH],
+        stages: [],
+        label: "Expired Scope",
+        ttlHours: 0,
+      }),
+    });
+    const { token } = await createRes.json() as any;
+    const link = server.shareRegistry.get(token);
+    if (link) link.expiresAt = new Date(Date.now() - 1000).toISOString();
+
+    const res = await fetch(
+      `${baseUrl}/api/share/${token}/entity/detail?path=${encodeURIComponent(ENTITY_PATH)}`
+    );
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("GET /api/share/:token/entity/comments", () => {
+  test("returns comments for in-scope entity", async () => {
+    const createRes = await fetch(`${baseUrl}/api/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        password: "comments-test",
+        entityPaths: [ENTITY_PATH],
+        stages: [],
+        label: "Comments Scope",
+        ttlHours: 24,
+      }),
+    });
+    const { token } = await createRes.json() as any;
+
+    const res = await fetch(
+      `${baseUrl}/api/share/${token}/entity/comments?path=${encodeURIComponent(ENTITY_PATH)}`
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json() as any;
+    expect(data.comments).toBeDefined();
+  });
+});
+
+describe("POST /api/share/:token/entity/comment", () => {
+  test("adds a guest comment on in-scope entity", async () => {
+    const createRes = await fetch(`${baseUrl}/api/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        password: "guest-comment",
+        entityPaths: [ENTITY_PATH],
+        stages: [],
+        label: "Guest Comment",
+        ttlHours: 24,
+      }),
+    });
+    const { token } = await createRes.json() as any;
+
+    const res = await fetch(`${baseUrl}/api/share/${token}/entity/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: ENTITY_PATH,
+        selected_text: "Body text",
+        section_heading: "",
+        content: "Guest feedback here",
+      }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json() as any;
+    expect(data.author).toBe("guest");
+  });
+});
