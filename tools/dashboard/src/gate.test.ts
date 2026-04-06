@@ -140,6 +140,7 @@ describe("POST /api/entity/gate/decision", () => {
       port: 0,
       hostname: "127.0.0.1",
       projectRoot: TMP,
+      dbPath: ":memory:",
       onChannelMessage: (content, meta) => {
         channelMessages.push({ content, meta });
       },
