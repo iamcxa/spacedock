@@ -1,11 +1,11 @@
 ---
 id: 017
 title: Dashboard Auth + Shareable Access — 部署無關的認證與分享機制
-status: pr-review
+status: shipped
 source: /build brainstorming (revised after plan rejection)
 started: 2026-04-06T09:45:00Z
-completed:
-verdict:
+completed: 2026-04-06T13:25:00Z
+verdict: PASSED
 score: 0.9
 worktree: .worktrees/spacedock-ensign-dashboard-shareable-warroom
 issue:
@@ -572,3 +572,14 @@ Body includes:
 ### Files changed
 - `tools/dashboard/static/detail.html` — Added `#share-error` div for inline error messages
 - `tools/dashboard/static/detail.js` — Rewrote share submit handler with error handling, loading state, success feedback
+
+## Stage Report: pr-review (Feedback Cycle 1)
+
+Re-review of commit 74fa438 — UX fix for Share Link Create button.
+
+1. [x] Review commit 74fa438 diff for correctness and consistency — DONE. The fix adds `res.ok` check, `.catch()`, loading state, success feedback, and inline error display. All four requirements from the feedback cycle are addressed.
+2. [x] Verify no new bugs or regressions introduced — DONE. No bugs found. `.finally()` correctly restores button state on all paths. Error div cleared on each new submit attempt (line 860). No-token edge case handled with else branch.
+3. [x] Check error handling pattern matches codebase conventions — DONE. Pattern is consistent with existing codebase: `res.ok` guard matches `detail.js:39` (`apiFetch`) and `share.js:47`; `.catch()` + `.finally()` matches `editor.js:298-304` and `activity.js:470-476`; inline error div matches `share.js` auth error pattern. Replaced `alert()` with inline display — improvement over older patterns that still use `alert()` (e.g., `detail.js:521`).
+4. [x] Run tests — DONE. 54 pass, 0 fail, 127 expect() calls. No regressions.
+5. [x] Ensure fix is pushed to remote — DONE. Commit 74fa438 confirmed on `origin/spacedock-ensign/dashboard-shareable-warroom`.
+6. [x] Review recommendation — **APPROVE**. The fix is correct, complete, and consistent with codebase patterns. No new issues introduced.
