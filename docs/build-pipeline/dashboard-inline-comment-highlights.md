@@ -1,7 +1,7 @@
 ---
 id: 013
 title: Dashboard Inline Comment Highlights — Notion-like Comment Threading & Visual Markers
-status: quality
+status: pr-draft
 source: UI testing feedback
 started: 2026-04-06T13:10:00Z
 completed:
