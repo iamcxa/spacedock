@@ -18,6 +18,7 @@ import { updateWorkflowStages } from "./frontmatter-io";
 
 interface ServerOptions {
   port: number;
+  hostname: string;
   projectRoot: string;
   staticDir?: string;
   logFile?: string;
@@ -57,6 +58,7 @@ export function createServer(opts: ServerOptions) {
 
   const server = Bun.serve({
     port: opts.port,
+    hostname: opts.hostname,
     routes: {
       "/api/workflows": {
         GET: (req) => {
@@ -644,6 +646,7 @@ if (import.meta.main) {
     args: Bun.argv.slice(2),
     options: {
       port: { type: "string", default: "8420" },
+      host: { type: "string", default: "127.0.0.1" },
       root: { type: "string" },
       "log-file": { type: "string" },
     },
@@ -665,9 +668,10 @@ if (import.meta.main) {
   const staticDir = join(dirname(import.meta.dir), "static");
   const logFile = values["log-file"] ?? undefined;
 
-  const server = createServer({ port, projectRoot, staticDir, logFile });
+  const hostname = values.host!;
+  const server = createServer({ port, hostname, projectRoot, staticDir, logFile });
 
-  const banner = `[${new Date().toISOString().slice(0, 19).replace("T", " ")}] Spacedock Dashboard started on http://127.0.0.1:${server.port}/ (root: ${projectRoot})`;
+  const banner = `[${new Date().toISOString().slice(0, 19).replace("T", " ")}] Spacedock Dashboard started on http://${hostname}:${server.port}/ (root: ${projectRoot})`;
   console.log(banner);
   if (logFile) {
     appendFileSync(logFile, banner + "\n");

@@ -88,6 +88,7 @@ describe("POST /api/entity/gate/decision", () => {
     channelMessages = [];
     server = createServer({
       port: 0,
+      hostname: "127.0.0.1",
       projectRoot: TMP,
       onChannelMessage: (content, meta) => {
         channelMessages.push({ content, meta });

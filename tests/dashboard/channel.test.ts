@@ -257,6 +257,7 @@ describe("Channel Integration", () => {
     const { createServer } = await import("../../tools/dashboard/src/server");
     const srv = createServer({
       port: 0,
+      hostname: "127.0.0.1",
       projectRoot: tmpDir,
       staticDir: join(tmpDir, "static"),
     });
