@@ -164,4 +164,47 @@ describe("POST /api/entity/gate/decision", () => {
     });
     expect(res.status).toBe(403);
   });
+
+  test("gate decision event appears in event buffer", async () => {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/entity/gate/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        entity_path: ENTITY_PATH,
+        entity_slug: "test-entity",
+        stage: "plan",
+        decision: "approved",
+      }),
+    });
+    expect(res.status).toBe(200);
+
+    // Verify event is in the buffer via GET /api/events
+    const eventsRes = await fetch(`http://127.0.0.1:${server.port}/api/events`);
+    const eventsData = await eventsRes.json() as { events: Array<{ event: { type: string; detail?: string } }> };
+    const gateEvents = eventsData.events.filter(
+      (e: { event: { type: string } }) => e.event.type === "gate_decision"
+    );
+    expect(gateEvents.length).toBeGreaterThan(0);
+    expect(gateEvents[gateEvents.length - 1].event.detail).toBe("approved");
+  });
+
+  test("changes_requested decision is accepted", async () => {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/entity/gate/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        entity_path: ENTITY_PATH,
+        entity_slug: "test-entity",
+        stage: "plan",
+        decision: "changes_requested",
+      }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+
+    // Verify channel message has correct meta
+    expect(channelMessages.length).toBe(1);
+    expect(channelMessages[0].meta?.decision).toBe("changes_requested");
+  });
 });
