@@ -485,6 +485,7 @@ body {
 .entity-body .comment-highlight {
     background: rgba(255, 212, 0, 0.25);
     border-bottom: 2px solid rgba(255, 212, 0, 0.6);
+    color: #e0d6c8;
     cursor: pointer;
 }
 
