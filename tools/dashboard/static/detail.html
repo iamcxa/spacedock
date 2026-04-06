@@ -73,6 +73,32 @@
                 </div>
             </section>
 
+            <section class="share-panel" id="share-panel">
+                <h3>Share</h3>
+                <button id="create-share-btn" class="btn btn-small">Create Share Link</button>
+                <div id="share-links" class="share-links"></div>
+                <div id="share-modal" class="share-modal" style="display:none;">
+                    <label>Password:
+                        <input type="text" id="share-password" class="share-input" placeholder="Set a password">
+                    </label>
+                    <label>Label:
+                        <input type="text" id="share-label-input" class="share-input" placeholder="e.g. Review for Alice">
+                    </label>
+                    <label>Expires in (hours):
+                        <input type="number" id="share-ttl" class="share-input" value="24" min="1" max="168">
+                    </label>
+                    <div class="share-modal-actions">
+                        <button id="share-submit" class="btn btn-small">Create</button>
+                        <button id="share-cancel" class="btn btn-small btn-secondary">Cancel</button>
+                    </div>
+                    <div id="share-result" style="display:none;">
+                        <p>Share link created:</p>
+                        <input type="text" id="share-url" class="share-input" readonly>
+                        <button id="share-copy" class="btn btn-small">Copy</button>
+                    </div>
+                </div>
+            </section>
+
             <section class="comments-panel" id="comments-panel">
                 <h3>Comments</h3>
                 <div id="comment-threads" class="comment-threads">
