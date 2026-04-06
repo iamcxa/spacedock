@@ -819,6 +819,18 @@ export function createServer(opts: ServerOptions) {
           }
         }
 
+        // Serve share page for /share/:token
+        const sharePageMatch = pathname.match(/^\/share\/[a-f0-9]+$/);
+        if (sharePageMatch && req.method === "GET") {
+          const shareHtml = join(staticDir, "share.html");
+          if (existsSync(shareHtml)) {
+            logRequest(req, 200);
+            return new Response(Bun.file(shareHtml));
+          }
+          logRequest(req, 404);
+          return new Response("Not Found", { status: 404 });
+        }
+
         // Serve static files
         const filename = pathname.slice(1); // remove leading /
         if (filename) {
