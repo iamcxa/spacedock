@@ -1,7 +1,7 @@
 ---
 id: 015
 title: Dashboard War Room Identity — 戰情室品牌重塑與指揮中心體驗
-status: e2e
+status: pr-draft
 source: /build brainstorming
 started: 2026-04-06T00:30:00+08:00
 completed:
