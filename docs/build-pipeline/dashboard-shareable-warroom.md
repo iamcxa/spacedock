@@ -1,8 +1,8 @@
 ---
 id: 017
-title: Dashboard Shareable War Room — 戰情室分享與多人協作審批
+title: Dashboard Auth + Shareable Access — 部署無關的認證與分享機制
 status: explore
-source: /build brainstorming
+source: /build brainstorming (revised after plan rejection)
 started:
 completed:
 verdict:
@@ -17,26 +17,36 @@ project: spacedock
 
 ## Dependencies
 
-- Feature 015 (war room identity)
 - Feature 016 (gate approval — required for shared review/approve flow)
 
 ## Brainstorming Spec
 
-APPROACH:     整合 ngrok（或 Cloudflare Tunnel 等免費替代方案）讓戰情室可以產生公開 URL 分享給同事。每次分享可限定特定 phase/entity，並設置獨立密碼。同事 A 收到 plan phase 的連結 + 密碼，review 後 approve；同事 B 收到 execute phase 的連結 + 不同密碼。密碼驗證在 server 端，per-share scope 控制可見範圍。
-ALTERNATIVE:  Screen share 或截圖分享（rejected: 沒有互動能力，同事無法直接 comment 或 approve，也無法非同步 review）。VPN/內網方案（rejected: 設定門檻高，不適合跨團隊快速分享）
-GUARDRAILS:   密碼必須 server-side 驗證，不能只靠前端。Share link 必須有過期時間（預設 24h）。分享範圍嚴格限定 — per-phase scope 不能看到其他 phase 的內容。ngrok 掉線時要有重連機制或友善錯誤提示。必須考慮 ngrok 免費方案的限制（連線數、頻寬、session 時長）。
-RATIONALE:    把 AI-human 協作從單人擴展到團隊 — 讓領域專家參與對應階段的 review，是戰情室概念的完整實現。Plan 階段讓架構師 review，E2E 階段讓 QA review，PR 階段讓 tech lead review — 每個人只看到自己該看的部分。
+APPROACH:     部署無關的認證 + 分享機制。三層設計：(1) Auth layer — token-based session auth，configurable bind host（`--host` flag，default 127.0.0.1，Docker/server 用 0.0.0.0），支援 captain / reviewer / guest 三種角色。(2) Share link — Captain 從 UI 建立 scoped link（entity + phase + 密碼 + 過期時間），Reviewer 開 URL 驗證後看到 scoped view，可 comment + approve gate。(3) ngrok 整合 — `ctl.sh start --tunnel` 自動啟動 ngrok，capture tunnel URL，UI 顯示可分享的 public URL。整套機制在 localhost / LAN / Docker / cloud 部署下完全一致。
+ALTERNATIVE:  (A) 純 ngrok tunnel hack（rejected: 第一版 plan 被 captain reject — 把 tunnel 當核心而非 auth，不適用 Docker/cloud 部署）。(B) 分拆成 auth entity + share entity（rejected: captain 確認 ngrok 應包含在同一 entity，ship 後要立即可用）。(C) MCP UI 嵌入 Claude 對話（deferred to entity 021 — 獨立 delivery channel，不影響 web sharing 核心）。
+GUARDRAILS:   Auth layer 是 application-level（不依賴 network topology）。密碼 server-side 驗證（Bun.password argon2id）。Share link 有 TTL（default 24h）。Scoped WebSocket（/ws/share/:token/activity）防止 event leakage。`--host` flag 控制 bind address，不硬改 0.0.0.0 或 127.0.0.1。ngrok interstitial 用 ngrok-skip-browser-warning header 繞過。現有 localhost 無 auth 使用模式保持不變（backward compatible — 127.0.0.1 不需要登入）。
+RATIONALE:    長期願景是 Dashboard as a Service — Claude Code + plugin 可以跑在 Docker / Mac / cloud，使用者透過 UI 與 Claude Code instance 互動。Auth + scoped access 是這個願景的基礎層。ngrok 讓 local Mac 也能立即分享，Docker/cloud 部署則直接用 public URL。同一套 auth 機制，部署無關。
+
+## Research Findings (from rejected plan — still valid)
+
+- Bun.password: argon2id hashing confirmed (HIGH confidence)
+- ngrok free tier: interstitial warning page (需 header workaround), 20K monthly request cap, 4K req/min
+- Cloudflare quick tunnel: 不支援 SSE, WebSocket 未確認 — 僅作為 experimental fallback
+- Server 目前 bind 0.0.0.0 (非 127.0.0.1) — auth 比預期更緊急
+- Frontend-only WebSocket filtering 會洩漏全部 events — 需要 scoped WebSocket endpoint
 
 ## Acceptance Criteria
 
-- 可從 UI 產生 share link（指定 entity + phase + 密碼）
-- Share link 透過 ngrok/tunnel 可從外部存取
-- 密碼驗證在 server 端，錯誤密碼無法存取
-- 分享範圍限定（只能看到指定 phase 的內容）
-- 分享頁面支援 comment 和 approve 操作（複用 016 pattern）
-- Share link 有過期時間（預設 24h，可設定）
-- 每個 share 可以有不同密碼
-- ngrok 斷線時顯示友善提示
+- Auth middleware: token-based session，localhost 免登入（backward compatible）
+- `--host` flag 控制 bind address（default 127.0.0.1，Docker 用 0.0.0.0）
+- Captain 可從 UI 建立 share link（entity + phase + 密碼 + 過期時間）
+- Share link 密碼 server-side 驗證（Bun.password argon2id）
+- Reviewer scoped view: 只看到被授權的 entity/phase
+- Reviewer 可 comment + approve gate（複用 016 pattern）
+- Scoped WebSocket: /ws/share/:token/activity 只推送相關 events
+- Share link TTL（default 24h），過期自動失效
+- `ctl.sh start --tunnel` 啟動 ngrok，UI 顯示 public URL
+- ngrok interstitial 自動處理（ngrok-skip-browser-warning header）
+- 同一套機制在 localhost / LAN / Docker / cloud 都能運作
 
 ## Coverage Infrastructure
 
