@@ -444,3 +444,48 @@ curl -s -X POST http://127.0.0.1:8421/api/share \
 ### Recommendation
 
 **SKIPPED** — E2E infrastructure is ready (mapping updated, flow written, dashboard running). Execution blocked by stale daemon. Feature 017 code verified correct by source inspection. Proceed to ship stage; optionally re-run `/e2e-test dashboard-auth-share` after dashboard restart to capture browser evidence.
+
+## Stage Report: pr-draft
+
+### Completion Checklist
+
+1. Branch pushed to origin — DONE (`git push -u origin spacedock-ensign/dashboard-shareable-warroom` → new branch on iamcxa/spacedock)
+2. Draft PR created on iamcxa/spacedock — DONE (`iamcxa/spacedock#8`)
+3. PR_NUMBER and PR_URL captured — DONE (PR #8, https://github.com/iamcxa/spacedock/pull/8)
+4. Self-review completed (>100 lines) — DONE (diff: 9063 lines, +7952/-393)
+
+### PR Details
+
+- **Title**: `feat(dashboard): add auth layer + shareable access for deployment-agnostic sharing`
+- **URL**: https://github.com/iamcxa/spacedock/pull/8
+- **State**: DRAFT
+- **Target**: `iamcxa/spacedock` base `main`
+- **Branch**: `spacedock-ensign/dashboard-shareable-warroom`
+- **Diff size**: +7952 / -393 (9063 diff lines)
+
+### Self-Review Findings
+
+Security scan (grep on `+` lines for innerHTML/eval/exec/dangerouslySet):
+- `bodyEl.innerHTML = DOMPurify.sanitize(marked.parse(...))` — SAFE (sanitized)
+- `bodyEl.innerHTML = sanitized` — SAFE (comment confirms DOMPurify output)
+- No raw `innerHTML` with user-supplied data found
+- No `eval()`, `Function()`, or dynamic code execution found
+- All user-sourced dynamic text uses `textContent`
+
+Auth implementation verified:
+- `generateToken()` uses `crypto.getRandomValues(new Uint8Array(24))` — 192-bit entropy
+- `create()` uses `Bun.password.hash(input.password)` — argon2id
+- `verify()` uses `Bun.password.verify(password, link.passwordHash)` — timing-safe
+- `get()` auto-deletes expired links on access (TTL enforcement)
+- `isInScope()` checks `link.entityPaths.includes(entityPath)` — correct scope guard
+
+### PR Body Summary
+
+Body includes:
+- Auth-first architecture overview (--host flag, backward compat, share links, scoped WS, ngrok)
+- Security highlights table (argon2id, token entropy, scope enforcement, XSS prevention, TTL)
+- Test evidence table (54 core + 16 share integration + 16 auth unit = 86 total, all PASS)
+- Quality report highlights (all 8 checks PASSED)
+- Files changed (4 created, 8 modified)
+- E2E status (mapping updated, flow written, execution skipped — stale daemon)
+- Dependencies note (requires Feature 016)
