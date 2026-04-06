@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spacedock Dashboard</title>
+    <title>戰情室 — Spacedock</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header>
-        <h1>Spacedock Dashboard</h1>
+        <h1>◆ 戰情室</h1>
         <div class="header-indicators">
             <span id="ws-status" class="indicator paused">Connecting...</span>
             <span id="channel-status" class="indicator paused">Channel: disconnected</span>
@@ -16,7 +16,9 @@
             <span id="telemetry-indicator" class="indicator" style="display:none"></span>
         </div>
     </header>
+    <div id="alert-bar" class="alert-bar"></div>
     <div class="dashboard-layout">
+        <nav id="missions-tree" class="missions-tree"></nav>
         <main id="workflows-container">
             <p class="loading">Loading workflows...</p>
         </main>
