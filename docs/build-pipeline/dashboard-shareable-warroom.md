@@ -1,13 +1,13 @@
 ---
 id: 017
 title: Dashboard Shareable War Room — 戰情室分享與多人協作審批
-status: plan
+status: explore
 source: /build brainstorming
-started: 2026-04-06T07:30:00Z
+started:
 completed:
 verdict:
 score: 0.9
-worktree: .worktrees/spacedock-ensign-dashboard-shareable-warroom
+worktree:
 issue:
 pr:
 intent: feature
