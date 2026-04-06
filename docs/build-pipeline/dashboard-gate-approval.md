@@ -1,7 +1,7 @@
 ---
 id: 016
 title: Dashboard Gate Approval — UI 上的階段審批與 PR-style Review
-status: e2e
+status: pr-draft
 source: /build brainstorming
 started: 2026-04-06T07:30:00Z
 completed:
