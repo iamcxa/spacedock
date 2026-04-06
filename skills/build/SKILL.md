@@ -1,6 +1,6 @@
 ---
 name: build
-description: "Use when starting new feature or bugfix development through the build pipeline. Interactive brainstorming → spec → entity creation → FO dispatch. Triggers on '/build', 'new feature', 'start building', or when user has a development idea to turn into code."
+description: "Use when starting new feature or bugfix development through the build pipeline. Triggers on '/build', 'new feature', 'start building', or when user has a development idea to turn into code."
 user-invocable: true
 ---
 
@@ -32,12 +32,11 @@ If the user's invocation includes text beyond the command:
 basename $(git rev-parse --show-toplevel 2>/dev/null || echo "unknown")
 ```
 
-Confirm with user:
+Announce (no confirmation needed):
 
-> Target project: **{project_name}** (`{project_root}`)
-> Correct? (If not, specify the target project.)
+> Building in **{project_name}** (`{project_root}`). Override with `/build --project <path>`.
 
-If user provides a different project, resolve its root path.
+If user provides `--project`, resolve that path instead.
 
 ### Step 2 — Locate Build Pipeline
 
@@ -57,9 +56,11 @@ Stop here — the pipeline must exist before `/build` can create entities.
 ### Step 3 — Linear Issue (if provided)
 
 If args contain a Linear issue ID:
-1. Fetch issue details (title, description, acceptance criteria, labels)
+1. Fetch issue details (title, description, acceptance criteria, labels) via Linear MCP
 2. Store as brainstorming input
 3. Set `{issue_ref}` for entity frontmatter
+
+If Linear MCP is unavailable: warn "Linear MCP not connected — using issue ID as reference only, provide details manually." Proceed with user's description.
 
 If no issue: proceed with user's description only.
 
@@ -85,6 +86,8 @@ RATIONALE:    {why this approach was chosen over alternatives}
 ```
 
 And a separate **Acceptance Criteria** list — concrete, testable conditions.
+
+**Quality floor**: Acceptance Criteria must have ≥2 testable items (not vague like "works correctly"). GUARDRAILS may be empty only with explicit note: "Checked — no notable constraints identified."
 
 If the brainstorming output doesn't clearly separate these, ask the user to confirm:
 
@@ -169,6 +172,8 @@ RATIONALE:    {from Phase II}
 
 ### Step 3 — Commit
 
+**Note**: `{workflow_dir}` may be in a different git repo than CWD (e.g., plugin-bundled or `~/.claude/workflows/`). The commit targets the workflow directory's repo.
+
 ```bash
 cd {workflow_dir}
 git add {slug}.md
@@ -183,9 +188,11 @@ git commit -m "seed: {slug} — {title}"
 >
 > | Option | Command | When |
 > |--------|---------|------|
-> | **Process now** (single entity) | `claude --agent spacedock:first-officer "{slug}"` | You want this feature built immediately |
+> | **Process now** (single entity) | `claude --plugin-dir {spacedock_plugin_dir} --agent spacedock:first-officer "{slug}"` | You want this feature built immediately |
 > | **Queue for batch** | Nothing — FO picks it up on next run | You're seeding multiple features first |
-> | **Process all pending** | `claude --agent spacedock:first-officer` | Ready to run the full pipeline |
+> | **Process all pending** | `claude --plugin-dir {spacedock_plugin_dir} --agent spacedock:first-officer` | Ready to run the full pipeline |
+>
+> `{spacedock_plugin_dir}` = the spacedock plugin directory (e.g., `~/Project/spacedock` or wherever the plugin is installed).
 >
 > The first officer will take it from `explore` through `research → plan → execute → quality → pr-review → shipped`.
 
@@ -193,7 +200,17 @@ git commit -m "seed: {slug} — {title}"
 
 ## Batch Mode
 
-If the user provides a complete spec in their message (approach, guardrails, acceptance criteria, intent, scale), skip Phase II brainstorming:
+If the user provides a **complete spec** — all 5 fields present — skip Phase II brainstorming:
+
+| Required Field | Minimum |
+|----------------|---------|
+| APPROACH | >1 sentence describing the chosen approach |
+| ALTERNATIVE | ≥1 alternative considered with rejection reason |
+| GUARDRAILS | Explicit constraints, or "Checked — no notable constraints" |
+| Acceptance Criteria | ≥2 testable items |
+| intent + scale | Both specified |
+
+If any field is missing or below minimum → Phase II brainstorming runs normally.
 
 1. Extract all provided fields
 2. Confirm the spec with the user (brief summary, not full brainstorming)
@@ -213,3 +230,14 @@ If the user wants to seed multiple features at once:
 4. Present all entities in the final report
 
 For bulk seeding without brainstorming (e.g., migrating from a backlog), use `/spacedock:commission` with seed entities instead.
+
+---
+
+## Rules
+
+- **Three phases in strict order** — Phase I before II before III, no combining or reordering
+- **Phase II brainstorming is mandatory** for non-batch invocations — "obvious" or "simple" features still brainstorm. Only a complete spec (all 5 fields at minimum quality) skips Phase II.
+- **Entity must have ≥2 testable acceptance criteria** before creation — vague criteria ("works correctly", "no bugs") do not count
+- **Workflow search must verify entity-type** — finding `commissioned-by: spacedock@*` is necessary but not sufficient. Confirm the workflow's `entity-type` matches what build expects (e.g., `feature`).
+- **Commit targets the workflow repo** — `{workflow_dir}` may be in a different git repo than CWD. Always `cd {workflow_dir}` before git operations.
+- **Linear MCP is optional** — if unavailable, warn and proceed with user-provided description only. Never block on missing MCP.
