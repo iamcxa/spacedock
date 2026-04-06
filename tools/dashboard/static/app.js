@@ -163,9 +163,70 @@
     });
   }
 
+  // --- Alert Bar ---
+  var alertBar = document.getElementById("alert-bar");
+  var alertItems = [];
+
+  function addAlert(alert) {
+    // Deduplicate by entity+type
+    var exists = alertItems.some(function (a) {
+      return a.entity === alert.entity && a.type === alert.type;
+    });
+    if (exists) return;
+    alertItems.push(alert);
+    renderAlertBar();
+  }
+
+  function removeAlert(entity, type) {
+    alertItems = alertItems.filter(function (a) {
+      return !(a.entity === entity && a.type === type);
+    });
+    renderAlertBar();
+  }
+
+  function renderAlertBar() {
+    if (!alertBar) return;
+    alertBar.textContent = "";
+    if (alertItems.length === 0) {
+      alertBar.classList.remove("has-alerts");
+      return;
+    }
+    alertBar.classList.add("has-alerts");
+    alertItems.forEach(function (alert) {
+      var item = el("div", { className: "alert-item" }, [
+        el("span", { className: "alert-text", textContent: alert.text }),
+        el("button", { className: "alert-action", textContent: "Review \u2192" })
+      ]);
+      var btn = item.querySelector(".alert-action");
+      btn.addEventListener("click", function () {
+        if (alert.path) {
+          window.location.href = "/detail?path=" + encodeURIComponent(alert.path);
+        }
+      });
+      alertBar.appendChild(item);
+    });
+  }
+
+  // Expose addAlert/removeAlert for activity.js to call
+  window._warRoomAlerts = { addAlert: addAlert, removeAlert: removeAlert };
+
   function render(workflows) {
     container.textContent = "";
     renderMissionsTree(workflows);
+
+    // Scan entities for gate-pending alerts
+    workflows.forEach(function (wf) {
+      wf.entities.forEach(function (entity) {
+        if (entity.status === "gate" || entity.status === "validation") {
+          addAlert({
+            type: "gate",
+            entity: entity.slug || entity.title || "",
+            text: "\uD83D\uDFE0 Gate pending: " + (entity.title || entity.slug || entity.id),
+            path: entity.path || ""
+          });
+        }
+      });
+    });
 
     if (!workflows.length) {
       container.appendChild(el("p", { className: "empty-state", textContent: "No workflows found." }));

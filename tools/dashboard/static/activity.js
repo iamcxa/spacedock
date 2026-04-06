@@ -460,6 +460,55 @@
     sendBtn.addEventListener("click", sendMessage);
   }
 
+  // --- Ticker Strip ---
+  var tickerEvents = [];
+  var TICKER_MAX = 5;
+
+  function updateTicker(entry) {
+    var e = entry.event;
+    if (e.type === "channel_message" || e.type === "channel_response" ||
+        e.type === "permission_request" || e.type === "permission_response") return;
+    var summary = e.type + ": " + (e.agent || "") + " \u2192 " + (e.entity || "") + " @ " + (e.stage || "");
+    tickerEvents.unshift(summary);
+    if (tickerEvents.length > TICKER_MAX) tickerEvents.pop();
+    renderTicker();
+
+    // Push gate/error alerts to alert bar
+    if (window._warRoomAlerts && (e.type === "gate" || e.type === "error")) {
+      window._warRoomAlerts.addAlert({
+        type: e.type,
+        entity: e.entity || "",
+        text: (e.type === "gate" ? "\uD83D\uDFE0 Gate: " : "\u274C Error: ") + (e.entity || "") + " @ " + (e.stage || ""),
+        path: ""
+      });
+    }
+  }
+
+  function renderTicker() {
+    var panel = document.getElementById("activity-panel");
+    if (!panel) return;
+    var existing = panel.querySelector(".ticker-strip");
+    if (existing) existing.remove();
+    if (tickerEvents.length === 0) return;
+    var ticker = document.createElement("div");
+    ticker.className = "ticker-strip";
+    ticker.textContent = tickerEvents[0];
+    // Insert before channel input bar
+    var inputBar = document.getElementById("channel-input-bar");
+    if (inputBar) {
+      panel.insertBefore(ticker, inputBar);
+    } else {
+      panel.appendChild(ticker);
+    }
+  }
+
+  // Hook ticker into renderEntry
+  var _origRenderEntry = renderEntry;
+  renderEntry = function (entry) {
+    _origRenderEntry(entry);
+    updateTicker(entry);
+  };
+
   // Start disconnected — channel.ts will broadcast status when connected
   setChannelStatus(false);
   connect();
