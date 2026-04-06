@@ -1,7 +1,7 @@
 ---
 id: 017
 title: Dashboard Auth + Shareable Access — 部署無關的認證與分享機制
-status: pr-draft
+status: pr-review
 source: /build brainstorming (revised after plan rejection)
 started: 2026-04-06T09:45:00Z
 completed:
@@ -9,7 +9,7 @@ verdict:
 score: 0.9
 worktree: .worktrees/spacedock-ensign-dashboard-shareable-warroom
 issue:
-pr:
+pr: "iamcxa/spacedock#8"
 intent: feature
 scale: Medium
 project: spacedock
