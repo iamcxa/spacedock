@@ -613,7 +613,7 @@ if (import.meta.main) {
 
   const server = createServer({ port, projectRoot, staticDir, logFile });
 
-  const banner = `[${new Date().toISOString().slice(0, 19).replace("T", " ")}] Spacedock Dashboard started on http://127.0.0.1:${server.port}/ (root: ${projectRoot})`;
+  const banner = `[${new Date().toISOString().slice(0, 19).replace("T", " ")}] 戰情室 started on http://127.0.0.1:${server.port}/ (root: ${projectRoot})`;
   console.log(banner);
   if (logFile) {
     appendFileSync(logFile, banner + "\n");
