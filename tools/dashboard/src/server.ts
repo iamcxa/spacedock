@@ -12,6 +12,7 @@ import {
   rejectSuggestion as rejectSuggestionAction,
 } from "./comments";
 import { EventBuffer } from "./events";
+import { ShareRegistry } from "./auth";
 import type { AgentEvent, AgentEventType, Stage } from "./types";
 import { telemetryInit, captureException, getPosthogJsConfig } from "./telemetry";
 import { updateWorkflowStages } from "./frontmatter-io";
@@ -46,6 +47,7 @@ export function createServer(opts: ServerOptions) {
   const { projectRoot, logFile } = opts;
   const staticDir = opts.staticDir ?? join(dirname(import.meta.dir), "static");
   const eventBuffer = new EventBuffer(500);
+  const shareRegistry = new ShareRegistry();
 
   telemetryInit();
 
@@ -528,6 +530,59 @@ export function createServer(opts: ServerOptions) {
           return new Response(Bun.file(filepath));
         },
       },
+      "/api/share": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as {
+              password?: string;
+              entityPaths?: string[];
+              stages?: string[];
+              label?: string;
+              ttlHours?: number;
+            };
+            if (!body.password) {
+              logRequest(req, 400);
+              return jsonResponse({ error: "Missing required field: password" }, 400);
+            }
+            if (!body.entityPaths || body.entityPaths.length === 0) {
+              logRequest(req, 400);
+              return jsonResponse({ error: "Missing required field: entityPaths (must be non-empty)" }, 400);
+            }
+            const link = await shareRegistry.create({
+              password: body.password,
+              entityPaths: body.entityPaths,
+              stages: body.stages ?? [],
+              label: body.label ?? "Share Link",
+              ttlHours: body.ttlHours ?? 24,
+            });
+            // Publish share_created event
+            const event: AgentEvent = {
+              type: "share_created",
+              entity: link.label,
+              stage: "",
+              agent: "captain",
+              timestamp: new Date().toISOString(),
+              detail: `Share link created: ${link.label} (${link.entityPaths.length} entities, expires ${link.expiresAt})`,
+            };
+            publishEvent(event);
+            // Return link WITHOUT passwordHash
+            const { passwordHash, ...safeLink } = link;
+            logRequest(req, 200);
+            return jsonResponse(safeLink);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/share/list": {
+        GET: (req) => {
+          const links = shareRegistry.list().map(({ passwordHash, ...rest }) => rest);
+          logRequest(req, 200);
+          return jsonResponse({ links });
+        },
+      },
       "/": {
         GET: (req) => {
           const filepath = join(staticDir, "index.html");
@@ -577,7 +632,7 @@ export function createServer(opts: ServerOptions) {
         ws.unsubscribe("activity");
       },
     },
-    fetch(req) {
+    async fetch(req) {
       try {
         // Fallback handler for static files and unmatched routes
         const url = new URL(req.url);
@@ -589,6 +644,48 @@ export function createServer(opts: ServerOptions) {
           if (upgraded) return undefined as any;
           logRequest(req, 400);
           return new Response("WebSocket upgrade failed", { status: 400 });
+        }
+
+        // Share link dynamic routes
+        const shareVerifyMatch = pathname.match(/^\/api\/share\/([a-f0-9]+)\/verify$/);
+        if (shareVerifyMatch && req.method === "POST") {
+          const token = shareVerifyMatch[1];
+          try {
+            const body = await req.json() as { password?: string };
+            if (!body.password) {
+              logRequest(req, 400);
+              return jsonResponse({ error: "Missing required field: password" }, 400);
+            }
+            const link = shareRegistry.get(token);
+            if (!link) {
+              logRequest(req, 404);
+              return jsonResponse({ error: "Share link not found or expired" }, 404);
+            }
+            const valid = await shareRegistry.verify(token, body.password);
+            if (!valid) {
+              logRequest(req, 401);
+              return jsonResponse({ error: "Invalid password" }, 401);
+            }
+            const { passwordHash, ...scope } = link;
+            logRequest(req, 200);
+            return jsonResponse({ ok: true, scope });
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        }
+
+        const shareDeleteMatch = pathname.match(/^\/api\/share\/([a-f0-9]+)$/);
+        if (shareDeleteMatch && req.method === "DELETE") {
+          const token = shareDeleteMatch[1];
+          const deleted = shareRegistry.delete(token);
+          if (!deleted) {
+            logRequest(req, 404);
+            return jsonResponse({ error: "Share link not found" }, 404);
+          }
+          logRequest(req, 200);
+          return jsonResponse({ ok: true });
         }
 
         // Serve static files
@@ -637,7 +734,7 @@ export function createServer(opts: ServerOptions) {
     server.publish("activity", JSON.stringify({ type: "channel_status", connected }));
   }
 
-  return Object.assign(server, { eventBuffer, publishEvent, broadcastChannelStatus });
+  return Object.assign(server, { eventBuffer, publishEvent, broadcastChannelStatus, shareRegistry });
 }
 
 // CLI entry point -- only runs when executed directly
