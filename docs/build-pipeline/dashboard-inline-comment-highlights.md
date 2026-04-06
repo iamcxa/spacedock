@@ -3,11 +3,11 @@ id: 013
 title: Dashboard Inline Comment Highlights — Notion-like Comment Threading & Visual Markers
 status: explore
 source: UI testing feedback
-started:
+started: 2026-04-06T13:10:00Z
 completed:
 verdict:
 score: 0.85
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-inline-comment-highlights
 issue:
 pr:
 intent: feature
