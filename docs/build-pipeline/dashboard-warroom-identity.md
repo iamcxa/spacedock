@@ -1,7 +1,7 @@
 ---
 id: 015
 title: Dashboard War Room Identity — 戰情室品牌重塑與指揮中心體驗
-status: pr-draft
+status: pr-review
 source: /build brainstorming
 started: 2026-04-06T00:30:00+08:00
 completed:
@@ -9,7 +9,7 @@ verdict:
 score: 0.75
 worktree: .worktrees/spacedock-ensign-dashboard-warroom-identity
 issue:
-pr:
+pr: iamcxa/spacedock#6
 intent: feature
 scale: Small
 project: spacedock
