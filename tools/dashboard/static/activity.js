@@ -91,6 +91,7 @@
       dispatch: "#58a6ff",
       completion: "#3fb950",
       gate: "#f0883e",
+      gate_decision: "#f0883e",
       feedback: "#d2a8ff",
       merge: "#79c0ff",
       idle: "#8b949e",
@@ -115,6 +116,8 @@
       renderPermissionRequest(entry);
     } else if (e.type === "permission_response") {
       renderPermissionResponse(entry);
+    } else if (e.type === "gate_decision") {
+      renderGateDecision(entry);
     } else {
       renderEvent(entry);
     }
@@ -408,6 +411,41 @@
     // Since we resolve cards in sendPermissionVerdict, this handles
     // verdicts from other sources (e.g., terminal responded first).
     if (!feedContainer) return;
+  }
+
+  function renderGateDecision(entry) {
+    if (!feedContainer) return;
+    removeEmptyState();
+
+    var e = entry.event;
+    var isApproved = e.detail === "approved";
+
+    var card = document.createElement("div");
+    card.className = "permission-card resolved";
+
+    var header = document.createElement("div");
+    header.className = "perm-header";
+    header.textContent = "Gate Decision";
+    card.appendChild(header);
+
+    var detail = document.createElement("div");
+    detail.className = "perm-tool";
+    detail.textContent = e.entity + " @ " + e.stage;
+    card.appendChild(detail);
+
+    var verdict = document.createElement("div");
+    verdict.className = "perm-verdict";
+    verdict.style.color = isApproved ? "#3fb950" : "#f85149";
+    verdict.textContent = isApproved ? "Approved" : "Changes Requested";
+    card.appendChild(verdict);
+
+    var time = document.createElement("span");
+    time.className = "bubble-time";
+    time.textContent = timeAgo(e.timestamp);
+    card.appendChild(time);
+
+    feedContainer.insertBefore(card, feedContainer.firstChild);
+    capFeedItems();
   }
 
   // --- Input Bar ---
