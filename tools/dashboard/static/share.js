@@ -393,26 +393,60 @@
           container.appendChild(empty);
           return;
         }
-        thread.comments.forEach(function (c) {
-          var div = document.createElement("div");
-          div.className = "comment-item";
+        // Sort: unresolved first, then by newest
+        var sorted = thread.comments.slice().sort(function (a, b) {
+          if (a.resolved !== b.resolved) return a.resolved ? 1 : -1;
+          return new Date(b.timestamp) - new Date(a.timestamp);
+        });
 
-          var author = document.createElement("div");
-          author.className = "comment-author";
-          author.textContent = c.author;
-          div.appendChild(author);
+        sorted.forEach(function (c) {
+          var card = document.createElement("div");
+          card.className = "comment-card" + (c.resolved ? " resolved" : "");
 
-          var text = document.createElement("div");
-          text.className = "comment-text";
-          text.textContent = c.content;
-          div.appendChild(text);
+          // Selected text preview
+          if (c.selected_text) {
+            var selectedText = document.createElement("div");
+            selectedText.className = "comment-selected-text";
+            selectedText.textContent = '"' + c.selected_text + '"';
+            card.appendChild(selectedText);
+          }
 
-          var time = document.createElement("div");
-          time.className = "comment-time";
-          time.textContent = new Date(c.timestamp).toLocaleString();
-          div.appendChild(time);
+          // Comment content
+          var content = document.createElement("div");
+          content.className = "comment-content";
+          content.textContent = c.content;
+          card.appendChild(content);
 
-          container.appendChild(div);
+          // Meta: author + section + resolve
+          var meta = document.createElement("div");
+          meta.className = "comment-meta";
+
+          var authorSpan = document.createElement("span");
+          authorSpan.textContent = c.author + (c.section_heading ? " \u2022 " + c.section_heading.replace("## ", "") : "");
+          meta.appendChild(authorSpan);
+
+          // No resolve button on share page — only captain can resolve
+
+          card.appendChild(meta);
+
+          // Click card → scroll to highlight + flash
+          (function (commentId) {
+            card.addEventListener("click", function (e) {
+              var marks = document.querySelectorAll(".comment-highlight");
+              for (var m = 0; m < marks.length; m++) {
+                var ids = (marks[m].getAttribute("data-comment-ids") || "").split(",");
+                if (ids.indexOf(commentId) !== -1) {
+                  marks[m].scrollIntoView({ behavior: "smooth", block: "center" });
+                  marks[m].classList.add("comment-highlight-flash");
+                  setTimeout(function () { marks[m].classList.remove("comment-highlight-flash"); }, 700);
+                  marks[m].click();
+                  break;
+                }
+              }
+            });
+          })(c.id);
+
+          container.appendChild(card);
         });
       });
   }
