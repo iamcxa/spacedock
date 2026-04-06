@@ -98,3 +98,90 @@ RATIONALE:    核心 UX 突破 — 讓非 CLI 用戶也能參與工作流決策�
 2. Gate state source of truth = FO frontmatter，非 dashboard。"Pending Review" badge 由前端讀 `frontmatter.status` + 對比 workflow stages 的 `gate: true` 推導
 3. Race condition 防護：按鈕 click 後立即 disable（同 permission card pattern），FO 收到第一個 gate decision 後忽略後續重複
 4. detail.html 不載入 activity.js — 需在 detail.js 內新增獨立 WebSocket 連線，或抽出共用 WS 模組
+
+## Technical Claims
+
+CLAIM-1: [type: framework] "Bun.serve() routes can handle POST /api/entity/gate/decision with JSON body parsing via await req.json()"
+CLAIM-2: [type: project-convention] "Channel protocol (MCP notification via channel.ts) can carry gate_decision meta type without protocol changes — meta is Record<string, string>"
+CLAIM-3: [type: project-convention] "Permission card UI pattern in activity.js (renderPermissionRequest) can be reused for gate approval cards (dual-button + disable-on-click + resolve)"
+CLAIM-4: [type: project-convention] "detail.js can add independent WebSocket connection to /ws/activity for real-time gate status — detail.html does NOT load activity.js"
+CLAIM-5: [type: project-convention] "VALID_EVENT_TYPES in events.ts is a hardcoded Set that must be manually synced with AgentEventType in types.ts"
+CLAIM-6: [type: domain-rule] "Gate state source of truth is FO frontmatter — dashboard derives Pending Review from status + gate:true stage property"
+CLAIM-7: [type: project-convention] "Feature 011 comment pattern (text selection -> tooltip -> POST /api/entity/comment -> sendCommentToChannel) can serve as Request Changes flow"
+CLAIM-8: [type: domain-rule] "Race condition between CLI and UI gate approval can be handled by first writer wins in FO (FO ignores duplicate decisions)"
+
+## Research Report
+
+**Claims analyzed**: 8
+**Recommendation**: REVISE
+
+### Verified (6 claims)
+
+- CLAIM-1: CONFIRMED — HIGH — Bun.serve() routes support POST handlers with JSON body parsing
+  Explorer: 10 existing POST handlers in server.ts (lines 129-462), all using `await req.json()` pattern
+  Web (Bun docs): Bun.serve routes API (v1.2.3+) explicitly supports per-HTTP-method handlers `{ GET: fn, POST: async req => { const body = await req.json(); ... } }`. Bun 1.3 (Oct 2025) further enhanced routes with dynamic params.
+  Adding `/api/entity/gate/decision` follows the identical pattern used by `/api/entity/score`, `/api/entity/comment`, etc.
+
+- CLAIM-2: CONFIRMED — HIGH — Channel protocol can carry gate_decision meta type without changes
+  Explorer: channel.ts:54-68 `onChannelMessage` callback receives `(content, meta)`. Only `meta?.type === "permission_response"` is special-cased (line 56); all other meta types fall through to the generic `mcp.notification({ method: "notifications/claude/channel", params: { content, meta: meta ?? {} } })` path (line 61-63).
+  Explorer: `meta` typed as `Record<string, string>` in server.ts:24 and channel.ts (open schema, no validation).
+  Web (MCP SDK): MCP supports custom notification methods with arbitrary params over JSON-RPC 2.0.
+  A new `gate_decision` meta type requires zero protocol changes — it flows through the existing generic path.
+
+- CLAIM-3: CONFIRMED — HIGH — Permission card UI pattern is directly reusable for gate approval cards
+  Explorer: activity.js:325-404 `renderPermissionRequest()` creates a card with: header, description, dual buttons (Approve/Reject), click handlers that (1) disable both buttons immediately, (2) POST to /api/channel/send, (3) add `.resolved` class and verdict text on success, (4) re-enable on failure.
+  This is exactly the UX pattern needed for gate approval cards — same dual-button, disable-on-click, resolve flow.
+
+- CLAIM-4: CONFIRMED — HIGH — detail.js has no WebSocket; needs independent connection
+  Explorer: Grep for "WebSocket" and "/ws/activity" in detail.js returned zero matches. detail.html (line 74) only loads `detail.js`, not `activity.js`.
+  Web (Bun docs): WebSocket upgrade happens in the `fetch` fallback handler (server.ts:531), not in routes. Multiple browser clients can connect to the same `/ws/activity` endpoint — each gets its own ServerWebSocket instance subscribed to the "activity" topic via `ws.subscribe("activity")` (server.ts:485).
+  No limitation on multiple concurrent WebSocket connections from different pages.
+
+- CLAIM-5: CONFIRMED — HIGH — VALID_EVENT_TYPES and AgentEventType are already out of sync (existing bug)
+  Explorer: types.ts:78-80 defines `AgentEventType` with 12 members: dispatch, completion, gate, feedback, merge, idle, channel_message, channel_response, permission_request, permission_response, **comment, suggestion**.
+  Explorer: events.ts:3-6 defines `VALID_EVENT_TYPES` with only 10 members — **missing "comment" and "suggestion"**.
+  This confirms the manual sync requirement AND reveals a pre-existing bug where comment/suggestion events would be rejected by EventBuffer.push() at runtime. The plan must add "gate_decision" to BOTH files and should also fix the existing "comment"/"suggestion" gap.
+
+- CLAIM-7: CONFIRMED — HIGH — Feature 011 comment pattern can serve as Request Changes flow
+  Explorer: detail.js:316-353 `submitComment()` POSTs to `/api/entity/comment` then calls `sendCommentToChannel()` which POSTs to `/api/channel/send` with `meta.type: "comment"`. The full pipeline: text selection -> tooltip -> POST comment -> channel notification to FO.
+  "Request Changes" can trigger this same flow — captain selects problematic text, adds comment explaining the issue, which gets routed to FO via the existing channel. No new UI components needed for the basic flow.
+
+### Corrected (2 claims)
+
+- CLAIM-6: CORRECTION — MEDIUM — Gate state derivation is more nuanced than described
+  Explorer: FO frontmatter `status` field reflects the current stage name (e.g., "plan", "execute"), NOT a separate "gate pending" flag. The `gate: true` property is on the stage definition in the workflow README, not on entity frontmatter.
+  Explorer: first-officer-shared-core.md:117-131 — FO checks "whether the completed stage is gated" by reading stage properties. Gate state = entity `status` matches a stage that has `gate: true` in the README stage definition.
+  **Fix**: The dashboard must cross-reference entity `status` against the workflow's stage definitions (already available in `WorkflowData.stages`) to determine if an entity is at a gate. It cannot derive this from entity frontmatter alone — it needs `stages.find(s => s.name === entity.status && s.gate)`. This is already available client-side since `/api/workflows` returns stage definitions including `gate: boolean`. The explore report's description is functionally correct but could mislead the planner into thinking gate state is a frontmatter field.
+
+- CLAIM-8: CORRECTION — MEDIUM — "First writer wins" is NOT documented in FO protocol; race condition handling must be designed
+  Explorer: first-officer-shared-core.md and claude-first-officer-runtime.md contain NO mention of "first writer wins", "duplicate decision", or "ignore subsequent" gate decisions. The FO protocol only states:
+  - "never self-approve" (shared-core:129)
+  - "Only the captain can approve or reject gates" (runtime:58)
+  - "keep the worker alive while waiting at the gate" (shared-core:131)
+  Explorer: The FO is an AI agent reading conversation context, not a state machine with duplicate-detection logic. If both CLI (captain text in terminal) and UI (channel message) send gate decisions, the FO would process whichever it sees first in its conversation, but there is NO explicit dedup mechanism.
+  **Fix**: The plan must design an explicit race-condition strategy. Options:
+  (a) UI-side: after sending gate decision via channel, disable buttons and show "Decision sent — waiting for FO confirmation". If FO already advanced (status changed), show "Already approved via CLI".
+  (b) FO-side: document a convention where FO checks entity status before acting on a gate decision — if entity already advanced past the gated stage, ignore the late decision.
+  (c) Both: UI polls entity status to detect if gate was already resolved elsewhere.
+  The explore report's claim that "FO ignores duplicate decisions" is an assumption, not a verified behavior.
+
+### Unverifiable (0 claims)
+
+(None — all claims had sufficient evidence from codebase and documentation.)
+
+### Recommendation Criteria
+
+**REVISE** recommended because:
+1. CLAIM-8 correction affects the race-condition handling strategy — a core architectural concern of this feature. The plan cannot assume "first writer wins" behavior exists; it must explicitly design dedup/race handling.
+2. CLAIM-6 correction affects how the dashboard determines gate state — the plan must specify the cross-reference logic between entity status and workflow stage definitions, not imply gate state lives in entity frontmatter.
+3. CLAIM-5 reveals a pre-existing bug (comment/suggestion missing from VALID_EVENT_TYPES) that should be fixed as part of this feature's event type additions.
+
+## Stage Report: research
+
+- [x] Claims extracted from plan (8 claims)
+- [x] Explorer subagent dispatched and returned — codebase verification of all 8 claims with file:line citations
+- [x] Context7 subagent dispatched and returned — library docs verified via Bun.sh official docs and MCP SDK GitHub
+- [x] Web subagent dispatched and returned — Bun HTTP/WebSocket docs confirmed framework claims
+- [x] Cross-reference synthesis completed — 6 CONFIRMED (HIGH), 2 CORRECTED (MEDIUM)
+- [x] Research report written to entity
+- [x] Insights cached to context lake (via prior explore stage insights; new findings documented in report)
