@@ -223,3 +223,17 @@ None of these corrections invalidate the overall approach, but the plan needs ad
 - [x] Cross-reference synthesis completed — 8 verified, 3 corrected, 1 unverifiable
 - [x] Research report written to entity
 - [x] Insights cached to context lake (pending below)
+
+## Stage Report: plan
+
+- [x] Formal plan document created via `Skill: "superpowers:writing-plans"` and saved to `docs/superpowers/plans/2026-04-06-dashboard-auth-shareable-access.md` — DONE
+- [x] Plan has concrete file paths for all new and modified files — DONE (12 files mapped in File Structure table: 4 Create, 8 Modify)
+- [x] Plan uses test-first ordering (tests before implementation code) — DONE (Tasks 2, 4, 5, 6 all write failing tests before implementation)
+- [x] Plan follows AUTH-FIRST architecture (auth middleware first, ngrok last) — DONE (Task 1: types, Task 2: ShareRegistry, Task 3: --host flag, Tasks 4-6: share routes/scoped WS, Tasks 7-8: UI, Task 9: ngrok — last)
+- [x] Plan incorporates all research corrections — DONE:
+  - CLAIM-3 (ngrok limits): 20K cap + interstitial documented in Task 9 output, header workaround noted
+  - CLAIM-4 (Cloudflare tunnel): NOT included as primary — experimental only, per spec guardrails
+  - CLAIM-8 (bind address 0.0.0.0): Task 3 adds --host flag defaulting to 127.0.0.1; Task 9 passes --host 0.0.0.0 when tunnel active
+  - CLAIM-7 (WebSocket leakage): Task 6 implements server-side scoped /ws/share/:token/activity endpoint
+  - CLAIM-1 (Bun.password argon2id): Task 2 uses Bun.password.hash/verify
+- [x] Plan includes quality gate steps — DONE (Task 10: type check, full test suite, share integration tests, backward compatibility verification)
