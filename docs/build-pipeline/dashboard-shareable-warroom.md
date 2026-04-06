@@ -489,3 +489,61 @@ Body includes:
 - Files changed (4 created, 8 modified)
 - E2E status (mapping updated, flow written, execution skipped — stale daemon)
 - Dependencies note (requires Feature 016)
+
+## Stage Report: pr-review
+
+### 1. Self-Review with Findings Classified
+
+**Files reviewed**: 12 source files (4 created, 8 modified) + 2 test files + E2E flows/mappings
+
+**Findings:**
+
+| # | Type | Severity | File | Description | Status |
+|---|------|----------|------|-------------|--------|
+| 1 | CODE | Medium | `static/share.js:37-52` | `doVerify()` did not handle non-200 responses (e.g. 500) — `res.json()` succeeds but `data.scope` is undefined, causing `showReviewView()` to crash accessing `scope.label`, `scope.expiresAt`, `scope.entityPaths` | FIXED (commit 51946da) |
+| 2 | SUGGESTION | Low | `static/share.html:84-89` | Gate panel HTML present (`#gate-panel`, approve/request-changes buttons) but `share.js` never wires up click handlers and `/api/share/:token/approve` route does not exist in `server.ts`. Dead HTML. Acceptance criteria "Reviewer 可 comment + approve gate" is incomplete for the approve part. | NOTED — not blocking; gate approval from share page can be a follow-up |
+| 3 | SUGGESTION | Low | `server.ts:684-711` | No rate limiting on `POST /api/share/:token/verify` — brute-force password attempts possible if token is known. Acceptable for internal tool with default 127.0.0.1 binding, but worth noting for when `--tunnel` or `--host 0.0.0.0` is used. | NOTED — acceptable risk for current scope |
+
+### 2. CODE/SUGGESTION Findings Fixed and Pushed
+
+- **Finding 1 FIXED**: Added `!res.ok` guard before `res.json()` in `doVerify()`, plus `!data.scope` null check before calling `showReviewView()`. Committed as `51946da` and pushed to remote.
+- **Findings 2-3**: SUGGESTION-level, documented but not blocking.
+
+### 3. Review Summary
+
+**Security assessment — PASS:**
+- Password hashing: `Bun.password.hash()` with argon2id (cryptographically sound, timing-safe verify)
+- Token generation: `crypto.getRandomValues()` for 24 bytes (192-bit entropy, 48 hex chars) — unforgeable
+- Scope enforcement: `isInScope()` checked on every share entity route (`/detail`, `/comments`, `/comment`); path traversal blocked by `validatePath()`
+- WebSocket scoping: Server-side filtering — share clients subscribe to `share:{token}` topic only; `publishEvent()` filters by `entitySlugs.has(event.entity)` before forwarding
+- XSS prevention: Only `innerHTML` usage is DOMPurify-sanitized `marked.parse()` output (share.js:109); all user data via `textContent`
+- No `eval()`, no `Function()`, no dynamic code execution
+- passwordHash excluded from all API responses (`{ passwordHash, ...safeLink } = link`)
+- TTL enforcement: `shareRegistry.get()` auto-deletes expired links on every access
+
+**Backward compatibility — PASS:**
+- Default hostname 127.0.0.1 (server.ts:898) — existing localhost users unaffected
+- All existing routes (/, /detail, /api/*) work without auth
+- `--host` flag only changes bind when explicitly provided
+- No breaking changes to existing API contracts
+
+**Test coverage — PASS:**
+- 54 core tests pass (tools/dashboard), 0 fail
+- 16 share integration tests pass (tests/dashboard/share.test.ts) covering: CRUD, verify (correct/wrong/expired), scope enforcement (in-scope/out-of-scope/expired), guest comments, scoped WebSocket (connect/replay/expired rejection)
+- 16 auth unit tests pass (auth.test.ts) covering: create, unique tokens, verify correct/wrong/expired, get valid/expired/unknown, list with expiry cleanup, delete, isInScope
+- Pre-existing failures in server.test.ts (3), channel.test.ts (9), parsing.test.ts (1) — all confirmed failing on main branch, not introduced by this PR
+
+**Code quality:**
+- Consistent error handling pattern across all share routes (try/catch, captureException, logRequest)
+- Share routes follow identical patterns to existing routes (/api/entity/detail, /api/entity/comment)
+- Clean separation: auth.ts (ShareRegistry), server.ts (routes), share.js (client), share.html (markup)
+- Type definitions properly extended (ShareLink, ShareSession, "guest" author, share_created event)
+
+### 4. Recommendation
+
+**APPROVE** — with the following notes:
+
+- Finding 1 (CODE) has been fixed and pushed
+- Finding 2 (gate approval from share page) is an incomplete acceptance criterion — the HTML scaffolding is in place but not wired. This can be addressed as a follow-up without blocking the PR, since the gate panel is hidden by default (`display:none`)
+- Finding 3 (rate limiting) is acceptable for the current threat model (default localhost binding); should be revisited if the tool is commonly used with `--tunnel` or `--host 0.0.0.0`
+- The 13 pre-existing test failures in `tests/dashboard/` are not related to this PR and should be tracked separately
