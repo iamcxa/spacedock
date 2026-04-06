@@ -1,7 +1,7 @@
 ---
 id: 021
 title: Dashboard SQLite Persistence — Share Links & Event History 持久化
-status: plan
+status: execute
 source: captain feedback (013 testing session)
 started: 2026-04-07T08:00:00Z
 completed:
