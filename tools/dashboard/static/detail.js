@@ -839,19 +839,27 @@ function rejectSuggestionAction(suggestionId) {
     modal.style.display = "none";
   });
 
+  var shareError = document.getElementById("share-error");
+
   submitBtn.addEventListener("click", function () {
     var password = document.getElementById("share-password").value;
     var label = document.getElementById("share-label-input").value || "Share Link";
     var ttl = parseInt(document.getElementById("share-ttl").value, 10) || 24;
 
     if (!password) {
-      alert("Password is required.");
+      shareError.textContent = "Password is required.";
+      shareError.style.display = "";
       return;
     }
 
     var params = new URLSearchParams(window.location.search);
     var entityPath = params.get("path");
     if (!entityPath) return;
+
+    // Loading state
+    shareError.style.display = "none";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Creating...";
 
     fetch("/api/share", {
       method: "POST",
@@ -864,14 +872,38 @@ function rejectSuggestionAction(suggestionId) {
         ttlHours: ttl,
       }),
     })
-      .then(function (res) { return res.json(); })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.text().then(function (text) {
+            throw new Error("Server error (" + res.status + "): " + (text || "Unknown error"));
+          });
+        }
+        return res.json();
+      })
       .then(function (data) {
         if (data.token) {
           var url = window.location.origin + "/share/" + data.token;
           shareUrlInput.value = url;
           shareResult.style.display = "block";
+          // Success feedback: highlight and auto-select URL for easy copy
+          shareUrlInput.style.outline = "2px solid #27ae60";
+          shareUrlInput.focus();
+          shareUrlInput.select();
+          setTimeout(function () { shareUrlInput.style.outline = ""; }, 2000);
           loadShareLinks();
+        } else {
+          shareError.textContent = "Unexpected response — no token returned.";
+          shareError.style.display = "";
         }
+      })
+      .catch(function (err) {
+        shareError.textContent = err.message || "Network error — could not reach server.";
+        shareError.style.display = "";
+        shareResult.style.display = "none";
+      })
+      .finally(function () {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Create";
       });
   });
 
