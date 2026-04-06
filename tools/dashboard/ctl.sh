@@ -158,7 +158,7 @@ do_start() {
         entry_script="tools/dashboard/src/channel.ts"
     fi
 
-    nohup bun run "$entry_script" \
+    nohup bun run "$REPO_ROOT/$entry_script" \
         --port "$selected_port" \
         --root "$ROOT" \
         --log-file "$LOG_FILE" \
