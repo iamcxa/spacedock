@@ -519,6 +519,202 @@ pages:
         type: text
         description: Text shown after gate decision — "Approved" or "Changes Requested"
 
+      # --- Share panel (Feature 017) ---
+      share_panel:
+        selector: "#share-panel"
+        type: container
+        description: Share link management panel in entity detail sidebar (always visible)
+      share_panel_heading:
+        selector: "#share-panel h3"
+        type: heading
+        description: '"Share" heading in share panel'
+      create_share_btn:
+        selector: "#create-share-btn"
+        type: button
+        description: '"Create Share Link" button — opens share creation modal'
+        interaction: click shows share_modal
+      share_links:
+        selector: "#share-links"
+        type: container
+        description: Container for list of existing share link entries
+      share_modal:
+        selector: "#share-modal"
+        type: container
+        description: Share creation form — password, label, TTL inputs
+        initially_hidden: true
+      share_password_input:
+        selector: "#share-password"
+        type: text-input
+        description: Password field for new share link (plain text input, will be hashed server-side with argon2id)
+      share_label_input:
+        selector: "#share-label-input"
+        type: text-input
+        description: Optional label for the share link (e.g. "Review for Alice")
+      share_ttl_input:
+        selector: "#share-ttl"
+        type: number-input
+        description: TTL in hours for share link (default 24, min 1, max 168)
+      share_submit:
+        selector: "#share-submit"
+        type: button
+        description: '"Create" button — submits share link creation to POST /api/share'
+        interaction: click creates share link; shows share_result on success
+      share_cancel:
+        selector: "#share-cancel"
+        type: button
+        description: '"Cancel" button — hides share_modal without creating link'
+        interaction: click hides share_modal
+      share_result:
+        selector: "#share-result"
+        type: container
+        description: Result section shown after successful share link creation — contains share URL and copy button
+        initially_hidden: true
+      share_url:
+        selector: "#share-url"
+        type: text-input
+        description: Readonly input showing the generated share link URL (e.g. http://127.0.0.1:8421/share/:token)
+      share_copy:
+        selector: "#share-copy"
+        type: button
+        description: '"Copy" button — copies share_url to clipboard'
+        interaction: click copies URL to clipboard
+
+  share_page:
+    path: /share/:token
+    title: "Spacedock -- Shared Review"
+    source: tools/dashboard/static/share.html
+    scripts:
+      - share.js
+    external_deps:
+      - marked.js (CDN — markdown rendering)
+      - DOMPurify (CDN — XSS sanitization)
+    elements:
+      # --- Auth view ---
+      auth_view:
+        selector: "#auth-view"
+        type: container
+        description: Password entry container shown before authentication (centered, max-width 400px)
+        initially_visible: true
+      auth_heading:
+        selector: "#auth-view h2"
+        type: heading
+        description: '"Review Access" heading in auth container'
+      share_label_display:
+        selector: "#share-label-display"
+        type: text
+        description: Share link label text shown above password input (e.g. "Review for Alice")
+      password_input:
+        selector: "#password-input"
+        type: password-input
+        description: Password field — autofocused; Enter key triggers verification
+        interaction: Enter key calls doVerify()
+      verify_btn:
+        selector: "#verify-btn"
+        type: button
+        description: '"Verify" button — POSTs password to /api/share/:token/verify'
+        interaction: click calls doVerify(); disabled during request
+      auth_error:
+        selector: "#auth-error"
+        type: text
+        description: Error message shown on wrong password — "Incorrect password. Please try again."
+        initially_hidden: true
+
+      # --- Review view (post-auth) ---
+      review_view:
+        selector: "#review-view"
+        type: container
+        description: Full review interface shown after successful auth — contains header + entity list or detail
+        initially_hidden: true
+      share_header:
+        selector: ".share-header"
+        type: container
+        description: Header bar in review view showing share label and expiry time
+      review_label:
+        selector: "#review-label"
+        type: text
+        description: Share link label shown in review header
+      review_expires:
+        selector: "#review-expires"
+        type: text
+        description: Expiry time shown in review header (e.g. "Expires: 4/7/2026, 10:00:00 AM")
+
+      # --- Entity list ---
+      entity_list:
+        selector: "#entity-list"
+        type: container
+        description: Scoped entity list — shows only entities authorized for this share token
+      entity_card:
+        selector: ".entity-card"
+        type: container
+        description: Individual entity card — clickable to open entity detail view
+        interaction: click shows entity_detail_view
+      entity_card_title:
+        selector: ".entity-card h3"
+        type: heading
+        description: Entity title in entity card
+      entity_card_meta:
+        selector: ".entity-card .meta"
+        type: text
+        description: 'Entity metadata line — "Status: {status} | Score: {score}"'
+
+      # --- Entity detail view (in-page) ---
+      entity_detail_view:
+        selector: "#entity-detail-view"
+        type: container
+        description: In-page entity detail view — shown when reviewer clicks an entity card
+        initially_hidden: true
+      back_to_list:
+        selector: "#back-to-list"
+        type: button
+        description: '"<- Back to list" button — hides entity detail view, shows entity list'
+        interaction: click shows entity_list, hides entity_detail_view
+      share_entity_body:
+        selector: "#entity-detail-view #entity-body"
+        type: container
+        description: Rendered markdown body of the entity in share page (DOMPurify-sanitized)
+      share_comments_panel:
+        selector: "#entity-detail-view #comments-panel"
+        type: container
+        description: Comments panel in share detail view — shows comments, allows adding new ones
+      share_comment_threads:
+        selector: "#entity-detail-view #comment-threads"
+        type: container
+        description: Container for comment threads in share page
+      share_gate_panel:
+        selector: "#entity-detail-view #gate-panel"
+        type: container
+        description: Gate review panel in share page — hidden by default, shown for gated entities
+        initially_hidden: true
+      share_gate_approve_btn:
+        selector: "#entity-detail-view #gate-approve-btn"
+        type: button
+        description: '"Approve" button on share page gate panel'
+        interaction: click sends gate approval via scoped share route
+      share_gate_request_changes_btn:
+        selector: "#entity-detail-view #gate-request-changes-btn"
+        type: button
+        description: '"Request Changes" button on share page gate panel'
+
+      # --- Comment tooltip (shared across pages) ---
+      share_comment_tooltip:
+        selector: "#comment-tooltip"
+        type: container
+        description: Text-selection comment tooltip — appears when user selects text in entity body
+        initially_hidden: true
+      share_comment_input:
+        selector: "#comment-input"
+        type: textarea
+        description: Comment text input inside tooltip
+      share_comment_submit:
+        selector: "#comment-submit"
+        type: button
+        description: '"Comment" submit button in tooltip'
+        interaction: click POSTs to /api/share/:token/entity/comment
+      share_comment_cancel:
+        selector: "#comment-cancel"
+        type: button
+        description: '"Cancel" button in comment tooltip — hides tooltip'
+
 api_endpoints:
   get_workflows:
     method: GET
@@ -571,6 +767,54 @@ api_endpoints:
     path: /api/config
     description: Returns PostHog config (if configured)
     response_format: application/json
+  post_share_create:
+    method: POST
+    path: /api/share
+    description: Create a new share link (body — entityPath, password, label?, ttlHours?)
+    response_format: application/json
+    added_in: "017"
+  get_share_list:
+    method: GET
+    path: /api/share
+    description: List all active share links (token, label, expiresAt, entityPaths)
+    response_format: application/json
+    added_in: "017"
+  delete_share:
+    method: DELETE
+    path: /api/share/:token
+    description: Delete a specific share link by token
+    response_format: application/json
+    added_in: "017"
+  post_share_verify:
+    method: POST
+    path: /api/share/:token/verify
+    description: Verify share link password (body — password); returns scope on success (401 on wrong pw, 404 on expired/missing)
+    response_format: application/json
+    added_in: "017"
+  get_share_entity_detail:
+    method: GET
+    path: /api/share/:token/entity/detail?path={filepath}
+    description: Get entity detail scoped to share token — same shape as /api/entity/detail but enforces scope
+    response_format: application/json
+    added_in: "017"
+  get_share_entity_comments:
+    method: GET
+    path: /api/share/:token/entity/comments?path={filepath}
+    description: Get comments for an entity scoped to share token
+    response_format: application/json
+    added_in: "017"
+  post_share_entity_comment:
+    method: POST
+    path: /api/share/:token/entity/comment
+    description: Add a guest comment to an entity (body — path, selected_text, section_heading, content)
+    response_format: application/json
+    added_in: "017"
+  post_share_approve:
+    method: POST
+    path: /api/share/:token/approve
+    description: Submit a gate decision from share page (body — entity_path, entity_slug, stage, decision)
+    response_format: application/json
+    added_in: "017"
 
 websocket_endpoints:
   activity_feed:
@@ -582,6 +826,16 @@ websocket_endpoints:
       channel_status: "Channel connection state — {type: 'channel_status', connected: bool}"
     client_messages:
       channel_send: "Send message/verdict — {type: 'channel_send', content: string, meta: {}}"
+  share_activity_feed:
+    path: /ws/share/:token/activity
+    description: Scoped real-time activity feed for share tokens — only pushes events relevant to authorized entity slugs
+    added_in: "017"
+    message_types:
+      event: "Filtered event broadcast — same shape as activity_feed but scoped to token's entitySlugs"
+    notes:
+      - "Token validated before WebSocket upgrade — returns 403 if invalid/expired"
+      - "Replay on connect filtered to entityPaths from share link"
+      - "Subscribes to share:{token} Bun pub/sub topic (not global activity)"
 
 dialogs: {}
 
@@ -592,3 +846,8 @@ notes:
   - "Activity feed capped at 100 items in DOM (oldest removed first)"
   - "Channel input textarea auto-resizes up to 96px height"
   - "IME composition (CJK input) is handled — Enter during composing does not send"
+  - "[017] Share panel is always visible in entity detail sidebar (no visibility condition)"
+  - "[017] Share page at /share/:token — auth-view shown first, review-view after successful verify"
+  - "[017] Server defaults to 127.0.0.1 binding; --tunnel flag switches to 0.0.0.0 + spawns ngrok"
+  - "[017] Share link TTL default 24h; expired links return 404 on verify"
+  - "[017] Scoped WebSocket /ws/share/:token/activity only receives events for authorized entity slugs"
