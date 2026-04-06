@@ -215,7 +215,7 @@
         var filters = filterState[wfIdx] || new Set();
         var filtered = filters.size > 0
           ? wf.entities.filter(function (e) { return filters.has(e.status); })
-          : wf.entities;
+          : wf.entities.filter(function (e) { return e.archived !== "true" && e.status !== "shipped"; });
         var sort = sortState[wfIdx] || { column: "id", asc: true };
         var sorted = sortEntities(filtered, sort.column, sort.asc);
         var columns = ["id", "slug", "status", "title", "score", "source"];

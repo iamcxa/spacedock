@@ -6,3 +6,17 @@ __pycache__/
 *.pyc
 .spacedock/
 node_modules/
+
+# Local dev config
+.mcp.json
+
+# Tool scaffolding & ephemeral reports
+.claude/agents/
+.claude/e2e/reports/
+.superpowers/
+
+# Review artifacts
+docs/build-pipeline/*.comments.json
+
+# Unrelated tool config
+recce.yml

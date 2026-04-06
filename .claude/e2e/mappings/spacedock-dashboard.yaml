@@ -1,23 +1,54 @@
 app: spacedock-dashboard
-base_url: http://127.0.0.1:8420
+base_url: http://127.0.0.1:8421/
 auth:
   type: none
 framework: vanilla-js
-mapped_at: 2026-04-04
+mapped_at: "2026-04-05"
 
 pages:
   dashboard:
     path: /
     title: Spacedock Dashboard
+    source: tools/dashboard/static/index.html
+    scripts:
+      - app.js
+      - activity.js
     elements:
+      # --- Header ---
       page_heading:
-        selector: header h1
+        selector: "header h1"
         type: heading
         description: Main dashboard title "Spacedock Dashboard"
+      header_indicators:
+        selector: .header-indicators
+        type: container
+        description: Row of status indicator spans in header
+      ws_status:
+        selector: "#ws-status"
+        type: indicator
+        description: WebSocket connection status — "Live", "Connecting...", or "Disconnected"
+        states:
+          connected: 'class="indicator", text="Live"'
+          connecting: 'class="indicator paused", text="Connecting..."'
+          disconnected: 'class="indicator paused", text="Disconnected"'
+      channel_status:
+        selector: "#channel-status"
+        type: indicator
+        description: Channel connection status — "Channel: connected" or "Channel: disconnected"
+        states:
+          connected: 'class="indicator channel-connected"'
+          disconnected: 'class="indicator channel-disconnected"'
       refresh_indicator:
         selector: "#refresh-indicator"
-        type: text
+        type: indicator
         description: Auto-refresh status indicator showing "Auto-refresh: ON"
+      telemetry_indicator:
+        selector: "#telemetry-indicator"
+        type: indicator
+        description: PostHog analytics indicator — hidden by default, shows "Analytics: ON" when PostHog configured
+        initially_hidden: true
+
+      # --- Main content ---
       workflows_container:
         selector: "#workflows-container"
         type: container
@@ -27,13 +58,15 @@ pages:
         type: container
         description: Individual workflow card (repeating)
       workflow_name:
-        selector: .workflow-card h2
+        selector: ".workflow-card h2"
         type: heading
         description: Workflow name heading within a card
       workflow_meta:
         selector: .workflow-meta
         type: text
-        description: Entity label and count summary (e.g. "tasks . 1 total")
+        description: 'Entity label and count summary (e.g. "tasks . 1 total")'
+
+      # --- Stage pipeline ---
       stage_pipeline:
         selector: .stage-pipeline
         type: container
@@ -41,20 +74,27 @@ pages:
       stage_chip:
         selector: .stage-chip
         type: badge
-        description: Individual stage chip with name and count
+        description: Individual stage chip — clickable to filter entities by stage
+        interaction: click to toggle stage filter (adds stage-chip--active class)
+      stage_chip_active:
+        selector: .stage-chip--active
+        type: badge
+        description: Active (selected) stage filter chip with highlighted border
       stage_chip_count:
-        selector: .stage-chip .count
+        selector: ".stage-chip .count"
         type: text
-        description: Entity count within a stage chip
+        description: Entity count number within a stage chip
+
+      # --- Entity table ---
       entity_table:
-        selector: .workflow-card table
+        selector: ".workflow-card table"
         type: table
         description: Sortable entity table within a workflow card
       column_header_id:
         selector: "th[data-col='id']"
         type: column-header
         description: Sortable ID column header
-        interaction: click to sort
+        interaction: click to sort ascending/descending (toggles sorted-asc/sorted-desc class)
       column_header_slug:
         selector: "th[data-col='slug']"
         type: column-header
@@ -80,28 +120,384 @@ pages:
         type: column-header
         description: Sortable SOURCE column header
         interaction: click to sort
+      entity_row:
+        selector: ".workflow-card tbody tr"
+        type: table-row
+        description: Individual entity data row — clickable to navigate to detail page
+        interaction: click navigates to /detail?path={entity.path}
+      entity_row_archived:
+        selector: .entity-row--archived
+        type: table-row
+        description: Archived/shipped entity row (dimmed opacity 0.5)
       status_badge:
         selector: .status-badge
         type: badge
-        description: Color-coded status badge in table cells
-      entity_row:
-        selector: .workflow-card tbody tr
-        type: table-row
-        description: Individual entity data row
+        description: Color-coded status badge in table cells (dynamic inline background/color)
       loading_message:
         selector: .loading
         type: text
-        description: Loading/error message shown during data fetch
+        description: Loading or error message shown during data fetch
       empty_state:
         selector: .empty-state
         type: text
-        description: Empty state message when no workflows found
+        description: Empty state message — "No Spacedock workflows found." or "No entities."
+
+      # --- Activity panel (right sidebar) ---
+      activity_panel:
+        selector: "#activity-panel"
+        type: container
+        description: Right sidebar — sticky, scrollable activity feed panel
+      activity_panel_heading:
+        selector: "#activity-panel h3"
+        type: heading
+        description: '"Activity Feed" heading in sidebar'
+      activity_feed:
+        selector: "#activity-feed"
+        type: container
+        description: Scrollable container for activity items and chat bubbles
+      activity_item:
+        selector: .activity-item
+        type: container
+        description: Workflow event entry in activity feed (dispatch, completion, gate, etc.)
+      activity_badge:
+        selector: .activity-badge
+        type: badge
+        description: Colored event type badge (e.g. "dispatch", "completion")
+      activity_info:
+        selector: .activity-info
+        type: text
+        description: 'Event info text — "agent -> entity @ stage"'
+      activity_time:
+        selector: .activity-time
+        type: text
+        description: Relative time display (e.g. "5s ago", "2m ago")
+      activity_detail:
+        selector: .activity-detail
+        type: text
+        description: Optional detail text under an activity item
+
+      # --- Chat bubbles ---
+      chat_bubble_captain:
+        selector: .chat-bubble.captain
+        type: container
+        description: Captain (user) chat message — blue, right-aligned
+      chat_bubble_fo:
+        selector: .chat-bubble.fo
+        type: container
+        description: First Officer (agent) response — dark, left-aligned
+      bubble_content:
+        selector: .bubble-content
+        type: text
+        description: Chat bubble message text content
+      bubble_time:
+        selector: .bubble-time
+        type: text
+        description: Relative timestamp inside chat bubble
+      show_more_toggle:
+        selector: .show-more
+        type: link
+        description: '"Show more" / "Show less" toggle for long FO responses (>100 chars)'
+        interaction: click toggles .truncated class on parent bubble
+
+      # --- Permission cards ---
+      permission_card:
+        selector: .permission-card
+        type: container
+        description: Tool permission request card with approve/reject buttons
+        data_attributes:
+          - data-request-id
+      perm_header:
+        selector: .perm-header
+        type: text
+        description: '"Permission Request" header text'
+      perm_tool:
+        selector: .perm-tool
+        type: text
+        description: 'Tool name and description text'
+      perm_preview:
+        selector: .perm-preview
+        type: text
+        description: Monospace preview of tool input (optional)
+      perm_approve_btn:
+        selector: ".perm-btn.approve"
+        type: button
+        description: Green "Approve" button on permission card
+        interaction: click sends allow verdict via POST /api/channel/send
+      perm_deny_btn:
+        selector: ".perm-btn.deny"
+        type: button
+        description: Red "Reject" button on permission card
+        interaction: click sends deny verdict via POST /api/channel/send
+      perm_verdict:
+        selector: .perm-verdict
+        type: text
+        description: '"Approved" or "Rejected" text shown after verdict'
+      permission_card_resolved:
+        selector: .permission-card.resolved
+        type: container
+        description: Permission card after verdict — dimmed, buttons hidden
+
+      # --- Channel input bar ---
+      channel_input_bar:
+        selector: "#channel-input-bar"
+        type: container
+        description: Message input bar at bottom of activity panel
+      channel_input:
+        selector: "#channel-input"
+        type: textarea
+        description: Message textarea — disabled when no channel connected. Placeholder changes based on channel status.
+        interaction: Enter (without Shift) sends message. Shift+Enter for newline. Auto-resizes up to 96px.
+        states:
+          enabled: 'placeholder="Message to FO..."'
+          disabled: 'placeholder="No active session — launch with --channels to enable"'
+      channel_send_btn:
+        selector: "#channel-send-btn"
+        type: button
+        description: '"Send" button — disabled when no channel connected'
+        interaction: click sends message via POST /api/channel/send
+
+  entity_detail:
+    path: /detail?path={entity_path}
+    title: "Entity Detail"
+    source: tools/dashboard/static/detail.html
+    scripts:
+      - detail.js
+    external_deps:
+      - marked.js (CDN — markdown rendering)
+      - DOMPurify (CDN — XSS sanitization)
+    elements:
+      # --- Top navigation bar ---
+      top_bar:
+        selector: .top-bar
+        type: container
+        description: Top navigation bar with back link and entity title
+      back_link:
+        selector: .back-link
+        type: link
+        description: '"<- Back to Dashboard" link — navigates to /'
+        interaction: click navigates to /
+      entity_title:
+        selector: "#entity-title"
+        type: text
+        description: Entity title in nav bar — dynamically set from frontmatter.title
+      telemetry_indicator_detail:
+        selector: "#telemetry-indicator"
+        type: indicator
+        description: PostHog analytics indicator (same behavior as dashboard page)
+        initially_hidden: true
+
+      # --- Main content ---
+      detail_layout:
+        selector: .detail-layout
+        type: container
+        description: Two-column grid layout (main + sidebar, 1fr 320px)
+      detail_main:
+        selector: .detail-main
+        type: container
+        description: Main content area (entity body + stage reports)
+      entity_body:
+        selector: "#entity-body"
+        type: container
+        description: Rendered markdown body of the entity (sanitized via DOMPurify)
+      stage_reports:
+        selector: "#stage-reports"
+        type: container
+        description: Container for stage report cards
+      stage_report_card:
+        selector: .stage-report-card
+        type: container
+        description: Individual stage report card with checklist items
+      stage_report_heading:
+        selector: ".stage-report-card h3"
+        type: heading
+        description: '"Stage Report: {stage_name}" heading'
+      checklist:
+        selector: .checklist
+        type: list
+        description: Unordered list of checklist items within a stage report
+      checklist_item:
+        selector: .checklist-item
+        type: list-item
+        description: Individual checklist item with status icon + text
+        variants:
+          - "checklist-item done (green checkmark)"
+          - "checklist-item skip (yellow dash)"
+          - "checklist-item fail (red x)"
+          - "checklist-item (default — open circle)"
+      status_icon:
+        selector: .status-icon
+        type: icon
+        description: Status icon in checklist item (check, dash, x, or circle)
+      item_text:
+        selector: .item-text
+        type: text
+        description: Checklist item main text
+      item_detail:
+        selector: .item-detail
+        type: text
+        description: Optional detail text under a checklist item (smaller, gray)
+      stage_summary:
+        selector: .stage-summary
+        type: text
+        description: Summary text at the bottom of a stage report card
+
+      # --- Sidebar ---
+      detail_sidebar:
+        selector: .detail-sidebar
+        type: container
+        description: Right sidebar — sticky, contains metadata and management panels
+      metadata_panel:
+        selector: .metadata-panel
+        type: container
+        description: Metadata section with key-value pairs from frontmatter
+      metadata_heading:
+        selector: ".metadata-panel h3"
+        type: heading
+        description: '"Metadata" section heading'
+      metadata_fields:
+        selector: "#metadata-fields"
+        type: definition-list
+        description: dl element with dt/dd pairs for each frontmatter key-value (tags excluded)
+      metadata_key:
+        selector: "#metadata-fields dt"
+        type: text
+        description: Frontmatter key name (repeating)
+      metadata_value:
+        selector: "#metadata-fields dd"
+        type: text
+        description: Frontmatter value (repeating)
+
+      # --- Score control ---
+      management_panel:
+        selector: .management-panel
+        type: container
+        description: Management section with score slider and tag editor
+      score_heading:
+        selector: ".management-panel h3:first-of-type"
+        type: heading
+        description: '"Score" section heading'
+      score_control:
+        selector: .score-control
+        type: container
+        description: Score slider row with display and save button
+      score_slider:
+        selector: "#score-slider"
+        type: range-input
+        description: Score range slider (min=0, max=1, step=0.05)
+        interaction: drag to change score — updates score_display in real-time
+      score_display:
+        selector: "#score-display"
+        type: text
+        description: Current score value display (e.g. "0.75")
+      score_save:
+        selector: "#score-save"
+        type: button
+        description: '"Save" button — persists score via POST /api/entity/score'
+        interaction: click saves score and reloads entity
+
+      # --- Tag editor ---
+      tags_heading:
+        selector: ".management-panel h3:nth-of-type(2)"
+        type: heading
+        description: '"Tags" section heading'
+      tag_editor:
+        selector: .tag-editor
+        type: container
+        description: Tag management section with chips and input
+      tag_chips:
+        selector: "#tag-chips"
+        type: container
+        description: Container for tag chip elements
+      tag_chip:
+        selector: .tag-chip
+        type: badge
+        description: Individual tag chip with remove button
+      remove_tag_btn:
+        selector: .remove-tag
+        type: button
+        description: 'X button on tag chip to remove the tag'
+        interaction: click removes tag via POST /api/entity/tags
+        data_attributes:
+          - data-tag
+      tag_input_row:
+        selector: .tag-input-row
+        type: container
+        description: Row with tag text input and Add button
+      tag_input:
+        selector: "#tag-input"
+        type: text-input
+        description: Text input for adding new tags (placeholder "Add tag...")
+        interaction: Enter key triggers addTag()
+      tag_add:
+        selector: "#tag-add"
+        type: button
+        description: '"Add" button — adds tag from input field'
+        interaction: click adds tag via POST /api/entity/tags
 
 api_endpoints:
-  workflows:
+  get_workflows:
     method: GET
     path: /api/workflows
     description: Returns JSON array of all discovered workflows with entities
     response_format: application/json
+  get_entity_detail:
+    method: GET
+    path: /api/entity/detail?path={filepath}
+    description: Returns entity frontmatter, body, stage_reports, tags for a specific entity file
+    response_format: application/json
+  get_entities:
+    method: GET
+    path: /api/entities?dir={dir}&status={status}&tag={tag}&min_score={n}&max_score={n}
+    description: Filter entities by status, tag, or score range
+    response_format: application/json
+  post_score:
+    method: POST
+    path: /api/entity/score
+    description: Update entity score (body — path, score)
+    response_format: application/json
+  post_tags:
+    method: POST
+    path: /api/entity/tags
+    description: Update entity tags (body — path, tags[])
+    response_format: application/json
+  get_events:
+    method: GET
+    path: /api/events?since={seq}
+    description: Get buffered activity events (optionally since a sequence number)
+    response_format: application/json
+  post_events:
+    method: POST
+    path: /api/events
+    description: Push a new agent event (body — type, entity, stage, agent, timestamp)
+    response_format: application/json
+  post_channel_send:
+    method: POST
+    path: /api/channel/send
+    description: Send a channel message or permission verdict (body — content, meta)
+    response_format: application/json
+  get_config:
+    method: GET
+    path: /api/config
+    description: Returns PostHog config (if configured)
+    response_format: application/json
+
+websocket_endpoints:
+  activity_feed:
+    path: /ws/activity
+    description: Real-time activity feed — publishes events, channel status, and replay on connect
+    message_types:
+      replay: "Sent on connect — array of buffered events"
+      event: "Live event broadcast — {type: 'event', data: entry}"
+      channel_status: "Channel connection state — {type: 'channel_status', connected: bool}"
+    client_messages:
+      channel_send: "Send message/verdict — {type: 'channel_send', content: string, meta: {}}"
 
 dialogs: {}
+
+notes:
+  - "Entity rows navigate to /detail?path= (not /detail.html?dir=&slug= as originally expected)"
+  - "Default entity table filter hides archived=true and status=shipped entities"
+  - "Stage chip filter state persisted in sessionStorage under 'dashboardFilterState'"
+  - "Activity feed capped at 100 items in DOM (oldest removed first)"
+  - "Channel input textarea auto-resizes up to 96px height"
+  - "IME composition (CJK input) is handled — Enter during composing does not send"
