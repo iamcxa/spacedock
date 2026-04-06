@@ -3,7 +3,7 @@ base_url: http://127.0.0.1:8421/
 auth:
   type: none
 framework: vanilla-js
-mapped_at: "2026-04-05"
+mapped_at: "2026-04-06"
 
 pages:
   dashboard:
@@ -237,6 +237,25 @@ pages:
         type: container
         description: Permission card after verdict — dimmed, buttons hidden
 
+      # --- Gate decision cards in activity feed (Feature 016) ---
+      gate_decision_card:
+        selector: ".permission-card.resolved"
+        type: container
+        description: Gate decision card in activity feed — rendered by renderGateDecision(); reuses permission-card.resolved styling
+        notes: gate_decision cards are always pre-resolved (no action buttons); distinguished by perm-header text "Gate Decision"
+      gate_decision_header:
+        selector: ".perm-header"
+        type: text
+        description: '"Gate Decision" header text on gate decision cards in activity feed'
+      gate_decision_entity:
+        selector: ".perm-tool"
+        type: text
+        description: 'Entity + stage text in gate decision card — "{entity} @ {stage}"'
+      gate_decision_verdict:
+        selector: ".perm-verdict"
+        type: text
+        description: Gate decision verdict — "Approved" (green) or "Changes Requested" (red)
+
       # --- Channel input bar ---
       channel_input_bar:
         selector: "#channel-input-bar"
@@ -434,6 +453,72 @@ pages:
         description: '"Add" button — adds tag from input field'
         interaction: click adds tag via POST /api/entity/tags
 
+      # --- Gate review panel (Feature 016) ---
+      gate_panel:
+        selector: "#gate-panel"
+        type: container
+        description: Gate review panel in sidebar — hidden by default, shown when entity is at a gated stage
+        initially_hidden: true
+        visibility_condition: entity status matches a stage with gate:true in workflow definition
+      gate_panel_heading:
+        selector: "#gate-panel h3"
+        type: heading
+        description: '"Gate Review" heading'
+      gate_status:
+        selector: "#gate-status"
+        type: container
+        description: Container for gate status badge
+      gate_status_badge:
+        selector: "#gate-status-badge"
+        type: badge
+        description: Gate status badge — "Pending Review" (pending class) or "Approved" / "Changes Requested" after resolution
+        states:
+          pending: 'class="gate-badge pending", text="Pending Review"'
+          approved: 'class="gate-badge approved"'
+          changes_requested: 'class="gate-badge changes-requested"'
+      gate_actions:
+        selector: "#gate-actions"
+        type: container
+        description: Container for Approve and Request Changes buttons
+      gate_approve_btn:
+        selector: "#gate-approve-btn"
+        type: button
+        description: '"Approve" button — triggers confirmation dialog before sending gate decision'
+        interaction: click shows gate_confirm dialog; disabled after click to prevent double-submit
+      gate_request_changes_btn:
+        selector: "#gate-request-changes-btn"
+        type: button
+        description: '"Request Changes" button — triggers confirmation dialog'
+        interaction: click shows gate_confirm dialog with "request changes" action
+      gate_confirm:
+        selector: "#gate-confirm"
+        type: container
+        description: Confirmation dialog shown after clicking Approve or Request Changes — prevents accidental gate decisions
+        initially_hidden: true
+      gate_confirm_action:
+        selector: "#gate-confirm-action"
+        type: text
+        description: Bold text showing the action being confirmed ("approve" or "request changes")
+      gate_confirm_yes:
+        selector: "#gate-confirm-yes"
+        type: button
+        description: '"Confirm" button in confirmation dialog — sends POST /api/entity/gate/decision'
+        interaction: click POSTs gate decision, disables both gate action buttons, shows gate_resolved
+      gate_confirm_cancel:
+        selector: "#gate-confirm-cancel"
+        type: button
+        description: '"Cancel" button in confirmation dialog — dismisses dialog without sending decision'
+        interaction: click hides gate_confirm, re-enables gate action buttons
+      gate_resolved:
+        selector: "#gate-resolved"
+        type: container
+        description: Resolved state container shown after gate decision is sent — replaces gate actions
+        initially_hidden: true
+      gate_resolved_text:
+        selector: "#gate-resolved-text"
+        type: text
+        description: Text shown after gate decision — "Approved" or "Changes Requested"
+
 api_endpoints:
   get_workflows:
     method: GET
@@ -475,6 +560,12 @@ api_endpoints:
     path: /api/channel/send
     description: Send a channel message or permission verdict (body — content, meta)
     response_format: application/json
+  post_gate_decision:
+    method: POST
+    path: /api/entity/gate/decision
+    description: Send gate decision (body — entity_path, entity_slug, stage, decision ["approved"|"changes_requested"])
+    response_format: application/json
+    added_in: "016"
   get_config:
     method: GET
     path: /api/config
