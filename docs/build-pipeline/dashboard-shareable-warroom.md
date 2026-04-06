@@ -275,3 +275,73 @@ None of these corrections invalidate the overall approach, but the plan needs ad
 **Quality gate findings fixed:**
 - channel.ts missing hostname parameter (TS2345)
 - WebSocket upgrade data type mismatch (TS2322) — resolved with type cast
+
+## Stage Report: quality
+
+### Test Results
+- **Tests**: DONE — 54 core tests pass, 0 fail, 127 expect() calls across 6 files in 1070ms
+- **Type Check**: DONE — bunx tsc --noEmit clean (bun-types dependency installed and resolved)
+- **Changed Files**: DONE — All execute stage commits merged to main, no pending changes on feature branch
+
+### Security Review
+
+**Auth (auth.ts) — PASSED**
+- Password hashing uses Bun.password.hash() with argon2id algorithm (cryptographically secure)
+- Verification uses Bun.password.verify() with timing-safe comparison
+- Token generation uses crypto.getRandomValues() for 24-byte (192-bit) entropy
+- Tokens are hex-encoded 48-character strings (unforgeable)
+- No password stored in plaintext; only hash persists in memory
+
+**Share Routes (server.ts /api/share/:token/*) — PASSED**
+- Scope enforcement verified on every share entity route (lines 742, 767, 798):
+  - /api/share/:token/entity/detail checks isInScope() before serving
+  - /api/share/:token/entity/comments checks isInScope() before serving
+  - /api/share/:token/entity/comment (POST) checks isInScope() before creating
+  - /api/share/:token/approve (POST) checks isInScope() before recording approval
+  - Path traversal protection via existing validatePath() on all entity paths
+- Token validation via shareRegistry.get(token) which auto-deletes expired links (TTL check)
+- 401 on invalid password, 403 on expired/not-found, 404 on missing link
+
+**Share Page (share.html/share.js) — XSS PREVENTION PASSED**
+- Markdown rendering uses marked.parse() + DOMPurify.sanitize() before innerHTML assignment (line 109 in share.js)
+- All user-sourced data (comment author, content, entity title) uses textContent assignment (lines 142, 147, 88)
+- No eval(), no innerHTML with unsanitized user data
+- CDN dependencies: marked.js + DOMPurify both loaded from CDN (jsdelivr)
+
+**WebSocket Scoping (server.ts /ws/share/:token/activity) — PASSED**
+- Server-side enforcement: ShareRegistry token validation before WebSocket upgrade (lines 660-672)
+- Event filtering at publish time (lines 872-879): only events with matching entity slug forwarded to scoped topic
+- Scope verified via entitySlugs.has(event.entity) — only authorized entities receive updates
+- Replay on connect filters by entityPaths from link (lines 597-606)
+- No event leakage: all share WebSocket clients subscribe only to share:token, not global activity
+
+**Password Protection & TTL — PASSED**
+- Share link creation requires password (line 540 check)
+- TTL enforcement: 24h default (line 553), checked on every shareRegistry.get() call (line 49 in auth.ts)
+- Expired links auto-deleted from registry (line 50 in auth.ts)
+- Client shows expiry time in review view (share.js line 67)
+
+### Backward Compatibility
+
+**Localhost Access Without Auth — VERIFIED WORKING**
+- Default hostname is 127.0.0.1 (server.ts line 898)
+- All existing routes (/, /detail, /api/*) accessible without token when running on localhost
+- No auth middleware inserted at router level; only scoped share routes check tokens
+- Localhost binding (127.0.0.1) restricts access to local machine only (loopback interface)
+- --tunnel flag overrides hostname to 0.0.0.0 only when explicitly requested (ctl.sh lines 203-205)
+- Result: Existing workflows unchanged; dashboard accessible from localhost without configuration
+
+### Checklist Summary
+
+- [x] Tests: 54 pass, 0 fail
+- [x] Type check: tsc --noEmit clean
+- [x] Changed files: all committed and merged
+- [x] Auth (Bun.password): PASSED — argon2id, timing-safe
+- [x] Share routes scope enforcement: PASSED — isInScope() on every route
+- [x] XSS prevention (share.html/js): PASSED — DOMPurify + textContent
+- [x] WebSocket scoping: PASSED — server-side filtering by entity slug
+- [x] Backward compatibility (localhost): PASSED — default 127.0.0.1, no auth required
+
+### Recommendation
+
+**PASSED** — Feature 017 meets all quality criteria. Auth layer is cryptographically sound, scope enforcement is comprehensive across routes and WebSocket, XSS prevention is correct, and backward compatibility is maintained. Ready for ship stage.
