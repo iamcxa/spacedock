@@ -1,10 +1,14 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import { ShareRegistry } from "./auth";
+import { openDb } from "./db";
+import { Database } from "bun:sqlite";
 
 let registry: ShareRegistry;
+let db: Database;
 
 beforeEach(() => {
-  registry = new ShareRegistry();
+  db = openDb(":memory:");
+  registry = new ShareRegistry(db);
 });
 
 describe("ShareRegistry.create", () => {
