@@ -132,3 +132,30 @@ However, for this feature's scope (Small scale), the traditional DOM approach wi
 - [x] Cross-reference synthesis completed (all 10 claims resolved: 8 verified, 2 corrected)
 - [x] Research report written to entity
 - [x] Corrections documented with cited sources and fix guidance
+
+## Stage Report: plan
+
+### Summary
+Formal implementation plan created via `superpowers:writing-plans`. 6 tasks across 4 layers (domain, router, frontend view, test). TDD ordering: tests first in Task 1, quality gate in Task 6. Both research corrections incorporated — no `Range.surroundContents()`, segment splitting for overlaps. Plan saved to `docs/superpowers/specs/2026-04-06-dashboard-inline-comment-highlights.md`.
+
+### Checklist
+
+1. **DONE** — Read entity file for explore + research findings
+   - Full entity file read including explore report (9 items), coverage infrastructure, and file map
+2. **DONE** — Use `Skill: "superpowers:writing-plans"` to create formal plan
+   - Plan produced with 6 tasks, bite-sized steps, complete code in every step
+3. **DONE** — Plan incorporates both research corrections (no surroundContents, segment splitting)
+   - Research Corrections section at top of plan explicitly states both rules
+   - `applyCommentHighlights()` uses TreeWalker + `splitText()` + `<mark>` wrapping (never `surroundContents`)
+   - Overlapping highlights decomposed into non-overlapping segments via breakpoint algorithm
+4. **DONE** — Plan has TDD test-first ordering
+   - Task 1: write failing `addReply` tests -> run to verify fail -> implement -> run to verify pass
+   - Task 6: quality gate (type-check, test, build)
+5. **DONE** — Plan specifies concrete file paths and injection points
+   - All 6 files with exact paths; injection points reference specific line numbers (e.g., `detail.js:780`, `server.ts:222`, `detail.css:489`, `share.js:129`)
+6. **DONE** — Plan includes quality gate steps (type-check, tests, lint, build)
+   - Task 6 runs `bunx tsc --noEmit`, `bun test`, server startup verification, and lint check
+7. **DONE** — Save plan to `docs/superpowers/specs/` directory
+   - Saved to `docs/superpowers/specs/2026-04-06-dashboard-inline-comment-highlights.md`
+8. **DONE** — Commit plan document
+   - Committed with stage report
