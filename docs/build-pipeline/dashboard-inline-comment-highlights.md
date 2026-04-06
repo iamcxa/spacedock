@@ -159,3 +159,49 @@ Formal implementation plan created via `superpowers:writing-plans`. 6 tasks acro
    - Saved to `docs/superpowers/specs/2026-04-06-dashboard-inline-comment-highlights.md`
 8. **DONE** — Commit plan document
    - Committed with stage report
+
+## Stage Report: execute
+
+### Summary
+All 6 plan tasks implemented with TDD discipline. 5 commits on `spacedock-ensign/dashboard-inline-comment-highlights` branch. 57 tests pass (54 existing + 3 new addReply tests). Type-check passes. Server starts without crash. Feature adds Notion-style inline comment highlights with click-to-open popovers on both detail and share pages.
+
+### Checklist
+
+1. **DONE** — Read plan document and understand all 6 tasks
+   - Full plan read from `docs/superpowers/specs/2026-04-06-dashboard-inline-comment-highlights.md`
+2. **DONE** — Task 1: addReply() in comments.ts (test-first in comments.test.ts)
+   - 3 failing tests written first (append reply, unknown ID throws, multiple replies in order)
+   - `addReply()` implemented with CommentReply type, sidecar read/write
+   - All 17 comment tests pass after implementation
+   - Commit: `feat(comments): add addReply() for comment threading`
+3. **DONE** — Task 2: POST /api/entity/comment/reply route + share-scoped equivalent in server.ts
+   - Static route added before `/api/entity/comment/resolve` with path validation and error handling
+   - Share-scoped route added after existing `subRoute === "comment"` block with scope check and guest author
+   - Import updated to include `addReply`
+   - 57 tests pass, type-check passes
+   - Commit: `feat(server): add POST /api/entity/comment/reply route + share equivalent`
+4. **DONE** — Task 3: Highlight + popover CSS in detail.css
+   - Extended `.comment-highlight` with hover (30% opacity) and `.resolved` (6% opacity, faded border)
+   - Added `.comment-popover` with dark theme styling matching dashboard accent colors
+   - Popover includes comment items, author/time styling, reply form with input + button
+   - Commit: `feat(css): add comment popover and resolved highlight styles`
+5. **DONE** — Task 4: applyCommentHighlights() in detail.js with TreeWalker + splitText + popover
+   - `applyCommentHighlights()`: flattens text via TreeWalker, finds intervals per comment, splits overlapping ranges into segments, wraps with `<mark>` elements in reverse order
+   - `wrapTextRange()`: per-text-node splitText + mark wrapping (no surroundContents)
+   - `showCommentPopover()`: builds DOM popover with author/time/content, thread replies, reply form — all using textContent for XSS safety
+   - Click handler on `#entity-body` delegates to `.comment-highlight` marks
+   - `cachedComments` variable + highlight fetch integrated into `window.loadEntity` override
+   - Commit: `feat(detail): add comment highlight injection + popover with reply`
+6. **DONE** — Task 5: Highlight injection in share.js
+   - Same `applyCommentHighlights()` + `wrapTextRange()` + popover functions adapted for share page
+   - `submitReply()` uses share-scoped `/api/share/:token/entity/comment/reply` endpoint with guest author
+   - Highlights injected in `showEntityDetail()` after body render
+   - WebSocket comment event handler re-fetches and re-applies highlights
+   - Commit: `feat(share): add comment highlight injection + popover with reply`
+7. **DONE** — Task 6: Quality gate — run `cd tools/dashboard && bun test` to verify all tests pass
+   - 57 tests pass, 0 fail (136 expect() calls across 6 files)
+   - Type-check passes (after bun install in worktree)
+   - Server starts and prints listening banner without crash
+8. **DONE** — All commits use `{type}(scope): {description}` format
+   - 5 commits: feat(comments), feat(server), feat(css), feat(detail), feat(share)
+9. **DONE** — Push branch to remote
