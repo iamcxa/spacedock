@@ -185,3 +185,14 @@ CLAIM-8: [type: domain-rule] "Race condition between CLI and UI gate approval ca
 - [x] Cross-reference synthesis completed — 6 CONFIRMED (HIGH), 2 CORRECTED (MEDIUM)
 - [x] Research report written to entity
 - [x] Insights cached to context lake (via prior explore stage insights; new findings documented in report)
+
+## Stage Report: plan
+
+- [x] Formal plan document created via `Skill: "superpowers:writing-plans"` and saved to `docs/superpowers/plans/2026-04-06-dashboard-gate-approval.md`
+- [x] Plan has concrete file paths for all new and modified files — 4 backend files (types.ts, events.ts, server.ts, gate.test.ts) + 4 frontend files (detail.html, detail.js, detail.css, activity.js)
+- [x] Plan uses test-first ordering — Tasks 1 and 2 write failing tests before implementation; Task 7 adds integration tests
+- [x] Plan incorporates all research corrections:
+  - CLAIM-5 bug fix: Task 1 adds "comment", "suggestion", "gate_decision" to VALID_EVENT_TYPES (events.ts lines 3-6)
+  - CLAIM-6 gate derivation: Task 5 uses `stages.find(s => s.name === entityStatus && s.gate === true)` cross-referencing WorkflowData.stages
+  - CLAIM-8 race condition: Task 5 implements UI-side handling — buttons disable immediately on click, confirmation dialog prevents accidental approval, WebSocket detects external gate_decision events, status polling (3s interval) detects when FO advances entity past gate
+- [x] Plan includes quality gate steps — QG-1 through QG-6 covering type check, full test suite, and 4 manual E2E scenarios
