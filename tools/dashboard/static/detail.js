@@ -817,3 +817,112 @@ function rejectSuggestionAction(suggestionId) {
   }
 })();
 
+// --- Share Link Creation ---
+(function initSharePanel() {
+  var createBtn = document.getElementById("create-share-btn");
+  var modal = document.getElementById("share-modal");
+  var submitBtn = document.getElementById("share-submit");
+  var cancelBtn = document.getElementById("share-cancel");
+  var copyBtn = document.getElementById("share-copy");
+  var shareResult = document.getElementById("share-result");
+  var shareUrlInput = document.getElementById("share-url");
+  var shareLinksContainer = document.getElementById("share-links");
+
+  if (!createBtn) return;
+
+  createBtn.addEventListener("click", function () {
+    modal.style.display = modal.style.display === "none" ? "block" : "none";
+    shareResult.style.display = "none";
+  });
+
+  cancelBtn.addEventListener("click", function () {
+    modal.style.display = "none";
+  });
+
+  submitBtn.addEventListener("click", function () {
+    var password = document.getElementById("share-password").value;
+    var label = document.getElementById("share-label-input").value || "Share Link";
+    var ttl = parseInt(document.getElementById("share-ttl").value, 10) || 24;
+
+    if (!password) {
+      alert("Password is required.");
+      return;
+    }
+
+    var params = new URLSearchParams(window.location.search);
+    var entityPath = params.get("path");
+    if (!entityPath) return;
+
+    fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        password: password,
+        entityPaths: [entityPath],
+        stages: [],
+        label: label,
+        ttlHours: ttl,
+      }),
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.token) {
+          var url = window.location.origin + "/share/" + data.token;
+          shareUrlInput.value = url;
+          shareResult.style.display = "block";
+          loadShareLinks();
+        }
+      });
+  });
+
+  copyBtn.addEventListener("click", function () {
+    shareUrlInput.select();
+    navigator.clipboard.writeText(shareUrlInput.value).then(function () {
+      copyBtn.textContent = "Copied!";
+      setTimeout(function () { copyBtn.textContent = "Copy"; }, 2000);
+    });
+  });
+
+  function loadShareLinks() {
+    fetch("/api/share/list")
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        shareLinksContainer.textContent = "";
+        if (!data.links || data.links.length === 0) {
+          var empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "No active share links";
+          shareLinksContainer.appendChild(empty);
+          return;
+        }
+        data.links.forEach(function (link) {
+          var div = document.createElement("div");
+          div.className = "share-link-item";
+
+          var labelSpan = document.createElement("span");
+          labelSpan.className = "share-link-label";
+          labelSpan.textContent = link.label;
+          div.appendChild(labelSpan);
+
+          var expiresSpan = document.createElement("span");
+          expiresSpan.className = "share-link-expires";
+          expiresSpan.textContent = "Expires: " + new Date(link.expiresAt).toLocaleString();
+          div.appendChild(expiresSpan);
+
+          var deleteBtn = document.createElement("button");
+          deleteBtn.className = "btn btn-small btn-danger share-delete";
+          deleteBtn.textContent = "Delete";
+          deleteBtn.addEventListener("click", function () {
+            fetch("/api/share/" + link.token, { method: "DELETE" })
+              .then(function () { loadShareLinks(); });
+          });
+          div.appendChild(deleteBtn);
+
+          shareLinksContainer.appendChild(div);
+        });
+      });
+  }
+
+  loadShareLinks();
+})();
+

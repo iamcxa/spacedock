@@ -237,3 +237,41 @@ None of these corrections invalidate the overall approach, but the plan needs ad
   - CLAIM-7 (WebSocket leakage): Task 6 implements server-side scoped /ws/share/:token/activity endpoint
   - CLAIM-1 (Bun.password argon2id): Task 2 uses Bun.password.hash/verify
 - [x] Plan includes quality gate steps — DONE (Task 10: type check, full test suite, share integration tests, backward compatibility verification)
+
+## Stage Report: execute
+
+- [x] All plan tasks implemented with commits on the feature branch — DONE (10 atomic commits: 40d4030..5958cc5)
+- [x] TDD discipline followed — tests written before implementation code — DONE (Tasks 2, 4, 5, 6 all wrote failing tests first, verified red-green cycle)
+- [x] Atomic commits using {type}(scope): description format — DONE (all 10 commits follow convention)
+- [x] All research corrections applied in implementation — DONE:
+  - CLAIM-8 (bind 0.0.0.0): Task 3 adds --host flag defaulting to 127.0.0.1
+  - CLAIM-1 (Bun.password): Task 2 uses argon2id via Bun.password.hash/verify
+  - CLAIM-3 (ngrok limits): Task 9 documents interstitial warning, uses header workaround
+  - CLAIM-7 (WS leakage): Task 6 implements server-side scoped /ws/share/:token/activity
+- [x] All tests passing at completion — DONE (54 core tests + 16 share integration tests + 16 auth unit tests = all pass, tsc --noEmit clean)
+
+### Implementation Summary
+
+**Files created (4):**
+- `tools/dashboard/src/auth.ts` — ShareRegistry class (create, verify, get, list, delete, isInScope)
+- `tools/dashboard/src/auth.test.ts` — 16 unit tests for ShareRegistry
+- `tools/dashboard/static/share.html` — Reviewer-facing password entry + scoped entity view
+- `tools/dashboard/static/share.js` — Share page client logic (auth, entity list, comments, scoped WebSocket)
+
+**Files modified (8):**
+- `tools/dashboard/src/types.ts` — ShareLink/ShareSession interfaces, "guest" author, share_created event type
+- `tools/dashboard/src/events.ts` — share_created in VALID_EVENT_TYPES
+- `tools/dashboard/src/comments.ts` — "guest" author in addComment
+- `tools/dashboard/src/server.ts` — hostname binding, ShareRegistry integration, share CRUD routes, scoped entity routes, scoped WebSocket, share page route, publishEvent consolidation
+- `tools/dashboard/src/channel.ts` — hostname parameter fix
+- `tools/dashboard/static/detail.html` — Share panel section in sidebar
+- `tools/dashboard/static/detail.js` — Share link creation/management UI
+- `tools/dashboard/ctl.sh` — --tunnel flag, ngrok lifecycle management
+
+**Test files created/modified (2):**
+- `tools/dashboard/src/auth.test.ts` — 16 unit tests
+- `tests/dashboard/share.test.ts` — 16 integration tests (CRUD, scoped entity, scoped WebSocket)
+
+**Quality gate findings fixed:**
+- channel.ts missing hostname parameter (TS2345)
+- WebSocket upgrade data type mismatch (TS2322) — resolved with type cast

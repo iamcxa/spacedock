@@ -13,6 +13,7 @@ ROOT=""
 STATUS_ALL=false
 LOGS_FOLLOW=false
 CHANNEL_MODE=false
+TUNNEL_MODE=false
 
 usage() {
     echo "Usage: $(basename "$0") <start|stop|status|logs|restart> [options]"
@@ -21,6 +22,7 @@ usage() {
     echo "  --port PORT    Port to serve on (default: 8420, auto-selects 8420-8429)"
     echo "  --root DIR     Project root (default: git toplevel or cwd)"
     echo "  --channel      Launch in channel mode (MCP + dashboard, for Claude Code --channels)"
+    echo "  --tunnel       Launch ngrok tunnel for public access (requires ngrok installed)"
     echo "  --all          (status) Show all dashboard instances"
     echo "  --follow       (logs) Tail the log file"
     echo ""
@@ -42,6 +44,8 @@ while [[ $# -gt 0 ]]; do
             STATUS_ALL=true; shift ;;
         --channel)
             CHANNEL_MODE=true; shift ;;
+        --tunnel)
+            TUNNEL_MODE=true; shift ;;
         --follow)
             LOGS_FOLLOW=true; shift ;;
         -h|--help)
@@ -74,6 +78,8 @@ PID_FILE="$STATE_DIR/pid"
 PORT_FILE="$STATE_DIR/port"
 ROOT_FILE="$STATE_DIR/root"
 LOG_FILE="$STATE_DIR/dashboard.log"
+TUNNEL_URL_FILE="$STATE_DIR/tunnel_url"
+TUNNEL_PID_FILE="$STATE_DIR/tunnel_pid"
 
 # --- helper functions ---
 
@@ -85,7 +91,7 @@ is_running() {
 }
 
 clean_stale() {
-    rm -f "$PID_FILE" "$PORT_FILE" "$ROOT_FILE"
+    rm -f "$PID_FILE" "$PORT_FILE" "$ROOT_FILE" "$TUNNEL_PID_FILE" "$TUNNEL_URL_FILE"
 }
 
 port_in_use() {
@@ -158,10 +164,16 @@ do_start() {
         entry_script="tools/dashboard/src/channel.ts"
     fi
 
+    local host_flag=""
+    if [[ "$TUNNEL_MODE" == "true" ]]; then
+        host_flag="--host 0.0.0.0"
+    fi
+
     nohup bun run "$REPO_ROOT/$entry_script" \
         --port "$selected_port" \
         --root "$ROOT" \
         --log-file "$LOG_FILE" \
+        $host_flag \
         > /dev/null 2>&1 &
     local daemon_pid=$!
 
@@ -189,11 +201,58 @@ do_start() {
     # Check if process is still alive
     if kill -0 "$daemon_pid" 2>/dev/null; then
         echo "Dashboard started but health check timed out: http://127.0.0.1:${selected_port}/ (PID: ${daemon_pid})"
-        return 0
     else
         clean_stale
         echo "Error: dashboard failed to start. Check log: $LOG_FILE" >&2
         return 1
+    fi
+
+    # --- Tunnel mode ---
+    if [[ "$TUNNEL_MODE" == "true" ]]; then
+        if ! command -v ngrok &>/dev/null; then
+            echo "Warning: ngrok not found in PATH. Skipping tunnel." >&2
+            return 0
+        fi
+
+        # Kill any existing ngrok for this port
+        if [[ -f "$TUNNEL_PID_FILE" ]]; then
+            local old_pid
+            old_pid="$(cat "$TUNNEL_PID_FILE")"
+            kill "$old_pid" 2>/dev/null || true
+            rm -f "$TUNNEL_PID_FILE" "$TUNNEL_URL_FILE"
+        fi
+
+        # Spawn ngrok
+        nohup ngrok http "$selected_port" \
+            --log=stdout \
+            > "$STATE_DIR/ngrok.log" 2>&1 &
+        local ngrok_pid=$!
+        echo "$ngrok_pid" > "$TUNNEL_PID_FILE"
+
+        # Poll ngrok API for tunnel URL (up to 10 seconds)
+        local tunnel_url=""
+        local t_attempts=0
+        local t_max=20
+        while [[ $t_attempts -lt $t_max ]]; do
+            tunnel_url="$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null \
+                | grep -o '"public_url":"[^"]*"' \
+                | head -1 \
+                | cut -d'"' -f4 || true)"
+            if [[ -n "$tunnel_url" ]]; then
+                break
+            fi
+            sleep 0.5
+            t_attempts=$((t_attempts + 1))
+        done
+
+        if [[ -n "$tunnel_url" ]]; then
+            echo "$tunnel_url" > "$TUNNEL_URL_FILE"
+            echo "Tunnel:    ${tunnel_url} (PID: ${ngrok_pid})"
+            echo "Note: ngrok free tier shows an interstitial page on first visit."
+            echo "      API calls should include 'ngrok-skip-browser-warning' header."
+        else
+            echo "Warning: ngrok started but tunnel URL not captured. Check $STATE_DIR/ngrok.log" >&2
+        fi
     fi
 }
 
@@ -211,6 +270,15 @@ do_stop() {
         clean_stale
         echo "Dashboard is not running (cleaned stale PID)."
         return 0
+    fi
+
+    # Stop tunnel if running
+    if [[ -f "$TUNNEL_PID_FILE" ]]; then
+        local tunnel_pid
+        tunnel_pid="$(cat "$TUNNEL_PID_FILE")"
+        kill "$tunnel_pid" 2>/dev/null || true
+        rm -f "$TUNNEL_PID_FILE" "$TUNNEL_URL_FILE"
+        echo "Tunnel stopped."
     fi
 
     # SIGTERM
@@ -268,6 +336,16 @@ do_status() {
     echo "  Root:    ${root_path}"
     echo "  Uptime:  ${uptime_str}"
     echo "  Log:     ${LOG_FILE}"
+    if [[ -f "$TUNNEL_URL_FILE" ]]; then
+        local tunnel_url
+        tunnel_url="$(cat "$TUNNEL_URL_FILE")"
+        if [[ -f "$TUNNEL_PID_FILE" ]] && kill -0 "$(cat "$TUNNEL_PID_FILE")" 2>/dev/null; then
+            echo "  Tunnel:  ${tunnel_url}"
+        else
+            echo "  Tunnel:  (not running)"
+            rm -f "$TUNNEL_PID_FILE" "$TUNNEL_URL_FILE"
+        fi
+    fi
 }
 
 do_status_all() {
