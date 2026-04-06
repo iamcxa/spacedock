@@ -44,10 +44,16 @@
           authView.textContent = "This share link has expired or does not exist.";
           return null;
         }
+        if (!res.ok) {
+          authError.textContent = "Server error. Please try again.";
+          authError.style.display = "block";
+          verifyBtn.disabled = false;
+          return null;
+        }
         return res.json();
       })
       .then(function (data) {
-        if (!data) return;
+        if (!data || !data.scope) return;
         scope = data.scope;
         showReviewView();
       })
