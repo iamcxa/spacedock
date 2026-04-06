@@ -17,6 +17,7 @@ beforeAll(() => {
     port: 0,
     hostname: "127.0.0.1",
     projectRoot: TMP,
+    dbPath: ":memory:",
   });
   baseUrl = `http://127.0.0.1:${server.port}`;
 });
@@ -190,9 +191,9 @@ describe("POST /api/share/:token/verify", () => {
     });
     const { token } = await createRes.json() as any;
 
-    // Force expiry via internal registry access
-    const link = server.shareRegistry.get(token);
-    if (link) link.expiresAt = new Date(Date.now() - 1000).toISOString();
+    // Force expiry via direct SQL UPDATE (object mutation does not update SQLite)
+    server.db.query("UPDATE share_links SET expires_at = ? WHERE token = ?")
+      .run(new Date(Date.now() - 1000).toISOString(), token);
 
     const verifyRes = await fetch(`${baseUrl}/api/share/${token}/verify`, {
       method: "POST",
@@ -253,8 +254,9 @@ describe("GET /api/share/:token/entity/detail", () => {
       }),
     });
     const { token } = await createRes.json() as any;
-    const link = server.shareRegistry.get(token);
-    if (link) link.expiresAt = new Date(Date.now() - 1000).toISOString();
+    // Force expiry via direct SQL UPDATE (object mutation does not update SQLite)
+    server.db.query("UPDATE share_links SET expires_at = ? WHERE token = ?")
+      .run(new Date(Date.now() - 1000).toISOString(), token);
 
     const res = await fetch(
       `${baseUrl}/api/share/${token}/entity/detail?path=${encodeURIComponent(ENTITY_PATH)}`
@@ -366,8 +368,9 @@ describe("WebSocket /ws/share/:token/activity", () => {
       }),
     });
     const { token } = await createRes.json() as any;
-    const link = server.shareRegistry.get(token);
-    if (link) link.expiresAt = new Date(Date.now() - 1000).toISOString();
+    // Force expiry via direct SQL UPDATE (object mutation does not update SQLite)
+    server.db.query("UPDATE share_links SET expires_at = ? WHERE token = ?")
+      .run(new Date(Date.now() - 1000).toISOString(), token);
 
     const wsUrl = `ws://127.0.0.1:${server.port}/ws/share/${token}/activity`;
     const ws = new WebSocket(wsUrl);

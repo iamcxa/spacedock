@@ -1,9 +1,11 @@
 import { describe, test, expect } from "bun:test";
 import { EventBuffer } from "../../tools/dashboard/src/events";
+import { openDb } from "../../tools/dashboard/src/db";
 
 describe("EventBuffer", () => {
   test("stores events and assigns incrementing sequence numbers", () => {
-    const buf = new EventBuffer(100);
+    const db = openDb(":memory:");
+    const buf = new EventBuffer(db, 100);
     const e1 = buf.push({
       type: "dispatch",
       entity: "feat-a",
@@ -24,7 +26,8 @@ describe("EventBuffer", () => {
   });
 
   test("getSince returns events after given sequence number", () => {
-    const buf = new EventBuffer(100);
+    const db = openDb(":memory:");
+    const buf = new EventBuffer(db, 100);
     buf.push({ type: "dispatch", entity: "a", stage: "plan", agent: "e1", timestamp: "2026-04-04T10:00:00Z" });
     buf.push({ type: "completion", entity: "a", stage: "plan", agent: "e1", timestamp: "2026-04-04T10:01:00Z" });
     buf.push({ type: "dispatch", entity: "b", stage: "plan", agent: "e2", timestamp: "2026-04-04T10:02:00Z" });
@@ -39,14 +42,16 @@ describe("EventBuffer", () => {
   });
 
   test("getSince returns empty array when no events after seq", () => {
-    const buf = new EventBuffer(100);
+    const db = openDb(":memory:");
+    const buf = new EventBuffer(db, 100);
     buf.push({ type: "dispatch", entity: "a", stage: "plan", agent: "e1", timestamp: "2026-04-04T10:00:00Z" });
     const result = buf.getSince(1);
     expect(result.length).toBe(0);
   });
 
   test("ring buffer evicts oldest events when capacity exceeded", () => {
-    const buf = new EventBuffer(3);
+    const db = openDb(":memory:");
+    const buf = new EventBuffer(db, 3);
     buf.push({ type: "dispatch", entity: "a", stage: "plan", agent: "e1", timestamp: "t1" });
     buf.push({ type: "dispatch", entity: "b", stage: "plan", agent: "e2", timestamp: "t2" });
     buf.push({ type: "dispatch", entity: "c", stage: "plan", agent: "e3", timestamp: "t3" });
@@ -62,7 +67,8 @@ describe("EventBuffer", () => {
   });
 
   test("getAll returns all buffered events", () => {
-    const buf = new EventBuffer(100);
+    const db = openDb(":memory:");
+    const buf = new EventBuffer(db, 100);
     buf.push({ type: "dispatch", entity: "a", stage: "plan", agent: "e1", timestamp: "t1" });
     buf.push({ type: "gate", entity: "a", stage: "plan", agent: "e1", timestamp: "t2" });
     const all = buf.getAll();
@@ -71,14 +77,16 @@ describe("EventBuffer", () => {
   });
 
   test("validates event type", () => {
-    const buf = new EventBuffer(100);
+    const db = openDb(":memory:");
+    const buf = new EventBuffer(db, 100);
     expect(() => {
       buf.push({ type: "invalid" as any, entity: "a", stage: "s", agent: "e", timestamp: "t" });
     }).toThrow();
   });
 
   test("push accepts channel_message event type", () => {
-    const buf = new EventBuffer(10);
+    const db = openDb(":memory:");
+    const buf = new EventBuffer(db, 10);
     const entry = buf.push({
       type: "channel_message",
       entity: "",
@@ -92,7 +100,8 @@ describe("EventBuffer", () => {
   });
 
   test("push accepts channel_response event type", () => {
-    const buf = new EventBuffer(10);
+    const db = openDb(":memory:");
+    const buf = new EventBuffer(db, 10);
     const entry = buf.push({
       type: "channel_response",
       entity: "",
@@ -106,7 +115,8 @@ describe("EventBuffer", () => {
   });
 
   test("push accepts permission_request event type", () => {
-    const buf = new EventBuffer(10);
+    const db = openDb(":memory:");
+    const buf = new EventBuffer(db, 10);
     const entry = buf.push({
       type: "permission_request",
       entity: "",
@@ -120,7 +130,8 @@ describe("EventBuffer", () => {
   });
 
   test("push accepts permission_response event type", () => {
-    const buf = new EventBuffer(10);
+    const db = openDb(":memory:");
+    const buf = new EventBuffer(db, 10);
     const entry = buf.push({
       type: "permission_response",
       entity: "",

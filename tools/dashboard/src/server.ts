@@ -1022,7 +1022,7 @@ export function createServer(opts: ServerOptions) {
     server.publish("activity", JSON.stringify({ type: "channel_status", connected }));
   }
 
-  return Object.assign(server, { eventBuffer, publishEvent, broadcastChannelStatus, shareRegistry });
+  return Object.assign(server, { db, eventBuffer, publishEvent, broadcastChannelStatus, shareRegistry });
 }
 
 // CLI entry point -- only runs when executed directly
