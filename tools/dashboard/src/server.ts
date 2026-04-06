@@ -881,6 +881,77 @@ export function createServer(opts: ServerOptions) {
           }
         }
 
+        // Scoped share gate decision route: /api/share/:token/gate/decision
+        const shareGateMatch = pathname.match(/^\/api\/share\/([a-f0-9]+)\/gate\/decision$/);
+        if (shareGateMatch && req.method === "POST") {
+          const token = shareGateMatch[1];
+          const link = shareRegistry.get(token);
+          if (!link) {
+            logRequest(req, 404);
+            return jsonResponse({ error: "Share link not found or expired" }, 404);
+          }
+          try {
+            const body = await req.json() as {
+              entity_path: string;
+              decision: string;
+              message?: string;
+            };
+            if (!body.entity_path || !body.decision) {
+              logRequest(req, 400);
+              return jsonResponse({ error: "Missing required fields: entity_path, decision" }, 400);
+            }
+            if (body.decision !== "approved" && body.decision !== "changes_requested") {
+              logRequest(req, 400);
+              return jsonResponse({ error: "Invalid decision: must be 'approved' or 'changes_requested'" }, 400);
+            }
+            if (!shareRegistry.isInScope(token, body.entity_path)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Entity not in share scope" }, 403);
+            }
+            if (!validatePath(body.entity_path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            // Derive entity_slug and stage from entity detail
+            const detail = getEntityDetail(body.entity_path);
+            const pathParts = body.entity_path.split("/");
+            const filename = pathParts[pathParts.length - 1];
+            const entitySlug = filename.replace(/\.md$/, "");
+            const stage = detail.frontmatter.status || "";
+
+            // Record gate_decision event
+            const event: AgentEvent = {
+              type: "gate_decision",
+              entity: entitySlug,
+              stage,
+              agent: "guest",
+              timestamp: new Date().toISOString(),
+              detail: body.decision,
+            };
+            const seq = publishEvent(event);
+
+            // Forward gate decision to FO via channel
+            if (opts.onChannelMessage) {
+              const content = body.decision === "approved"
+                ? `Gate approved for ${entitySlug} at stage "${stage}"`
+                : `Changes requested for ${entitySlug} at stage "${stage}"`;
+              opts.onChannelMessage(content, {
+                type: "gate_decision",
+                decision: body.decision,
+                entity_path: body.entity_path,
+                entity_slug: entitySlug,
+                stage,
+              });
+            }
+            logRequest(req, 200);
+            return jsonResponse({ ok: true, seq });
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        }
+
         // Serve share page for /share/:token
         const sharePageMatch = pathname.match(/^\/share\/[a-f0-9]+$/);
         if (sharePageMatch && req.method === "GET") {
