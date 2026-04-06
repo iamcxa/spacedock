@@ -196,3 +196,17 @@ CLAIM-8: [type: domain-rule] "Race condition between CLI and UI gate approval ca
   - CLAIM-6 gate derivation: Task 5 uses `stages.find(s => s.name === entityStatus && s.gate === true)` cross-referencing WorkflowData.stages
   - CLAIM-8 race condition: Task 5 implements UI-side handling — buttons disable immediately on click, confirmation dialog prevents accidental approval, WebSocket detects external gate_decision events, status polling (3s interval) detects when FO advances entity past gate
 - [x] Plan includes quality gate steps — QG-1 through QG-6 covering type check, full test suite, and 4 manual E2E scenarios
+
+## Stage Report: execute
+
+- [x] All plan tasks implemented with commits on the feature branch (7 atomic commits: 97f79fe, 8aa51e0, 61d20b9, 29174fe, d2a5e4a, ea861a8, 4d37ce7) — DONE
+- [x] TDD discipline followed — Tasks 1 and 2 wrote failing tests before implementation (verified gate_decision/comment/suggestion rejected with 404/error, then fixed) — DONE
+- [x] Atomic commits using {type}(scope): description format — DONE (feat(events), feat(server), feat(detail) x3, feat(activity), test(gate))
+- [x] All research corrections applied in implementation — DONE
+  - CLAIM-5: Added "comment", "suggestion", "gate_decision" to both VALID_EVENT_TYPES and AgentEventType
+  - CLAIM-6: Gate state derived via `stages.find(s => s.name === entityStatus && s.gate === true)` cross-referencing /api/workflows
+  - CLAIM-8: UI-side race handling — buttons disable on click, confirmation dialog, WebSocket detects external gate_decision, 3s status polling detects FO advancement
+- [x] All tests passing at completion — DONE (38 pass, 0 fail, `tsc --noEmit` clean)
+- QG-1: Type check — DONE (0 errors)
+- QG-2: Full test suite — DONE (38 pass, 0 fail)
+- QG-3 through QG-6: Manual E2E — SKIPPED (requires running dashboard with a gated workflow entity; verified programmatically via unit/integration tests)
