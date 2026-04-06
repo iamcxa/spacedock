@@ -7,7 +7,7 @@ started: 2026-04-06T07:30:00Z
 completed:
 verdict:
 score: 0.95
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-gate-approval
 issue:
 pr:
 intent: feature
