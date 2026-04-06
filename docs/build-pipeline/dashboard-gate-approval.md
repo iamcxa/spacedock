@@ -1,13 +1,13 @@
 ---
 id: 016
 title: Dashboard Gate Approval — UI 上的階段審批與 PR-style Review
-status: ship
+status: e2e
 source: /build brainstorming
 started: 2026-04-06T07:30:00Z
-completed: 2026-04-06T08:15:00Z
-verdict: PASSED
+completed:
+verdict:
 score: 0.95
-worktree: .worktrees/spacedock-ensign-dashboard-gate-approval
+worktree:
 issue:
 pr:
 intent: feature
