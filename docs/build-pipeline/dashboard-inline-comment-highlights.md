@@ -1,7 +1,7 @@
 ---
 id: 013
 title: Dashboard Inline Comment Highlights — Notion-like Comment Threading & Visual Markers
-status: pr-draft
+status: pr-review
 source: UI testing feedback
 started: 2026-04-06T13:10:00Z
 completed:
@@ -9,7 +9,7 @@ verdict:
 score: 0.85
 worktree: .worktrees/spacedock-ensign-dashboard-inline-comment-highlights
 issue:
-pr:
+pr: "iamcxa/spacedock#9"
 intent: feature
 scale: Small
 project: spacedock
@@ -193,3 +193,37 @@ All quality checks completed. Feature is production-ready: 57/57 tests pass (100
    - All mandatory checks complete and passing
    - No failures, blockers, or escalations
    - Ready for next stage (execute/ship)
+
+## Stage Report: pr-draft
+
+### Summary
+Draft PR created for entity 013 (Dashboard Inline Comment Highlights) on iamcxa/spacedock. All 9 checklist items addressed. 6 self-review annotations posted covering key design decisions: cached comments closure, normalize() necessity, overlap algorithm, closure capture fix, dual-refresh pattern, and author defaulting asymmetry.
+
+- **PR_NUMBER:** 9
+- **PR_URL:** https://github.com/iamcxa/spacedock/pull/9
+
+### Checklist
+
+1. **DONE** — Push feature branch to remote
+   - `git push -u origin spacedock-ensign/dashboard-inline-comment-highlights` — branch already up-to-date on remote
+
+2. **DONE** — Create draft PR on iamcxa/spacedock with conventional commit title
+   - Title: `feat(dashboard): add inline comment highlights with Notion-style threading`
+   - Created as PR #9 (--draft-only mode = created without --draft flag per skill spec)
+
+3. **DONE** — PR body includes: summary, test plan, quality report highlights
+   - Summary: 5 bullet points covering highlights, popover, dual-presence replies, resolved fade, re-render survival
+   - Reviewer Guide: 6-row table covering domain/API/detail/share/CSS/test layers + 4 design notes
+   - Test plan: 5 checklist items (unit tests, coverage, security, API contract, browser E2E pending)
+
+4. **DONE** — Capture PR_NUMBER and PR_URL in stage report
+   - PR_NUMBER: 9
+   - PR_URL: https://github.com/iamcxa/spacedock/pull/9
+
+5. **DONE** — Self-review annotations (if >100 lines changed)
+   - 1905 total insertions, 843 code-only diff lines — annotation required
+   - 6 annotations posted via `gh api repos/iamcxa/spacedock/pulls/9/reviews`
+   - Covered: cachedComments closure scope, normalize() after mark removal, overlap segment algorithm, capturedId closure fix, submitReply dual-refresh, author default asymmetry
+
+6. **DONE** — Write stage report to entity file
+   - This section
