@@ -235,6 +235,60 @@ export function createServer(opts: ServerOptions) {
           }
         },
       },
+      "/api/entity/gate/decision": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as {
+              entity_path: string;
+              entity_slug: string;
+              stage: string;
+              decision: string;
+            };
+            if (!body.entity_path || !body.entity_slug || !body.stage || !body.decision) {
+              logRequest(req, 400);
+              return jsonResponse({ error: "Missing required fields: entity_path, entity_slug, stage, decision" }, 400);
+            }
+            if (body.decision !== "approved" && body.decision !== "changes_requested") {
+              logRequest(req, 400);
+              return jsonResponse({ error: "Invalid decision: must be 'approved' or 'changes_requested'" }, 400);
+            }
+            if (!validatePath(body.entity_path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            // Record gate_decision event in activity feed
+            const event: AgentEvent = {
+              type: "gate_decision",
+              entity: body.entity_slug,
+              stage: body.stage,
+              agent: "captain",
+              timestamp: new Date().toISOString(),
+              detail: body.decision,
+            };
+            const entry = eventBuffer.push(event);
+            server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+            // Forward gate decision to FO via channel
+            if (opts.onChannelMessage) {
+              const content = body.decision === "approved"
+                ? `Gate approved for ${body.entity_slug} at stage "${body.stage}"`
+                : `Changes requested for ${body.entity_slug} at stage "${body.stage}"`;
+              opts.onChannelMessage(content, {
+                type: "gate_decision",
+                decision: body.decision,
+                entity_path: body.entity_path,
+                entity_slug: body.entity_slug,
+                stage: body.stage,
+              });
+            }
+            logRequest(req, 200);
+            return jsonResponse({ ok: true, seq: entry.seq });
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
       "/api/entity/suggestion": {
         POST: async (req) => {
           try {
