@@ -488,6 +488,97 @@ body {
     cursor: pointer;
 }
 
+.entity-body .comment-highlight:hover {
+    background: rgba(88, 166, 255, 0.30);
+}
+
+.entity-body .comment-highlight.resolved {
+    background: rgba(88, 166, 255, 0.06);
+    border-bottom-color: rgba(88, 166, 255, 0.3);
+}
+
+/* --- Comment Popover --- */
+
+.comment-popover {
+    position: absolute;
+    z-index: 1000;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 0.75rem;
+    max-width: 360px;
+    min-width: 240px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    font-size: 0.875rem;
+    color: #c9d1d9;
+}
+
+.comment-popover .popover-comment {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #21262d;
+}
+
+.comment-popover .popover-comment:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.comment-popover .popover-author {
+    font-weight: 600;
+    color: #58a6ff;
+    margin-right: 0.5rem;
+}
+
+.comment-popover .popover-time {
+    color: #484f58;
+    font-size: 0.75rem;
+}
+
+.comment-popover .popover-text {
+    margin-top: 0.25rem;
+    line-height: 1.4;
+}
+
+.comment-popover .popover-reply-form {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #21262d;
+}
+
+.comment-popover .popover-reply-input {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #c9d1d9;
+    padding: 0.375rem 0.5rem;
+    font-size: 0.8125rem;
+    outline: none;
+}
+
+.comment-popover .popover-reply-input:focus {
+    border-color: #58a6ff;
+}
+
+.comment-popover .popover-reply-btn {
+    background: #238636;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 0.375rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.comment-popover .popover-reply-btn:hover {
+    background: #2ea043;
+}
+
 /* --- Gate Review Panel --- */
 
 .gate-panel {
