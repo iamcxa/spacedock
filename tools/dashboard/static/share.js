@@ -128,9 +128,13 @@
         applyCommentHighlights(cachedComments);
       });
 
+    // Check gate status for this entity
+    checkGateStatus(path, data);
+
     document.getElementById("back-to-list").onclick = function () {
       detailView.style.display = "none";
       document.getElementById("entity-list").style.display = "block";
+      resetGatePanel();
     };
   }
 
@@ -525,11 +529,221 @@
                 applyCommentHighlights(cachedComments);
               });
           }
+          // Update gate panel on gate_decision events
+          if (msg.data.event.type === "gate_decision" && currentGatePath) {
+            refreshGateStatus();
+          }
         }
       } catch (e) { /* ignore parse errors */ }
     };
     ws.onclose = function () {
       setTimeout(connectScopedWebSocket, 3000);
     };
+  }
+
+  // --- Gate Review (share page) ---
+
+  var gatePanel = document.getElementById("gate-panel");
+  var gateStatusBadge = document.getElementById("gate-status-badge");
+  var gateActions = document.getElementById("gate-actions");
+  var gateApproveBtn = document.getElementById("gate-approve-btn");
+  var gateRequestChangesBtn = document.getElementById("gate-request-changes-btn");
+  var gateConfirm = document.getElementById("gate-confirm");
+  var gateConfirmAction = document.getElementById("gate-confirm-action");
+  var gateConfirmYes = document.getElementById("gate-confirm-yes");
+  var gateConfirmCancel = document.getElementById("gate-confirm-cancel");
+  var gateResolved = document.getElementById("gate-resolved");
+  var gateResolvedText = document.getElementById("gate-resolved-text");
+
+  var currentGatePath = null;
+  var gateDecisionSent = false;
+  var gateWorkflowStages = null;
+  var gateStatusPollTimer = null;
+
+  function isEntityAtGate(entityStatus, stages) {
+    if (!entityStatus || !stages || !stages.length) return false;
+    var matchingStage = stages.find(function (s) {
+      return s.name === entityStatus && s.gate === true;
+    });
+    return !!matchingStage;
+  }
+
+  function resetGatePanel() {
+    if (gatePanel) gatePanel.style.display = "none";
+    currentGatePath = null;
+    gateDecisionSent = false;
+    if (gateStatusPollTimer) {
+      clearInterval(gateStatusPollTimer);
+      gateStatusPollTimer = null;
+    }
+  }
+
+  function checkGateStatus(path, data) {
+    currentGatePath = path;
+    gateDecisionSent = false;
+
+    // Fetch workflow stages to determine if entity is at a gate
+    fetch("/api/share/" + token + "/entity/detail?path=" + encodeURIComponent(path))
+      .then(function (res) { return res.json(); })
+      .then(function (detail) {
+        var entityStatus = detail.frontmatter.status;
+        // Need workflow stages — fetch from /api/workflows (public route)
+        return fetch("/api/workflows")
+          .then(function (res) { return res.json(); })
+          .then(function (workflows) {
+            var stages = null;
+            for (var i = 0; i < workflows.length; i++) {
+              var wf = workflows[i];
+              for (var j = 0; j < wf.entities.length; j++) {
+                if (wf.entities[j].path === path) {
+                  stages = wf.stages;
+                  break;
+                }
+              }
+              if (stages) break;
+            }
+            gateWorkflowStages = stages;
+            updateGatePanel(entityStatus, stages);
+          });
+      });
+  }
+
+  function refreshGateStatus() {
+    if (!currentGatePath) return;
+    fetch("/api/share/" + token + "/entity/detail?path=" + encodeURIComponent(currentGatePath))
+      .then(function (res) { return res.json(); })
+      .then(function (detail) {
+        updateGatePanel(detail.frontmatter.status, gateWorkflowStages);
+      });
+  }
+
+  function updateGatePanel(entityStatus, stages) {
+    if (!gatePanel || !stages) {
+      if (gatePanel) gatePanel.style.display = "none";
+      return;
+    }
+
+    var atGate = isEntityAtGate(entityStatus, stages);
+    if (!atGate) {
+      gatePanel.style.display = "none";
+      return;
+    }
+
+    gatePanel.style.display = "";
+
+    if (gateDecisionSent) return;
+
+    gateStatusBadge.textContent = "Pending Review";
+    gateStatusBadge.className = "gate-badge pending";
+    gateActions.style.display = "";
+    gateConfirm.style.display = "none";
+    gateResolved.style.display = "none";
+    gateApproveBtn.disabled = false;
+    gateRequestChangesBtn.disabled = false;
+  }
+
+  // --- Gate Actions with Confirmation ---
+
+  var pendingGateDecision = null;
+
+  if (gateApproveBtn) {
+    gateApproveBtn.addEventListener("click", function () {
+      pendingGateDecision = "approved";
+      gateConfirmAction.textContent = "approve";
+      gateConfirmYes.className = "btn gate-btn approve";
+      gateActions.style.display = "none";
+      gateConfirm.style.display = "";
+    });
+  }
+
+  if (gateRequestChangesBtn) {
+    gateRequestChangesBtn.addEventListener("click", function () {
+      pendingGateDecision = "changes_requested";
+      gateConfirmAction.textContent = "request changes on";
+      gateConfirmYes.className = "btn gate-btn request-changes";
+      gateActions.style.display = "none";
+      gateConfirm.style.display = "";
+    });
+  }
+
+  if (gateConfirmCancel) {
+    gateConfirmCancel.addEventListener("click", function () {
+      pendingGateDecision = null;
+      gateConfirm.style.display = "none";
+      gateActions.style.display = "";
+    });
+  }
+
+  if (gateConfirmYes) {
+    gateConfirmYes.addEventListener("click", function () {
+      if (!pendingGateDecision || !currentGatePath) return;
+      var decision = pendingGateDecision;
+      pendingGateDecision = null;
+
+      gateApproveBtn.disabled = true;
+      gateRequestChangesBtn.disabled = true;
+      gateConfirmYes.disabled = true;
+      gateConfirmCancel.disabled = true;
+
+      fetch("/api/share/" + token + "/gate/decision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity_path: currentGatePath,
+          decision: decision,
+        }),
+      }).then(function (res) {
+        if (!res.ok) throw new Error(res.status);
+        return res.json();
+      }).then(function () {
+        gateDecisionSent = true;
+        gateConfirm.style.display = "none";
+        gateActions.style.display = "none";
+        gateResolved.style.display = "";
+
+        if (decision === "approved") {
+          gateStatusBadge.textContent = "Approved";
+          gateStatusBadge.className = "gate-badge approved";
+          gateResolvedText.textContent = "Decision sent \u2014 waiting for FO to advance.";
+        } else {
+          gateStatusBadge.textContent = "Changes Requested";
+          gateStatusBadge.className = "gate-badge changes-requested";
+          gateResolvedText.textContent = "Changes requested \u2014 FO will address feedback.";
+        }
+
+        startGateStatusPoll();
+      }).catch(function () {
+        gateApproveBtn.disabled = false;
+        gateRequestChangesBtn.disabled = false;
+        gateConfirmYes.disabled = false;
+        gateConfirmCancel.disabled = false;
+        gateConfirm.style.display = "none";
+        gateActions.style.display = "";
+      });
+    });
+  }
+
+  // --- Gate Status Polling ---
+
+  function startGateStatusPoll() {
+    if (gateStatusPollTimer) return;
+    gateStatusPollTimer = setInterval(function () {
+      if (!currentGatePath) return;
+      fetch("/api/share/" + token + "/entity/detail?path=" + encodeURIComponent(currentGatePath))
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          var newStatus = data.frontmatter.status;
+          var atGate = isEntityAtGate(newStatus, gateWorkflowStages);
+          if (!atGate) {
+            clearInterval(gateStatusPollTimer);
+            gateStatusPollTimer = null;
+            gateStatusBadge.textContent = "Advanced";
+            gateStatusBadge.className = "gate-badge approved";
+            gateResolvedText.textContent = "Entity advanced to stage: " + newStatus;
+            gateResolved.style.display = "";
+            gateActions.style.display = "none";
+          }
+        });
+    }, 3000);
   }
 })();
