@@ -172,7 +172,7 @@
     var nameP = document.createElement("div");
     nameP.style.marginBottom = "0.5rem";
     nameP.style.fontWeight = "600";
-    nameP.style.color = "#f0f6fc";
+    nameP.style.color = "#e0d6c8";
     nameP.textContent = stage.name;
     panel.appendChild(nameP);
 

@@ -37,7 +37,7 @@
       "dominant-baseline": "central",
       "font-family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace",
       "font-size": "11",
-      fill: "#c9d1d9",
+      fill: "#e0d6c8",
     }, attrs || {}));
     t.textContent = text;
     return t;
@@ -120,23 +120,23 @@
       ].join(" ");
       g.appendChild(svgEl("polygon", {
         points: points,
-        fill: isActiveFilter ? "#58a6ff22" : "#161b22",
-        stroke: isActiveFilter ? "#58a6ff" : "#f0883e",
+        fill: isActiveFilter ? "#53a8b622" : "#16213e",
+        stroke: isActiveFilter ? "#53a8b6" : "#e94560",
         "stroke-width": isActiveFilter ? "2" : "1.5",
         "stroke-dasharray": node.conditional ? "4,3" : "none",
       }));
     } else {
       // Rect shape — rounded for terminal/initial
       var rx = (node.terminal || node.initial) ? 12 : 4;
-      var strokeColor = node.terminal ? "#3fb950" : (node.initial ? "#d2a8ff" : "#21262d");
+      var strokeColor = node.terminal ? "#2ecc71" : (node.initial ? "#53a8b6" : "#0f3460");
       g.appendChild(svgEl("rect", {
         x: cx - NODE_W / 2,
         y: cy - NODE_H / 2,
         width: NODE_W,
         height: NODE_H,
         rx: rx,
-        fill: isActiveFilter ? "#58a6ff22" : "#161b22",
-        stroke: isActiveFilter ? "#58a6ff" : strokeColor,
+        fill: isActiveFilter ? "#53a8b622" : "#16213e",
+        stroke: isActiveFilter ? "#53a8b6" : strokeColor,
         "stroke-width": isActiveFilter ? "2" : "1",
         "stroke-dasharray": node.conditional ? "4,3" : "none",
       }));
@@ -144,7 +144,7 @@
 
     // Label
     g.appendChild(svgText(cx, cy, node.name, {
-      fill: isActiveFilter ? "#58a6ff" : "#c9d1d9",
+      fill: isActiveFilter ? "#53a8b6" : "#e0d6c8",
       "font-size": "11",
       "font-weight": isActiveFilter ? "600" : "400",
     }));
@@ -161,10 +161,10 @@
     var g = svgEl("g", { class: "pipeline-badge" });
     g.appendChild(svgEl("circle", {
       cx: cx, cy: cy, r: BADGE_R,
-      fill: "#58a6ff",
+      fill: "#53a8b6",
     }));
     g.appendChild(svgText(cx, cy, String(count), {
-      fill: "#0d1117",
+      fill: "#1a1a2e",
       "font-size": "9",
       "font-weight": "700",
     }));
@@ -193,7 +193,7 @@
     // Line
     g.appendChild(svgEl("line", {
       x1: x1, y1: y, x2: x2 - ARROW_SIZE, y2: y,
-      stroke: "#21262d",
+      stroke: "#0f3460",
       "stroke-width": "1.5",
     }));
 
@@ -205,7 +205,7 @@
     ].join(" ");
     g.appendChild(svgEl("polygon", {
       points: arrowPoints,
-      fill: "#21262d",
+      fill: "#0f3460",
     }));
 
     return g;
@@ -228,7 +228,7 @@
     g.appendChild(svgEl("path", {
       d: d,
       fill: "none",
-      stroke: "#f0883e",
+      stroke: "#e94560",
       "stroke-width": "1.5",
       "stroke-dasharray": "5,3",
     }));
@@ -241,13 +241,13 @@
     ].join(" ");
     g.appendChild(svgEl("polygon", {
       points: arrowPoints,
-      fill: "#f0883e",
+      fill: "#e94560",
     }));
 
     // Label
     var midX = (x1 + x2) / 2;
     g.appendChild(svgText(midX, arcY - 5, "feedback", {
-      fill: "#f0883e",
+      fill: "#e94560",
       "font-size": "9",
       "font-style": "italic",
     }));
