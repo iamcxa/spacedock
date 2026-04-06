@@ -126,8 +126,164 @@ tr:hover td { background: #0f3460; }
 
 .dashboard-layout {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 120px 1fr 320px;
     gap: 1.5rem;
+}
+
+/* --- Alert Bar --- */
+
+.alert-bar {
+    display: none;
+    background: #e9456018;
+    border-left: 3px solid #e94560;
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 1rem;
+    font-size: 0.8rem;
+}
+
+.alert-bar.has-alerts {
+    display: block;
+}
+
+.alert-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+}
+
+.alert-item .alert-text {
+    flex: 1;
+    color: #e0d6c8;
+}
+
+.alert-item .alert-action {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    background: #e94560;
+    color: #e0d6c8;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.alert-item .alert-action:hover {
+    background: #d63850;
+}
+
+/* --- Missions Tree --- */
+
+.missions-tree {
+    background: #16213e;
+    border-radius: 4px;
+    padding: 0.5rem;
+    overflow-y: auto;
+    max-height: calc(100vh - 5rem);
+    position: sticky;
+    top: 1.5rem;
+    font-size: 0.75rem;
+}
+
+.missions-tree h4 {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #e0d6c880;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid #0f3460;
+}
+
+.tree-workflow {
+    margin-bottom: 0.25rem;
+}
+
+.tree-workflow-label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.25rem;
+    cursor: pointer;
+    color: #e0d6c8;
+    font-weight: 500;
+    border-radius: 3px;
+    transition: background 0.15s;
+}
+
+.tree-workflow-label:hover {
+    background: #0f3460;
+}
+
+.tree-workflow-label .tree-arrow {
+    font-size: 0.6rem;
+    width: 0.8em;
+    text-align: center;
+    color: #e0d6c880;
+}
+
+.tree-entities {
+    display: none;
+    padding-left: 0.75rem;
+}
+
+.tree-workflow.expanded .tree-entities {
+    display: block;
+}
+
+.tree-entity {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.25rem;
+    cursor: pointer;
+    color: #e0d6c880;
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.15s;
+}
+
+.tree-entity:hover {
+    background: #0f3460;
+    color: #e0d6c8;
+}
+
+.tree-entity.active {
+    background: #0f3460;
+    border-left: 2px solid #53a8b6;
+    color: #e0d6c8;
+}
+
+.tree-entity .tree-status {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+}
+
+.tree-entity .tree-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tree-shipped-count {
+    color: #e0d6c880;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.25rem 0.15rem 0.75rem;
+}
+
+/* --- Ticker Strip --- */
+
+.ticker-strip {
+    font-size: 0.7rem;
+    color: #e0d6c880;
+    padding: 0.4rem 0;
+    border-top: 1px solid #0f3460;
+    margin-top: 0.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 #activity-panel {
@@ -532,6 +688,9 @@ tr:hover td { background: #0f3460; }
 @media (max-width: 768px) {
     .dashboard-layout {
         grid-template-columns: 1fr;
+    }
+    .missions-tree {
+        display: none;
     }
     #activity-panel {
         position: static;
