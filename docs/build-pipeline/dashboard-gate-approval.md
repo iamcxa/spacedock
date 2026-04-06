@@ -9,7 +9,7 @@ verdict:
 score: 0.95
 worktree: .worktrees/spacedock-ensign-dashboard-gate-approval
 issue:
-pr: "#33"
+pr: "iamcxa/spacedock#7"
 intent: feature
 scale: Medium
 project: spacedock
