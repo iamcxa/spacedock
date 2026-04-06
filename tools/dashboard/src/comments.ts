@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import type { Comment, Suggestion, CommentThread } from "./types";
+import type { Comment, CommentReply, Suggestion, CommentThread } from "./types";
 
 function sidecarPath(entityPath: string): string {
   return entityPath.replace(/\.md$/, ".comments.json");
@@ -124,4 +124,22 @@ export function rejectSuggestion(entityPath: string, suggestionId: string): Sugg
   suggestion.status = "rejected";
   writeSidecar(entityPath, thread);
   return suggestion;
+}
+
+export function addReply(
+  entityPath: string,
+  commentId: string,
+  input: { content: string; author: "captain" | "fo" | "guest" }
+): CommentReply {
+  const thread = readSidecar(entityPath);
+  const comment = thread.comments.find((c) => c.id === commentId);
+  if (!comment) throw new Error("Comment not found: " + commentId);
+  const reply: CommentReply = {
+    content: input.content,
+    author: input.author,
+    timestamp: new Date().toISOString(),
+  };
+  comment.thread.push(reply);
+  writeSidecar(entityPath, thread);
+  return reply;
 }

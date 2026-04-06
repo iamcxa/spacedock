@@ -547,3 +547,28 @@ Body includes:
 - Finding 2 (gate approval from share page) is an incomplete acceptance criterion — the HTML scaffolding is in place but not wired. This can be addressed as a follow-up without blocking the PR, since the gate panel is hidden by default (`display:none`)
 - Finding 3 (rate limiting) is acceptable for the current threat model (default localhost binding); should be revisited if the tool is commonly used with `--tunnel` or `--host 0.0.0.0`
 - The 13 pre-existing test failures in `tests/dashboard/` are not related to this PR and should be tracked separately
+
+### Feedback Cycles
+
+**Cycle 1** (pr-review → execute): Captain reported Share Link creation UX bug — pressing "Create" button produces no visible feedback. Root cause: `detail.js` fetch handler for `POST /api/share` has no `res.ok` check, no `.catch()`, no loading state, and silently swallows errors. Fix requirements:
+1. Add `res.ok` / error status handling with user-visible error message
+2. Add loading state on Create button during fetch
+3. Show clear success feedback when link is created (e.g., highlight the generated URL)
+4. Add `.catch()` for network errors
+
+## Stage Report: execute (Feedback Cycle 1)
+
+1. [x] Add `res.ok` check and inline error message display for API errors — DONE (detail.js: `!res.ok` guard reads response text, throws Error with status code; displayed in `#share-error` div)
+2. [x] Add `.catch()` handler for network errors with user-visible feedback — DONE (detail.js: `.catch()` shows error message in `#share-error`, hides result area)
+3. [x] Add loading state (disable button + "Creating..." text) during fetch — DONE (detail.js: `submitBtn.disabled = true` + `textContent = "Creating..."` before fetch, restored in `.finally()`)
+4. [x] Show clear success feedback — highlight generated URL, auto-select for copy — DONE (detail.js: green outline on URL input, `.focus()` + `.select()` for instant copy, outline fades after 2s)
+5. [x] Verify fix by running existing tests (`cd tools/dashboard && bun test`) — DONE (54 pass, 0 fail, 127 expect() calls)
+6. [x] Commit with `fix(share): improve Create Share Link UX feedback and error handling` — DONE (commit 74fa438)
+7. [x] Push to remote branch — DONE
+
+### Additional fix
+- Replaced `alert("Password is required.")` with inline error message in `#share-error` div — consistent UX pattern (no browser alert dialogs)
+
+### Files changed
+- `tools/dashboard/static/detail.html` — Added `#share-error` div for inline error messages
+- `tools/dashboard/static/detail.js` — Rewrote share submit handler with error handling, loading state, success feedback

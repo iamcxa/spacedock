@@ -9,6 +9,7 @@ import {
   acceptSuggestion,
   rejectSuggestion,
   applyBodyEdit,
+  addReply,
 } from "./comments";
 
 const TMP = join(import.meta.dir, "__test_comments__");
@@ -237,5 +238,49 @@ describe("rejectSuggestion", () => {
 
     const fileContent = readFileSync(ENTITY_PATH, "utf-8");
     expect(fileContent).toContain("first paragraph");
+  });
+});
+
+describe("addReply", () => {
+  test("appends reply to comment thread array", () => {
+    const comment = addComment(ENTITY_PATH, {
+      selected_text: "first paragraph",
+      section_heading: "## Brainstorming Spec",
+      content: "Needs work",
+    });
+    const reply = addReply(ENTITY_PATH, comment.id, {
+      content: "Fixed it",
+      author: "fo",
+    });
+    expect(reply.content).toBe("Fixed it");
+    expect(reply.author).toBe("fo");
+    expect(reply.timestamp).toBeTruthy();
+
+    const thread = getComments(ENTITY_PATH);
+    const updated = thread.comments.find((c) => c.id === comment.id);
+    expect(updated!.thread.length).toBe(1);
+    expect(updated!.thread[0].content).toBe("Fixed it");
+  });
+
+  test("throws on unknown comment id", () => {
+    expect(() =>
+      addReply(ENTITY_PATH, "nonexistent", { content: "reply", author: "fo" })
+    ).toThrow("Comment not found");
+  });
+
+  test("appends multiple replies in order", () => {
+    const comment = addComment(ENTITY_PATH, {
+      selected_text: "first paragraph",
+      section_heading: "## Brainstorming Spec",
+      content: "Thread test",
+    });
+    addReply(ENTITY_PATH, comment.id, { content: "Reply 1", author: "fo" });
+    addReply(ENTITY_PATH, comment.id, { content: "Reply 2", author: "captain" });
+
+    const thread = getComments(ENTITY_PATH);
+    const updated = thread.comments.find((c) => c.id === comment.id);
+    expect(updated!.thread.length).toBe(2);
+    expect(updated!.thread[0].content).toBe("Reply 1");
+    expect(updated!.thread[1].content).toBe("Reply 2");
   });
 });

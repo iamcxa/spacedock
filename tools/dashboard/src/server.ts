@@ -10,6 +10,7 @@ import {
   resolveComment,
   acceptSuggestion as acceptSuggestionAction,
   rejectSuggestion as rejectSuggestionAction,
+  addReply,
 } from "./comments";
 import { EventBuffer } from "./events";
 import { ShareRegistry } from "./auth";
@@ -212,6 +213,35 @@ export function createServer(opts: ServerOptions) {
             });
             logRequest(req, 200);
             return jsonResponse(comment);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/comment/reply": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as {
+              path: string;
+              comment_id: string;
+              content: string;
+              author?: "captain" | "fo" | "guest";
+            };
+            if (!body.path) return jsonResponse({ error: "Missing field: path" }, 400);
+            if (!body.comment_id) return jsonResponse({ error: "Missing field: comment_id" }, 400);
+            if (!body.content) return jsonResponse({ error: "Missing field: content" }, 400);
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const reply = addReply(body.path, body.comment_id, {
+              content: body.content,
+              author: body.author ?? "captain",
+            });
+            logRequest(req, 200);
+            return jsonResponse(reply);
           } catch (err) {
             captureException(err instanceof Error ? err : new Error(String(err)));
             logRequest(req, 500);
@@ -811,6 +841,38 @@ export function createServer(opts: ServerOptions) {
               });
               logRequest(req, 200);
               return jsonResponse(comment);
+            } catch (err) {
+              captureException(err instanceof Error ? err : new Error(String(err)));
+              logRequest(req, 500);
+              return jsonResponse({ error: "Internal server error" }, 500);
+            }
+          }
+
+          if (subRoute === "comment/reply" && req.method === "POST") {
+            try {
+              const body = await req.json() as {
+                path: string;
+                comment_id: string;
+                content: string;
+              };
+              if (!body.path || !body.comment_id || !body.content) {
+                logRequest(req, 400);
+                return jsonResponse({ error: "Missing required fields" }, 400);
+              }
+              if (!shareRegistry.isInScope(token, body.path)) {
+                logRequest(req, 403);
+                return jsonResponse({ error: "Entity not in share scope" }, 403);
+              }
+              if (!validatePath(body.path, projectRoot)) {
+                logRequest(req, 403);
+                return jsonResponse({ error: "Forbidden" }, 403);
+              }
+              const reply = addReply(body.path, body.comment_id, {
+                content: body.content,
+                author: "guest",
+              });
+              logRequest(req, 200);
+              return jsonResponse(reply);
             } catch (err) {
               captureException(err instanceof Error ? err : new Error(String(err)));
               logRequest(req, 500);
