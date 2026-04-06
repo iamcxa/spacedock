@@ -1,13 +1,13 @@
 ---
 id: 009
 title: Dashboard Entity Visibility — Show All Entities with Stage Filtering
-status: execute
+status: shipped
 source: session discussion
 started: 2026-04-05T04:25:00Z
-completed:
-verdict:
+completed: 2026-04-05T04:30:00Z
+verdict: PASSED
 score: 0.9
-worktree: .worktrees/ensign-dashboard-entity-visibility
+worktree:
 issue:
 pr:
 intent: feature

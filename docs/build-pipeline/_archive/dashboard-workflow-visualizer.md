@@ -1,13 +1,13 @@
 ---
 id: 012
 title: Dashboard Workflow Visualizer — Stage Pipeline Graph with Visual Editing
-status: pr-review
+status: shipped
 source: channel conversation
 started: 2026-04-05T19:00:00+08:00
-completed:
-verdict:
+completed: 2026-04-05T15:30:09Z
+verdict: PASSED
 score: 0.85
-worktree: .worktrees/spacedock-ensign-dashboard-workflow-visualizer
+worktree:
 issue:
 pr: iamcxa/spacedock#5
 intent: feature

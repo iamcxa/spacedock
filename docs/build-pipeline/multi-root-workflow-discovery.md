@@ -1,12 +1,12 @@
 ---
 id: 018
-title: Multi-root workflow discovery
+title: Dashboard Multi-root Aggregation — 跨 Repo Workflow 聚合
 status: explore
 source: /build brainstorming (forge audit of build skill)
 started:
 completed:
 verdict:
-score:
+score: 0.8
 worktree:
 issue:
 pr:
@@ -14,6 +14,10 @@ intent: feature
 scale: Medium
 project: spacedock
 ---
+
+## Dependencies
+
+- Feature 015 (war room layout — MISSIONS 左欄已就緒，018 擴展為跨 repo 分組)
 
 ## Brainstorming Spec
 
