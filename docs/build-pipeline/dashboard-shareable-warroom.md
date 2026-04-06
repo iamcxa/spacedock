@@ -1,7 +1,7 @@
 ---
 id: 017
 title: Dashboard Auth + Shareable Access — 部署無關的認證與分享機制
-status: e2e
+status: pr-draft
 source: /build brainstorming (revised after plan rejection)
 started: 2026-04-06T09:45:00Z
 completed:
