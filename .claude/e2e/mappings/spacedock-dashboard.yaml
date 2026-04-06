@@ -1,107 +1,351 @@
 app: spacedock-dashboard
-base_url: http://127.0.0.1:8420
+base_url: http://127.0.0.1:8421
 auth:
   type: none
 framework: vanilla-js
-mapped_at: 2026-04-04
+mapped_at: 2026-04-06
 
 pages:
   dashboard:
     path: /
-    title: Spacedock Dashboard
+    title: "戰情室 — Spacedock"
     elements:
       page_heading:
         selector: header h1
         type: heading
-        description: Main dashboard title "Spacedock Dashboard"
+        description: Main dashboard title "◆ 戰情室" (War Room rebrand)
+
+      ws_status:
+        selector: "#ws-status"
+        type: badge
+        description: WebSocket connection status indicator ("Live" / "Connecting...")
+
+      channel_status:
+        selector: "#channel-status"
+        type: badge
+        description: Channel connection status ("Channel: disconnected")
+
       refresh_indicator:
         selector: "#refresh-indicator"
         type: text
         description: Auto-refresh status indicator showing "Auto-refresh: ON"
+
+      telemetry_indicator:
+        selector: "#telemetry-indicator"
+        type: text
+        description: Telemetry status indicator (hidden by default)
+
+      # --- Alert Bar (new in 015) ---
+      alert_bar:
+        selector: "#alert-bar"
+        type: container
+        description: Alert bar showing gate-pending and agent-error items requiring human action; visible when items exist
+
+      alert_item_text:
+        selector: ".alert-bar > span, #alert-bar > span"
+        type: text
+        description: Alert bar text item showing gate pending status (e.g. "🟠 Gate pending: ...")
+
+      alert_review_button:
+        selector: ".alert-bar button, #alert-bar button"
+        type: button
+        description: Review button in alert bar linking to gate-pending entity
+        interaction: click to navigate to detail page
+
+      # --- Missions Tree (new in 015) ---
+      missions_tree:
+        selector: "#missions-tree"
+        type: container
+        description: Left-column MISSIONS tree navigation showing all workflows and entities
+
+      missions_tree_heading:
+        selector: "#missions-tree h4"
+        type: heading
+        description: MISSIONS tree section heading
+
+      tree_workflow:
+        selector: ".tree-workflow"
+        type: container
+        description: Expandable workflow node in missions tree (click to expand/collapse entity list)
+        interaction: click to toggle expanded state
+
+      tree_entity:
+        selector: ".tree-entity"
+        type: container
+        description: Entity item in missions tree showing status icon and entity slug
+        interaction: click to navigate to detail page
+
+      tree_shipped_count:
+        selector: ".tree-shipped"
+        type: text
+        description: Collapsed shipped entity count line (e.g. "✅ 78 shipped")
+
+      # --- Main Content ---
       workflows_container:
         selector: "#workflows-container"
         type: container
-        description: Main container for all workflow cards
+        description: Center column main container for all workflow cards
+
       workflow_card:
         selector: .workflow-card
         type: container
         description: Individual workflow card (repeating)
+
       workflow_name:
         selector: .workflow-card h2
         type: heading
         description: Workflow name heading within a card
+
       workflow_meta:
         selector: .workflow-meta
         type: text
-        description: Entity label and count summary (e.g. "tasks . 1 total")
+        description: Entity label and count summary (e.g. "tasks · 87 total")
+
       stage_pipeline:
         selector: .stage-pipeline
         type: container
         description: Stage pipeline chip bar showing stage names and entity counts
+
       stage_chip:
         selector: .stage-chip
         type: badge
         description: Individual stage chip with name and count
+
       stage_chip_count:
-        selector: .stage-chip .count
+        selector: ".stage-chip .count"
         type: text
         description: Entity count within a stage chip
+
       entity_table:
         selector: .workflow-card table
         type: table
         description: Sortable entity table within a workflow card
+
       column_header_id:
         selector: "th[data-col='id']"
         type: column-header
         description: Sortable ID column header
         interaction: click to sort
+
       column_header_slug:
         selector: "th[data-col='slug']"
         type: column-header
         description: Sortable SLUG column header
         interaction: click to sort
+
       column_header_status:
         selector: "th[data-col='status']"
         type: column-header
         description: Sortable STATUS column header
         interaction: click to sort
+
       column_header_title:
         selector: "th[data-col='title']"
         type: column-header
         description: Sortable TITLE column header
         interaction: click to sort
+
       column_header_score:
         selector: "th[data-col='score']"
         type: column-header
         description: Sortable SCORE column header
         interaction: click to sort
+
       column_header_source:
         selector: "th[data-col='source']"
         type: column-header
         description: Sortable SOURCE column header
         interaction: click to sort
+
       status_badge:
         selector: .status-badge
         type: badge
-        description: Color-coded status badge in table cells
+        description: Color-coded status badge in table cells (Retro Aerospace palette)
+
       entity_row:
-        selector: .workflow-card tbody tr
+        selector: ".workflow-card tbody tr"
         type: table-row
         description: Individual entity data row
+        interaction: click to navigate to detail page
+
       loading_message:
         selector: .loading
         type: text
         description: Loading/error message shown during data fetch
+
       empty_state:
         selector: .empty-state
         type: text
         description: Empty state message when no workflows found
+
+      edit_pipeline_button:
+        selector: "button.pipeline-toggle"
+        type: button
+        description: Edit Pipeline toggle button on workflow card
+        interaction: click to show/hide visual pipeline editor
+
+      # --- Activity Feed / COMMS (right column) ---
+      activity_panel:
+        selector: "#activity-panel"
+        type: container
+        description: Right-column COMMS panel containing activity feed and channel input
+
+      activity_feed_heading:
+        selector: "#activity-panel h3"
+        type: heading
+        description: Activity Feed section heading
+
+      activity_feed:
+        selector: "#activity-feed"
+        type: container
+        description: Live activity feed container showing WebSocket events
+
+      activity_feed_empty:
+        selector: "#activity-feed .empty-state"
+        type: text
+        description: Empty state message in activity feed ("No activity yet.")
+
+      channel_input:
+        selector: "#channel-input"
+        type: input
+        description: Channel message textarea (disabled when no active session)
+
+      channel_send_btn:
+        selector: "#channel-send-btn"
+        type: button
+        description: Send button for channel input (disabled when no active session)
+
+      ticker_strip:
+        selector: ".ticker-strip"
+        type: text
+        description: One-line COMMS ticker summary at bottom of activity panel showing condensed recent events
+
+  detail:
+    path: /detail.html
+    title: "戰情室 — Entity Detail"
+    elements:
+      back_link:
+        selector: ".back-link"
+        type: link
+        description: Back navigation link showing "← 返回戰情室"
+        interaction: click to return to main dashboard
+
+      top_bar:
+        selector: ".top-bar"
+        type: container
+        description: Top navigation bar with back link and entity title
+
+      entity_title_nav:
+        selector: "#entity-title"
+        type: text
+        description: Entity title in top navigation bar
+
+      entity_body:
+        selector: "#entity-body"
+        type: container
+        description: Main entity body rendered as markdown
+
+      stage_reports:
+        selector: "#stage-reports"
+        type: container
+        description: Stage report sections rendered from entity markdown
+
+      metadata_panel:
+        selector: ".metadata-panel"
+        type: container
+        description: Sidebar metadata panel showing frontmatter key-value pairs
+
+      metadata_fields:
+        selector: "#metadata-fields"
+        type: container
+        description: Description list of frontmatter fields
+
+      score_heading:
+        selector: ".management-panel h3:first-of-type"
+        type: heading
+        description: Score section heading in management panel
+
+      score_slider:
+        selector: "#score-slider"
+        type: input
+        description: Score range slider (0.00–1.00, step 0.05)
+        interaction: drag to set score
+
+      score_display:
+        selector: "#score-display"
+        type: text
+        description: Current score value display
+
+      score_save:
+        selector: "#score-save"
+        type: button
+        description: Save button for score changes
+        interaction: click to persist score
+
+      tag_chips:
+        selector: "#tag-chips"
+        type: container
+        description: Container for current tag chips
+
+      tag_input:
+        selector: "#tag-input"
+        type: input
+        description: Text input for adding new tags
+
+      tag_add_button:
+        selector: "#tag-add"
+        type: button
+        description: Add button to create a new tag
+        interaction: click to add tag from input
+
+      comments_panel:
+        selector: "#comments-panel"
+        type: container
+        description: Comments sidebar panel
+
+      comment_threads:
+        selector: "#comment-threads"
+        type: container
+        description: Container for inline comment threads
+
+      comment_empty_state:
+        selector: "#comment-threads .empty-state"
+        type: text
+        description: Empty state for comments ("Select text to add a comment")
+
+      comment_tooltip:
+        selector: "#comment-tooltip"
+        type: container
+        description: Floating comment tooltip shown on text selection (hidden by default)
+
+      comment_input:
+        selector: "#comment-input"
+        type: input
+        description: Textarea in comment tooltip for entering comment text
+
+      comment_submit:
+        selector: "#comment-submit"
+        type: button
+        description: Submit button in comment tooltip
+        interaction: click to post inline comment
+
+      comment_cancel:
+        selector: "#comment-cancel"
+        type: button
+        description: Cancel button in comment tooltip
+        interaction: click to dismiss comment tooltip
 
 api_endpoints:
   workflows:
     method: GET
     path: /api/workflows
     description: Returns JSON array of all discovered workflows with entities
+    response_format: application/json
+
+  entity:
+    method: GET
+    path: /api/entity
+    description: Returns entity file content by path query parameter
     response_format: application/json
 
 dialogs: {}

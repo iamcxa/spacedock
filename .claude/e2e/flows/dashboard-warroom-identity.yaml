@@ -1,0 +1,97 @@
+name: dashboard-warroom-identity
+description: "Verify War Room Identity rebrand: three-column layout, ◆ 戰情室 header, Retro Aerospace palette, missions tree, alert bar, and detail page back link."
+tags: [smoke, warroom]
+mapping: spacedock-dashboard
+
+steps:
+  - id: load-dashboard
+    action: "Navigate to http://127.0.0.1:8421/"
+    expect:
+      - "page_heading is visible"
+      - "page_heading contains text ◆ 戰情室"
+    screenshot: true
+
+  - id: verify-page-title
+    action: "Check browser page title"
+    expect:
+      - "page title contains 戰情室"
+    screenshot: false
+
+  - id: verify-retro-palette
+    action: "Verify body background color is the Retro Aerospace deep navy"
+    expect:
+      - "body background-color equals rgb(26, 26, 46)"
+    screenshot: false
+
+  - id: verify-three-column-layout
+    action: "Verify three-column layout is rendered: missions tree, main content, and activity panel are all visible"
+    expect:
+      - "missions_tree is visible"
+      - "workflows_container is visible"
+      - "activity_panel is visible"
+    screenshot: true
+
+  - id: verify-missions-tree-heading
+    action: "Verify MISSIONS tree section heading is visible"
+    expect:
+      - "missions_tree_heading is visible"
+      - "missions_tree_heading contains text MISSIONS"
+    screenshot: false
+
+  - id: verify-missions-tree-workflows
+    action: "Verify missions tree contains at least one workflow node"
+    expect:
+      - "tree_workflow is visible"
+    screenshot: false
+
+  - id: verify-missions-tree-entities
+    action: "Verify missions tree shows entity items with status icons"
+    expect:
+      - "tree_entity is visible"
+    screenshot: true
+
+  - id: verify-alert-bar
+    action: "Verify alert bar is present in the page and showing gate-pending items"
+    expect:
+      - "alert_bar is visible"
+      - "alert_review_button is visible"
+    screenshot: true
+
+  - id: verify-entity-table
+    action: "Verify entity table renders with data rows in the main content area"
+    expect:
+      - "entity_table is visible"
+      - "entity_row is visible"
+    screenshot: true
+
+  - id: verify-activity-feed
+    action: "Verify activity feed section is present in the right column"
+    expect:
+      - "activity_feed_heading is visible"
+      - "activity_feed is visible"
+    screenshot: false
+
+  - id: navigate-to-detail
+    action: "Navigate to http://127.0.0.1:8421/detail.html?path=docs/build-pipeline/dashboard-collaborative-review.md"
+    expect:
+      - "back_link is visible"
+    screenshot: true
+
+  - id: verify-back-link-text
+    action: "Verify the back navigation link shows the War Room label"
+    expect:
+      - "back_link contains text 返回戰情室"
+    screenshot: false
+
+  - id: verify-detail-palette
+    action: "Verify detail page uses Retro Aerospace palette"
+    expect:
+      - "body background-color equals rgb(26, 26, 46)"
+    screenshot: false
+
+  - id: verify-detail-layout
+    action: "Verify detail page two-column layout: main content and sidebar"
+    expect:
+      - "entity_body is visible"
+      - "metadata_panel is visible"
+    screenshot: true
