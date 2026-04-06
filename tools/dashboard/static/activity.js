@@ -88,14 +88,14 @@
 
   function statusColor(type) {
     var colors = {
-      dispatch: "#58a6ff",
-      completion: "#3fb950",
-      gate: "#f0883e",
-      feedback: "#d2a8ff",
-      merge: "#79c0ff",
-      idle: "#8b949e",
+      dispatch: "#53a8b6",
+      completion: "#2ecc71",
+      gate: "#e94560",
+      feedback: "#53a8b6",
+      merge: "#53a8b6",
+      idle: "#e0d6c880",
     };
-    return colors[type] || "#8b949e";
+    return colors[type] || "#e0d6c880";
   }
 
   function timeAgo(isoStr) {
@@ -261,7 +261,7 @@
 
     var del = document.createElement("span");
     del.style.background = "rgba(248, 81, 73, 0.15)";
-    del.style.color = "#f85149";
+    del.style.color = "#e94560";
     del.style.textDecoration = "line-through";
     del.textContent = suggestion.diff_from;
     diff.appendChild(del);
@@ -270,7 +270,7 @@
 
     var ins = document.createElement("span");
     ins.style.background = "rgba(63, 185, 80, 0.15)";
-    ins.style.color = "#3fb950";
+    ins.style.color = "#2ecc71";
     ins.textContent = suggestion.diff_to;
     diff.appendChild(ins);
 

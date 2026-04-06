@@ -61,16 +61,16 @@
 
   function statusColor(status) {
     var colors = {
-      backlog: "#8b949e",
-      ideation: "#d2a8ff",
-      implementation: "#58a6ff",
-      validation: "#f0883e",
-      done: "#3fb950",
-      explore: "#d2a8ff",
-      research: "#79c0ff",
-      plan: "#58a6ff",
+      backlog: "#e0d6c880",
+      ideation: "#53a8b6",
+      implementation: "#53a8b6",
+      validation: "#e94560",
+      done: "#2ecc71",
+      explore: "#53a8b6",
+      research: "#53a8b6",
+      plan: "#53a8b6",
     };
-    return colors[status] || "#8b949e";
+    return colors[status] || "#e0d6c880";
   }
 
   function sortEntities(entities, column, ascending) {
