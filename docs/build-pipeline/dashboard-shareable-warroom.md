@@ -1,7 +1,7 @@
 ---
 id: 017
 title: Dashboard Auth + Shareable Access — 部署無關的認證與分享機制
-status: pr-review
+status: execute
 source: /build brainstorming (revised after plan rejection)
 started: 2026-04-06T09:45:00Z
 completed:
@@ -547,3 +547,11 @@ Body includes:
 - Finding 2 (gate approval from share page) is an incomplete acceptance criterion — the HTML scaffolding is in place but not wired. This can be addressed as a follow-up without blocking the PR, since the gate panel is hidden by default (`display:none`)
 - Finding 3 (rate limiting) is acceptable for the current threat model (default localhost binding); should be revisited if the tool is commonly used with `--tunnel` or `--host 0.0.0.0`
 - The 13 pre-existing test failures in `tests/dashboard/` are not related to this PR and should be tracked separately
+
+### Feedback Cycles
+
+**Cycle 1** (pr-review → execute): Captain reported Share Link creation UX bug — pressing "Create" button produces no visible feedback. Root cause: `detail.js` fetch handler for `POST /api/share` has no `res.ok` check, no `.catch()`, no loading state, and silently swallows errors. Fix requirements:
+1. Add `res.ok` / error status handling with user-visible error message
+2. Add loading state on Create button during fetch
+3. Show clear success feedback when link is created (e.g., highlight the generated URL)
+4. Add `.catch()` for network errors
