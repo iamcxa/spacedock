@@ -48,6 +48,7 @@ export function createChannelServer(opts: ChannelServerOptions) {
 
   const dashboard = createServer({
     port: opts.port,
+    hostname: "127.0.0.1",
     projectRoot: opts.projectRoot,
     staticDir: opts.staticDir,
     logFile: opts.logFile,

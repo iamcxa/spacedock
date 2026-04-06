@@ -535,3 +535,426 @@ function rejectSuggestionAction(suggestionId) {
     });
 }
 
+// --- Gate Review: WebSocket + Status Derivation + Actions ---
+
+(function initGateReview() {
+  var gatePanel = document.getElementById('gate-panel');
+  var gateStatusBadge = document.getElementById('gate-status-badge');
+  var gateActions = document.getElementById('gate-actions');
+  var gateApproveBtn = document.getElementById('gate-approve-btn');
+  var gateRequestChangesBtn = document.getElementById('gate-request-changes-btn');
+  var gateConfirm = document.getElementById('gate-confirm');
+  var gateConfirmAction = document.getElementById('gate-confirm-action');
+  var gateConfirmYes = document.getElementById('gate-confirm-yes');
+  var gateConfirmCancel = document.getElementById('gate-confirm-cancel');
+  var gateResolved = document.getElementById('gate-resolved');
+  var gateResolvedText = document.getElementById('gate-resolved-text');
+
+  if (!gatePanel) return;
+
+  var workflowStages = null;
+  var currentEntityStatus = null;
+  var gateDecisionSent = false;
+  var statusPollTimer = null;
+
+  // --- Gate State Derivation ---
+  // CLAIM-6 correction: gate state = entity status matches a stage with gate:true
+  // Must cross-reference entity status against workflow stage definitions
+
+  function isEntityAtGate(entityStatus, stages) {
+    if (!entityStatus || !stages || !stages.length) return false;
+    var matchingStage = stages.find(function (s) {
+      return s.name === entityStatus && s.gate === true;
+    });
+    return !!matchingStage;
+  }
+
+  function fetchWorkflowStages() {
+    return apiFetch('/api/workflows').then(function (workflows) {
+      for (var i = 0; i < workflows.length; i++) {
+        var wf = workflows[i];
+        for (var j = 0; j < wf.entities.length; j++) {
+          if (wf.entities[j].path === entityPath) {
+            workflowStages = wf.stages;
+            return wf.stages;
+          }
+        }
+      }
+      return null;
+    });
+  }
+
+  function updateGatePanel(entityStatus, stages) {
+    currentEntityStatus = entityStatus;
+    if (!stages) stages = workflowStages;
+    if (!stages) {
+      gatePanel.style.display = 'none';
+      return;
+    }
+
+    var atGate = isEntityAtGate(entityStatus, stages);
+    if (!atGate) {
+      gatePanel.style.display = 'none';
+      return;
+    }
+
+    gatePanel.style.display = '';
+
+    if (gateDecisionSent) {
+      return;
+    }
+
+    gateStatusBadge.textContent = 'Pending Review';
+    gateStatusBadge.className = 'gate-badge pending';
+    gateActions.style.display = '';
+    gateConfirm.style.display = 'none';
+    gateResolved.style.display = 'none';
+    gateApproveBtn.disabled = false;
+    gateRequestChangesBtn.disabled = false;
+  }
+
+  // --- Gate Actions with Confirmation ---
+
+  var pendingDecision = null;
+
+  gateApproveBtn.addEventListener('click', function () {
+    pendingDecision = 'approved';
+    gateConfirmAction.textContent = 'approve';
+    gateConfirmYes.className = 'btn gate-btn approve';
+    gateActions.style.display = 'none';
+    gateConfirm.style.display = '';
+  });
+
+  gateRequestChangesBtn.addEventListener('click', function () {
+    pendingDecision = 'changes_requested';
+    gateConfirmAction.textContent = 'request changes on';
+    gateConfirmYes.className = 'btn gate-btn request-changes';
+    gateActions.style.display = 'none';
+    gateConfirm.style.display = '';
+  });
+
+  gateConfirmCancel.addEventListener('click', function () {
+    pendingDecision = null;
+    gateConfirm.style.display = 'none';
+    gateActions.style.display = '';
+  });
+
+  gateConfirmYes.addEventListener('click', function () {
+    if (!pendingDecision || !entityPath) return;
+    var decision = pendingDecision;
+    pendingDecision = null;
+
+    gateApproveBtn.disabled = true;
+    gateRequestChangesBtn.disabled = true;
+    gateConfirmYes.disabled = true;
+    gateConfirmCancel.disabled = true;
+
+    var pathParts = entityPath.split('/');
+    var filename = pathParts[pathParts.length - 1];
+    var entitySlug = filename.replace(/\.md$/, '');
+
+    apiFetch('/api/entity/gate/decision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        entity_path: entityPath,
+        entity_slug: entitySlug,
+        stage: currentEntityStatus,
+        decision: decision,
+      }),
+    }).then(function () {
+      gateDecisionSent = true;
+      gateConfirm.style.display = 'none';
+      gateActions.style.display = 'none';
+      gateResolved.style.display = '';
+
+      if (decision === 'approved') {
+        gateStatusBadge.textContent = 'Approved';
+        gateStatusBadge.className = 'gate-badge approved';
+        gateResolvedText.textContent = 'Decision sent \u2014 waiting for FO to advance.';
+      } else {
+        gateStatusBadge.textContent = 'Changes Requested';
+        gateStatusBadge.className = 'gate-badge changes-requested';
+        gateResolvedText.textContent = 'Changes requested \u2014 FO will address feedback.';
+      }
+
+      startStatusPoll();
+    }).catch(function () {
+      gateApproveBtn.disabled = false;
+      gateRequestChangesBtn.disabled = false;
+      gateConfirmYes.disabled = false;
+      gateConfirmCancel.disabled = false;
+      gateConfirm.style.display = 'none';
+      gateActions.style.display = '';
+    });
+  });
+
+  // --- Status Polling for Race Condition Detection ---
+  // CLAIM-8 correction: no FO dedup — poll entity status to detect if gate resolved elsewhere
+
+  function startStatusPoll() {
+    if (statusPollTimer) return;
+    statusPollTimer = setInterval(function () {
+      if (!entityPath) return;
+      apiFetch('/api/entity/detail?path=' + encodeURIComponent(entityPath))
+        .then(function (data) {
+          var newStatus = data.frontmatter.status;
+          if (newStatus !== currentEntityStatus) {
+            currentEntityStatus = newStatus;
+            stopStatusPoll();
+            var atGate = isEntityAtGate(newStatus, workflowStages);
+            if (!atGate) {
+              gateStatusBadge.textContent = 'Advanced';
+              gateStatusBadge.className = 'gate-badge approved';
+              gateResolvedText.textContent = 'Entity advanced to stage: ' + newStatus;
+              gateResolved.style.display = '';
+              gateActions.style.display = 'none';
+            }
+          }
+        });
+    }, 3000);
+  }
+
+  function stopStatusPoll() {
+    if (statusPollTimer) {
+      clearInterval(statusPollTimer);
+      statusPollTimer = null;
+    }
+  }
+
+  // --- WebSocket for Real-time Gate Status ---
+
+  var detailWs = null;
+  var detailRetryCount = 0;
+  var detailMaxRetries = 10;
+
+  function getWsUrl() {
+    var loc = window.location;
+    var proto = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+    return proto + '//' + loc.host + '/ws/activity';
+  }
+
+  function connectDetailWs() {
+    detailWs = new WebSocket(getWsUrl());
+
+    detailWs.onopen = function () {
+      detailRetryCount = 0;
+    };
+
+    detailWs.onmessage = function (ev) {
+      var msg = JSON.parse(ev.data);
+      if (msg.type === 'event') {
+        var event = msg.data.event;
+        if (event.type === 'gate_decision' && !gateDecisionSent) {
+          gateDecisionSent = true;
+          gateActions.style.display = 'none';
+          gateConfirm.style.display = 'none';
+          gateResolved.style.display = '';
+
+          if (event.detail === 'approved') {
+            gateStatusBadge.textContent = 'Approved (via CLI)';
+            gateStatusBadge.className = 'gate-badge approved';
+            gateResolvedText.textContent = 'Gate approved via another session.';
+          } else {
+            gateStatusBadge.textContent = 'Changes Requested (via CLI)';
+            gateStatusBadge.className = 'gate-badge changes-requested';
+            gateResolvedText.textContent = 'Changes requested via another session.';
+          }
+          startStatusPoll();
+        }
+      }
+    };
+
+    detailWs.onclose = function () {
+      if (detailRetryCount < detailMaxRetries) {
+        var delay = Math.min(500 * Math.pow(2, detailRetryCount), 30000);
+        delay = delay * (0.75 + Math.random() * 0.5);
+        detailRetryCount++;
+        setTimeout(connectDetailWs, delay);
+      }
+    };
+
+    detailWs.onerror = function () {};
+  }
+
+  // --- Initialize ---
+
+  var _originalLoadEntity = loadEntity;
+  window.loadEntity = function () {
+    if (!entityPath) return;
+    apiFetch('/api/entity/detail?path=' + encodeURIComponent(entityPath))
+      .then(function (data) {
+        document.getElementById('entity-title').textContent = data.frontmatter.title || '(untitled)';
+        document.title = (data.frontmatter.title || 'Entity') + ' \u2014 Spacedock';
+        renderMetadata(data.frontmatter);
+        renderBody(data.body);
+        renderStageReports(data.stage_reports);
+        renderTags(data.tags);
+        initScore(data.frontmatter.score || '0');
+        if (typeof loadComments === 'function') loadComments();
+
+        var entityStatus = data.frontmatter.status;
+        if (workflowStages) {
+          updateGatePanel(entityStatus, workflowStages);
+        } else {
+          fetchWorkflowStages().then(function (stages) {
+            updateGatePanel(entityStatus, stages);
+          });
+        }
+      });
+  };
+
+  connectDetailWs();
+
+  if (entityPath) {
+    fetchWorkflowStages().then(function (stages) {
+      if (!stages) return;
+      apiFetch('/api/entity/detail?path=' + encodeURIComponent(entityPath))
+        .then(function (data) {
+          updateGatePanel(data.frontmatter.status, stages);
+        });
+    });
+  }
+})();
+
+// --- Share Link Creation ---
+(function initSharePanel() {
+  var createBtn = document.getElementById("create-share-btn");
+  var modal = document.getElementById("share-modal");
+  var submitBtn = document.getElementById("share-submit");
+  var cancelBtn = document.getElementById("share-cancel");
+  var copyBtn = document.getElementById("share-copy");
+  var shareResult = document.getElementById("share-result");
+  var shareUrlInput = document.getElementById("share-url");
+  var shareLinksContainer = document.getElementById("share-links");
+
+  if (!createBtn) return;
+
+  createBtn.addEventListener("click", function () {
+    modal.style.display = modal.style.display === "none" ? "block" : "none";
+    shareResult.style.display = "none";
+  });
+
+  cancelBtn.addEventListener("click", function () {
+    modal.style.display = "none";
+  });
+
+  var shareError = document.getElementById("share-error");
+
+  submitBtn.addEventListener("click", function () {
+    var password = document.getElementById("share-password").value;
+    var label = document.getElementById("share-label-input").value || "Share Link";
+    var ttl = parseInt(document.getElementById("share-ttl").value, 10) || 24;
+
+    if (!password) {
+      shareError.textContent = "Password is required.";
+      shareError.style.display = "";
+      return;
+    }
+
+    var params = new URLSearchParams(window.location.search);
+    var entityPath = params.get("path");
+    if (!entityPath) return;
+
+    // Loading state
+    shareError.style.display = "none";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Creating...";
+
+    fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        password: password,
+        entityPaths: [entityPath],
+        stages: [],
+        label: label,
+        ttlHours: ttl,
+      }),
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.text().then(function (text) {
+            throw new Error("Server error (" + res.status + "): " + (text || "Unknown error"));
+          });
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        if (data.token) {
+          var url = window.location.origin + "/share/" + data.token;
+          shareUrlInput.value = url;
+          shareResult.style.display = "block";
+          // Success feedback: highlight and auto-select URL for easy copy
+          shareUrlInput.style.outline = "2px solid #27ae60";
+          shareUrlInput.focus();
+          shareUrlInput.select();
+          setTimeout(function () { shareUrlInput.style.outline = ""; }, 2000);
+          loadShareLinks();
+        } else {
+          shareError.textContent = "Unexpected response — no token returned.";
+          shareError.style.display = "";
+        }
+      })
+      .catch(function (err) {
+        shareError.textContent = err.message || "Network error — could not reach server.";
+        shareError.style.display = "";
+        shareResult.style.display = "none";
+      })
+      .finally(function () {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Create";
+      });
+  });
+
+  copyBtn.addEventListener("click", function () {
+    shareUrlInput.select();
+    navigator.clipboard.writeText(shareUrlInput.value).then(function () {
+      copyBtn.textContent = "Copied!";
+      setTimeout(function () { copyBtn.textContent = "Copy"; }, 2000);
+    });
+  });
+
+  function loadShareLinks() {
+    fetch("/api/share/list")
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        shareLinksContainer.textContent = "";
+        if (!data.links || data.links.length === 0) {
+          var empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "No active share links";
+          shareLinksContainer.appendChild(empty);
+          return;
+        }
+        data.links.forEach(function (link) {
+          var div = document.createElement("div");
+          div.className = "share-link-item";
+
+          var labelSpan = document.createElement("span");
+          labelSpan.className = "share-link-label";
+          labelSpan.textContent = link.label;
+          div.appendChild(labelSpan);
+
+          var expiresSpan = document.createElement("span");
+          expiresSpan.className = "share-link-expires";
+          expiresSpan.textContent = "Expires: " + new Date(link.expiresAt).toLocaleString();
+          div.appendChild(expiresSpan);
+
+          var deleteBtn = document.createElement("button");
+          deleteBtn.className = "btn btn-small btn-danger share-delete";
+          deleteBtn.textContent = "Delete";
+          deleteBtn.addEventListener("click", function () {
+            fetch("/api/share/" + link.token, { method: "DELETE" })
+              .then(function () { loadShareLinks(); });
+          });
+          div.appendChild(deleteBtn);
+
+          shareLinksContainer.appendChild(div);
+        });
+      });
+  }
+
+  loadShareLinks();
+})();
+

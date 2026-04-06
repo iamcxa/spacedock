@@ -4,10 +4,10 @@ title: Workflow Status Dashboard
 status: shipped
 source: commission seed
 started: 2026-04-04T02:54:00Z
-completed:
-verdict:
+completed: 2026-04-06T07:00:00Z
+verdict: PASSED
 score: 0.9
-worktree: .worktrees/ensign-workflow-status-dashboard
+worktree:
 issue:
 pr:
 intent: feature

@@ -3,6 +3,7 @@ import type { AgentEvent, SequencedEvent } from "./types";
 const VALID_EVENT_TYPES: Set<string> = new Set([
   "dispatch", "completion", "gate", "feedback", "merge", "idle",
   "channel_message", "channel_response", "permission_request", "permission_response",
+  "comment", "suggestion", "gate_decision", "share_created",
 ]);
 
 export class EventBuffer {

@@ -1,0 +1,175 @@
+name: dashboard-auth-share
+description: "Dashboard Auth + Share — create share link from entity detail, verify as reviewer, view scoped entity, add comment"
+tags: [feature-017, auth, share, shareable-warroom]
+mapping: spacedock-dashboard
+
+steps:
+  # === PART 1: Captain creates a share link ===
+
+  - id: navigate-to-dashboard
+    action: "Navigate to the dashboard home page"
+    expect:
+      - "page_heading is visible"
+      - "workflows_container is visible"
+    screenshot: true
+
+  - id: open-entity-detail
+    action: "Click on any entity row to open the entity detail page"
+    expect:
+      - "back_link is visible"
+      - "entity_title is visible"
+      - "detail_sidebar is visible"
+    screenshot: true
+
+  - id: verify-share-panel-visible
+    action: "Verify the Share panel is visible in the sidebar"
+    expect:
+      - "share_panel is visible"
+      - "share_panel_heading is visible"
+      - "create_share_btn is visible"
+      - "share_modal is not visible"
+    screenshot: true
+
+  - id: click-create-share-btn
+    action: "Click the 'Create Share Link' button to open the share creation modal"
+    expect:
+      - "share_modal is visible"
+      - "share_password_input is visible"
+      - "share_label_input is visible"
+      - "share_ttl_input is visible"
+      - "share_ttl_input value is 24"
+      - "share_submit is visible"
+      - "share_cancel is visible"
+      - "share_result is not visible"
+    screenshot: true
+
+  - id: fill-share-form
+    action: "Enter password 'test-review-pw', label 'Review for Alice', leave TTL at 24"
+    note: "Server API uses entityPaths (plural array), not entityPath — detail.js must send entityPaths: [currentPath]"
+    expect:
+      - "share_password_input value is test-review-pw"
+      - "share_label_input value is Review for Alice"
+    screenshot: false
+
+  - id: submit-share-form
+    action: "Click the 'Create' button to submit the share link creation form"
+    expect:
+      - "share_result is visible"
+      - "share_url is visible"
+      - "share_url value contains /share/"
+      - "share_copy is visible"
+    screenshot: true
+
+  - id: capture-share-url
+    action: "Read the generated share URL from the share_url input field"
+    expect:
+      - "share_url value matches pattern http://127.0.0.1:8421/share/[a-f0-9]{48}"
+    screenshot: false
+
+  - id: cancel-share-modal
+    action: "Click Cancel to close the share modal"
+    expect:
+      - "share_modal is not visible"
+    screenshot: false
+
+  # === PART 2: Reviewer opens share page and authenticates ===
+
+  - id: navigate-to-share-page
+    action: "Navigate directly to the share URL captured in capture-share-url step"
+    expect:
+      - "auth_view is visible"
+      - "auth_heading is visible"
+      - "password_input is visible"
+      - "verify_btn is visible"
+      - "review_view is not visible"
+      - "auth_error is not visible"
+    screenshot: true
+
+  - id: enter-wrong-password
+    action: "Enter incorrect password 'wrong-password' in the password field and click Verify"
+    expect:
+      - "auth_error is visible"
+      - "auth_error text contains Incorrect password"
+      - "review_view is not visible"
+      - "verify_btn is not disabled"
+    screenshot: true
+
+  - id: enter-correct-password
+    action: "Clear password field, enter correct password 'test-review-pw', and click Verify"
+    expect:
+      - "auth_view is not visible"
+      - "review_view is visible"
+      - "share_header is visible"
+      - "review_label text is Review for Alice"
+      - "review_expires text contains Expires:"
+      - "entity_list is visible"
+    screenshot: true
+
+  # === PART 3: Reviewer views scoped entity ===
+
+  - id: verify-entity-list-scoped
+    action: "Verify the entity list shows only the authorized entity (not all entities from the dashboard)"
+    expect:
+      - "entity_card is visible"
+      - "entity_card_title is visible"
+      - "entity_card_meta is visible"
+      - "entity_detail_view is not visible"
+    screenshot: true
+
+  - id: click-entity-card
+    action: "Click on the entity card to open the entity detail view"
+    expect:
+      - "entity_detail_view is visible"
+      - "back_to_list is visible"
+      - "share_entity_body is visible"
+      - "share_comments_panel is visible"
+    screenshot: true
+
+  - id: verify-entity-body-rendered
+    action: "Verify the entity body is rendered as HTML (markdown parsed and sanitized)"
+    expect:
+      - "share_entity_body innerHTML is not empty"
+    screenshot: false
+
+  # === PART 4: Reviewer adds a comment ===
+
+  - id: select-text-for-comment
+    action: "Select some text in the entity body to trigger the comment tooltip"
+    expect:
+      - "share_comment_tooltip is visible"
+      - "share_comment_input is visible"
+      - "share_comment_submit is visible"
+      - "share_comment_cancel is visible"
+    screenshot: true
+
+  - id: submit-comment
+    action: "Type 'This section needs clarification.' in the comment input and click Comment"
+    expect:
+      - "share_comment_tooltip is not visible"
+      - "share_comment_threads contains at least one comment"
+    screenshot: true
+
+  - id: verify-comment-persisted
+    action: "Verify the comment appears in the comment threads list with guest author attribution"
+    expect:
+      - "share_comment_threads contains comment text This section needs clarification."
+    screenshot: true
+
+  # === PART 5: Navigate back and verify ===
+
+  - id: back-to-entity-list
+    action: "Click the 'Back to list' button to return to the entity list"
+    expect:
+      - "entity_detail_view is not visible"
+      - "entity_list is visible"
+      - "entity_card is visible"
+    screenshot: true
+
+  # === PART 6: API smoke tests (non-browser steps for documentation) ===
+  # The following are API-level verifications that would be run directly:
+  #
+  # GET /api/share — lists active share links (captain only, no token required from localhost)
+  # DELETE /api/share/:token — deletes a share link (returns 200, subsequent verify returns 404)
+  # POST /api/share/:token/verify with expired token — returns 404 "expired or does not exist"
+  # GET /api/share/:token/entity/detail with out-of-scope entity path — returns 403 Forbidden
+  # GET /ws/share/:token/activity — WebSocket connects successfully after verify

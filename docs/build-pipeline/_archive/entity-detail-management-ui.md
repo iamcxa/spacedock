@@ -1,11 +1,11 @@
 ---
 id: 002
 title: Entity Detail & Management UI
-status: pr-draft
+status: shipped
 source: commission seed
 started: 2026-04-04T02:55:00Z
-completed:
-verdict:
+completed: 2026-04-05T00:00:00Z
+verdict: PASSED
 score: 0.8
 worktree:
 issue:

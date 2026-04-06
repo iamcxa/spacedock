@@ -77,7 +77,7 @@ export interface FilterOptions {
 
 export type AgentEventType = "dispatch" | "completion" | "gate" | "feedback" | "merge" | "idle"
   | "channel_message" | "channel_response" | "permission_request" | "permission_response"
-  | "comment" | "suggestion";
+  | "comment" | "suggestion" | "gate_decision" | "share_created";
 
 export interface AgentEvent {
   type: AgentEventType;
@@ -118,7 +118,7 @@ export interface Comment {
   selected_text: string;
   section_heading: string;
   content: string;
-  author: "captain" | "fo";
+  author: "captain" | "fo" | "guest";
   timestamp: string; // ISO 8601
   resolved: boolean;
   thread: CommentReply[];
@@ -126,7 +126,7 @@ export interface Comment {
 
 export interface CommentReply {
   content: string;
-  author: "captain" | "fo";
+  author: "captain" | "fo" | "guest";
   timestamp: string;
 }
 
@@ -142,4 +142,21 @@ export interface Suggestion {
 export interface CommentThread {
   comments: Comment[];
   suggestions: Suggestion[];
+}
+
+// --- Share Link Types ---
+
+export interface ShareLink {
+  token: string;
+  passwordHash: string;
+  entityPaths: string[];       // scoped entity file paths
+  stages: string[];            // scoped stages (empty = all)
+  createdAt: string;           // ISO 8601
+  expiresAt: string;           // ISO 8601
+  label: string;               // human-readable label for UI
+}
+
+export interface ShareSession {
+  token: string;               // maps back to ShareLink.token
+  authenticatedAt: string;     // ISO 8601
 }

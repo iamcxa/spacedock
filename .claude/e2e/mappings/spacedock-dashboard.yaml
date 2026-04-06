@@ -1,23 +1,54 @@
 app: spacedock-dashboard
-base_url: http://127.0.0.1:8420
+base_url: http://127.0.0.1:8421/
 auth:
   type: none
 framework: vanilla-js
-mapped_at: 2026-04-04
+mapped_at: "2026-04-06"
 
 pages:
   dashboard:
     path: /
     title: Spacedock Dashboard
+    source: tools/dashboard/static/index.html
+    scripts:
+      - app.js
+      - activity.js
     elements:
+      # --- Header ---
       page_heading:
-        selector: header h1
+        selector: "header h1"
         type: heading
         description: Main dashboard title "Spacedock Dashboard"
+      header_indicators:
+        selector: .header-indicators
+        type: container
+        description: Row of status indicator spans in header
+      ws_status:
+        selector: "#ws-status"
+        type: indicator
+        description: WebSocket connection status — "Live", "Connecting...", or "Disconnected"
+        states:
+          connected: 'class="indicator", text="Live"'
+          connecting: 'class="indicator paused", text="Connecting..."'
+          disconnected: 'class="indicator paused", text="Disconnected"'
+      channel_status:
+        selector: "#channel-status"
+        type: indicator
+        description: Channel connection status — "Channel: connected" or "Channel: disconnected"
+        states:
+          connected: 'class="indicator channel-connected"'
+          disconnected: 'class="indicator channel-disconnected"'
       refresh_indicator:
         selector: "#refresh-indicator"
-        type: text
+        type: indicator
         description: Auto-refresh status indicator showing "Auto-refresh: ON"
+      telemetry_indicator:
+        selector: "#telemetry-indicator"
+        type: indicator
+        description: PostHog analytics indicator — hidden by default, shows "Analytics: ON" when PostHog configured
+        initially_hidden: true
+
+      # --- Main content ---
       workflows_container:
         selector: "#workflows-container"
         type: container
@@ -27,13 +58,15 @@ pages:
         type: container
         description: Individual workflow card (repeating)
       workflow_name:
-        selector: .workflow-card h2
+        selector: ".workflow-card h2"
         type: heading
         description: Workflow name heading within a card
       workflow_meta:
         selector: .workflow-meta
         type: text
-        description: Entity label and count summary (e.g. "tasks . 1 total")
+        description: 'Entity label and count summary (e.g. "tasks . 1 total")'
+
+      # --- Stage pipeline ---
       stage_pipeline:
         selector: .stage-pipeline
         type: container
@@ -41,20 +74,27 @@ pages:
       stage_chip:
         selector: .stage-chip
         type: badge
-        description: Individual stage chip with name and count
+        description: Individual stage chip — clickable to filter entities by stage
+        interaction: click to toggle stage filter (adds stage-chip--active class)
+      stage_chip_active:
+        selector: .stage-chip--active
+        type: badge
+        description: Active (selected) stage filter chip with highlighted border
       stage_chip_count:
-        selector: .stage-chip .count
+        selector: ".stage-chip .count"
         type: text
-        description: Entity count within a stage chip
+        description: Entity count number within a stage chip
+
+      # --- Entity table ---
       entity_table:
-        selector: .workflow-card table
+        selector: ".workflow-card table"
         type: table
         description: Sortable entity table within a workflow card
       column_header_id:
         selector: "th[data-col='id']"
         type: column-header
         description: Sortable ID column header
-        interaction: click to sort
+        interaction: click to sort ascending/descending (toggles sorted-asc/sorted-desc class)
       column_header_slug:
         selector: "th[data-col='slug']"
         type: column-header
@@ -80,28 +120,734 @@ pages:
         type: column-header
         description: Sortable SOURCE column header
         interaction: click to sort
+      entity_row:
+        selector: ".workflow-card tbody tr"
+        type: table-row
+        description: Individual entity data row — clickable to navigate to detail page
+        interaction: click navigates to /detail?path={entity.path}
+      entity_row_archived:
+        selector: .entity-row--archived
+        type: table-row
+        description: Archived/shipped entity row (dimmed opacity 0.5)
       status_badge:
         selector: .status-badge
         type: badge
-        description: Color-coded status badge in table cells
-      entity_row:
-        selector: .workflow-card tbody tr
-        type: table-row
-        description: Individual entity data row
+        description: Color-coded status badge in table cells (dynamic inline background/color)
       loading_message:
         selector: .loading
         type: text
-        description: Loading/error message shown during data fetch
+        description: Loading or error message shown during data fetch
       empty_state:
         selector: .empty-state
         type: text
-        description: Empty state message when no workflows found
+        description: Empty state message — "No Spacedock workflows found." or "No entities."
+
+      # --- Activity panel (right sidebar) ---
+      activity_panel:
+        selector: "#activity-panel"
+        type: container
+        description: Right sidebar — sticky, scrollable activity feed panel
+      activity_panel_heading:
+        selector: "#activity-panel h3"
+        type: heading
+        description: '"Activity Feed" heading in sidebar'
+      activity_feed:
+        selector: "#activity-feed"
+        type: container
+        description: Scrollable container for activity items and chat bubbles
+      activity_item:
+        selector: .activity-item
+        type: container
+        description: Workflow event entry in activity feed (dispatch, completion, gate, etc.)
+      activity_badge:
+        selector: .activity-badge
+        type: badge
+        description: Colored event type badge (e.g. "dispatch", "completion")
+      activity_info:
+        selector: .activity-info
+        type: text
+        description: 'Event info text — "agent -> entity @ stage"'
+      activity_time:
+        selector: .activity-time
+        type: text
+        description: Relative time display (e.g. "5s ago", "2m ago")
+      activity_detail:
+        selector: .activity-detail
+        type: text
+        description: Optional detail text under an activity item
+
+      # --- Chat bubbles ---
+      chat_bubble_captain:
+        selector: .chat-bubble.captain
+        type: container
+        description: Captain (user) chat message — blue, right-aligned
+      chat_bubble_fo:
+        selector: .chat-bubble.fo
+        type: container
+        description: First Officer (agent) response — dark, left-aligned
+      bubble_content:
+        selector: .bubble-content
+        type: text
+        description: Chat bubble message text content
+      bubble_time:
+        selector: .bubble-time
+        type: text
+        description: Relative timestamp inside chat bubble
+      show_more_toggle:
+        selector: .show-more
+        type: link
+        description: '"Show more" / "Show less" toggle for long FO responses (>100 chars)'
+        interaction: click toggles .truncated class on parent bubble
+
+      # --- Permission cards ---
+      permission_card:
+        selector: .permission-card
+        type: container
+        description: Tool permission request card with approve/reject buttons
+        data_attributes:
+          - data-request-id
+      perm_header:
+        selector: .perm-header
+        type: text
+        description: '"Permission Request" header text'
+      perm_tool:
+        selector: .perm-tool
+        type: text
+        description: 'Tool name and description text'
+      perm_preview:
+        selector: .perm-preview
+        type: text
+        description: Monospace preview of tool input (optional)
+      perm_approve_btn:
+        selector: ".perm-btn.approve"
+        type: button
+        description: Green "Approve" button on permission card
+        interaction: click sends allow verdict via POST /api/channel/send
+      perm_deny_btn:
+        selector: ".perm-btn.deny"
+        type: button
+        description: Red "Reject" button on permission card
+        interaction: click sends deny verdict via POST /api/channel/send
+      perm_verdict:
+        selector: .perm-verdict
+        type: text
+        description: '"Approved" or "Rejected" text shown after verdict'
+      permission_card_resolved:
+        selector: .permission-card.resolved
+        type: container
+        description: Permission card after verdict — dimmed, buttons hidden
+
+      # --- Gate decision cards in activity feed (Feature 016) ---
+      gate_decision_card:
+        selector: ".permission-card.resolved"
+        type: container
+        description: Gate decision card in activity feed — rendered by renderGateDecision(); reuses permission-card.resolved styling
+        notes: gate_decision cards are always pre-resolved (no action buttons); distinguished by perm-header text "Gate Decision"
+      gate_decision_header:
+        selector: ".perm-header"
+        type: text
+        description: '"Gate Decision" header text on gate decision cards in activity feed'
+      gate_decision_entity:
+        selector: ".perm-tool"
+        type: text
+        description: 'Entity + stage text in gate decision card — "{entity} @ {stage}"'
+      gate_decision_verdict:
+        selector: ".perm-verdict"
+        type: text
+        description: Gate decision verdict — "Approved" (green) or "Changes Requested" (red)
+
+      # --- Channel input bar ---
+      channel_input_bar:
+        selector: "#channel-input-bar"
+        type: container
+        description: Message input bar at bottom of activity panel
+      channel_input:
+        selector: "#channel-input"
+        type: textarea
+        description: Message textarea — disabled when no channel connected. Placeholder changes based on channel status.
+        interaction: Enter (without Shift) sends message. Shift+Enter for newline. Auto-resizes up to 96px.
+        states:
+          enabled: 'placeholder="Message to FO..."'
+          disabled: 'placeholder="No active session — launch with --channels to enable"'
+      channel_send_btn:
+        selector: "#channel-send-btn"
+        type: button
+        description: '"Send" button — disabled when no channel connected'
+        interaction: click sends message via POST /api/channel/send
+
+  entity_detail:
+    path: /detail?path={entity_path}
+    title: "Entity Detail"
+    source: tools/dashboard/static/detail.html
+    scripts:
+      - detail.js
+    external_deps:
+      - marked.js (CDN — markdown rendering)
+      - DOMPurify (CDN — XSS sanitization)
+    elements:
+      # --- Top navigation bar ---
+      top_bar:
+        selector: .top-bar
+        type: container
+        description: Top navigation bar with back link and entity title
+      back_link:
+        selector: .back-link
+        type: link
+        description: '"<- Back to Dashboard" link — navigates to /'
+        interaction: click navigates to /
+      entity_title:
+        selector: "#entity-title"
+        type: text
+        description: Entity title in nav bar — dynamically set from frontmatter.title
+      telemetry_indicator_detail:
+        selector: "#telemetry-indicator"
+        type: indicator
+        description: PostHog analytics indicator (same behavior as dashboard page)
+        initially_hidden: true
+
+      # --- Main content ---
+      detail_layout:
+        selector: .detail-layout
+        type: container
+        description: Two-column grid layout (main + sidebar, 1fr 320px)
+      detail_main:
+        selector: .detail-main
+        type: container
+        description: Main content area (entity body + stage reports)
+      entity_body:
+        selector: "#entity-body"
+        type: container
+        description: Rendered markdown body of the entity (sanitized via DOMPurify)
+      stage_reports:
+        selector: "#stage-reports"
+        type: container
+        description: Container for stage report cards
+      stage_report_card:
+        selector: .stage-report-card
+        type: container
+        description: Individual stage report card with checklist items
+      stage_report_heading:
+        selector: ".stage-report-card h3"
+        type: heading
+        description: '"Stage Report: {stage_name}" heading'
+      checklist:
+        selector: .checklist
+        type: list
+        description: Unordered list of checklist items within a stage report
+      checklist_item:
+        selector: .checklist-item
+        type: list-item
+        description: Individual checklist item with status icon + text
+        variants:
+          - "checklist-item done (green checkmark)"
+          - "checklist-item skip (yellow dash)"
+          - "checklist-item fail (red x)"
+          - "checklist-item (default — open circle)"
+      status_icon:
+        selector: .status-icon
+        type: icon
+        description: Status icon in checklist item (check, dash, x, or circle)
+      item_text:
+        selector: .item-text
+        type: text
+        description: Checklist item main text
+      item_detail:
+        selector: .item-detail
+        type: text
+        description: Optional detail text under a checklist item (smaller, gray)
+      stage_summary:
+        selector: .stage-summary
+        type: text
+        description: Summary text at the bottom of a stage report card
+
+      # --- Sidebar ---
+      detail_sidebar:
+        selector: .detail-sidebar
+        type: container
+        description: Right sidebar — sticky, contains metadata and management panels
+      metadata_panel:
+        selector: .metadata-panel
+        type: container
+        description: Metadata section with key-value pairs from frontmatter
+      metadata_heading:
+        selector: ".metadata-panel h3"
+        type: heading
+        description: '"Metadata" section heading'
+      metadata_fields:
+        selector: "#metadata-fields"
+        type: definition-list
+        description: dl element with dt/dd pairs for each frontmatter key-value (tags excluded)
+      metadata_key:
+        selector: "#metadata-fields dt"
+        type: text
+        description: Frontmatter key name (repeating)
+      metadata_value:
+        selector: "#metadata-fields dd"
+        type: text
+        description: Frontmatter value (repeating)
+
+      # --- Score control ---
+      management_panel:
+        selector: .management-panel
+        type: container
+        description: Management section with score slider and tag editor
+      score_heading:
+        selector: ".management-panel h3:first-of-type"
+        type: heading
+        description: '"Score" section heading'
+      score_control:
+        selector: .score-control
+        type: container
+        description: Score slider row with display and save button
+      score_slider:
+        selector: "#score-slider"
+        type: range-input
+        description: Score range slider (min=0, max=1, step=0.05)
+        interaction: drag to change score — updates score_display in real-time
+      score_display:
+        selector: "#score-display"
+        type: text
+        description: Current score value display (e.g. "0.75")
+      score_save:
+        selector: "#score-save"
+        type: button
+        description: '"Save" button — persists score via POST /api/entity/score'
+        interaction: click saves score and reloads entity
+
+      # --- Tag editor ---
+      tags_heading:
+        selector: ".management-panel h3:nth-of-type(2)"
+        type: heading
+        description: '"Tags" section heading'
+      tag_editor:
+        selector: .tag-editor
+        type: container
+        description: Tag management section with chips and input
+      tag_chips:
+        selector: "#tag-chips"
+        type: container
+        description: Container for tag chip elements
+      tag_chip:
+        selector: .tag-chip
+        type: badge
+        description: Individual tag chip with remove button
+      remove_tag_btn:
+        selector: .remove-tag
+        type: button
+        description: 'X button on tag chip to remove the tag'
+        interaction: click removes tag via POST /api/entity/tags
+        data_attributes:
+          - data-tag
+      tag_input_row:
+        selector: .tag-input-row
+        type: container
+        description: Row with tag text input and Add button
+      tag_input:
+        selector: "#tag-input"
+        type: text-input
+        description: Text input for adding new tags (placeholder "Add tag...")
+        interaction: Enter key triggers addTag()
+      tag_add:
+        selector: "#tag-add"
+        type: button
+        description: '"Add" button — adds tag from input field'
+        interaction: click adds tag via POST /api/entity/tags
+
+      # --- Gate review panel (Feature 016) ---
+      gate_panel:
+        selector: "#gate-panel"
+        type: container
+        description: Gate review panel in sidebar — hidden by default, shown when entity is at a gated stage
+        initially_hidden: true
+        visibility_condition: entity status matches a stage with gate:true in workflow definition
+      gate_panel_heading:
+        selector: "#gate-panel h3"
+        type: heading
+        description: '"Gate Review" heading'
+      gate_status:
+        selector: "#gate-status"
+        type: container
+        description: Container for gate status badge
+      gate_status_badge:
+        selector: "#gate-status-badge"
+        type: badge
+        description: Gate status badge — "Pending Review" (pending class) or "Approved" / "Changes Requested" after resolution
+        states:
+          pending: 'class="gate-badge pending", text="Pending Review"'
+          approved: 'class="gate-badge approved"'
+          changes_requested: 'class="gate-badge changes-requested"'
+      gate_actions:
+        selector: "#gate-actions"
+        type: container
+        description: Container for Approve and Request Changes buttons
+      gate_approve_btn:
+        selector: "#gate-approve-btn"
+        type: button
+        description: '"Approve" button — triggers confirmation dialog before sending gate decision'
+        interaction: click shows gate_confirm dialog; disabled after click to prevent double-submit
+      gate_request_changes_btn:
+        selector: "#gate-request-changes-btn"
+        type: button
+        description: '"Request Changes" button — triggers confirmation dialog'
+        interaction: click shows gate_confirm dialog with "request changes" action
+      gate_confirm:
+        selector: "#gate-confirm"
+        type: container
+        description: Confirmation dialog shown after clicking Approve or Request Changes — prevents accidental gate decisions
+        initially_hidden: true
+      gate_confirm_action:
+        selector: "#gate-confirm-action"
+        type: text
+        description: Bold text showing the action being confirmed ("approve" or "request changes")
+      gate_confirm_yes:
+        selector: "#gate-confirm-yes"
+        type: button
+        description: '"Confirm" button in confirmation dialog — sends POST /api/entity/gate/decision'
+        interaction: click POSTs gate decision, disables both gate action buttons, shows gate_resolved
+      gate_confirm_cancel:
+        selector: "#gate-confirm-cancel"
+        type: button
+        description: '"Cancel" button in confirmation dialog — dismisses dialog without sending decision'
+        interaction: click hides gate_confirm, re-enables gate action buttons
+      gate_resolved:
+        selector: "#gate-resolved"
+        type: container
+        description: Resolved state container shown after gate decision is sent — replaces gate actions
+        initially_hidden: true
+      gate_resolved_text:
+        selector: "#gate-resolved-text"
+        type: text
+        description: Text shown after gate decision — "Approved" or "Changes Requested"
+
+      # --- Share panel (Feature 017) ---
+      share_panel:
+        selector: "#share-panel"
+        type: container
+        description: Share link management panel in entity detail sidebar (always visible)
+      share_panel_heading:
+        selector: "#share-panel h3"
+        type: heading
+        description: '"Share" heading in share panel'
+      create_share_btn:
+        selector: "#create-share-btn"
+        type: button
+        description: '"Create Share Link" button — opens share creation modal'
+        interaction: click shows share_modal
+      share_links:
+        selector: "#share-links"
+        type: container
+        description: Container for list of existing share link entries
+      share_modal:
+        selector: "#share-modal"
+        type: container
+        description: Share creation form — password, label, TTL inputs
+        initially_hidden: true
+      share_password_input:
+        selector: "#share-password"
+        type: text-input
+        description: Password field for new share link (plain text input, will be hashed server-side with argon2id)
+      share_label_input:
+        selector: "#share-label-input"
+        type: text-input
+        description: Optional label for the share link (e.g. "Review for Alice")
+      share_ttl_input:
+        selector: "#share-ttl"
+        type: number-input
+        description: TTL in hours for share link (default 24, min 1, max 168)
+      share_submit:
+        selector: "#share-submit"
+        type: button
+        description: '"Create" button — submits share link creation to POST /api/share'
+        interaction: click creates share link; shows share_result on success
+      share_cancel:
+        selector: "#share-cancel"
+        type: button
+        description: '"Cancel" button — hides share_modal without creating link'
+        interaction: click hides share_modal
+      share_result:
+        selector: "#share-result"
+        type: container
+        description: Result section shown after successful share link creation — contains share URL and copy button
+        initially_hidden: true
+      share_url:
+        selector: "#share-url"
+        type: text-input
+        description: Readonly input showing the generated share link URL (e.g. http://127.0.0.1:8421/share/:token)
+      share_copy:
+        selector: "#share-copy"
+        type: button
+        description: '"Copy" button — copies share_url to clipboard'
+        interaction: click copies URL to clipboard
+
+  share_page:
+    path: /share/:token
+    title: "Spacedock -- Shared Review"
+    source: tools/dashboard/static/share.html
+    scripts:
+      - share.js
+    external_deps:
+      - marked.js (CDN — markdown rendering)
+      - DOMPurify (CDN — XSS sanitization)
+    elements:
+      # --- Auth view ---
+      auth_view:
+        selector: "#auth-view"
+        type: container
+        description: Password entry container shown before authentication (centered, max-width 400px)
+        initially_visible: true
+      auth_heading:
+        selector: "#auth-view h2"
+        type: heading
+        description: '"Review Access" heading in auth container'
+      share_label_display:
+        selector: "#share-label-display"
+        type: text
+        description: Share link label text shown above password input (e.g. "Review for Alice")
+      password_input:
+        selector: "#password-input"
+        type: password-input
+        description: Password field — autofocused; Enter key triggers verification
+        interaction: Enter key calls doVerify()
+      verify_btn:
+        selector: "#verify-btn"
+        type: button
+        description: '"Verify" button — POSTs password to /api/share/:token/verify'
+        interaction: click calls doVerify(); disabled during request
+      auth_error:
+        selector: "#auth-error"
+        type: text
+        description: Error message shown on wrong password — "Incorrect password. Please try again."
+        initially_hidden: true
+
+      # --- Review view (post-auth) ---
+      review_view:
+        selector: "#review-view"
+        type: container
+        description: Full review interface shown after successful auth — contains header + entity list or detail
+        initially_hidden: true
+      share_header:
+        selector: ".share-header"
+        type: container
+        description: Header bar in review view showing share label and expiry time
+      review_label:
+        selector: "#review-label"
+        type: text
+        description: Share link label shown in review header
+      review_expires:
+        selector: "#review-expires"
+        type: text
+        description: Expiry time shown in review header (e.g. "Expires: 4/7/2026, 10:00:00 AM")
+
+      # --- Entity list ---
+      entity_list:
+        selector: "#entity-list"
+        type: container
+        description: Scoped entity list — shows only entities authorized for this share token
+      entity_card:
+        selector: ".entity-card"
+        type: container
+        description: Individual entity card — clickable to open entity detail view
+        interaction: click shows entity_detail_view
+      entity_card_title:
+        selector: ".entity-card h3"
+        type: heading
+        description: Entity title in entity card
+      entity_card_meta:
+        selector: ".entity-card .meta"
+        type: text
+        description: 'Entity metadata line — "Status: {status} | Score: {score}"'
+
+      # --- Entity detail view (in-page) ---
+      entity_detail_view:
+        selector: "#entity-detail-view"
+        type: container
+        description: In-page entity detail view — shown when reviewer clicks an entity card
+        initially_hidden: true
+      back_to_list:
+        selector: "#back-to-list"
+        type: button
+        description: '"<- Back to list" button — hides entity detail view, shows entity list'
+        interaction: click shows entity_list, hides entity_detail_view
+      share_entity_body:
+        selector: "#entity-detail-view #entity-body"
+        type: container
+        description: Rendered markdown body of the entity in share page (DOMPurify-sanitized)
+      share_comments_panel:
+        selector: "#entity-detail-view #comments-panel"
+        type: container
+        description: Comments panel in share detail view — shows comments, allows adding new ones
+      share_comment_threads:
+        selector: "#entity-detail-view #comment-threads"
+        type: container
+        description: Container for comment threads in share page
+      share_gate_panel:
+        selector: "#entity-detail-view #gate-panel"
+        type: container
+        description: Gate review panel in share page — hidden by default, shown for gated entities
+        initially_hidden: true
+      share_gate_approve_btn:
+        selector: "#entity-detail-view #gate-approve-btn"
+        type: button
+        description: '"Approve" button on share page gate panel'
+        interaction: click sends gate approval via scoped share route
+      share_gate_request_changes_btn:
+        selector: "#entity-detail-view #gate-request-changes-btn"
+        type: button
+        description: '"Request Changes" button on share page gate panel'
+
+      # --- Comment tooltip (shared across pages) ---
+      share_comment_tooltip:
+        selector: "#comment-tooltip"
+        type: container
+        description: Text-selection comment tooltip — appears when user selects text in entity body
+        initially_hidden: true
+      share_comment_input:
+        selector: "#comment-input"
+        type: textarea
+        description: Comment text input inside tooltip
+      share_comment_submit:
+        selector: "#comment-submit"
+        type: button
+        description: '"Comment" submit button in tooltip'
+        interaction: click POSTs to /api/share/:token/entity/comment
+      share_comment_cancel:
+        selector: "#comment-cancel"
+        type: button
+        description: '"Cancel" button in comment tooltip — hides tooltip'
 
 api_endpoints:
-  workflows:
+  get_workflows:
     method: GET
     path: /api/workflows
     description: Returns JSON array of all discovered workflows with entities
     response_format: application/json
+  get_entity_detail:
+    method: GET
+    path: /api/entity/detail?path={filepath}
+    description: Returns entity frontmatter, body, stage_reports, tags for a specific entity file
+    response_format: application/json
+  get_entities:
+    method: GET
+    path: /api/entities?dir={dir}&status={status}&tag={tag}&min_score={n}&max_score={n}
+    description: Filter entities by status, tag, or score range
+    response_format: application/json
+  post_score:
+    method: POST
+    path: /api/entity/score
+    description: Update entity score (body — path, score)
+    response_format: application/json
+  post_tags:
+    method: POST
+    path: /api/entity/tags
+    description: Update entity tags (body — path, tags[])
+    response_format: application/json
+  get_events:
+    method: GET
+    path: /api/events?since={seq}
+    description: Get buffered activity events (optionally since a sequence number)
+    response_format: application/json
+  post_events:
+    method: POST
+    path: /api/events
+    description: Push a new agent event (body — type, entity, stage, agent, timestamp)
+    response_format: application/json
+  post_channel_send:
+    method: POST
+    path: /api/channel/send
+    description: Send a channel message or permission verdict (body — content, meta)
+    response_format: application/json
+  post_gate_decision:
+    method: POST
+    path: /api/entity/gate/decision
+    description: Send gate decision (body — entity_path, entity_slug, stage, decision ["approved"|"changes_requested"])
+    response_format: application/json
+    added_in: "016"
+  get_config:
+    method: GET
+    path: /api/config
+    description: Returns PostHog config (if configured)
+    response_format: application/json
+  post_share_create:
+    method: POST
+    path: /api/share
+    description: Create a new share link (body — entityPath, password, label?, ttlHours?)
+    response_format: application/json
+    added_in: "017"
+  get_share_list:
+    method: GET
+    path: /api/share
+    description: List all active share links (token, label, expiresAt, entityPaths)
+    response_format: application/json
+    added_in: "017"
+  delete_share:
+    method: DELETE
+    path: /api/share/:token
+    description: Delete a specific share link by token
+    response_format: application/json
+    added_in: "017"
+  post_share_verify:
+    method: POST
+    path: /api/share/:token/verify
+    description: Verify share link password (body — password); returns scope on success (401 on wrong pw, 404 on expired/missing)
+    response_format: application/json
+    added_in: "017"
+  get_share_entity_detail:
+    method: GET
+    path: /api/share/:token/entity/detail?path={filepath}
+    description: Get entity detail scoped to share token — same shape as /api/entity/detail but enforces scope
+    response_format: application/json
+    added_in: "017"
+  get_share_entity_comments:
+    method: GET
+    path: /api/share/:token/entity/comments?path={filepath}
+    description: Get comments for an entity scoped to share token
+    response_format: application/json
+    added_in: "017"
+  post_share_entity_comment:
+    method: POST
+    path: /api/share/:token/entity/comment
+    description: Add a guest comment to an entity (body — path, selected_text, section_heading, content)
+    response_format: application/json
+    added_in: "017"
+  post_share_approve:
+    method: POST
+    path: /api/share/:token/approve
+    description: Submit a gate decision from share page (body — entity_path, entity_slug, stage, decision)
+    response_format: application/json
+    added_in: "017"
+
+websocket_endpoints:
+  activity_feed:
+    path: /ws/activity
+    description: Real-time activity feed — publishes events, channel status, and replay on connect
+    message_types:
+      replay: "Sent on connect — array of buffered events"
+      event: "Live event broadcast — {type: 'event', data: entry}"
+      channel_status: "Channel connection state — {type: 'channel_status', connected: bool}"
+    client_messages:
+      channel_send: "Send message/verdict — {type: 'channel_send', content: string, meta: {}}"
+  share_activity_feed:
+    path: /ws/share/:token/activity
+    description: Scoped real-time activity feed for share tokens — only pushes events relevant to authorized entity slugs
+    added_in: "017"
+    message_types:
+      event: "Filtered event broadcast — same shape as activity_feed but scoped to token's entitySlugs"
+    notes:
+      - "Token validated before WebSocket upgrade — returns 403 if invalid/expired"
+      - "Replay on connect filtered to entityPaths from share link"
+      - "Subscribes to share:{token} Bun pub/sub topic (not global activity)"
 
 dialogs: {}
+
+notes:
+  - "Entity rows navigate to /detail?path= (not /detail.html?dir=&slug= as originally expected)"
+  - "Default entity table filter hides archived=true and status=shipped entities"
+  - "Stage chip filter state persisted in sessionStorage under 'dashboardFilterState'"
+  - "Activity feed capped at 100 items in DOM (oldest removed first)"
+  - "Channel input textarea auto-resizes up to 96px height"
+  - "IME composition (CJK input) is handled — Enter during composing does not send"
+  - "[017] Share panel is always visible in entity detail sidebar (no visibility condition)"
+  - "[017] Share page at /share/:token — auth-view shown first, review-view after successful verify"
+  - "[017] Server defaults to 127.0.0.1 binding; --tunnel flag switches to 0.0.0.0 + spawns ngrok"
+  - "[017] Share link TTL default 24h; expired links return 404 on verify"
+  - "[017] Scoped WebSocket /ws/share/:token/activity only receives events for authorized entity slugs"
