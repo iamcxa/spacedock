@@ -109,11 +109,66 @@
     return node;
   }
 
+  // --- Missions Tree ---
+  var missionsTree = document.getElementById("missions-tree");
+  var treeExpandState = {};
+
+  function renderMissionsTree(workflows) {
+    if (!missionsTree) return;
+    missionsTree.textContent = "";
+    missionsTree.appendChild(el("h4", { textContent: "MISSIONS" }));
+
+    workflows.forEach(function (wf, wfIdx) {
+      var wfNode = el("div", { className: "tree-workflow" + (treeExpandState[wfIdx] !== false ? " expanded" : "") });
+
+      var label = el("div", { className: "tree-workflow-label" }, [
+        el("span", { className: "tree-arrow", textContent: treeExpandState[wfIdx] !== false ? "\u25BC" : "\u25B6" }),
+        wf.name
+      ]);
+      label.addEventListener("click", function () {
+        treeExpandState[wfIdx] = !wfNode.classList.contains("expanded");
+        wfNode.classList.toggle("expanded");
+        var arrow = label.querySelector(".tree-arrow");
+        arrow.textContent = wfNode.classList.contains("expanded") ? "\u25BC" : "\u25B6";
+      });
+      wfNode.appendChild(label);
+
+      var entitiesContainer = el("div", { className: "tree-entities" });
+      var shippedCount = 0;
+
+      wf.entities.forEach(function (entity) {
+        if (entity.status === "shipped" || entity.status === "done") {
+          shippedCount++;
+          return;
+        }
+        var statusIcon = entity.status === "gate" || entity.status === "validation" ? "\uD83D\uDFE0" : "\uD83D\uDD35";
+        var entityItem = el("div", { className: "tree-entity" }, [
+          el("span", { className: "tree-status", textContent: statusIcon }),
+          el("span", { className: "tree-label", textContent: (entity.id ? entity.id + " " : "") + (entity.slug || entity.title || "") })
+        ]);
+        if (entity.path) {
+          entityItem.addEventListener("click", function () {
+            window.location.href = "/detail?path=" + encodeURIComponent(entity.path);
+          });
+        }
+        entitiesContainer.appendChild(entityItem);
+      });
+
+      if (shippedCount > 0) {
+        entitiesContainer.appendChild(el("div", { className: "tree-shipped-count", textContent: "\u2705 " + shippedCount + " shipped" }));
+      }
+
+      wfNode.appendChild(entitiesContainer);
+      missionsTree.appendChild(wfNode);
+    });
+  }
+
   function render(workflows) {
     container.textContent = "";
+    renderMissionsTree(workflows);
 
     if (!workflows.length) {
-      container.appendChild(el("p", { className: "empty-state", textContent: "No Spacedock workflows found." }));
+      container.appendChild(el("p", { className: "empty-state", textContent: "No workflows found." }));
       return;
     }
 
