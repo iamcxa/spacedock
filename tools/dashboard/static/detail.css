@@ -487,3 +487,115 @@ body {
     border-bottom: 2px solid #58a6ff;
     cursor: pointer;
 }
+
+/* --- Gate Review Panel --- */
+
+.gate-panel {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.gate-panel h3 {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8b949e;
+  margin-bottom: 0.75rem;
+}
+
+.gate-status {
+  margin-bottom: 0.75rem;
+}
+
+.gate-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 2rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.gate-badge.pending {
+  background: rgba(240, 136, 62, 0.15);
+  color: #f0883e;
+}
+
+.gate-badge.approved {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+
+.gate-badge.changes-requested {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+}
+
+.gate-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.gate-btn {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.gate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gate-btn.approve {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+  border-color: #3fb950;
+}
+
+.gate-btn.approve:hover:not(:disabled) {
+  background: rgba(63, 185, 80, 0.25);
+}
+
+.gate-btn.request-changes {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+  border-color: #f85149;
+}
+
+.gate-btn.request-changes:hover:not(:disabled) {
+  background: rgba(248, 81, 73, 0.25);
+}
+
+.gate-confirm {
+  padding: 0.75rem;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+}
+
+.gate-confirm p {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  color: #c9d1d9;
+}
+
+.gate-confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.gate-resolved {
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  text-align: center;
+}
