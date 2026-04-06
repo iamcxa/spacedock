@@ -440,6 +440,31 @@ function renderComments(thread) {
             card.appendChild(renderSuggestionCard(suggestion));
         });
 
+        // Click sidebar comment → scroll to highlight + flash + show popover
+        (function (commentId) {
+            card.addEventListener('click', function (e) {
+                // Don't trigger if clicking resolve button or suggestion actions
+                if (e.target.closest('.comment-resolve-btn') || e.target.closest('.suggestion-actions')) return;
+                var marks = document.querySelectorAll('.comment-highlight');
+                for (var m = 0; m < marks.length; m++) {
+                    var ids = (marks[m].getAttribute('data-comment-ids') || '').split(',');
+                    if (ids.indexOf(commentId) !== -1) {
+                        var targetMark = marks[m];
+                        targetMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        targetMark.classList.add('comment-highlight-flash');
+                        targetMark.addEventListener('animationend', function () {
+                            this.classList.remove('comment-highlight-flash');
+                        }, { once: true });
+                        // Trigger popover via synthetic click (handled by IIFE click listener)
+                        setTimeout(function () {
+                            targetMark.click();
+                        }, 400);
+                        break;
+                    }
+                }
+            });
+        })(comment.id);
+
         commentThreadsContainer.appendChild(card);
     });
 }
