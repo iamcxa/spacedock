@@ -85,11 +85,11 @@ describe("ShareRegistry.verify", () => {
       entityPaths: ["/a.md"],
       stages: [],
       label: "Expired",
-      ttlHours: 0,
+      ttlHours: 1,
     });
-    // Force expiry by setting expiresAt to the past
-    const stored = registry.get(link.token)!;
-    stored.expiresAt = new Date(Date.now() - 1000).toISOString();
+    // Force expiry via direct SQL UPDATE (object mutation does not update SQLite)
+    db.query("UPDATE share_links SET expires_at = ? WHERE token = ?")
+      .run(new Date(Date.now() - 1000).toISOString(), link.token);
     const result = await registry.verify(link.token, "pass");
     expect(result).toBe(false);
   });
@@ -116,10 +116,11 @@ describe("ShareRegistry.get", () => {
       entityPaths: ["/a.md"],
       stages: [],
       label: "Expired",
-      ttlHours: 0,
+      ttlHours: 1,
     });
-    const stored = registry.get(link.token)!;
-    stored.expiresAt = new Date(Date.now() - 1000).toISOString();
+    // Force expiry via direct SQL UPDATE
+    db.query("UPDATE share_links SET expires_at = ? WHERE token = ?")
+      .run(new Date(Date.now() - 1000).toISOString(), link.token);
     const found = registry.get(link.token);
     expect(found).toBeNull();
   });
@@ -158,9 +159,9 @@ describe("ShareRegistry.list", () => {
       label: "Expired",
       ttlHours: 1,
     });
-    // Force expiry via direct Map access
-    const stored = registry["links"].get(link.token)!;
-    stored.expiresAt = new Date(Date.now() - 1000).toISOString();
+    // Force expiry via direct SQL UPDATE
+    db.query("UPDATE share_links SET expires_at = ? WHERE token = ?")
+      .run(new Date(Date.now() - 1000).toISOString(), link.token);
     const all = registry.list();
     expect(all.length).toBe(0);
   });
