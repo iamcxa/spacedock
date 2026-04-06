@@ -1073,6 +1073,15 @@ function rejectSuggestionAction(suggestionId) {
         });
     });
   }
+
+  // Apply highlights for already-loaded page (initial load used original loadEntity)
+  if (entityPath) {
+    apiFetch('/api/entity/comments?path=' + encodeURIComponent(entityPath))
+      .then(function (threadData) {
+        cachedComments = threadData.comments || [];
+        applyCommentHighlights(cachedComments);
+      });
+  }
 })();
 
 // --- Share Link Creation ---
