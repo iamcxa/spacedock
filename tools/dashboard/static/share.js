@@ -362,6 +362,13 @@
     }).then(function () {
       hideCommentPopover();
       loadComments(currentCommentPath);
+      // Re-fetch and re-apply highlights after reply
+      fetch('/api/share/' + token + '/entity/comments?path=' + encodeURIComponent(currentCommentPath))
+        .then(function (res) { return res.json(); })
+        .then(function (thread) {
+          cachedComments = thread.comments || [];
+          applyCommentHighlights(cachedComments);
+        });
     });
   }
 
@@ -450,6 +457,13 @@
       }).then(function () {
         tooltip.style.display = "none";
         loadComments(currentCommentPath);
+        // Re-fetch and re-apply highlights after new comment
+        fetch('/api/share/' + token + '/entity/comments?path=' + encodeURIComponent(currentCommentPath))
+          .then(function (res) { return res.json(); })
+          .then(function (thread) {
+            cachedComments = thread.comments || [];
+            applyCommentHighlights(cachedComments);
+          });
       });
     };
 
