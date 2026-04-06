@@ -1,0 +1,83 @@
+name: gate-approval
+description: "Gate approval UI — captain reviews a gated entity and approves via dashboard"
+tags: [feature-016, gate-approval]
+mapping: spacedock-dashboard
+
+steps:
+  - id: navigate-to-dashboard
+    action: "Navigate to the dashboard home page"
+    expect:
+      - "page_heading is visible"
+      - "workflows_container is visible"
+    screenshot: true
+
+  - id: find-gated-entity
+    action: "Look for an entity in a gated stage (status matches a stage with gate:true)"
+    expect:
+      - "entity_row is visible"
+      - "status_badge shows a gated stage name"
+    screenshot: true
+
+  - id: open-entity-detail
+    action: "Click on the gated entity row to open the detail page"
+    expect:
+      - "back_link is visible"
+      - "entity_title is visible"
+      - "detail_sidebar is visible"
+    screenshot: true
+
+  - id: verify-gate-panel-visible
+    action: "Verify the Gate Review panel is visible in the sidebar (gate-panel is shown for gated entities)"
+    expect:
+      - "gate_panel is visible"
+      - "gate_panel_heading is visible"
+      - "gate_status_badge shows text Pending Review"
+    screenshot: true
+
+  - id: verify-gate-action-buttons
+    action: "Verify the Approve and Request Changes buttons are present and enabled"
+    expect:
+      - "gate_approve_btn is visible"
+      - "gate_request_changes_btn is visible"
+      - "gate_confirm is not visible"
+    screenshot: true
+
+  - id: click-approve-button
+    action: "Click the Approve button to initiate gate decision"
+    expect:
+      - "gate_confirm is visible"
+      - "gate_confirm_action shows text approve"
+      - "gate_confirm_yes is visible"
+      - "gate_confirm_cancel is visible"
+    screenshot: true
+
+  - id: cancel-confirmation
+    action: "Click the Cancel button in the confirmation dialog to dismiss without sending decision"
+    expect:
+      - "gate_confirm is not visible"
+      - "gate_approve_btn is visible"
+      - "gate_request_changes_btn is visible"
+    screenshot: true
+
+  - id: click-approve-again
+    action: "Click the Approve button again to re-open the confirmation dialog"
+    expect:
+      - "gate_confirm is visible"
+      - "gate_confirm_action shows text approve"
+    screenshot: false
+
+  - id: confirm-approval
+    action: "Click the Confirm button to send the gate approval decision"
+    expect:
+      - "gate_resolved is visible"
+      - "gate_resolved_text shows text Approved"
+      - "gate_actions is not visible"
+    screenshot: true
+
+  - id: verify-activity-feed-card
+    action: "Navigate back to the dashboard and verify a gate_decision card appears in the activity feed"
+    expect:
+      - "gate_decision_card is visible"
+      - "gate_decision_header shows text Gate Decision"
+      - "gate_decision_verdict shows text Approved"
+    screenshot: true
