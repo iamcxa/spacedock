@@ -317,3 +317,68 @@ describe("POST /api/share/:token/entity/comment", () => {
     expect(data.author).toBe("guest");
   });
 });
+
+describe("WebSocket /ws/share/:token/activity", () => {
+  test("connects and receives replay for valid token", async () => {
+    const createRes = await fetch(`${baseUrl}/api/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        password: "ws-test",
+        entityPaths: [ENTITY_PATH],
+        stages: [],
+        label: "WS Scoped",
+        ttlHours: 24,
+      }),
+    });
+    const { token } = await createRes.json() as any;
+
+    const wsUrl = `ws://127.0.0.1:${server.port}/ws/share/${token}/activity`;
+    const ws = new WebSocket(wsUrl);
+    const messages: any[] = [];
+
+    await new Promise<void>((resolve) => {
+      ws.onopen = () => resolve();
+    });
+
+    ws.onmessage = (ev) => {
+      messages.push(JSON.parse(String(ev.data)));
+    };
+
+    // Wait for replay message
+    await new Promise((r) => setTimeout(r, 200));
+    ws.close();
+
+    const replayMessages = messages.filter((m) => m.type === "replay");
+    expect(replayMessages.length).toBe(1);
+  });
+
+  test("rejects connection for expired token", async () => {
+    const createRes = await fetch(`${baseUrl}/api/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        password: "ws-expire",
+        entityPaths: [ENTITY_PATH],
+        stages: [],
+        label: "WS Expired",
+        ttlHours: 0,
+      }),
+    });
+    const { token } = await createRes.json() as any;
+    const link = server.shareRegistry.get(token);
+    if (link) link.expiresAt = new Date(Date.now() - 1000).toISOString();
+
+    const wsUrl = `ws://127.0.0.1:${server.port}/ws/share/${token}/activity`;
+    const ws = new WebSocket(wsUrl);
+
+    const result = await new Promise<string>((resolve) => {
+      ws.onopen = () => resolve("opened");
+      ws.onerror = () => resolve("error");
+      ws.onclose = () => resolve("closed");
+      setTimeout(() => resolve("timeout"), 2000);
+    });
+
+    expect(result === "error" || result === "closed").toBe(true);
+  });
+});

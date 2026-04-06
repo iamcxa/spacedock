@@ -269,8 +269,7 @@ export function createServer(opts: ServerOptions) {
               timestamp: new Date().toISOString(),
               detail: body.decision,
             };
-            const entry = eventBuffer.push(event);
-            server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+            const seq = publishEvent(event);
             // Forward gate decision to FO via channel
             if (opts.onChannelMessage) {
               const content = body.decision === "approved"
@@ -285,7 +284,7 @@ export function createServer(opts: ServerOptions) {
               });
             }
             logRequest(req, 200);
-            return jsonResponse({ ok: true, seq: entry.seq });
+            return jsonResponse({ ok: true, seq });
           } catch (err) {
             captureException(err instanceof Error ? err : new Error(String(err)));
             logRequest(req, 500);
@@ -400,10 +399,9 @@ export function createServer(opts: ServerOptions) {
             }
           }
           try {
-            const entry = eventBuffer.push(body as unknown as AgentEvent);
-            server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+            const seq = publishEvent(body as unknown as AgentEvent);
             logRequest(req, 200);
-            return jsonResponse({ ok: true, seq: entry.seq });
+            return jsonResponse({ ok: true, seq });
           } catch (e: any) {
             logRequest(req, 400);
             return jsonResponse({ error: e.message }, 400);
@@ -430,13 +428,12 @@ export function createServer(opts: ServerOptions) {
               timestamp: new Date().toISOString(),
               detail: body.content,
             };
-            const entry = eventBuffer.push(event);
-            server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+            const seq = publishEvent(event);
             if (opts.onChannelMessage) {
               opts.onChannelMessage(body.content, body.meta);
             }
             logRequest(req, 200);
-            return jsonResponse({ ok: true, seq: entry.seq });
+            return jsonResponse({ ok: true, seq });
           } catch (err) {
             captureException(err instanceof Error ? err : new Error(String(err)));
             logRequest(req, 500);
@@ -593,10 +590,26 @@ export function createServer(opts: ServerOptions) {
     },
     websocket: {
       open(ws) {
-        ws.subscribe("activity");
-        const events = eventBuffer.getAll();
-        ws.send(JSON.stringify({ type: "replay", events }));
-        ws.send(JSON.stringify({ type: "channel_status", connected: channelConnected }));
+        const wsData = ws.data as { shareToken?: string; entityPaths?: string[] } | undefined;
+        if (wsData?.shareToken) {
+          // Scoped share WebSocket -- subscribe to per-token topic
+          ws.subscribe(`share:${wsData.shareToken}`);
+          // Replay only scoped events
+          const entitySlugs = new Set(
+            (wsData.entityPaths ?? []).map((p: string) =>
+              p.replace(/\.md$/, "").split("/").pop()!
+            )
+          );
+          const events = eventBuffer.getAll().filter(
+            (e) => entitySlugs.has(e.event.entity)
+          );
+          ws.send(JSON.stringify({ type: "replay", events }));
+        } else {
+          ws.subscribe("activity");
+          const events = eventBuffer.getAll();
+          ws.send(JSON.stringify({ type: "replay", events }));
+          ws.send(JSON.stringify({ type: "channel_status", connected: channelConnected }));
+        }
       },
       message(_ws, message) {
         try {
@@ -618,8 +631,7 @@ export function createServer(opts: ServerOptions) {
               timestamp: new Date().toISOString(),
               detail: data.content,
             };
-            const entry = eventBuffer.push(event);
-            server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+            publishEvent(event);
             if (opts.onChannelMessage) {
               opts.onChannelMessage(data.content, data.meta);
             }
@@ -629,7 +641,12 @@ export function createServer(opts: ServerOptions) {
         }
       },
       close(ws) {
-        ws.unsubscribe("activity");
+        const wsData = ws.data as { shareToken?: string } | undefined;
+        if (wsData?.shareToken) {
+          ws.unsubscribe(`share:${wsData.shareToken}`);
+        } else {
+          ws.unsubscribe("activity");
+        }
       },
     },
     async fetch(req) {
@@ -637,6 +654,23 @@ export function createServer(opts: ServerOptions) {
         // Fallback handler for static files and unmatched routes
         const url = new URL(req.url);
         const pathname = url.pathname;
+
+        // Scoped WebSocket for share links
+        const shareWsMatch = pathname.match(/^\/ws\/share\/([a-f0-9]+)\/activity$/);
+        if (shareWsMatch) {
+          const token = shareWsMatch[1];
+          const link = shareRegistry.get(token);
+          if (!link) {
+            logRequest(req, 403);
+            return new Response("Share link not found or expired", { status: 403 });
+          }
+          const upgraded = server.upgrade(req, {
+            data: { shareToken: token, entityPaths: link.entityPaths },
+          });
+          if (upgraded) return undefined as any;
+          logRequest(req, 400);
+          return new Response("WebSocket upgrade failed", { status: 400 });
+        }
 
         // Handle WebSocket upgrade
         if (pathname === "/ws/activity") {
@@ -822,6 +856,15 @@ export function createServer(opts: ServerOptions) {
   function publishEvent(event: AgentEvent): number {
     const entry = eventBuffer.push(event);
     server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+    // Forward to scoped share topics
+    for (const [token, link] of shareRegistry.entries()) {
+      const entitySlugs = new Set(
+        link.entityPaths.map((p) => p.replace(/\.md$/, "").split("/").pop()!)
+      );
+      if (entitySlugs.has(event.entity)) {
+        server.publish(`share:${token}`, JSON.stringify({ type: "event", data: entry }));
+      }
+    }
     return entry.seq;
   }
 
