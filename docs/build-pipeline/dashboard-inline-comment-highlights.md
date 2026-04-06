@@ -1,11 +1,11 @@
 ---
 id: 013
 title: Dashboard Inline Comment Highlights — Notion-like Comment Threading & Visual Markers
-status: execute
+status: shipped
 source: UI testing feedback
 started: 2026-04-06T13:10:00Z
-completed:
-verdict:
+completed: 2026-04-06T17:30:00Z
+verdict: PASSED
 score: 0.85
 worktree: .worktrees/spacedock-ensign-dashboard-inline-comment-highlights
 issue:
@@ -263,3 +263,63 @@ Self-review of PR #9 complete. All 6 changed files reviewed for code quality, bu
 ### Feedback Cycles
 
 **Cycle 1** (pr-review → execute): Captain tested on port 8422 — highlights not visible on page load. Root cause: `applyCommentHighlights()` is defined inside `initGateReview()` IIFE and only wired into the overridden `window.loadEntity` (line 1034). But the **original** `loadEntity()` at line 215 (called on initial page load at line 240) does NOT call `applyCommentHighlights()`. Highlights only appear on subsequent re-renders (e.g., after accepting a suggestion), never on first load. Fix: add comment fetch + highlight call to the original `loadEntity()` at line 215-228.
+
+## Stage Report: execute (Feedback Cycle 1)
+
+### Summary
+Fixed highlights not appearing on initial page load. The `initGateReview()` IIFE overrides `window.loadEntity` with a version that applies highlights, but the original `loadEntity()` at line 215 runs on page load (line 240) before the IIFE executes. Added a retroactive highlight application at the end of the IIFE that fetches comments and calls `applyCommentHighlights()` for the already-rendered page. share.js confirmed unaffected (its `showEntityDetail()` already applies highlights inline). 57/57 tests pass.
+
+### Checklist
+
+1. **DONE** — Fix highlights not appearing on initial page load in detail.js
+   - Added comment fetch + `applyCommentHighlights(cachedComments)` call at end of `initGateReview()` IIFE (before closing `})();`)
+   - This retroactively applies highlights for the page already rendered by the original `loadEntity()`
+   - Commit: `b42cf01 fix(highlight): apply comment highlights on initial page load`
+
+2. **DONE** — Verify share.js doesn't have the same issue
+   - share.js `showEntityDetail()` (line 106) already fetches comments and applies highlights at lines 124-129, right after body render
+   - share.js has no separate initial load path — `showEntityDetail()` is only called on user click (line 98-100), by which time `applyCommentHighlights` is already defined
+   - No fix needed
+
+3. **DONE** — Run tests (`cd tools/dashboard && bun test`) — no regressions
+   - 57 pass, 0 fail, 136 expect() calls across 6 test files
+
+4. **DONE** — Commit with `fix(highlight): apply comment highlights on initial page load`
+   - Committed as `b42cf01`
+
+5. **DONE** — Push to remote
+   - Pushed to `origin/spacedock-ensign/dashboard-inline-comment-highlights`
+
+## Stage Report: execute (Feedback Cycle 1 continued — 3 UX improvements)
+
+### Summary
+Three UX polish improvements from captain testing: (1) sidebar comment click now scrolls to the matching highlight, plays a flash animation, and opens the popover; (2) highlight color changed from blue to Notion-style goose-egg yellow; (3) share page auto-refreshes highlights after comment or reply submit. 57/57 tests pass. 3 commits pushed.
+
+### Checklist
+
+1. **DONE** — Fix 1: Sidebar comment click → scroll to highlight + flash + show popover
+   - Added click handler on each sidebar comment card in `renderComments()` (detail.js)
+   - Handler finds `<mark>` with matching `data-comment-ids`, scrolls into view, adds flash animation class, then triggers synthetic click to open popover via existing IIFE click listener
+   - Commit: `23f8924 feat(highlight): sidebar comment click scrolls to highlight with flash + popover`
+
+2. **DONE** — Fix 2: Change highlight color to Notion-style yellow (goose-egg yellow) in detail.css
+   - Changed `.comment-highlight` background from `rgba(88,166,255,0.15)` to `rgba(255,212,0,0.25)`
+   - Hover: `rgba(255,212,0,0.45)`, resolved: `rgba(255,212,0,0.1)`
+   - Added `@keyframes highlight-flash` animation (0.6s pulse to 65% opacity yellow)
+   - Commit: `b7f1868 style(highlight): change comment highlight color to Notion-style yellow`
+
+3. **DONE** — Fix 3: Share page auto-refresh highlights after comment/reply submit
+   - After comment submit handler (share.js `submitBtn.onclick`), added re-fetch + `applyCommentHighlights()` call
+   - After reply submit handler (share.js `submitReply()`), added same re-fetch + re-apply pattern
+   - WebSocket handler already had this — confirmed no change needed there
+   - Commit: `7c3ab7f fix(share): auto-refresh highlights after comment and reply submit`
+
+4. **DONE** — Run tests (`cd tools/dashboard && bun test`) — no regressions
+   - 57 pass, 0 fail, 136 expect() calls across 6 test files
+   - 1 transient auth.test.ts failure on first run (pre-existing timing flakiness), passed on retry
+
+5. **DONE** — Commit each fix separately with descriptive messages
+   - 3 commits: `23f8924`, `b7f1868`, `7c3ab7f`
+
+6. **DONE** — Push to remote
+   - Pushed `b42cf01..7c3ab7f` to `origin/spacedock-ensign/dashboard-inline-comment-highlights`
