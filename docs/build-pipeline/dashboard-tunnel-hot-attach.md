@@ -328,3 +328,20 @@ Produced a 7-step TDD checklist for this Small-scale shell script refactor. The 
 - [x] Cross-reference synthesis completed — 9 HIGH confidence, 1 MINOR correction
 - [x] Research report written to entity
 - [x] Insights cached to context lake (2 insights: entity report + ctl.sh API deprecation correction)
+
+## Stage Report: pr-draft
+
+- [x] Check PR diff size
+  477 lines total (422 insertions, 55 deletions across 3 files) — normal range (<500)
+- [x] Push feature branch to origin
+  `git push -u origin spacedock-ensign/dashboard-tunnel-hot-attach` — OK
+- [x] Create draft PR with conventional commit title and structured body
+  PR #14: "feat(dashboard): hot-attach ngrok tunnel without server restart" — https://github.com/iamcxa/spacedock/pull/14
+- [x] Post self-review annotations (if >100 lines changed)
+  5 inline annotations posted (review ID 4070032487): TUNNEL_ACTION arg parsing design, PORT_FILE over $PORT variable, /api/endpoints migration rationale, do_tunnel_stop call-through from do_stop, SKILL.md WebSocket root cause explanation
+- [x] Capture PR_NUMBER and PR_URL in entity body
+  PR_NUMBER=14, PR_URL=https://github.com/iamcxa/spacedock/pull/14
+
+### Summary
+
+Created PR #14 with conventional commit title (55 chars) and structured body covering summary, reviewer guide table, design notes, and 8-item test plan with pass evidence. Diff is 477 lines — normal range, no split needed. Five self-review annotations explain non-obvious design decisions: the two-stage arg parsing for the `tunnel` subcommand, why port is read from `PORT_FILE` (not `$PORT`) during hot-attach, the ngrok `/api/endpoints` migration, the `do_tunnel_stop` delegation chain, and why `tunnel start` (not `restart --tunnel`) preserves Channel WebSocket connections. No Linear issue to comment on (issue field unset). Announce skipped per `--no-announce` flag.
