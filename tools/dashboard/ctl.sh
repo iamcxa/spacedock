@@ -1,6 +1,6 @@
 #!/bin/bash
 # ABOUTME: Daemon lifecycle manager for the Spacedock workflow dashboard.
-# ABOUTME: Subcommands: start, stop, status, logs, restart.
+# ABOUTME: Subcommands: start, stop, status, logs, restart, tunnel.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -8,6 +8,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # --- argument parsing ---
 
 CMD=""
+TUNNEL_ACTION=""
 PORT=""
 ROOT=""
 STATUS_ALL=false
@@ -16,7 +17,7 @@ CHANNEL_MODE=false
 TUNNEL_MODE=false
 
 usage() {
-    echo "Usage: $(basename "$0") <start|stop|status|logs|restart> [options]"
+    echo "Usage: $(basename "$0") <start|stop|status|logs|restart|tunnel> [options]"
     echo ""
     echo "Options:"
     echo "  --port PORT    Port to serve on (default: 8420, auto-selects 8420-8429)"
@@ -26,16 +27,27 @@ usage() {
     echo "  --all          (status) Show all dashboard instances"
     echo "  --follow       (logs) Tail the log file"
     echo ""
+    echo "Tunnel subcommand:"
+    echo "  tunnel start   Start ngrok tunnel for an already-running dashboard"
+    echo "  tunnel stop    Stop ngrok tunnel (dashboard keeps running)"
+    echo "  tunnel status  Show tunnel state and URL"
+    echo ""
     echo "Examples:"
     echo "  $(basename "$0") start"
     echo "  $(basename "$0") status --all"
     echo "  $(basename "$0") stop --root /path/to/project"
+    echo "  $(basename "$0") tunnel start --root /path/to/project"
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        start|stop|status|logs|restart)
-            CMD="$1"; shift ;;
+        start|stop|status|logs|restart|tunnel)
+            if [[ "$CMD" == "tunnel" && -z "$TUNNEL_ACTION" ]]; then
+                TUNNEL_ACTION="$1"; shift
+            else
+                CMD="$1"; shift
+            fi
+            ;;
         --port)
             PORT="$2"; shift 2 ;;
         --root)
@@ -122,6 +134,104 @@ format_uptime() {
     else
         echo "${seconds}s"
     fi
+}
+
+# --- tunnel lifecycle ---
+
+do_tunnel_start() {
+    # Require dashboard to be running
+    if ! is_running; then
+        echo "Error: dashboard is not running. Start it first with: ctl.sh start" >&2
+        return 1
+    fi
+
+    # Read port from state file (dashboard is already running)
+    local selected_port
+    selected_port="$(cat "$PORT_FILE" 2>/dev/null)"
+    if [[ -z "$selected_port" ]]; then
+        echo "Error: cannot read dashboard port from $PORT_FILE" >&2
+        return 1
+    fi
+
+    if ! command -v ngrok &>/dev/null; then
+        echo "Error: ngrok not found in PATH." >&2
+        return 1
+    fi
+
+    # Kill any existing ngrok for this port
+    if [[ -f "$TUNNEL_PID_FILE" ]]; then
+        local old_pid
+        old_pid="$(cat "$TUNNEL_PID_FILE")"
+        kill "$old_pid" 2>/dev/null || true
+        rm -f "$TUNNEL_PID_FILE" "$TUNNEL_URL_FILE"
+    fi
+
+    # Spawn ngrok
+    nohup ngrok http "$selected_port" \
+        --log=stdout \
+        > "$STATE_DIR/ngrok.log" 2>&1 &
+    local ngrok_pid=$!
+    echo "$ngrok_pid" > "$TUNNEL_PID_FILE"
+
+    # Poll ngrok API for tunnel URL (up to 10 seconds)
+    local tunnel_url=""
+    local t_attempts=0
+    local t_max=20
+    while [[ $t_attempts -lt $t_max ]]; do
+        tunnel_url="$(curl -s http://127.0.0.1:4040/api/endpoints 2>/dev/null \
+            | grep -o '"url":"https://[^"]*"' \
+            | head -1 \
+            | cut -d'"' -f4 || true)"
+        if [[ -n "$tunnel_url" ]]; then
+            break
+        fi
+        sleep 0.5
+        t_attempts=$((t_attempts + 1))
+    done
+
+    if [[ -n "$tunnel_url" ]]; then
+        echo "$tunnel_url" > "$TUNNEL_URL_FILE"
+        echo "Tunnel:    ${tunnel_url} (PID: ${ngrok_pid})"
+        echo "Note: ngrok free tier shows an interstitial page on first visit."
+        echo "      API calls should include 'ngrok-skip-browser-warning' header."
+    else
+        echo "Warning: ngrok started but tunnel URL not captured. Check $STATE_DIR/ngrok.log" >&2
+    fi
+}
+
+do_tunnel_status() {
+    if [[ ! -f "$TUNNEL_PID_FILE" ]]; then
+        echo "Tunnel is not running."
+        return 0
+    fi
+
+    local tunnel_pid
+    tunnel_pid="$(cat "$TUNNEL_PID_FILE")"
+
+    if ! kill -0 "$tunnel_pid" 2>/dev/null; then
+        rm -f "$TUNNEL_PID_FILE" "$TUNNEL_URL_FILE"
+        echo "Tunnel is not running (cleaned stale PID)."
+        return 0
+    fi
+
+    local tunnel_url="(unknown)"
+    if [[ -f "$TUNNEL_URL_FILE" ]]; then
+        tunnel_url="$(cat "$TUNNEL_URL_FILE")"
+    fi
+    echo "Tunnel:  ${tunnel_url} (PID: ${tunnel_pid})"
+}
+
+do_tunnel_stop() {
+    if [[ ! -f "$TUNNEL_PID_FILE" ]]; then
+        echo "Tunnel is not running."
+        return 0
+    fi
+
+    local tunnel_pid
+    tunnel_pid="$(cat "$TUNNEL_PID_FILE")"
+    kill "$tunnel_pid" 2>/dev/null || true
+    rm -f "$TUNNEL_PID_FILE" "$TUNNEL_URL_FILE"
+    echo "Tunnel stopped."
 }
 
 # --- subcommands ---
@@ -211,50 +321,7 @@ do_start() {
 
     # --- Tunnel mode ---
     if [[ "$TUNNEL_MODE" == "true" ]]; then
-        if ! command -v ngrok &>/dev/null; then
-            echo "Warning: ngrok not found in PATH. Skipping tunnel." >&2
-            return 0
-        fi
-
-        # Kill any existing ngrok for this port
-        if [[ -f "$TUNNEL_PID_FILE" ]]; then
-            local old_pid
-            old_pid="$(cat "$TUNNEL_PID_FILE")"
-            kill "$old_pid" 2>/dev/null || true
-            rm -f "$TUNNEL_PID_FILE" "$TUNNEL_URL_FILE"
-        fi
-
-        # Spawn ngrok
-        nohup ngrok http "$selected_port" \
-            --log=stdout \
-            > "$STATE_DIR/ngrok.log" 2>&1 &
-        local ngrok_pid=$!
-        echo "$ngrok_pid" > "$TUNNEL_PID_FILE"
-
-        # Poll ngrok API for tunnel URL (up to 10 seconds)
-        local tunnel_url=""
-        local t_attempts=0
-        local t_max=20
-        while [[ $t_attempts -lt $t_max ]]; do
-            tunnel_url="$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null \
-                | grep -o '"public_url":"[^"]*"' \
-                | head -1 \
-                | cut -d'"' -f4 || true)"
-            if [[ -n "$tunnel_url" ]]; then
-                break
-            fi
-            sleep 0.5
-            t_attempts=$((t_attempts + 1))
-        done
-
-        if [[ -n "$tunnel_url" ]]; then
-            echo "$tunnel_url" > "$TUNNEL_URL_FILE"
-            echo "Tunnel:    ${tunnel_url} (PID: ${ngrok_pid})"
-            echo "Note: ngrok free tier shows an interstitial page on first visit."
-            echo "      API calls should include 'ngrok-skip-browser-warning' header."
-        else
-            echo "Warning: ngrok started but tunnel URL not captured. Check $STATE_DIR/ngrok.log" >&2
-        fi
+        do_tunnel_start
     fi
 }
 
@@ -276,11 +343,7 @@ do_stop() {
 
     # Stop tunnel if running
     if [[ -f "$TUNNEL_PID_FILE" ]]; then
-        local tunnel_pid
-        tunnel_pid="$(cat "$TUNNEL_PID_FILE")"
-        kill "$tunnel_pid" 2>/dev/null || true
-        rm -f "$TUNNEL_PID_FILE" "$TUNNEL_URL_FILE"
-        echo "Tunnel stopped."
+        do_tunnel_stop
     fi
 
     # SIGTERM
@@ -416,6 +479,17 @@ case "$CMD" in
     status)  do_status ;;
     logs)    do_logs ;;
     restart) do_restart ;;
+    tunnel)
+        case "$TUNNEL_ACTION" in
+            start)  do_tunnel_start ;;
+            stop)   do_tunnel_stop ;;
+            status) do_tunnel_status ;;
+            *)
+                echo "Usage: $(basename "$0") tunnel <start|stop|status> [options]" >&2
+                exit 1
+                ;;
+        esac
+        ;;
     *)
         echo "Unknown command: $CMD" >&2
         usage >&2

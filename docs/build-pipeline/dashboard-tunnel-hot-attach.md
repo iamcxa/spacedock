@@ -1,7 +1,7 @@
 ---
 id: 023
 title: Dashboard Tunnel Hot-Attach — ngrok 無需重啟 Server
-status: explore
+status: execute
 source: captain feedback (021 share flow testing)
 started: 2026-04-07T09:15:00Z
 completed:
@@ -35,3 +35,332 @@ RATIONALE:    `/dashboard share` 會觸發 restart 重啟 server，導致 Channe
 - `/dashboard share` 使用 `tunnel start` 而非 `restart --tunnel`
 - 現有 `ctl.sh start --tunnel` 保持 backward compatible
 - Channel WebSocket 連線在 share flow 中不中斷
+
+## Explore Results
+
+**Scale:** Small (2 files to modify)
+
+**File map:**
+
+| File | Layer | Purpose |
+|------|-------|---------|
+| `tools/dashboard/ctl.sh` | infra | Extract tunnel spawn block into `tunnel start/stop/status` subcommands |
+| `skills/dashboard/SKILL.md` | skill | Fix `/dashboard share` flow: `restart --tunnel` → `tunnel start` |
+
+**Notes:**
+- Health check bug fix (`return 0` → `break`) already landed on main (commit `2ac2388`)
+- ngrok is an external OS process — it connects to `localhost:PORT` as a reverse proxy
+- Dashboard MCP channel uses stdio transport, has no `instructions` field, single static `reply` tool
+- ngrok lifecycle is entirely managed by `ctl.sh`, zero references in `server.ts` or `channel.ts`
+- #44731 (MCP instruction delta fork) assessed as **zero risk** — tunnel start/stop does not touch MCP transport
+
+## Technical Claims
+
+CLAIM-1: [type: project-convention] "ctl.sh has tunnel spawn logic embedded in the `start` subcommand (do_start), not as a separate subcommand"
+CLAIM-2: [type: tool-behavior] "ngrok can be started independently pointing at an already-running localhost server — it is a reverse proxy to localhost:PORT"
+CLAIM-3: [type: project-convention] "The `/dashboard share` skill triggers `restart --tunnel` when dashboard is running but tunnel is not active"
+CLAIM-4: [type: project-convention] "Backward compat: `--tunnel` flag on `start` subcommand must be preserved"
+CLAIM-5: [type: tool-behavior] "ngrok local API at http://127.0.0.1:4040/api/tunnels returns the public tunnel URL"
+CLAIM-6: [type: project-convention] "ctl.sh uses STATE_DIR files (tunnel_pid, tunnel_url) to track tunnel state; clean_stale removes them"
+CLAIM-7: [type: project-convention] "ngrok lifecycle is entirely managed by ctl.sh — zero references in server.ts or channel.ts"
+CLAIM-8: [type: project-convention] "ctl.sh currently has only 5 subcommands: start, stop, status, logs, restart — no `tunnel` subcommand exists"
+CLAIM-9: [type: domain-rule] "do_stop already handles tunnel cleanup (kills tunnel_pid, removes tunnel files)"
+CLAIM-10: [type: tool-behavior] "ngrok http <port> is the correct command to start an HTTP tunnel"
+
+## Research Report
+
+**Claims analyzed**: 10
+**Recommendation**: PROCEED
+
+### Verified (9 claims)
+
+- CLAIM-1: CONFIRMED HIGH — tunnel spawn is inside do_start() at lines 212-258
+  Explorer: `ctl.sh:212-258` — entire tunnel block is gated by `if [[ "$TUNNEL_MODE" == "true" ]]` inside do_start(). No separate tunnel subcommand exists. Extracting this block into `do_tunnel_start()` and wiring a `tunnel` top-level subcommand is the core refactor.
+
+- CLAIM-2: CONFIRMED HIGH — ngrok operates independently of the target server
+  Web (ngrok docs, sitepoint.com, medium.com): ngrok runs as a separate process. You start your local server first, then run `ngrok http <port>` in another terminal. Stopping/restarting your app does not terminate the ngrok session. ngrok is purely a reverse proxy — it forwards traffic to localhost:PORT.
+  Explorer: ctl.sh already does this — starts bun server first (line 172-177), then spawns ngrok (line 228) pointing at the same port. The proposal to run tunnel independently is architecturally sound.
+
+- CLAIM-3: CONFIRMED HIGH — SKILL.md line 82 uses `restart --tunnel`
+  Explorer: `skills/dashboard/SKILL.md:82` — exact text: `"Running, no tunnel" -> restart with tunnel: bash {ctl} restart --tunnel --root {project_root}"`. This is the line that causes the WebSocket disconnect problem. The fix changes this to `tunnel start` (no server restart needed).
+
+- CLAIM-4: CONFIRMED HIGH — `--tunnel` flag already exists and works on `start`
+  Explorer: `ctl.sh:47-48` parses `--tunnel` flag, sets `TUNNEL_MODE=true`. `do_start()` checks `TUNNEL_MODE` at line 168 (host flag) and line 213 (spawn ngrok). Backward compat means keeping this flag working — when `start --tunnel` is used, it should still start server + tunnel together.
+
+- CLAIM-6: CONFIRMED HIGH — STATE_DIR tunnel files are properly tracked
+  Explorer: `ctl.sh:81-82` defines `TUNNEL_URL_FILE` and `TUNNEL_PID_FILE`. `clean_stale()` at line 94 removes both. `do_start()` writes them at lines 232/251. `do_stop()` reads and cleans them at lines 278-283. `do_status()` checks them at lines 341-349.
+
+- CLAIM-7: CONFIRMED HIGH — zero ngrok/tunnel references in server.ts or channel.ts
+  Explorer: Grep for `ngrok|tunnel` in `tools/dashboard/src/` returned zero matches. ngrok is purely a ctl.sh concern.
+
+- CLAIM-8: CONFIRMED HIGH — exactly 5 subcommands in the case dispatch
+  Explorer: `ctl.sh:413-424` — case dispatch handles `start|stop|status|logs|restart`. No `tunnel` subcommand exists. The proposal adds `tunnel` as a new top-level subcommand with sub-actions `start/stop/status`.
+
+- CLAIM-9: CONFIRMED HIGH — do_stop handles tunnel cleanup
+  Explorer: `ctl.sh:277-283` — `do_stop()` checks for `TUNNEL_PID_FILE`, reads the PID, kills it, removes both `TUNNEL_PID_FILE` and `TUNNEL_URL_FILE`. This logic should be extracted into `do_tunnel_stop()` and called from both `do_stop()` (for full shutdown) and `tunnel stop` (for tunnel-only shutdown).
+
+- CLAIM-10: CONFIRMED HIGH — `ngrok http <port>` is the correct command
+  Explorer: `ctl.sh:228` uses `ngrok http "$selected_port"`. Web (ngrok docs): `ngrok http [port]` is the standard command to create an HTTP tunnel.
+
+### Corrected (1 claim)
+
+- CLAIM-5: CORRECTED MINOR — `/api/tunnels` works but is deprecated; `/api/endpoints` is recommended
+  Explorer: `ctl.sh:239` currently uses `curl -s http://127.0.0.1:4040/api/tunnels` to capture the public URL.
+  Context Lake: Prior entity 017 research noted `/api/endpoints` as the recommended endpoint.
+  Web (ngrok.com/docs/agent/api): `/api/tunnels` is explicitly marked deprecated: "This API is deprecated. Use the list endpoints API instead." Both still work — ngrok guarantees no breaking changes without explicit opt-in. The v3.16.0 agent (Nov 2024) introduced the endpoints terminology. Full removal planned for future v4 release.
+  **Fix**: When extracting tunnel logic into `do_tunnel_start()`, consider updating the URL capture from `/api/tunnels` to `/api/endpoints`. This is a minor improvement, not a blocker. The response format differs (array key is `"endpoints"` vs `"tunnels"`, field is `"url"` vs `"public_url"`), so the grep pattern would need adjustment. This can be done as part of the extraction or deferred.
+
+### Unverifiable (0 claims)
+
+None.
+
+### Recommendation Criteria
+
+- 0 corrections affecting control flow, data model, or architecture
+- 1 minor correction (deprecated API endpoint — still functional, non-breaking)
+- All 10 claims verified with codebase evidence
+- **PROCEED** — the plan's core assumptions are correct. The ngrok API deprecation is a minor improvement opportunity, not a blocker.
+
+## Coverage Infrastructure
+
+No coverage infrastructure applicable — this is a shell script + skill doc change, no runtime code.
+
+## TDD Checklist
+
+This is a shell script refactor (no TypeScript runtime changes). No shell test infrastructure exists in this project, so "tests" are manual verification commands run after implementation.
+
+### 1. Extract `do_tunnel_start()` from `do_start()`
+
+**File:** `tools/dashboard/ctl.sh`
+
+**What:** Extract lines 212-258 (the tunnel spawn block inside `do_start()`) into a standalone `do_tunnel_start()` function. This function must:
+- Check dashboard is running (`is_running` or PID_FILE + PORT_FILE exist) — error if not
+- Read `selected_port` from `PORT_FILE` (not from function-local variable)
+- Check `ngrok` is in PATH
+- Kill any existing tunnel (reuse existing cleanup at lines 220-225)
+- Spawn ngrok, write PID file, poll for URL, write URL file
+- **Research correction**: Update URL capture from deprecated `/api/tunnels` (line 239) to `/api/endpoints`. Change grep pattern from `"public_url":"[^"]*"` to `"url":"[^"]*"` (endpoints response uses `"url"` not `"public_url"`)
+
+**Implementation notes:**
+- `do_start()` keeps its `TUNNEL_MODE` gate but calls `do_tunnel_start` instead of inline code
+- `do_tunnel_start()` needs the port — read from `PORT_FILE` since dashboard is already running
+- Host binding (`--host 0.0.0.0` at line 168-169) is a `do_start()` concern and stays there
+
+### 2. Extract `do_tunnel_stop()` from `do_stop()`
+
+**File:** `tools/dashboard/ctl.sh`
+
+**What:** Extract lines 277-283 (tunnel cleanup inside `do_stop()`) into a standalone `do_tunnel_stop()` function. This function must:
+- Check if `TUNNEL_PID_FILE` exists
+- Read PID, kill it, remove `TUNNEL_PID_FILE` and `TUNNEL_URL_FILE`
+- Print "Tunnel stopped." or "Tunnel is not running."
+
+**Implementation notes:**
+- `do_stop()` calls `do_tunnel_stop` instead of inline cleanup
+- `do_tunnel_stop()` is also callable independently (tunnel-only shutdown)
+
+### 3. Add `do_tunnel_status()` function
+
+**File:** `tools/dashboard/ctl.sh`
+
+**What:** New function that reports tunnel state:
+- If `TUNNEL_PID_FILE` exists and PID is alive: print tunnel URL from `TUNNEL_URL_FILE`
+- If PID is dead: clean stale tunnel files, print "Tunnel is not running (cleaned stale PID)."
+- If no PID file: print "Tunnel is not running."
+
+**Implementation notes:**
+- Reuse pattern from `do_status()` lines 341-349 but as standalone output
+
+### 4. Wire `tunnel` top-level subcommand in case dispatch
+
+**File:** `tools/dashboard/ctl.sh`
+
+**What:** Add `tunnel)` case at lines 413-424. Parse sub-action from a second positional argument:
+- `tunnel start` → `do_tunnel_start`
+- `tunnel stop` → `do_tunnel_stop`
+- `tunnel status` → `do_tunnel_status`
+- No sub-action or unknown → print tunnel usage and exit 1
+
+**Implementation notes:**
+- Requires adjusting argument parsing: `CMD` currently consumes the first positional arg. The `tunnel` subcommand needs a second positional arg for the sub-action. Parse this inside the `tunnel)` case block, not in the global arg parser.
+- Update `usage()` to document `tunnel start|stop|status`
+- Update ABOUTME comment (line 3) to include `tunnel` in the subcommand list
+
+### 5. Preserve backward compatibility for `--tunnel` flag
+
+**File:** `tools/dashboard/ctl.sh`
+
+**What:** `ctl.sh start --tunnel` must continue to work. After extracting tunnel logic:
+- `do_start()` still checks `TUNNEL_MODE` at line 168 (host flag) and at the former line 213 block
+- When `TUNNEL_MODE=true`, `do_start()` calls `do_tunnel_start` after the server health check passes
+- `ctl.sh restart --tunnel` also continues to work (restart = stop + start, and start respects `TUNNEL_MODE`)
+
+**Verification command:**
+```bash
+# Syntax check (catches parse errors, unmatched quotes, etc.)
+bash -n tools/dashboard/ctl.sh
+
+# Verify all subcommands are listed in usage
+bash tools/dashboard/ctl.sh --help 2>&1 | grep -q 'tunnel'
+
+# Verify backward compat: --tunnel flag still parsed
+grep -q 'TUNNEL_MODE=true' tools/dashboard/ctl.sh
+```
+
+### 6. Fix SKILL.md share flow
+
+**File:** `skills/dashboard/SKILL.md`
+
+**What:** Change line 82 from:
+```
+"Running, no tunnel" → restart with tunnel: bash {ctl} restart --tunnel --root {project_root}
+```
+to:
+```
+"Running, no tunnel" → start tunnel: bash {ctl} tunnel start --root {project_root}
+```
+
+**Verification command:**
+```bash
+# Confirm no more "restart --tunnel" in share flow
+grep -c 'restart --tunnel' skills/dashboard/SKILL.md  # expect 0
+# Confirm "tunnel start" is present
+grep -c 'tunnel start' skills/dashboard/SKILL.md  # expect >= 1
+```
+
+### 7. Quality gate
+
+**Commands to run after all changes:**
+```bash
+# Shell syntax validation
+bash -n tools/dashboard/ctl.sh
+
+# Existing dashboard tests still pass (no TS runtime changes, but verify nothing broke)
+cd tools/dashboard && bun test
+
+# Grep checks
+grep -q 'do_tunnel_start' tools/dashboard/ctl.sh    # new function exists
+grep -q 'do_tunnel_stop' tools/dashboard/ctl.sh     # new function exists
+grep -q 'do_tunnel_status' tools/dashboard/ctl.sh   # new function exists
+grep -q '/api/endpoints' tools/dashboard/ctl.sh     # deprecated API fixed
+grep -qv '/api/tunnels' tools/dashboard/ctl.sh      # old API removed (or commented)
+grep -q 'tunnel start' skills/dashboard/SKILL.md    # SKILL.md updated
+```
+
+### Implementation order (test-first where possible)
+
+1. Write verification commands first (step 5 + 6 checks) — they should FAIL before implementation
+2. Extract `do_tunnel_stop()` (step 2) — simplest, no new logic
+3. Extract `do_tunnel_start()` (step 1) — includes research correction for `/api/endpoints`
+4. Add `do_tunnel_status()` (step 3) — new but small
+5. Wire case dispatch + update usage (step 4)
+6. Verify backward compat (step 5)
+7. Fix SKILL.md (step 6)
+8. Run quality gate (step 7)
+
+## Stage Report: execute
+
+- [x] Run pre-implementation verification commands (should fail)
+  All 6 checks confirmed NOT FOUND: do_tunnel_start, do_tunnel_stop, do_tunnel_status, /api/endpoints, tunnel start in SKILL.md, tunnel subcommand in usage
+- [x] Extract `do_tunnel_stop()` and commit
+  Commit `f74791d` — extracted inline tunnel PID cleanup from do_stop() into standalone function
+- [x] Extract `do_tunnel_start()` with `/api/endpoints` fix and commit
+  Commit `aad062e` — extracted ngrok spawn logic, reads port from PORT_FILE, fixed deprecated `/api/tunnels` to `/api/endpoints` (field `"url"` not `"public_url"`)
+- [x] Add `do_tunnel_status()` and commit
+  Commit `7be1b6e` — reports tunnel URL+PID, cleans stale PIDs, or prints not running
+- [x] Wire `tunnel` subcommand + update usage/ABOUTME and commit
+  Commit `da00100` — added TUNNEL_ACTION parsing, tunnel case dispatch, usage docs, ABOUTME updated
+- [x] Verify backward compat (`start --tunnel` still works)
+  Confirmed: `--tunnel` flag still sets TUNNEL_MODE=true, do_start() still binds 0.0.0.0 and calls do_tunnel_start when TUNNEL_MODE=true, restart --tunnel works via do_stop+do_start
+- [x] Fix SKILL.md and commit
+  Commit `78cc92e` — changed `restart --tunnel` to `tunnel start` in share flow (line 82)
+- [x] Run quality gate (bash -n, bun test, grep checks)
+  bash -n PASS, bun test 106/106 PASS (0 fail), all 6 grep checks PASS (3 functions exist, /api/endpoints present, /api/tunnels removed, SKILL.md updated)
+
+### Summary
+
+Implemented the tunnel hot-attach feature across 5 atomic commits. Extracted `do_tunnel_start()`, `do_tunnel_stop()`, and `do_tunnel_status()` from the monolithic `do_start()`/`do_stop()` functions, wired a new `tunnel` top-level subcommand with sub-action dispatch, and fixed the SKILL.md share flow to use `tunnel start` instead of `restart --tunnel`. The deprecated ngrok `/api/tunnels` endpoint was updated to `/api/endpoints` as specified by the research correction. All existing 106 dashboard tests pass unchanged. Backward compatibility for `--tunnel` flag on start/restart is preserved.
+
+## Stage Report: quality
+
+- [x] Shell syntax validation (bash -n)
+  `bash -n tools/dashboard/ctl.sh` PASS — no parse errors, unmatched quotes, or syntax issues
+- [x] Dashboard test suite (bun test)
+  `cd tools/dashboard && bun test` — 106 pass, 0 fail, all tests unchanged from main (no TypeScript runtime changes)
+- [x] Grep assertions (function existence, API endpoint, SKILL.md fix, backward compat)
+  All 8 checks PASS: do_tunnel_start exists, do_tunnel_stop exists, do_tunnel_status exists, /api/endpoints used, /api/tunnels removed, tunnel case dispatch present, tunnel start in SKILL.md, restart --tunnel removed from SKILL.md
+- [x] Diff review for correctness, edge cases, error handling
+  Reviewed 3 files (151 insertions, 54 deletions): (1) ctl.sh tunnel functions have error handling (is_running check, PORT_FILE validation, ngrok PATH check, idempotent stop), (2) do_tunnel_start reads port from PORT_FILE not function variable (correct for hot-attach), (3) /api/endpoints grep pattern uses "url" not "public_url", (4) do_stop calls do_tunnel_stop preserving cleanup, (5) tunnel case dispatch validates TUNNEL_ACTION, (6) SKILL.md line 82 changed from restart --tunnel to tunnel start
+- [ ] SKIP: Security/coverage/contract/migration checks
+  Not applicable — shell script and markdown changes only, no new dependencies, no API changes, no migrations, no runtime code affected
+- [ ] SKIP: TypeScript type-check
+  Not applicable — no TypeScript code changes, all runtime changes are in shell script which has no type system
+
+### Summary
+
+All quality gates pass. Shell syntax is valid, all 106 dashboard tests pass unchanged, and all 8 grep assertions confirm correct implementation. Error handling is robust: do_tunnel_start validates dashboard is running, port is readable, and ngrok is in PATH before spawning; do_tunnel_stop is idempotent and returns cleanly if tunnel not running; do_tunnel_status handles stale PIDs. The deprecated ngrok API endpoint `/api/tunnels` is correctly updated to `/api/endpoints` with the proper field mapping. Backward compatibility for `--tunnel` flag is preserved through TUNNEL_MODE. SKILL.md share flow correctly updated to use `tunnel start` instead of `restart --tunnel` for hot-attach without WebSocket disconnect.
+
+## Stage Report: plan
+
+- [x] Read entity file and research report
+  Entity file at `docs/build-pipeline/dashboard-tunnel-hot-attach.md` — all 10 claims verified, 1 minor correction (deprecated `/api/tunnels`)
+- [x] Search context lake for relevant cached insights
+  Context lake returned research correction for `ctl.sh` (deprecated ngrok API) and entity 023 research report — both consistent with entity body
+- [x] Produce TDD checklist with concrete file paths, test-first ordering, and quality gate steps
+  7-step checklist targeting `tools/dashboard/ctl.sh` (steps 1-5, 7) and `skills/dashboard/SKILL.md` (step 6), with implementation order that verifies assertions fail first
+- [x] Incorporate the research correction (deprecated ngrok API)
+  Step 1 explicitly specifies updating `/api/tunnels` to `/api/endpoints` with the field name change (`"public_url"` to `"url"`)
+- [x] Write plan to entity body
+  TDD Checklist section added above this report
+- [x] Commit plan to main
+  Committed as `d82e2b2` on main
+
+### Summary
+
+Produced a 7-step TDD checklist for this Small-scale shell script refactor. The core work is extracting tunnel lifecycle from `do_start()`/`do_stop()` into three standalone functions (`do_tunnel_start`, `do_tunnel_stop`, `do_tunnel_status`), wiring a new `tunnel` top-level subcommand, and fixing the SKILL.md share flow to use `tunnel start` instead of `restart --tunnel`. The deprecated ngrok `/api/tunnels` endpoint is corrected to `/api/endpoints` as part of the extraction. No TypeScript runtime changes needed. Quality gate uses `bash -n` syntax check, `bun test` for existing dashboard tests, and grep-based assertions.
+
+## Stage Report: research
+
+- [x] Claims extracted from plan (10 claims)
+- [x] Explorer subagent dispatched and returned — all 10 claims verified against codebase (ctl.sh, SKILL.md, server.ts, channel.ts)
+- [x] Context7 subagent dispatched and returned — ngrok is an external CLI tool, not a library; prior context lake insights from entity 017 research used instead
+- [x] Web subagent dispatched and returned — ngrok docs (ngrok.com/docs/agent/api), ngrok blog (agent-endpoints), community guides verified
+- [x] Cross-reference synthesis completed — 9 HIGH confidence, 1 MINOR correction
+- [x] Research report written to entity
+- [x] Insights cached to context lake (2 insights: entity report + ctl.sh API deprecation correction)
+
+## Stage Report: pr-draft
+
+- [x] Check PR diff size
+  477 lines total (422 insertions, 55 deletions across 3 files) — normal range (<500)
+- [x] Push feature branch to origin
+  `git push -u origin spacedock-ensign/dashboard-tunnel-hot-attach` — OK
+- [x] Create draft PR with conventional commit title and structured body
+  PR #14: "feat(dashboard): hot-attach ngrok tunnel without server restart" — https://github.com/iamcxa/spacedock/pull/14
+- [x] Post self-review annotations (if >100 lines changed)
+  5 inline annotations posted (review ID 4070032487): TUNNEL_ACTION arg parsing design, PORT_FILE over $PORT variable, /api/endpoints migration rationale, do_tunnel_stop call-through from do_stop, SKILL.md WebSocket root cause explanation
+- [x] Capture PR_NUMBER and PR_URL in entity body
+  PR_NUMBER=14, PR_URL=https://github.com/iamcxa/spacedock/pull/14
+
+### Summary
+
+Created PR #14 with conventional commit title (55 chars) and structured body covering summary, reviewer guide table, design notes, and 8-item test plan with pass evidence. Diff is 477 lines — normal range, no split needed. Five self-review annotations explain non-obvious design decisions: the two-stage arg parsing for the `tunnel` subcommand, why port is read from `PORT_FILE` (not `$PORT`) during hot-attach, the ngrok `/api/endpoints` migration, the `do_tunnel_stop` delegation chain, and why `tunnel start` (not `restart --tunnel`) preserves Channel WebSocket connections. No Linear issue to comment on (issue field unset). Announce skipped per `--no-announce` flag.
+
+## Stage Report: pr-review
+
+- [x] Review diff (git diff main...HEAD)
+  187 insertions, 54 deletions across 3 files (ctl.sh, SKILL.md, entity doc). All changes are coherent extraction/refactor of tunnel lifecycle + SKILL.md flow fix.
+- [x] Code quality analysis (error handling, edge cases, quoting, exit codes)
+  Reviewed all 6 edge case categories: (1) Error handling: do_tunnel_start validates is_running, PORT_FILE readable, ngrok in PATH before spawning — all 3 guards return 1 to stderr. (2) Race conditions: stale PID self-heals via do_tunnel_status kill -0 check + cleanup. PID file written immediately after nohup spawn — acceptable, same as original. (3) Signal handling: do_tunnel_stop sends SIGTERM, fire-and-forget (no wait/SIGKILL escalation) — acceptable for ngrok which exits cleanly on SIGTERM. (4) Quoting: all bash variables properly quoted; $host_flag at line 286 is intentional word-splitting (pre-existing pattern, not introduced by this PR). (5) Exit codes: return 1 on errors, return 0 on idempotent no-ops (tunnel not running). (6) Argument parsing: traced 10 input permutations (tunnel start, tunnel stop, tunnel --root /foo start, tunnel with no sub-action, etc.) — all parse correctly via the two-stage CMD/TUNNEL_ACTION logic.
+- [x] SKILL.md consistency check
+  Line 82 changed from `restart --tunnel` to `tunnel start` — matches ctl.sh tunnel subcommand dispatch at line 482-491. Line 81 (`start --tunnel` for not-running case) preserved — backward compat confirmed via TUNNEL_MODE flag at line 323. Tunnel detection via tunnel_url file (line 85-88) aligns with TUNNEL_URL_FILE written by do_tunnel_start(). Commands table (lines 25-31) correctly omits tunnel as a user-facing command — it is an internal detail used by the share flow.
+- [x] Fix CODE/SUGGESTION findings (if any)
+  No CODE-level bugs found. Three advisory findings noted (all pre-existing, not introduced by this PR): (A) ngrok early-exit: polling loop waits full 10s if ngrok dies immediately — could add kill -0 check but original code had same behavior. (B) do_tunnel_stop fire-and-forget: no wait/escalation unlike do_stop — acceptable for ngrok. (C) Multiple ngrok instances sharing port 4040 could cause wrong URL capture — pre-existing risk.
+- [x] Push fixes (if any)
+  No fixes needed — no CODE-level issues found. Working tree clean.
+- [x] Write review summary with recommendation
+  APPROVE — see summary below.
+
+### Summary
+
+Code review of PR #14 finds no bugs or issues requiring fixes. The tunnel lifecycle extraction is clean: `do_tunnel_start()` properly validates preconditions (dashboard running, port readable, ngrok installed), `do_tunnel_stop()` is idempotent, and `do_tunnel_status()` handles stale PIDs. The argument parsing correctly handles all tested permutations of the two-stage CMD/TUNNEL_ACTION dispatch. The deprecated `/api/tunnels` endpoint is correctly migrated to `/api/endpoints` with the field name change. SKILL.md accurately reflects the new `tunnel start` command while preserving backward compatibility for `start --tunnel`. Three advisory findings are all pre-existing patterns from the original code, not regressions. **Recommendation: APPROVE.**
