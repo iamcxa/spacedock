@@ -108,3 +108,12 @@ None.
 - [x] Cross-reference synthesis completed (6 CONFIRMED HIGH, 1 CORRECTED MEDIUM, 1 CORRECTED LOW)
 - [x] Research report written to entity
 - [x] Insights cached to context lake -- key findings documented in report for plan stage consumption
+
+## Stage Report: plan
+
+- [x] Read entity body fully (spec + research report + acceptance criteria) -- read all 111 lines, 8 claims analyzed, 2 corrections noted, 6 acceptance criteria extracted
+- [x] Create formal plan via `Skill: "superpowers:writing-plans"` incorporating research corrections -- 6 tasks, TDD-first ordering, complete code in every step
+- [x] Save plan to `docs/superpowers/specs/` directory -- saved to `docs/superpowers/specs/2026-04-07-dashboard-dependency-graph.md`
+- [x] Plan includes concrete file paths, test-first ordering, and quality gate steps -- 9 files mapped, Tasks 1-2 are test-first, quality gate at end runs full suite
+- [x] Plan references research-verified patterns (especially the 2 corrections about visualizer.js and DAG layout) -- Research Corrections section at top of plan; Task 4 creates NEW `buildDependencyLayout` instead of reusing `buildLayout()`; DAG layout is ~130 lines simplified Sugiyama (topological sort + median heuristic)
+- [x] Write ## Stage Report into entity file with all checklist items -- this section
