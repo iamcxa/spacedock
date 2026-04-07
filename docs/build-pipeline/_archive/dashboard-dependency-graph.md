@@ -1,15 +1,15 @@
 ---
 id: 020
 title: Dashboard Dependency Graph — Entity 相依性視覺化與 Blocked 偵測
-status: execute
+status: shipped
 source: captain direction (pipeline operation observation)
 started: 2026-04-07T10:45:00Z
-worktree: .worktrees/spacedock-ensign-dashboard-dependency-graph
-completed:
-verdict:
+completed: 2026-04-07T18:05:00Z
+worktree:
+verdict: PASSED
 score: 0.85
 issue:
-pr: "#11"
+pr: "iamcxa/spacedock#11"
 intent: feature
 scale: Medium
 project: spacedock
