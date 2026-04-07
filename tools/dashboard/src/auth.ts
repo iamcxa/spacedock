@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import type { ShareLink } from "./types";
 
 export interface CreateShareInput {
@@ -15,7 +16,25 @@ function generateToken(): string {
 }
 
 export class ShareRegistry {
-  private links: Map<string, ShareLink> = new Map();
+  private readonly db: Database;
+  private readonly insertStmt;
+  private readonly getStmt;
+  private readonly deleteStmt;
+  private readonly deleteExpiredStmt;
+  private readonly listStmt;
+  private readonly allStmt;
+
+  constructor(db: Database) {
+    this.db = db;
+    this.insertStmt = db.query(
+      "INSERT INTO share_links (token, password_hash, entity_paths, stages, label, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    );
+    this.getStmt = db.query("SELECT * FROM share_links WHERE token = ?");
+    this.deleteStmt = db.query("DELETE FROM share_links WHERE token = ?");
+    this.deleteExpiredStmt = db.query("DELETE FROM share_links WHERE expires_at < ?");
+    this.listStmt = db.query("SELECT * FROM share_links WHERE expires_at >= ?");
+    this.allStmt = db.query("SELECT * FROM share_links");
+  }
 
   async create(input: CreateShareInput): Promise<ShareLink> {
     const token = generateToken();
@@ -23,7 +42,17 @@ export class ShareRegistry {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + input.ttlHours * 60 * 60 * 1000);
 
-    const link: ShareLink = {
+    this.insertStmt.run(
+      token,
+      passwordHash,
+      JSON.stringify(input.entityPaths),
+      JSON.stringify(input.stages),
+      input.label,
+      now.toISOString(),
+      expiresAt.toISOString(),
+    );
+
+    return {
       token,
       passwordHash,
       entityPaths: input.entityPaths,
@@ -32,9 +61,6 @@ export class ShareRegistry {
       expiresAt: expiresAt.toISOString(),
       label: input.label,
     };
-
-    this.links.set(token, link);
-    return link;
   }
 
   async verify(token: string, password: string): Promise<boolean> {
@@ -44,30 +70,25 @@ export class ShareRegistry {
   }
 
   get(token: string): ShareLink | null {
-    const link = this.links.get(token);
-    if (!link) return null;
-    if (new Date(link.expiresAt).getTime() < Date.now()) {
-      this.links.delete(token);
+    const row = this.getStmt.get(token) as ShareLinkRow | null;
+    if (!row) return null;
+    if (new Date(row.expires_at).getTime() < Date.now()) {
+      this.deleteStmt.run(token);
       return null;
     }
-    return link;
+    return rowToShareLink(row);
   }
 
   list(): ShareLink[] {
-    const now = Date.now();
-    const result: ShareLink[] = [];
-    for (const [token, link] of this.links) {
-      if (new Date(link.expiresAt).getTime() < now) {
-        this.links.delete(token);
-      } else {
-        result.push(link);
-      }
-    }
-    return result;
+    // Clean up expired first, then return remaining
+    this.deleteExpiredStmt.run(new Date().toISOString());
+    const rows = this.listStmt.all(new Date().toISOString()) as ShareLinkRow[];
+    return rows.map(rowToShareLink);
   }
 
   delete(token: string): boolean {
-    return this.links.delete(token);
+    const result = this.deleteStmt.run(token);
+    return result.changes > 0;
   }
 
   isInScope(token: string, entityPath: string): boolean {
@@ -76,7 +97,30 @@ export class ShareRegistry {
     return link.entityPaths.includes(entityPath);
   }
 
-  entries(): IterableIterator<[string, ShareLink]> {
-    return this.links.entries();
+  entries(): Array<[string, ShareLink]> {
+    const rows = this.allStmt.all() as ShareLinkRow[];
+    return rows.map((row) => [row.token, rowToShareLink(row)] as [string, ShareLink]);
   }
+}
+
+interface ShareLinkRow {
+  token: string;
+  password_hash: string;
+  entity_paths: string;
+  stages: string;
+  label: string;
+  created_at: string;
+  expires_at: string;
+}
+
+function rowToShareLink(row: ShareLinkRow): ShareLink {
+  return {
+    token: row.token,
+    passwordHash: row.password_hash,
+    entityPaths: JSON.parse(row.entity_paths),
+    stages: JSON.parse(row.stages),
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    label: row.label,
+  };
 }

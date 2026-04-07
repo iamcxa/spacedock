@@ -39,7 +39,7 @@ describe("Dashboard Server", () => {
 
     // Import and start server
     const { createServer } = await import("../../tools/dashboard/src/server");
-    const srv = createServer({ port: 0, hostname: "127.0.0.1", projectRoot: tmpDir, staticDir });
+    const srv = createServer({ port: 0, hostname: "127.0.0.1", projectRoot: tmpDir, staticDir, dbPath: ":memory:" });
     baseUrl = `http://localhost:${srv.port}`;
     server = srv;
   });
@@ -466,7 +466,7 @@ describe("Event Pipeline Integration", () => {
     writeFileSync(join(staticDir, "index.html"), "<html></html>");
 
     const { createServer } = await import("../../tools/dashboard/src/server");
-    const srv = createServer({ port: 0, hostname: "127.0.0.1", projectRoot: tmpDir, staticDir });
+    const srv = createServer({ port: 0, hostname: "127.0.0.1", projectRoot: tmpDir, staticDir, dbPath: ":memory:" });
     baseUrl = `http://localhost:${srv.port}`;
     server = srv;
   });

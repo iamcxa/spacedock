@@ -14,6 +14,7 @@ import {
 } from "./comments";
 import { EventBuffer } from "./events";
 import { ShareRegistry } from "./auth";
+import { openDb } from "./db";
 import type { AgentEvent, AgentEventType, Stage } from "./types";
 import { telemetryInit, captureException, getPosthogJsConfig } from "./telemetry";
 import { updateWorkflowStages } from "./frontmatter-io";
@@ -24,6 +25,7 @@ interface ServerOptions {
   projectRoot: string;
   staticDir?: string;
   logFile?: string;
+  dbPath?: string;  // defaults to ~/.spacedock/dashboard.db
   onChannelMessage?: (content: string, meta?: Record<string, string>) => void;
 }
 
@@ -47,8 +49,9 @@ function jsonResponse(data: unknown, status = 200): Response {
 export function createServer(opts: ServerOptions) {
   const { projectRoot, logFile } = opts;
   const staticDir = opts.staticDir ?? join(dirname(import.meta.dir), "static");
-  const eventBuffer = new EventBuffer(500);
-  const shareRegistry = new ShareRegistry();
+  const db = openDb(opts.dbPath);
+  const eventBuffer = new EventBuffer(db, 500);
+  const shareRegistry = new ShareRegistry(db);
 
   telemetryInit();
 
@@ -1019,7 +1022,7 @@ export function createServer(opts: ServerOptions) {
     server.publish("activity", JSON.stringify({ type: "channel_status", connected }));
   }
 
-  return Object.assign(server, { eventBuffer, publishEvent, broadcastChannelStatus, shareRegistry });
+  return Object.assign(server, { db, eventBuffer, publishEvent, broadcastChannelStatus, shareRegistry });
 }
 
 // CLI entry point -- only runs when executed directly
