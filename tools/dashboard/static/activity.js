@@ -14,6 +14,103 @@
   var maxDelay = 30000;
   var channelConnected = false;
 
+  // ABOUTME: Browser-side mirror of src/activity-history.ts (canonical, unit-tested source).
+  // IIFE has no module loader, so the pure logic is duplicated inline here. Keep the two
+  // in sync; if behavior diverges, update both and add a corresponding test in activity-history.test.ts.
+  //
+  // Two intentional divergences from the canonical TypeScript source:
+  //   1. `persist` swallows non-quota errors (returns false) instead of re-throwing.
+  //      The TS source throws so unit tests can assert real failures, but on the
+  //      browser side an uncaught throw inside ws.onmessage would break the live
+  //      feed mid-replay. We accept silent degradation here — the UI keeps rendering
+  //      and the captain can refresh to recover.
+  //   2. `hydrate` and `clear` wrap `window.localStorage` access in try/catch to
+  //      tolerate browsers where storage is disabled (incognito mode, blocked
+  //      cookies). The TS source assumes a working Storage object via DI.
+  // Any other behavioral drift between this block and activity-history.ts is a bug.
+  var HISTORY_KEY = "spacedock.dashboard.activity.v1";
+  var HISTORY_CAPACITY = 500; // matches EventBuffer(db, 500) at src/server.ts
+  var HISTORY_EVICT_BATCH = 50;
+
+  function isQuotaExceeded(err) {
+    if (!err) return false;
+    if (err.name === "QuotaExceededError") return true;
+    return err.code === 22 || err.code === 1014;
+  }
+
+  var history = (function () {
+    function hydrate() {
+      var raw;
+      try {
+        raw = window.localStorage.getItem(HISTORY_KEY);
+      } catch (err) {
+        return [];
+      }
+      if (raw === null || raw === "") return [];
+      var parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (err) {
+        clear();
+        return [];
+      }
+      if (!Array.isArray(parsed)) return [];
+      return parsed;
+    }
+    function persist(entries) {
+      try {
+        window.localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
+        return true;
+      } catch (err) {
+        if (!isQuotaExceeded(err)) return false;
+        var evicted = entries.slice(HISTORY_EVICT_BATCH);
+        try {
+          window.localStorage.setItem(HISTORY_KEY, JSON.stringify(evicted));
+          return true;
+        } catch (err2) {
+          return false;
+        }
+      }
+    }
+    function appendMany(entries) {
+      if (!entries || entries.length === 0) return true;
+      var current = hydrate();
+      for (var i = 0; i < entries.length; i++) current.push(entries[i]);
+      var trimmed = current.length > HISTORY_CAPACITY
+        ? current.slice(current.length - HISTORY_CAPACITY)
+        : current;
+      return persist(trimmed);
+    }
+    function append(entry) {
+      return appendMany([entry]);
+    }
+    function dedupReplay(events, seqFloor) {
+      var out = [];
+      for (var i = 0; i < events.length; i++) {
+        if (events[i].seq > seqFloor) out.push(events[i]);
+      }
+      return out;
+    }
+    function detectSeqReset(events, storedLastSeq) {
+      return events.length > 0 && events[0].seq === 1 && storedLastSeq > 0;
+    }
+    function clear() {
+      try {
+        window.localStorage.removeItem(HISTORY_KEY);
+      } catch (err) {
+        /* noop — if storage is blocked, clear is a best-effort */
+      }
+    }
+    return {
+      hydrate: hydrate,
+      append: append,
+      appendMany: appendMany,
+      dedupReplay: dedupReplay,
+      detectSeqReset: detectSeqReset,
+      clear: clear,
+    };
+  })();
+
   function getWsUrl() {
     var loc = window.location;
     var proto = loc.protocol === "https:" ? "wss:" : "ws:";
@@ -54,14 +151,31 @@
       var msg = JSON.parse(ev.data);
       if (msg.type === "replay") {
         if (msg.events && msg.events.length > 0) {
-          msg.events.forEach(function (entry) {
+          // Detect DB wipe: server restarted with fresh DB (seq counter reset to 1)
+          // while we still hold entries from the old DB. Without this guard, stored
+          // seqs would phantom-dedup new unrelated events that reuse the same numbers.
+          if (history.detectSeqReset(msg.events, lastSeq)) {
+            history.clear();
+            clearFeedDom();
+            lastSeq = 0;
+          }
+          var fresh = history.dedupReplay(msg.events, lastSeq);
+          // Render in DOM first (one node each), then persist the whole batch
+          // in a single localStorage write. The previous version called
+          // history.append() per entry, which re-hydrated and re-stringified
+          // the entire array on every iteration (O(N²) on the JSON cost).
+          fresh.forEach(function (entry) {
             renderEntry(entry);
             if (entry.seq > lastSeq) lastSeq = entry.seq;
           });
+          if (fresh.length > 0) history.appendMany(fresh);
         }
       } else if (msg.type === "event") {
-        renderEntry(msg.data);
-        if (msg.data.seq > lastSeq) lastSeq = msg.data.seq;
+        if (msg.data.seq > lastSeq) {
+          renderEntry(msg.data);
+          history.append(msg.data);
+          lastSeq = msg.data.seq;
+        }
       } else if (msg.type === "channel_status") {
         setChannelStatus(msg.connected);
       }
@@ -511,6 +625,44 @@
 
   if (sendBtn) {
     sendBtn.addEventListener("click", sendMessage);
+  }
+
+  // Safe DOM removal — avoid innerHTML = "" so we never parse attacker-controlled
+  // HTML from stored events. Uses removeChild loop per XSS guardrails.
+  function clearFeedDom() {
+    if (!feedContainer) return;
+    while (feedContainer.firstChild) {
+      feedContainer.removeChild(feedContainer.firstChild);
+    }
+  }
+
+  function clearHistory() {
+    history.clear();
+    clearFeedDom();
+    lastSeq = 0;
+    if (feedContainer) {
+      var empty = document.createElement("p");
+      empty.className = "empty-state";
+      empty.textContent = "No activity yet.";
+      feedContainer.appendChild(empty);
+    }
+  }
+
+  var clearBtn = document.getElementById("clear-history-btn");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", clearHistory);
+  }
+
+  // Hydrate from localStorage BEFORE WebSocket connects — instant-paint UX.
+  // Replay dedup later uses lastSeq seeded here so server-side replay events
+  // with seq <= hydratedLastSeq are skipped.
+  var hydrated = history.hydrate();
+  if (hydrated.length > 0) {
+    removeEmptyState();
+    for (var h = 0; h < hydrated.length; h++) {
+      renderEntry(hydrated[h]);
+      if (hydrated[h].seq > lastSeq) lastSeq = hydrated[h].seq;
+    }
   }
 
   // Start disconnected — channel.ts will broadcast status when connected
