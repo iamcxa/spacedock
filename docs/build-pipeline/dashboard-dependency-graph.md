@@ -187,3 +187,33 @@ Summary:
 - Coverage: SKIP (no infra)
 - Security: SKIP (tools not available)
 - Contracts/Migrations/License: SKIP (no changes)
+
+## Stage Report: pr-draft
+
+**PR created successfully.**
+
+- PR_NUMBER: 11
+- PR_URL: https://github.com/iamcxa/spacedock/pull/11
+
+### Checklist
+
+1. **Create PR branch with feature commits** — DONE
+   - Branch `spacedock-ensign/dashboard-dependency-graph` already contained all 5 feature commits (1f87a3b, 36376c8, 0b0eb3a, 0989929, 715d269) from main
+
+2. **Push branch to origin** — DONE
+   - Pushed to `origin` (iamcxa/spacedock): `git push -u origin spacedock-ensign/dashboard-dependency-graph`
+
+3. **Create draft PR with conventional commit title and structured body** — DONE
+   - Title: `feat(dashboard): add dependency graph — DAG viz + blocked detection` (57 chars)
+   - Body: Summary (5 bullets), Reviewer Guide table (5 commits mapped), Design notes (3 non-obvious decisions), Test plan (4 checks all pass)
+   - PR created via `gh pr create --assignee @me`
+
+4. **Note PR size (690 lines — "Consider splitting for easier review")** — DONE
+   - 5 feature commits total ~620 insertions, in 500-1000 range
+   - Note embedded in PR body: "Consider splitting for easier review: (1) backend dispatch rule, (2) frontend DAG viz + table badges"
+
+5. **Capture PR_NUMBER and PR_URL in entity body** — DONE
+   - PR_NUMBER: 11
+   - PR_URL: https://github.com/iamcxa/spacedock/pull/11
+
+6. **Write ## Stage Report into entity file with all checklist items** — DONE (this section)
