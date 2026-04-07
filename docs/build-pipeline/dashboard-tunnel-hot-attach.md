@@ -345,3 +345,22 @@ Produced a 7-step TDD checklist for this Small-scale shell script refactor. The 
 ### Summary
 
 Created PR #14 with conventional commit title (55 chars) and structured body covering summary, reviewer guide table, design notes, and 8-item test plan with pass evidence. Diff is 477 lines — normal range, no split needed. Five self-review annotations explain non-obvious design decisions: the two-stage arg parsing for the `tunnel` subcommand, why port is read from `PORT_FILE` (not `$PORT`) during hot-attach, the ngrok `/api/endpoints` migration, the `do_tunnel_stop` delegation chain, and why `tunnel start` (not `restart --tunnel`) preserves Channel WebSocket connections. No Linear issue to comment on (issue field unset). Announce skipped per `--no-announce` flag.
+
+## Stage Report: pr-review
+
+- [x] Review diff (git diff main...HEAD)
+  187 insertions, 54 deletions across 3 files (ctl.sh, SKILL.md, entity doc). All changes are coherent extraction/refactor of tunnel lifecycle + SKILL.md flow fix.
+- [x] Code quality analysis (error handling, edge cases, quoting, exit codes)
+  Reviewed all 6 edge case categories: (1) Error handling: do_tunnel_start validates is_running, PORT_FILE readable, ngrok in PATH before spawning — all 3 guards return 1 to stderr. (2) Race conditions: stale PID self-heals via do_tunnel_status kill -0 check + cleanup. PID file written immediately after nohup spawn — acceptable, same as original. (3) Signal handling: do_tunnel_stop sends SIGTERM, fire-and-forget (no wait/SIGKILL escalation) — acceptable for ngrok which exits cleanly on SIGTERM. (4) Quoting: all bash variables properly quoted; $host_flag at line 286 is intentional word-splitting (pre-existing pattern, not introduced by this PR). (5) Exit codes: return 1 on errors, return 0 on idempotent no-ops (tunnel not running). (6) Argument parsing: traced 10 input permutations (tunnel start, tunnel stop, tunnel --root /foo start, tunnel with no sub-action, etc.) — all parse correctly via the two-stage CMD/TUNNEL_ACTION logic.
+- [x] SKILL.md consistency check
+  Line 82 changed from `restart --tunnel` to `tunnel start` — matches ctl.sh tunnel subcommand dispatch at line 482-491. Line 81 (`start --tunnel` for not-running case) preserved — backward compat confirmed via TUNNEL_MODE flag at line 323. Tunnel detection via tunnel_url file (line 85-88) aligns with TUNNEL_URL_FILE written by do_tunnel_start(). Commands table (lines 25-31) correctly omits tunnel as a user-facing command — it is an internal detail used by the share flow.
+- [x] Fix CODE/SUGGESTION findings (if any)
+  No CODE-level bugs found. Three advisory findings noted (all pre-existing, not introduced by this PR): (A) ngrok early-exit: polling loop waits full 10s if ngrok dies immediately — could add kill -0 check but original code had same behavior. (B) do_tunnel_stop fire-and-forget: no wait/escalation unlike do_stop — acceptable for ngrok. (C) Multiple ngrok instances sharing port 4040 could cause wrong URL capture — pre-existing risk.
+- [x] Push fixes (if any)
+  No fixes needed — no CODE-level issues found. Working tree clean.
+- [x] Write review summary with recommendation
+  APPROVE — see summary below.
+
+### Summary
+
+Code review of PR #14 finds no bugs or issues requiring fixes. The tunnel lifecycle extraction is clean: `do_tunnel_start()` properly validates preconditions (dashboard running, port readable, ngrok installed), `do_tunnel_stop()` is idempotent, and `do_tunnel_status()` handles stale PIDs. The argument parsing correctly handles all tested permutations of the two-stage CMD/TUNNEL_ACTION dispatch. The deprecated `/api/tunnels` endpoint is correctly migrated to `/api/endpoints` with the field name change. SKILL.md accurately reflects the new `tunnel start` command while preserving backward compatibility for `start --tunnel`. Three advisory findings are all pre-existing patterns from the original code, not regressions. **Recommendation: APPROVE.**
