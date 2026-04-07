@@ -300,14 +300,17 @@
                 td.textContent = "";
               } else {
                 var depBadge = el("span", { className: "status-badge dep-badge dep-" + ds.status });
+                var depIds = ds.deps.map(function (d) {
+                  return String(d.id).padStart(3, "0");
+                }).join(", ");
                 if (ds.status === "blocked") {
                   depBadge.style.background = "#f8514922";
                   depBadge.style.color = "#f85149";
-                  depBadge.textContent = "\u26D4 blocked";
+                  depBadge.textContent = "\u{1F6AB} \u2192 " + depIds;
                 } else {
                   depBadge.style.background = "#3fb95022";
                   depBadge.style.color = "#3fb950";
-                  depBadge.textContent = "\u2705 clear";
+                  depBadge.textContent = "\u2192 " + depIds;
                 }
                 var tooltipLines = ds.deps.map(function (d) {
                   return (d.done ? "\u2713" : "\u2717") + " #" + String(d.id).padStart(3, "0") + " " + d.name + " (" + d.status + ")";
