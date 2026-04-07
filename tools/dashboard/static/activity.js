@@ -14,6 +14,87 @@
   var maxDelay = 30000;
   var channelConnected = false;
 
+  // ABOUTME: Browser-side mirror of src/activity-history.ts (canonical, unit-tested source).
+  // IIFE has no module loader, so the pure logic is duplicated inline here. Keep the two
+  // in sync; if behavior diverges, update both and add a corresponding test in activity-history.test.ts.
+  var HISTORY_KEY = "spacedock.dashboard.activity.v1";
+  var HISTORY_CAPACITY = 500; // matches EventBuffer(db, 500) at src/server.ts
+  var HISTORY_EVICT_BATCH = 50;
+
+  function isQuotaExceeded(err) {
+    if (!err) return false;
+    if (err.name === "QuotaExceededError") return true;
+    return err.code === 22 || err.code === 1014;
+  }
+
+  var history = (function () {
+    function hydrate() {
+      var raw;
+      try {
+        raw = window.localStorage.getItem(HISTORY_KEY);
+      } catch (err) {
+        return [];
+      }
+      if (raw === null || raw === "") return [];
+      var parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (err) {
+        clear();
+        return [];
+      }
+      if (!Array.isArray(parsed)) return [];
+      return parsed;
+    }
+    function persist(entries) {
+      try {
+        window.localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
+        return true;
+      } catch (err) {
+        if (!isQuotaExceeded(err)) return false;
+        var evicted = entries.slice(HISTORY_EVICT_BATCH);
+        try {
+          window.localStorage.setItem(HISTORY_KEY, JSON.stringify(evicted));
+          return true;
+        } catch (err2) {
+          return false;
+        }
+      }
+    }
+    function append(entry) {
+      var current = hydrate();
+      current.push(entry);
+      var trimmed = current.length > HISTORY_CAPACITY
+        ? current.slice(current.length - HISTORY_CAPACITY)
+        : current;
+      return persist(trimmed);
+    }
+    function dedupReplay(events, seqFloor) {
+      var out = [];
+      for (var i = 0; i < events.length; i++) {
+        if (events[i].seq > seqFloor) out.push(events[i]);
+      }
+      return out;
+    }
+    function detectSeqReset(events, storedLastSeq) {
+      return events.length > 0 && events[0].seq === 1 && storedLastSeq > 0;
+    }
+    function clear() {
+      try {
+        window.localStorage.removeItem(HISTORY_KEY);
+      } catch (err) {
+        /* noop — if storage is blocked, clear is a best-effort */
+      }
+    }
+    return {
+      hydrate: hydrate,
+      append: append,
+      dedupReplay: dedupReplay,
+      detectSeqReset: detectSeqReset,
+      clear: clear,
+    };
+  })();
+
   function getWsUrl() {
     var loc = window.location;
     var proto = loc.protocol === "https:" ? "wss:" : "ws:";
