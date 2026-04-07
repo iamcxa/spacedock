@@ -13,6 +13,7 @@ pr:
 intent: feature
 scale: Medium
 project: spacedock
+depends-on: [023]
 ---
 
 ## Dependencies

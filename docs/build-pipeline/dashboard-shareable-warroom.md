@@ -7,12 +7,13 @@ started: 2026-04-06T09:45:00Z
 completed: 2026-04-06T13:25:00Z
 verdict: PASSED
 score: 0.9
-worktree: .worktrees/spacedock-ensign-dashboard-shareable-warroom
+worktree:
 issue:
 pr: "iamcxa/spacedock#8"
 intent: feature
 scale: Medium
 project: spacedock
+depends-on: [016]
 ---
 
 ## Dependencies
