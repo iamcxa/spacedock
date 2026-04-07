@@ -1,15 +1,15 @@
 ---
 id: 023
 title: Dashboard Tunnel Hot-Attach — ngrok 無需重啟 Server
-status: execute
+status: shipped
 source: captain feedback (021 share flow testing)
 started: 2026-04-07T09:15:00Z
-completed:
-verdict:
+completed: 2026-04-08T01:30:00Z
+verdict: PASSED
 score: 0.8
-worktree: .worktrees/spacedock-ensign-dashboard-tunnel-hot-attach
+worktree:
 issue:
-pr:
+pr: "#14"
 intent: feature
 scale: Small
 project: spacedock
