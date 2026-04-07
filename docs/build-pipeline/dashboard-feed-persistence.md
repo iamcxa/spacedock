@@ -517,3 +517,24 @@ All quality checks pass:
 Feature is a **Small UI entity** with **zero breaking changes, zero data-destructive operations, zero API contract changes**. Inline JavaScript duplication is intentional (documented with `// ABOUTME` breadcrumbs) to match IIFE constraint; canonical source (`activity-history.ts`) is 100% tested and mirrors the duplicate exactly.
 
 **Next stage**: Gate (FO dispatch → 010 may require manual smoke test if dispatcher enforces it; optional for execution but recommended for UX confidence before shipping).
+
+## PR Reference
+
+- PR URL: https://github.com/iamcxa/spacedock/pull/12
+- PR Number: 12
+
+## Stage Report: pr-draft
+
+**PR size check:** 995 insertions across 5 files (500–1000 range) — noted in PR body. No escalation required; breakdown is 287 test + 87 impl + 138 JS wiring + 5 HTML + 478 entity doc.
+
+1. **Read entity file end-to-end** — DONE. Read Brainstorming Spec, Acceptance Criteria Reframe (binding), TDD Plan, and Stage Reports for research/plan/execute/quality. All evidence assembled for PR body.
+2. **PR Size Check** — DONE. `git diff --stat $(git merge-base HEAD main)...HEAD` → 995 insertions / 4 deletions across 5 files. 500–1000 range: noted in PR body under "PR size note". No captain escalation required.
+3. **Detect kc-pr-flow availability** — DONE. `Skill: "kc-pr-flow:kc-pr-create"` available and invoked with `--draft-only --no-announce`.
+4. **PR Title** — DONE. `feat(dashboard): persist activity feed in localStorage with instant hydration` (69 chars, ≤70 limit, captures instant-paint value prop as required).
+5. **PR Body** — DONE. Structured body with Summary (3 bullets, instant-paint framing), What changed (file table with one-liner each), Test plan (90 pass / 212 expects evidence + 5-step manual smoke recipe), Acceptance criteria checklist (10 items, 8 met by code, 2 deferred), Notes for reviewer (4 design-decision explanations: inline-duplicate, QuotaExceeded, detectSeqReset, deferred CSS).
+6. **Self-review annotations** — DONE. Diff is 995 lines (>100 threshold). Posted 4 inline review comments via `gh api .../pulls/12/reviews` batched in a single call: (a) `activity.js:17` — inline duplicate + ABOUTME breadcrumb justification, (b) `activity.js:26` — QuotaExceededError dual-check (err.name + err.code 22/1014, cross-browser Firefox/Chrome/Safari), (c) `activity.js:79` — detectSeqReset heuristic rationale (replaces install-id namespace, known false-positive is safe), (d) `index.html:24` — deferred CSS for `.activity-panel-header` flex layout.
+7. **Push branch and create draft PR** — DONE. `git push -u origin auto-researcher/dashboard-feed-persistence` → OK. `gh pr create --draft ...` → https://github.com/iamcxa/spacedock/pull/12.
+8. **Linear comment** — SKIPPED. Entity `issue` field is empty; no Linear ticket to comment on.
+9. **Write PR_NUMBER and PR_URL into entity body** — DONE. Added `## PR Reference` section above with PR URL and Number for FO frontmatter handoff.
+10. **Commit entity body update** — DONE. See next commit on branch `auto-researcher/dashboard-feed-persistence`.
+11. **Write Stage Report: pr-draft** — DONE (this section).
