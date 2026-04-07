@@ -111,6 +111,66 @@
     };
   })();
 
+  // ABOUTME: Browser-side mirror of src/permission-tracker.ts (canonical, unit-tested source).
+  // Tracks pending permission requests and infers resolution via the
+  // "conversation-continues" heuristic: any non-permission_request event with
+  // a higher seq resolves all currently-pending requests. 30s timeout fallback
+  // via tick(). Keep in sync with permission-tracker.ts; divergence is a bug.
+  var PERM_TIMEOUT_MS = 30000;
+
+  var permissionTracker = (function () {
+    var pending = {};  // request_id → { seq, timestamp_ms }
+
+    function track(event) {
+      if (event.type === "permission_request" && event.request_id) {
+        pending[event.request_id] = { seq: event.seq, timestamp_ms: event.timestamp_ms };
+        return [];
+      }
+      var resolved = [];
+      for (var id in pending) {
+        if (pending.hasOwnProperty(id) && pending[id].seq < event.seq) {
+          resolved.push(id);
+        }
+      }
+      for (var i = 0; i < resolved.length; i++) {
+        delete pending[resolved[i]];
+      }
+      return resolved;
+    }
+
+    function tick(now_ms) {
+      var expired = [];
+      for (var id in pending) {
+        if (pending.hasOwnProperty(id) && now_ms - pending[id].timestamp_ms >= PERM_TIMEOUT_MS) {
+          expired.push(id);
+        }
+      }
+      for (var i = 0; i < expired.length; i++) {
+        delete pending[expired[i]];
+      }
+      return expired;
+    }
+
+    function resolve(request_id) {
+      delete pending[request_id];
+    }
+
+    return { track: track, tick: tick, resolve: resolve };
+  })();
+
+  function buildTrackedEvent(entry, timestampMs) {
+    var requestId;
+    if (entry.event.type === "permission_request") {
+      try { requestId = JSON.parse(entry.event.detail || "{}").request_id; } catch (e) { /* ignore */ }
+    }
+    return {
+      type: entry.event.type,
+      seq: entry.seq,
+      request_id: requestId || undefined,
+      timestamp_ms: timestampMs,
+    };
+  }
+
   function getWsUrl() {
     var loc = window.location;
     var proto = loc.protocol === "https:" ? "wss:" : "ws:";
@@ -168,11 +228,26 @@
             renderEntry(entry);
             if (entry.seq > lastSeq) lastSeq = entry.seq;
           });
+          // Permission tracker: batch-track after all entries are rendered
+          // so cards exist in the DOM before markResolved runs.
+          fresh.forEach(function (entry) {
+            var tracked = buildTrackedEvent(entry, Date.now());
+            var resolved = permissionTracker.track(tracked);
+            for (var ri = 0; ri < resolved.length; ri++) {
+              markResolved(resolved[ri], "inferred");
+            }
+          });
           if (fresh.length > 0) history.appendMany(fresh);
         }
       } else if (msg.type === "event") {
         if (msg.data.seq > lastSeq) {
           renderEntry(msg.data);
+          // Permission tracker: track after render so card exists in DOM
+          var tracked = buildTrackedEvent(msg.data, Date.now());
+          var resolved = permissionTracker.track(tracked);
+          for (var ri = 0; ri < resolved.length; ri++) {
+            markResolved(resolved[ri], "inferred");
+          }
           history.append(msg.data);
           lastSeq = msg.data.seq;
         }
@@ -510,6 +585,84 @@
     capFeedItems();
   }
 
+  function markResolved(requestId, reason) {
+    if (!feedContainer) return;
+    var card = feedContainer.querySelector('[data-request-id="' + requestId + '"]');
+    if (!card) return;
+    if (card.classList.contains("resolved")) return; // idempotent
+    card.classList.add("resolved");
+    var actions = card.querySelector(".perm-actions");
+    if (actions) actions.remove();
+    var badge = document.createElement("div");
+    badge.className = "perm-verdict";
+    badge.textContent = reason === "inferred"
+      ? "\uD83D\uDD12 Resolved (continued)"
+      : "\uD83D\uDD12 Resolved (timeout)";
+    card.appendChild(badge);
+    mergeIntoResolvedGroup(card);
+  }
+
+  function buildGroupSummary(count) {
+    var summary = document.createElement("summary");
+    var label = document.createTextNode("\uD83D\uDD12 Permission resolved (");
+    var countSpan = document.createElement("span");
+    countSpan.className = "count";
+    countSpan.textContent = String(count);
+    var suffix = document.createTextNode(" " + (count === 1 ? "item" : "items") + ") ");
+    var chevron = document.createElement("span");
+    chevron.className = "chevron";
+    chevron.textContent = "\u25B8";
+    summary.appendChild(label);
+    summary.appendChild(countSpan);
+    summary.appendChild(suffix);
+    summary.appendChild(chevron);
+    return summary;
+  }
+
+  function mergeIntoResolvedGroup(card) {
+    var prev = card.previousElementSibling;
+    var next = card.nextElementSibling;
+    var prevIsGroup = prev && prev.classList && prev.classList.contains("collapsed-group");
+    var nextIsGroup = next && next.classList && next.classList.contains("collapsed-group");
+
+    if (prevIsGroup && nextIsGroup) {
+      // Sandwiched: merge card + next group's cards into prev group
+      prev.appendChild(card);
+      while (next.children.length > 1) {
+        prev.appendChild(next.children[1]);
+      }
+      next.remove();
+      updateGroupCount(prev);
+    } else if (prevIsGroup) {
+      prev.appendChild(card);
+      updateGroupCount(prev);
+    } else if (nextIsGroup) {
+      var summaryEl = next.querySelector("summary");
+      if (summaryEl && summaryEl.nextSibling) {
+        next.insertBefore(card, summaryEl.nextSibling);
+      } else {
+        next.appendChild(card);
+      }
+      updateGroupCount(next);
+    } else {
+      // Create a new collapsed group wrapping this card
+      var details = document.createElement("details");
+      details.className = "collapsed-group";
+      details.appendChild(buildGroupSummary(1));
+      card.parentNode.insertBefore(details, card);
+      details.appendChild(card);
+    }
+  }
+
+  function updateGroupCount(group) {
+    var n = group.querySelectorAll(".permission-card").length;
+    var oldSummary = group.querySelector("summary");
+    if (oldSummary) oldSummary.remove();
+    // Prepend new summary as first child
+    var newSummary = buildGroupSummary(n);
+    group.insertBefore(newSummary, group.firstChild);
+  }
+
   function sendPermissionVerdict(requestId, behavior, card) {
     var buttons = card.querySelectorAll(".perm-btn");
     buttons.forEach(function (btn) { btn.disabled = true; });
@@ -523,11 +676,15 @@
       }),
     })
       .then(function () {
+        permissionTracker.resolve(requestId);
         card.classList.add("resolved");
+        var actions = card.querySelector(".perm-actions");
+        if (actions) actions.remove();
         var verdict = document.createElement("div");
         verdict.className = "perm-verdict";
-        verdict.textContent = behavior === "allow" ? "Approved" : "Rejected";
+        verdict.textContent = behavior === "allow" ? "\u2705 Approved" : "\u274C Rejected";
         card.appendChild(verdict);
+        mergeIntoResolvedGroup(card);
       })
       .catch(function () {
         buttons.forEach(function (btn) { btn.disabled = false; });
@@ -535,10 +692,18 @@
   }
 
   function renderPermissionResponse(entry) {
-    // Find the matching permission card and mark it resolved
-    // Since we resolve cards in sendPermissionVerdict, this handles
-    // verdicts from other sources (e.g., terminal responded first).
+    // Called when server replays a permission_response event back.
+    // Remove from tracker so the heuristic doesn't double-fire on the
+    // next non-permission event. The card was already visually resolved
+    // by sendPermissionVerdict's .then() callback when the dashboard
+    // itself sent the verdict, so markResolved's idempotency guard
+    // (classList.contains("resolved")) handles the no-op case.
     if (!feedContainer) return;
+    var requestId;
+    try { requestId = JSON.parse(entry.event.detail || "{}").request_id; } catch (e) { /* ignore */ }
+    if (requestId) {
+      permissionTracker.resolve(requestId);
+    }
   }
 
   function renderGateDecision(entry) {
@@ -664,6 +829,15 @@
       if (hydrated[h].seq > lastSeq) lastSeq = hydrated[h].seq;
     }
   }
+
+  // Permission tracker: poll every 5s, resolve requests pending > 30s.
+  setInterval(function () {
+    var now = Date.now();
+    var expired = permissionTracker.tick(now);
+    for (var i = 0; i < expired.length; i++) {
+      markResolved(expired[i], "timeout");
+    }
+  }, 5000);
 
   // Start disconnected — channel.ts will broadcast status when connected
   setChannelStatus(false);
