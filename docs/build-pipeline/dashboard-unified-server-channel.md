@@ -262,3 +262,10 @@ None — all claims verified from codebase and/or official Bun docs.
 - [x] Research report written to entity
 - [x] Corrections documented (1 minor: CLAIM-2 --port CLI exists)
 - [x] Edge cases documented (tunnel guard, cleanup race, worktree hash, status --all)
+
+## Stage Report: plan
+
+- [x] Plan document created — formal plan saved to `docs/superpowers/specs/2026-04-08-dashboard-unified-server-channel.md` with 6 tasks, TDD ordering (failing tests -> implementation -> verification), concrete file paths
+- [x] Research corrections incorporated — CLAIM-2 correction (use `dashboard.port` not hardcoded 8420), all 4 edge cases addressed: (1) `do_tunnel_start()` guard updated to try `is_channel_running()` as alternative, (2) SIGKILL cleanup race handled via `port_in_use()` validation in `is_channel_running()`, (3) worktree hash addressed in `computeStateDir` documentation note, (4) `do_status_all()` updated to scan `channel_port` files
+- [x] Quality gate steps included — `bun test` (channel + ctl), `bun build` type-check, `bash -n` syntax check, backward compatibility verification
+- [x] Plan committed on branch (3da5241)
