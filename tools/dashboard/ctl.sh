@@ -192,19 +192,21 @@ do_start() {
                 mode_label=" [channel mode]"
             fi
             echo "Dashboard running${mode_label}: http://127.0.0.1:${selected_port}/ (PID: ${daemon_pid})"
-            return 0
+            break
         fi
         sleep 0.5
         attempts=$((attempts + 1))
     done
 
-    # Check if process is still alive
-    if kill -0 "$daemon_pid" 2>/dev/null; then
-        echo "Dashboard started but health check timed out: http://127.0.0.1:${selected_port}/ (PID: ${daemon_pid})"
-    else
-        clean_stale
-        echo "Error: dashboard failed to start. Check log: $LOG_FILE" >&2
-        return 1
+    # Check if process is still alive (only if health check didn't succeed)
+    if [[ $attempts -ge $max_attempts ]]; then
+        if kill -0 "$daemon_pid" 2>/dev/null; then
+            echo "Dashboard started but health check timed out: http://127.0.0.1:${selected_port}/ (PID: ${daemon_pid})"
+        else
+            clean_stale
+            echo "Error: dashboard failed to start. Check log: $LOG_FILE" >&2
+            return 1
+        fi
     fi
 
     # --- Tunnel mode ---
