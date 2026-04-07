@@ -106,6 +106,15 @@
     return Math.floor(diff / 3600000) + "h ago";
   }
 
+  function setTimeWithTooltip(el, isoStr) {
+    el.textContent = timeAgo(isoStr);
+    el.title = new Date(isoStr).toLocaleString(undefined, {
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      timeZoneName: "short"
+    });
+  }
+
   function renderEntry(entry) {
     var e = entry.event;
     if (e.type === "channel_message") {
@@ -156,7 +165,7 @@
 
     var time = document.createElement("span");
     time.className = "activity-time";
-    time.textContent = timeAgo(e.timestamp);
+    setTimeWithTooltip(time, e.timestamp);
 
     item.appendChild(badge);
     item.appendChild(info);
@@ -188,7 +197,7 @@
 
     var time = document.createElement("span");
     time.className = "bubble-time";
-    time.textContent = timeAgo(entry.event.timestamp);
+    setTimeWithTooltip(time, entry.event.timestamp);
     bubble.appendChild(time);
 
     feedContainer.appendChild(bubble);
@@ -243,7 +252,7 @@
 
     var time = document.createElement("span");
     time.className = "bubble-time";
-    time.textContent = timeAgo(entry.event.timestamp);
+    setTimeWithTooltip(time, entry.event.timestamp);
     bubble.appendChild(time);
 
     feedContainer.appendChild(bubble);
@@ -284,7 +293,7 @@
 
     var time = document.createElement("span");
     time.className = "bubble-time";
-    time.textContent = timeAgo(entry.event.timestamp);
+    setTimeWithTooltip(time, entry.event.timestamp);
     bubble.appendChild(time);
 
     feedContainer.appendChild(bubble);
@@ -446,7 +455,7 @@
 
     var time = document.createElement("span");
     time.className = "bubble-time";
-    time.textContent = timeAgo(e.timestamp);
+    setTimeWithTooltip(time, e.timestamp);
     card.appendChild(time);
 
     feedContainer.appendChild(card);

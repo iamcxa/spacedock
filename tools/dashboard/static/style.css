@@ -224,6 +224,7 @@ tr:hover td { background: #1c2128; }
 /* --- Chat Bubbles --- */
 
 .chat-bubble {
+    width: fit-content;
     max-width: 80%;
     padding: 0.5rem 0.75rem;
     margin: 0.4rem 0;
