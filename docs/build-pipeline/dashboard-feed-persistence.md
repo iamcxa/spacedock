@@ -1,7 +1,7 @@
 ---
 id: 010
 title: Dashboard Feed Persistence — localStorage History for Activity Feed
-status: quality
+status: pr-draft
 source: channel conversation
 started: 2026-04-07T14:24:24Z
 completed:
