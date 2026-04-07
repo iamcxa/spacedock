@@ -1,6 +1,6 @@
 #!/bin/bash
 # ABOUTME: Daemon lifecycle manager for the Spacedock workflow dashboard.
-# ABOUTME: Subcommands: start, stop, status, logs, restart.
+# ABOUTME: Subcommands: start, stop, status, logs, restart, tunnel.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -8,6 +8,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # --- argument parsing ---
 
 CMD=""
+TUNNEL_ACTION=""
 PORT=""
 ROOT=""
 STATUS_ALL=false
@@ -16,7 +17,7 @@ CHANNEL_MODE=false
 TUNNEL_MODE=false
 
 usage() {
-    echo "Usage: $(basename "$0") <start|stop|status|logs|restart> [options]"
+    echo "Usage: $(basename "$0") <start|stop|status|logs|restart|tunnel> [options]"
     echo ""
     echo "Options:"
     echo "  --port PORT    Port to serve on (default: 8420, auto-selects 8420-8429)"
@@ -26,16 +27,27 @@ usage() {
     echo "  --all          (status) Show all dashboard instances"
     echo "  --follow       (logs) Tail the log file"
     echo ""
+    echo "Tunnel subcommand:"
+    echo "  tunnel start   Start ngrok tunnel for an already-running dashboard"
+    echo "  tunnel stop    Stop ngrok tunnel (dashboard keeps running)"
+    echo "  tunnel status  Show tunnel state and URL"
+    echo ""
     echo "Examples:"
     echo "  $(basename "$0") start"
     echo "  $(basename "$0") status --all"
     echo "  $(basename "$0") stop --root /path/to/project"
+    echo "  $(basename "$0") tunnel start --root /path/to/project"
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        start|stop|status|logs|restart)
-            CMD="$1"; shift ;;
+        start|stop|status|logs|restart|tunnel)
+            if [[ "$CMD" == "tunnel" && -z "$TUNNEL_ACTION" ]]; then
+                TUNNEL_ACTION="$1"; shift
+            else
+                CMD="$1"; shift
+            fi
+            ;;
         --port)
             PORT="$2"; shift 2 ;;
         --root)
@@ -467,6 +479,17 @@ case "$CMD" in
     status)  do_status ;;
     logs)    do_logs ;;
     restart) do_restart ;;
+    tunnel)
+        case "$TUNNEL_ACTION" in
+            start)  do_tunnel_start ;;
+            stop)   do_tunnel_stop ;;
+            status) do_tunnel_status ;;
+            *)
+                echo "Usage: $(basename "$0") tunnel <start|stop|status> [options]" >&2
+                exit 1
+                ;;
+        esac
+        ;;
     *)
         echo "Unknown command: $CMD" >&2
         usage >&2
