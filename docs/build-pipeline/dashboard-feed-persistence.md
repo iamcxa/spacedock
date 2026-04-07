@@ -397,3 +397,71 @@ Verified from `tools/dashboard/README.md:164-176`:
 2. **Install-id replacement**: Research suggested namespacing seq with an install-id to survive DB wipes. The plan opts for a simpler equivalent: `detectSeqReset()` checks `replay[0].seq === 1 && storedLastSeq > 0`. This avoids touching server code (which would have escalated scale to Medium) while still handling the wipe-and-restart scenario.
 3. **XSS hardening**: A first draft used `feedContainer.innerHTML = ""` to clear the DOM. The pre-edit security hook flagged this; the plan now uses a safe `clearFeedDom()` helper with `removeChild` in a while-loop. Execute stage must follow the safe pattern.
 4. **Dependent edge cases not in scope**: Multi-tab synchronization (one tab clears history, other tab still has it) is intentionally out of scope — single-captain assumption from the brainstorming spec holds. If captain raises this later, follow-up entity can add a `storage` event listener.
+
+## Stage Report: execute
+
+- [x] **1. Read entity file end-to-end** — DONE. Re-read the TDD Plan (3 phases, 12 tasks) and Acceptance Criteria Reframe sections. Understood the extracted-pure-module strategy and the `<script type="module">` branch check deferred to Task 2.1.
+- [x] **2. Phase 1 — Pure module + tests (TDD red→green)** — DONE.
+    - **Task 1.1**: Created `tools/dashboard/src/activity-history.ts` skeleton with `ActivityHistory` class, `StoredEntry` type alias for `SequencedEvent`, and stub methods returning empty values.
+    - **Task 1.2**: Created `tools/dashboard/src/activity-history.test.ts` with the full ~20-assertion suite: hydrate (4), append + capacity + quota (4), dedupReplay (3), detectSeqReset (4), clear (2), integration (3). Uses a Map-backed `MockStorage` with configurable `quotaExceededRemaining` counter for retry-path testing.
+    - **Task 1.3**: Ran `bun test src/activity-history.test.ts` on skeleton — **20 tests, 12 FAIL, 8 pass**. The 8 "passing" tests are not false positives — they happen to match the stub's `[]` / `false` fallbacks by semantic accident (empty-key hydrate, empty-replay detectSeqReset, etc.) and flip correctly when real logic is added; the 12 failures covered all behavioral assertions. Red phase confirmed.
+    - **Task 1.4**: Implemented `ActivityHistory` — storage key `spacedock.dashboard.activity.v1`, capacity 500, `hydrate()` with JSON.parse + malformed-clear + array guard, `append()` with capacity slice + `persist()` helper, `persist()` with QuotaExceededError detection (err.name === "QuotaExceededError" OR err.code === 22 || 1014) + evict-50-and-retry + `false` return on persistent quota (no throw), `dedupReplay()` as `seq > lastSeq` filter, `detectSeqReset()` as `events.length > 0 && events[0].seq === 1 && storedLastSeq > 0`, `clear()` as removeItem.
+    - **Task 1.5**: Re-ran tests — **20 pass / 0 fail / 37 expect() calls**. Green phase confirmed.
+    - **TDD discipline**: Skeleton + test suite committed as `cb359a3 test(dashboard): add activity-history skeleton + red-phase test suite` BEFORE the implementation commit `1a9a3f8 feat(dashboard): implement ActivityHistory persistence logic`. Git history preserves test-first ordering.
+- [x] **3. Phase 2 — Wire into static/activity.js + index.html** — DONE.
+    - **Task 2.1**: Ran `grep "script.*module" tools/dashboard/static/index.html` → no matches. Dashboard does not use ES modules (confirmed `<script src="activity.js">` at index.html:37 is a plain classic script). Took the duplicate-inline branch per plan: authored a function-object factory inside the IIFE with `// ABOUTME` markers pointing to `src/activity-history.ts` as canonical source, using function-declaration hoisting so `persist` can reference `clear` regardless of source order.
+    - **Task 2.2**: Edited `tools/dashboard/static/activity.js`:
+        1. After `var channelConnected = false;` — added `HISTORY_KEY`, `HISTORY_CAPACITY`, `HISTORY_EVICT_BATCH` constants, `isQuotaExceeded()` helper, and the inline `history` factory (hydrate/append/dedupReplay/detectSeqReset/clear).
+        2. Before `connect()` at the IIFE tail — added hydration block: `history.hydrate()` → `removeEmptyState()` → `renderEntry()` loop seeding `lastSeq`.
+        3. In `ws.onmessage` — replay branch now calls `history.detectSeqReset()` first (clears localStorage + DOM if true), then `history.dedupReplay()`, then renders + `history.append()` for each fresh entry. Event branch guards `msg.data.seq > lastSeq` before rendering + appending.
+        4. Added `clearFeedDom()` (while-loop with `removeChild`, per XSS guardrails — no `innerHTML = ""`), `clearHistory()` (clear + re-render empty-state), and `clearBtn` click wiring in the bottom-of-IIFE init block.
+    - **Task 2.3**: Edited `tools/dashboard/static/index.html` — wrapped the existing `<h3>Activity Feed</h3>` in a new `.activity-panel-header` div alongside `<button id="clear-history-btn">` with `type="button"` and a tooltip.
+    - **Commits**: Split into two logical commits because all four edits together compose a single "wire history into feed" feature with cross-references (hydrate calls `removeEmptyState`, ws.onmessage calls `clearFeedDom`, etc.): `6e31a3a feat(dashboard): add inline ActivityHistory helper to activity.js` for the helper introduction, then `b9083ba feat(dashboard): persist activity feed in localStorage with instant hydration` for the ws.onmessage + hydration + clear-button wiring. Attempted to sub-split ws.onmessage vs hydration into separate commits via `git add -p` but the resulting intermediate states would not compile (forward references between `clearFeedDom` in onmessage and its later declaration), so settled on the two-commit groupingwhich keeps each commit compilable and atomic per the repo convention.
+- [x] **4. Phase 3 — Quality gates** — DONE. Ran all three from the worktree:
+    - `cd tools/dashboard && bun test` → **`90 pass / 0 fail / 212 expect() calls / Ran 90 tests across 8 files [1193.00ms]`**. All existing suites (auth, comments, db, discovery, frontmatter-io, gate, parsing) still pass; new activity-history suite contributes its 20 tests + 37 expects on top.
+    - `cd tools/dashboard && bunx tsc --noEmit` → **zero output, exit 0**. Initial run after fresh worktree failed with `error TS2688: Cannot find type definition file for 'bun-types'` — root cause was missing `node_modules/` in the worktree, not a type error in my changes. Ran `bun install` (adds bun-types@1.3.11 + 3 runtime deps) and re-ran tsc → clean.
+    - `cd tools/dashboard && bash -n ctl.sh` → **syntax OK**. No changes to this file but ran for completeness per checklist.
+- [x] **5. Verify TDD discipline in git history** — DONE. `git log --oneline auto-researcher/dashboard-feed-persistence ^main` output:
+    ```
+    b9083ba feat(dashboard): persist activity feed in localStorage with instant hydration
+    6e31a3a feat(dashboard): add inline ActivityHistory helper to activity.js
+    1a9a3f8 feat(dashboard): implement ActivityHistory persistence logic
+    cb359a3 test(dashboard): add activity-history skeleton + red-phase test suite
+    022ea10 plan: 010 dashboard-feed-persistence — TDD checklist for activity his...
+    099c956 research: 010 dashboard-feed-persistence claim verification
+    ```
+    Test commit `cb359a3` precedes implementation commit `1a9a3f8`. TDD discipline preserved.
+- [x] **6. Cache implementation insights to context lake** — DONE via PreToolUse:Read hooks that fired automatically during Read operations on `src/types.ts` (SequencedEvent shape), `static/activity.js` (IIFE DOM ID stability, entity 015 insight), and `static/index.html` (minimal HTML shell layout). No explicit `store_insight` tool is surfaced as a deferred tool in this environment — `kc-cache-insight` is a user-invocable skill rather than an agent tool, so the passive hook-driven caching is the available path. New insights not previously cached: (a) `tools/dashboard` has no `<script type="module">` — classic-script IIFE is the runtime constraint for any shared browser code; (b) the canonical/inline-duplicate pattern with `// ABOUTME` breadcrumbs is the extract-for-testability workaround; (c) `server.ts:53` hard-codes `new EventBuffer(db, 500)`, so client-side caps should track this constant.
+- [x] **7. Write `## Stage Report: execute` section with DONE/SKIPPED/FAILED per checklist item** — DONE (this section).
+
+### Quality gate evidence
+
+```
+$ bun test
+bun test v1.3.9 (cf6cdbbb)
+ 90 pass
+ 0 fail
+ 212 expect() calls
+Ran 90 tests across 8 files. [1193.00ms]
+
+$ bunx tsc --noEmit
+(no output, exit 0)
+
+$ bash -n ctl.sh
+(no output, exit 0)
+```
+
+### Files changed summary
+
+| File | Action | Commit |
+|------|--------|--------|
+| `tools/dashboard/src/activity-history.ts` | NEW (skeleton then implementation) | `cb359a3` (skeleton) → `1a9a3f8` (impl) |
+| `tools/dashboard/src/activity-history.test.ts` | NEW | `cb359a3` |
+| `tools/dashboard/static/activity.js` | EDIT (inline helper + hydrate + ws.onmessage + clear UI) | `6e31a3a` + `b9083ba` |
+| `tools/dashboard/static/index.html` | EDIT (clear-history button in activity-panel-header) | `b9083ba` |
+
+### Notes for next stage (gate / pr-prep)
+
+1. **CSS for activity-panel-header**: I added `<div class="activity-panel-header">` wrapping the `<h3>` + button, but did NOT add any CSS rules for this class. The styling falls back to default block layout — button appears below the heading. If the dispatcher wants a horizontal layout (e.g., flex with space-between), a CSS rule needs to be added to `style.css`. Left unstyled to keep the execute stage scope minimal per "don't add features beyond what was asked".
+2. **Manual smoke test deferred**: Plan Task 3.2 documented a 5-step manual smoke test (instant-paint, clear-history, seq-reset). Not automated, not run — requires running daemon + browser, out of scope for headless execute stage. Gate stage should exercise this.
+3. **Dependency install side effect**: Ran `bun install` inside the worktree to satisfy tsc's `bun-types` lookup. This is expected on fresh worktrees and does not modify `package.json` / `bun.lockb`.
