@@ -1,7 +1,7 @@
 ---
 id: 014
 title: Dashboard Permission Sync — Auto-resolve Permission Requests Answered in CLI
-status: pr-draft
+status: pr-review
 source: UI testing feedback
 started: 2026-04-07T14:24:24Z
 completed:
@@ -9,7 +9,7 @@ verdict:
 score: 0.8
 worktree: .worktrees/auto-researcher-dashboard-permission-sync
 issue:
-pr:
+pr: "iamcxa/spacedock#13"
 intent: feature
 scale: Small
 project: spacedock
