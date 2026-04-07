@@ -158,6 +158,43 @@ describe("ActivityHistory.append", () => {
   });
 });
 
+describe("ActivityHistory.appendMany", () => {
+  let storage: MockStorage;
+  beforeEach(() => {
+    storage = new MockStorage();
+  });
+
+  test("returns true and is a no-op when given an empty batch", () => {
+    const h = makeHistory(storage, 500);
+    expect(h.appendMany([])).toBe(true);
+    expect(storage.storedCount(KEY)).toBe(0);
+  });
+
+  test("persists once for a batch of N entries (single setItem)", () => {
+    const h = makeHistory(storage, 500);
+    let setItemCalls = 0;
+    const realSet = storage.setItem.bind(storage);
+    storage.setItem = (key: string, value: string) => {
+      setItemCalls += 1;
+      realSet(key, value);
+    };
+    const batch = [makeEntry(1), makeEntry(2), makeEntry(3), makeEntry(4), makeEntry(5)];
+    expect(h.appendMany(batch)).toBe(true);
+    expect(setItemCalls).toBe(1);
+    expect(storage.storedCount(KEY)).toBe(5);
+  });
+
+  test("trims oldest entries when batch pushes total over capacity", () => {
+    const h = makeHistory(storage, 4);
+    h.append(makeEntry(1));
+    h.append(makeEntry(2));
+    expect(h.appendMany([makeEntry(3), makeEntry(4), makeEntry(5), makeEntry(6)])).toBe(true);
+    const stored = h.hydrate();
+    expect(stored).toHaveLength(4);
+    expect(stored.map((e) => e.seq)).toEqual([3, 4, 5, 6]);
+  });
+});
+
 describe("ActivityHistory.dedupReplay", () => {
   let storage: MockStorage;
   beforeEach(() => {

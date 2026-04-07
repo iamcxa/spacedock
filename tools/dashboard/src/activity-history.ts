@@ -41,8 +41,17 @@ export class ActivityHistory {
   }
 
   append(entry: StoredEntry): boolean {
+    return this.appendMany([entry]);
+  }
+
+  // Batch insert. Hydrates and persists once for the whole batch instead of
+  // doing one full hydrate→stringify→setItem cycle per entry. WebSocket replay
+  // can deliver dozens to hundreds of events at once, so the O(N) save matters
+  // more than for the single-event path that just delegates to this.
+  appendMany(entries: StoredEntry[]): boolean {
+    if (entries.length === 0) return true;
     const current = this.hydrate();
-    current.push(entry);
+    for (const entry of entries) current.push(entry);
     const trimmed = current.length > this.capacity
       ? current.slice(current.length - this.capacity)
       : current;

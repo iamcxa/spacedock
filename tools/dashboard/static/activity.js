@@ -17,6 +17,17 @@
   // ABOUTME: Browser-side mirror of src/activity-history.ts (canonical, unit-tested source).
   // IIFE has no module loader, so the pure logic is duplicated inline here. Keep the two
   // in sync; if behavior diverges, update both and add a corresponding test in activity-history.test.ts.
+  //
+  // Two intentional divergences from the canonical TypeScript source:
+  //   1. `persist` swallows non-quota errors (returns false) instead of re-throwing.
+  //      The TS source throws so unit tests can assert real failures, but on the
+  //      browser side an uncaught throw inside ws.onmessage would break the live
+  //      feed mid-replay. We accept silent degradation here — the UI keeps rendering
+  //      and the captain can refresh to recover.
+  //   2. `hydrate` and `clear` wrap `window.localStorage` access in try/catch to
+  //      tolerate browsers where storage is disabled (incognito mode, blocked
+  //      cookies). The TS source assumes a working Storage object via DI.
+  // Any other behavioral drift between this block and activity-history.ts is a bug.
   var HISTORY_KEY = "spacedock.dashboard.activity.v1";
   var HISTORY_CAPACITY = 500; // matches EventBuffer(db, 500) at src/server.ts
   var HISTORY_EVICT_BATCH = 50;
@@ -61,13 +72,17 @@
         }
       }
     }
-    function append(entry) {
+    function appendMany(entries) {
+      if (!entries || entries.length === 0) return true;
       var current = hydrate();
-      current.push(entry);
+      for (var i = 0; i < entries.length; i++) current.push(entries[i]);
       var trimmed = current.length > HISTORY_CAPACITY
         ? current.slice(current.length - HISTORY_CAPACITY)
         : current;
       return persist(trimmed);
+    }
+    function append(entry) {
+      return appendMany([entry]);
     }
     function dedupReplay(events, seqFloor) {
       var out = [];
@@ -89,6 +104,7 @@
     return {
       hydrate: hydrate,
       append: append,
+      appendMany: appendMany,
       dedupReplay: dedupReplay,
       detectSeqReset: detectSeqReset,
       clear: clear,
@@ -144,11 +160,15 @@
             lastSeq = 0;
           }
           var fresh = history.dedupReplay(msg.events, lastSeq);
+          // Render in DOM first (one node each), then persist the whole batch
+          // in a single localStorage write. The previous version called
+          // history.append() per entry, which re-hydrated and re-stringified
+          // the entire array on every iteration (O(N²) on the JSON cost).
           fresh.forEach(function (entry) {
             renderEntry(entry);
-            history.append(entry);
             if (entry.seq > lastSeq) lastSeq = entry.seq;
           });
+          if (fresh.length > 0) history.appendMany(fresh);
         }
       } else if (msg.type === "event") {
         if (msg.data.seq > lastSeq) {
