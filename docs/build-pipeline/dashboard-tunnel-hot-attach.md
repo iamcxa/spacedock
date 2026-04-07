@@ -258,6 +258,29 @@ grep -q 'tunnel start' skills/dashboard/SKILL.md    # SKILL.md updated
 7. Fix SKILL.md (step 6)
 8. Run quality gate (step 7)
 
+## Stage Report: execute
+
+- [x] Run pre-implementation verification commands (should fail)
+  All 6 checks confirmed NOT FOUND: do_tunnel_start, do_tunnel_stop, do_tunnel_status, /api/endpoints, tunnel start in SKILL.md, tunnel subcommand in usage
+- [x] Extract `do_tunnel_stop()` and commit
+  Commit `f74791d` — extracted inline tunnel PID cleanup from do_stop() into standalone function
+- [x] Extract `do_tunnel_start()` with `/api/endpoints` fix and commit
+  Commit `aad062e` — extracted ngrok spawn logic, reads port from PORT_FILE, fixed deprecated `/api/tunnels` to `/api/endpoints` (field `"url"` not `"public_url"`)
+- [x] Add `do_tunnel_status()` and commit
+  Commit `7be1b6e` — reports tunnel URL+PID, cleans stale PIDs, or prints not running
+- [x] Wire `tunnel` subcommand + update usage/ABOUTME and commit
+  Commit `da00100` — added TUNNEL_ACTION parsing, tunnel case dispatch, usage docs, ABOUTME updated
+- [x] Verify backward compat (`start --tunnel` still works)
+  Confirmed: `--tunnel` flag still sets TUNNEL_MODE=true, do_start() still binds 0.0.0.0 and calls do_tunnel_start when TUNNEL_MODE=true, restart --tunnel works via do_stop+do_start
+- [x] Fix SKILL.md and commit
+  Commit `78cc92e` — changed `restart --tunnel` to `tunnel start` in share flow (line 82)
+- [x] Run quality gate (bash -n, bun test, grep checks)
+  bash -n PASS, bun test 106/106 PASS (0 fail), all 6 grep checks PASS (3 functions exist, /api/endpoints present, /api/tunnels removed, SKILL.md updated)
+
+### Summary
+
+Implemented the tunnel hot-attach feature across 5 atomic commits. Extracted `do_tunnel_start()`, `do_tunnel_stop()`, and `do_tunnel_status()` from the monolithic `do_start()`/`do_stop()` functions, wired a new `tunnel` top-level subcommand with sub-action dispatch, and fixed the SKILL.md share flow to use `tunnel start` instead of `restart --tunnel`. The deprecated ngrok `/api/tunnels` endpoint was updated to `/api/endpoints` as specified by the research correction. All existing 106 dashboard tests pass unchanged. Backward compatibility for `--tunnel` flag on start/restart is preserved.
+
 ## Stage Report: plan
 
 - [x] Read entity file and research report
