@@ -827,6 +827,14 @@
     for (var h = 0; h < hydrated.length; h++) {
       renderEntry(hydrated[h]);
       if (hydrated[h].seq > lastSeq) lastSeq = hydrated[h].seq;
+      // Permission tracker (Phase 4): use event's original timestamp so stale
+      // events from prior sessions time out immediately on next tick(), not 30s
+      // from now. Synchronous — resolved state materializes before first paint.
+      var ht = buildTrackedEvent(hydrated[h], new Date(hydrated[h].event.timestamp).getTime());
+      var hResolved = permissionTracker.track(ht);
+      for (var hr = 0; hr < hResolved.length; hr++) {
+        markResolved(hResolved[hr], "inferred");
+      }
     }
   }
 
