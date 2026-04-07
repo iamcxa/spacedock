@@ -117,3 +117,73 @@ None.
 - [x] Plan includes concrete file paths, test-first ordering, and quality gate steps -- 9 files mapped, Tasks 1-2 are test-first, quality gate at end runs full suite
 - [x] Plan references research-verified patterns (especially the 2 corrections about visualizer.js and DAG layout) -- Research Corrections section at top of plan; Task 4 creates NEW `buildDependencyLayout` instead of reusing `buildLayout()`; DAG layout is ~130 lines simplified Sugiyama (topological sort + median heuristic)
 - [x] Write ## Stage Report into entity file with all checklist items -- this section
+
+## Stage Report: execute
+
+- [x] Read and understand the full plan document -- 6 tasks across 9 files, TDD-first ordering, research corrections incorporated
+- [x] Execute Task 1: parseDependsOn() utility with tests (TDD) -- wrote 6 failing tests in parsing.test.ts, implemented 3-line regex parser in parsing.ts, all 11 tests pass. Commit: `feat(dashboard): add parseDependsOn() utility for depends-on frontmatter field`
+- [x] Execute Task 2: Status script 5th dispatch rule with tests (TDD) -- wrote 3 failing tests (unmet deps excluded, shipped deps pass, no deps unaffected), added parse_depends_on() + Rule 5 terminal_stages check to print_next_table, all 36 tests pass. Commit: `feat(status): add 5th dispatch rule — filter entities with unmet depends-on`
+- [x] Execute Task 3: DEPS column with badges in entity table (app.js) -- added parseDependsOn() + depStatus() helpers, "deps" column to columns array, badge rendering with blocked/clear colors and hover tooltip showing dependency status. Commit: `feat(dashboard): add DEPS column with blocked/clear badges to entity table`
+- [x] Execute Task 4: DAG layout engine — NEW buildDependencyLayout() in dependency-graph.js (~339 lines) -- created dependency-graph.js with simplified Sugiyama algorithm: buildGraph (adjacency), assignLayers (Kahn's topological sort), orderWithinLayers (median heuristic), positionNodes (left-to-right layout), renderDagNode/renderDagEdge (SVG). Reused svgEl/svgText helpers and color conventions from visualizer.js pattern but did NOT reuse buildLayout(). Commit: `feat(dashboard): add DAG layout engine with simplified Sugiyama algorithm`
+- [x] Execute Task 5: Integrate DAG graph into detail page (detail.html, detail.js, detail.css) -- added dependency-graph-section container and script tag in detail.html, renderDependencySection() function in detail.js (fetches /api/workflows for full entity list, calls SpacedockDependencyGraph.renderDependencyGraph with highlight), CSS styling for section/container/SVG/hover. Commit: `feat(dashboard): integrate dependency DAG graph into entity detail page`
+- [x] Execute Task 6: Backward compatibility verification -- all 70 TypeScript tests pass, all 36 Python tests pass, dependency-graph.js syntax valid. Entities without depends-on: DEPS column blank, detail page graph section hidden, status --next unchanged.
+- [x] All commits use format: `{type}(scope): {description}` -- 5 atomic commits, all feat(dashboard) or feat(status) scope
+- [x] Write ## Stage Report into entity file with all checklist items -- this section
+
+## Stage Report: quality
+
+**All checks PASSED. Auto-advance recommended.**
+
+### Compilation & Tests
+
+1. **TypeScript Type-Check** — DONE
+   - Command: `bunx tsc --noEmit` in tools/dashboard/
+   - Result: PASS — No type errors in feature-changed files (parsing.ts, parsing.test.ts)
+   - Note: Pre-existing bun-types missing error (TS2688) is unrelated infrastructure noise, not caused by this feature
+
+2. **TypeScript Test Suite** — DONE
+   - Command: `bun test`
+   - Result: **PASS** — 70 tests, 0 fails, 175 expect() calls, 1197ms
+   - All tests in parsing.test.ts (feature changes) pass
+
+3. **Python Test Suite** — DONE
+   - Command: `python3 -m pytest tests/test_status_script.py -v`
+   - Result: **PASS** — 36 tests, 0 fails
+   - All 3 new dependency-filter tests pass (test_next_excludes_entities_with_unmet_dependencies, test_next_includes_entities_with_all_deps_shipped, test_next_no_depends_on_still_dispatchable)
+
+4. **JavaScript Syntax Validation** — DONE
+   - Command: `node --check` on dependency-graph.js, app.js, detail.js
+   - Result: **PASS** — All 3 files have valid syntax
+
+### Code Coverage Delta
+
+- **Status:** SKIP — No coverage infrastructure detected in explore stage
+
+### Security Analysis
+
+- **Status:** SKIP — trailofbits/skills marketplace plugin not installed
+
+### API Contract Compatibility
+
+- **Status:** SKIP — No contract/schema files changed in diff
+
+### Migration Safety
+
+- **Status:** SKIP — No migration files in diff
+
+### License Compliance
+
+- **Status:** SKIP — No lockfile/dependency changes in diff
+
+### Advance Decision
+
+✅ **ALL CHECKS PASS** — Auto-advance to gate stage.
+
+Summary:
+- Type-check: PASS (feature files clean, pre-existing bun-types noise ignored)
+- TypeScript tests: PASS (70/70, all new tests included)
+- Python tests: PASS (36/36, all dependency-logic tests pass)
+- JS syntax: PASS (3/3 files valid)
+- Coverage: SKIP (no infra)
+- Security: SKIP (tools not available)
+- Contracts/Migrations/License: SKIP (no changes)

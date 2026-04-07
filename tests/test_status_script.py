@@ -390,6 +390,90 @@ class TestNextOption(unittest.TestCase):
             data_lines = result.stdout.strip().split('\n')[2:]
             self.assertEqual(len(data_lines), 0)
 
+    def test_next_excludes_entities_with_unmet_dependencies(self):
+        """Entities whose depends-on targets are not shipped should not be dispatchable."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            make_pipeline(tmpdir, README_WITH_STAGES, entities={
+                'entity-a.md': textwrap.dedent("""\
+                    ---
+                    id: 001
+                    status: backlog
+                    title: Entity A
+                    score: 0.9
+                    source: test
+                    worktree:
+                    ---
+                    """),
+                'entity-b.md': textwrap.dedent("""\
+                    ---
+                    id: 002
+                    status: backlog
+                    title: Entity B
+                    score: 0.8
+                    source: test
+                    depends-on: [001]
+                    worktree:
+                    ---
+                    """),
+            })
+            result = run_status(tmpdir, '--next', script_path=self.script_path)
+            lines = result.stdout.strip().split('\n')
+            slugs = [l.split()[1] for l in lines[2:] if l.strip()]
+            self.assertIn('entity-a', slugs)
+            self.assertNotIn('entity-b', slugs)
+
+    def test_next_includes_entities_with_all_deps_shipped(self):
+        """Entities whose depends-on targets are all shipped should be dispatchable."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            make_pipeline(tmpdir, README_WITH_STAGES, entities={
+                'entity-b.md': textwrap.dedent("""\
+                    ---
+                    id: 002
+                    status: backlog
+                    title: Entity B
+                    score: 0.8
+                    source: test
+                    depends-on: [001]
+                    worktree:
+                    ---
+                    """),
+            }, archived={
+                'entity-a.md': textwrap.dedent("""\
+                    ---
+                    id: 001
+                    status: done
+                    title: Entity A
+                    score: 0.9
+                    source: test
+                    worktree:
+                    ---
+                    """),
+            })
+            result = run_status(tmpdir, '--next', '--archived', script_path=self.script_path)
+            lines = result.stdout.strip().split('\n')
+            slugs = [l.split()[1] for l in lines[2:] if l.strip()]
+            self.assertIn('entity-b', slugs)
+
+    def test_next_no_depends_on_still_dispatchable(self):
+        """Entities without depends-on field should be unaffected."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            make_pipeline(tmpdir, README_WITH_STAGES, entities={
+                'entity-c.md': textwrap.dedent("""\
+                    ---
+                    id: 003
+                    status: backlog
+                    title: Entity C
+                    score: 0.7
+                    source: test
+                    worktree:
+                    ---
+                    """),
+            })
+            result = run_status(tmpdir, '--next', script_path=self.script_path)
+            lines = result.stdout.strip().split('\n')
+            slugs = [l.split()[1] for l in lines[2:] if l.strip()]
+            self.assertIn('entity-c', slugs)
+
     def test_empty_pipeline(self):
         """--next with no entities outputs header only."""
         with tempfile.TemporaryDirectory() as tmpdir:

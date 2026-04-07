@@ -73,6 +73,34 @@
     return colors[status] || "#8b949e";
   }
 
+  function parseDependsOn(raw) {
+    if (!raw) return [];
+    var matches = raw.match(/\d+/g);
+    if (!matches) return [];
+    return matches.map(Number);
+  }
+
+  function depStatus(entity, allEntities) {
+    var deps = parseDependsOn(entity["depends-on"]);
+    if (deps.length === 0) return { status: "none", deps: [] };
+    var idToEntity = {};
+    allEntities.forEach(function (e) {
+      var eid = parseInt(e.id, 10);
+      if (!isNaN(eid)) idToEntity[eid] = e;
+    });
+    var resolved = [];
+    var blocked = false;
+    deps.forEach(function (depId) {
+      var dep = idToEntity[depId];
+      var depName = dep ? (dep.title || dep.slug) : ("entity " + depId);
+      var depSt = dep ? dep.status : "unknown";
+      var done = depSt === "shipped" || depSt === "done";
+      resolved.push({ id: depId, name: depName, status: depSt, done: done });
+      if (!done) blocked = true;
+    });
+    return { status: blocked ? "blocked" : "clear", deps: resolved };
+  }
+
   function sortEntities(entities, column, ascending) {
     return entities.slice().sort(function (a, b) {
       var va = a[column] || "";
@@ -218,7 +246,7 @@
           : wf.entities.filter(function (e) { return e.archived !== "true" && e.status !== "shipped"; });
         var sort = sortState[wfIdx] || { column: "id", asc: true };
         var sorted = sortEntities(filtered, sort.column, sort.asc);
-        var columns = ["id", "slug", "status", "title", "score", "source"];
+        var columns = ["id", "slug", "status", "deps", "title", "score", "source"];
 
         var table = document.createElement("table");
         var thead = document.createElement("thead");
@@ -266,6 +294,27 @@
               badge.style.color = statusColor(val);
               badge.textContent = val;
               td.appendChild(badge);
+            } else if (col === "deps") {
+              var ds = depStatus(e, wf.entities);
+              if (ds.status === "none") {
+                td.textContent = "";
+              } else {
+                var depBadge = el("span", { className: "status-badge dep-badge dep-" + ds.status });
+                if (ds.status === "blocked") {
+                  depBadge.style.background = "#f8514922";
+                  depBadge.style.color = "#f85149";
+                  depBadge.textContent = "\u26D4 blocked";
+                } else {
+                  depBadge.style.background = "#3fb95022";
+                  depBadge.style.color = "#3fb950";
+                  depBadge.textContent = "\u2705 clear";
+                }
+                var tooltipLines = ds.deps.map(function (d) {
+                  return (d.done ? "\u2713" : "\u2717") + " #" + String(d.id).padStart(3, "0") + " " + d.name + " (" + d.status + ")";
+                });
+                depBadge.title = tooltipLines.join("\n");
+                td.appendChild(depBadge);
+              }
             } else {
               td.textContent = val;
             }

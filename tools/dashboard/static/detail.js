@@ -159,6 +159,41 @@ function renderTags(tags) {
     });
 }
 
+function renderDependencySection(frontmatter) {
+    var section = document.getElementById('dependency-graph-section');
+    var container = document.getElementById('dependency-graph-container');
+    while (container.firstChild) container.removeChild(container.firstChild);
+
+    // Need depends-on to show anything
+    var hasDeps = frontmatter['depends-on'] && frontmatter['depends-on'].trim();
+    if (!hasDeps) {
+        section.style.display = 'none';
+        return;
+    }
+
+    // Fetch all entities to build the graph
+    fetch('/api/workflows')
+        .then(function (res) { return res.json(); })
+        .then(function (workflows) {
+            var allEntities = [];
+            workflows.forEach(function (wf) {
+                wf.entities.forEach(function (e) { allEntities.push(e); });
+            });
+
+            var currentId = parseInt(frontmatter.id, 10) || null;
+            var svg = window.SpacedockDependencyGraph.renderDependencyGraph(allEntities, currentId);
+            if (svg) {
+                container.appendChild(svg);
+                section.style.display = '';
+            } else {
+                section.style.display = 'none';
+            }
+        })
+        .catch(function () {
+            section.style.display = 'none';
+        });
+}
+
 function initScore(scoreStr) {
     var slider = document.getElementById('score-slider');
     var display = document.getElementById('score-display');
@@ -220,6 +255,7 @@ function loadEntity() {
             document.title = (data.frontmatter.title || 'Entity') + ' \u2014 Spacedock';
             renderMetadata(data.frontmatter);
             renderBody(data.body);
+            renderDependencySection(data.frontmatter);
             renderStageReports(data.stage_reports);
             renderTags(data.tags);
             initScore(data.frontmatter.score || '0');
