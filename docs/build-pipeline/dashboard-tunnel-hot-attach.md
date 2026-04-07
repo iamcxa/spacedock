@@ -125,6 +125,158 @@ None.
 
 No coverage infrastructure applicable — this is a shell script + skill doc change, no runtime code.
 
+## TDD Checklist
+
+This is a shell script refactor (no TypeScript runtime changes). No shell test infrastructure exists in this project, so "tests" are manual verification commands run after implementation.
+
+### 1. Extract `do_tunnel_start()` from `do_start()`
+
+**File:** `tools/dashboard/ctl.sh`
+
+**What:** Extract lines 212-258 (the tunnel spawn block inside `do_start()`) into a standalone `do_tunnel_start()` function. This function must:
+- Check dashboard is running (`is_running` or PID_FILE + PORT_FILE exist) — error if not
+- Read `selected_port` from `PORT_FILE` (not from function-local variable)
+- Check `ngrok` is in PATH
+- Kill any existing tunnel (reuse existing cleanup at lines 220-225)
+- Spawn ngrok, write PID file, poll for URL, write URL file
+- **Research correction**: Update URL capture from deprecated `/api/tunnels` (line 239) to `/api/endpoints`. Change grep pattern from `"public_url":"[^"]*"` to `"url":"[^"]*"` (endpoints response uses `"url"` not `"public_url"`)
+
+**Implementation notes:**
+- `do_start()` keeps its `TUNNEL_MODE` gate but calls `do_tunnel_start` instead of inline code
+- `do_tunnel_start()` needs the port — read from `PORT_FILE` since dashboard is already running
+- Host binding (`--host 0.0.0.0` at line 168-169) is a `do_start()` concern and stays there
+
+### 2. Extract `do_tunnel_stop()` from `do_stop()`
+
+**File:** `tools/dashboard/ctl.sh`
+
+**What:** Extract lines 277-283 (tunnel cleanup inside `do_stop()`) into a standalone `do_tunnel_stop()` function. This function must:
+- Check if `TUNNEL_PID_FILE` exists
+- Read PID, kill it, remove `TUNNEL_PID_FILE` and `TUNNEL_URL_FILE`
+- Print "Tunnel stopped." or "Tunnel is not running."
+
+**Implementation notes:**
+- `do_stop()` calls `do_tunnel_stop` instead of inline cleanup
+- `do_tunnel_stop()` is also callable independently (tunnel-only shutdown)
+
+### 3. Add `do_tunnel_status()` function
+
+**File:** `tools/dashboard/ctl.sh`
+
+**What:** New function that reports tunnel state:
+- If `TUNNEL_PID_FILE` exists and PID is alive: print tunnel URL from `TUNNEL_URL_FILE`
+- If PID is dead: clean stale tunnel files, print "Tunnel is not running (cleaned stale PID)."
+- If no PID file: print "Tunnel is not running."
+
+**Implementation notes:**
+- Reuse pattern from `do_status()` lines 341-349 but as standalone output
+
+### 4. Wire `tunnel` top-level subcommand in case dispatch
+
+**File:** `tools/dashboard/ctl.sh`
+
+**What:** Add `tunnel)` case at lines 413-424. Parse sub-action from a second positional argument:
+- `tunnel start` → `do_tunnel_start`
+- `tunnel stop` → `do_tunnel_stop`
+- `tunnel status` → `do_tunnel_status`
+- No sub-action or unknown → print tunnel usage and exit 1
+
+**Implementation notes:**
+- Requires adjusting argument parsing: `CMD` currently consumes the first positional arg. The `tunnel` subcommand needs a second positional arg for the sub-action. Parse this inside the `tunnel)` case block, not in the global arg parser.
+- Update `usage()` to document `tunnel start|stop|status`
+- Update ABOUTME comment (line 3) to include `tunnel` in the subcommand list
+
+### 5. Preserve backward compatibility for `--tunnel` flag
+
+**File:** `tools/dashboard/ctl.sh`
+
+**What:** `ctl.sh start --tunnel` must continue to work. After extracting tunnel logic:
+- `do_start()` still checks `TUNNEL_MODE` at line 168 (host flag) and at the former line 213 block
+- When `TUNNEL_MODE=true`, `do_start()` calls `do_tunnel_start` after the server health check passes
+- `ctl.sh restart --tunnel` also continues to work (restart = stop + start, and start respects `TUNNEL_MODE`)
+
+**Verification command:**
+```bash
+# Syntax check (catches parse errors, unmatched quotes, etc.)
+bash -n tools/dashboard/ctl.sh
+
+# Verify all subcommands are listed in usage
+bash tools/dashboard/ctl.sh --help 2>&1 | grep -q 'tunnel'
+
+# Verify backward compat: --tunnel flag still parsed
+grep -q 'TUNNEL_MODE=true' tools/dashboard/ctl.sh
+```
+
+### 6. Fix SKILL.md share flow
+
+**File:** `skills/dashboard/SKILL.md`
+
+**What:** Change line 82 from:
+```
+"Running, no tunnel" → restart with tunnel: bash {ctl} restart --tunnel --root {project_root}
+```
+to:
+```
+"Running, no tunnel" → start tunnel: bash {ctl} tunnel start --root {project_root}
+```
+
+**Verification command:**
+```bash
+# Confirm no more "restart --tunnel" in share flow
+grep -c 'restart --tunnel' skills/dashboard/SKILL.md  # expect 0
+# Confirm "tunnel start" is present
+grep -c 'tunnel start' skills/dashboard/SKILL.md  # expect >= 1
+```
+
+### 7. Quality gate
+
+**Commands to run after all changes:**
+```bash
+# Shell syntax validation
+bash -n tools/dashboard/ctl.sh
+
+# Existing dashboard tests still pass (no TS runtime changes, but verify nothing broke)
+cd tools/dashboard && bun test
+
+# Grep checks
+grep -q 'do_tunnel_start' tools/dashboard/ctl.sh    # new function exists
+grep -q 'do_tunnel_stop' tools/dashboard/ctl.sh     # new function exists
+grep -q 'do_tunnel_status' tools/dashboard/ctl.sh   # new function exists
+grep -q '/api/endpoints' tools/dashboard/ctl.sh     # deprecated API fixed
+grep -qv '/api/tunnels' tools/dashboard/ctl.sh      # old API removed (or commented)
+grep -q 'tunnel start' skills/dashboard/SKILL.md    # SKILL.md updated
+```
+
+### Implementation order (test-first where possible)
+
+1. Write verification commands first (step 5 + 6 checks) — they should FAIL before implementation
+2. Extract `do_tunnel_stop()` (step 2) — simplest, no new logic
+3. Extract `do_tunnel_start()` (step 1) — includes research correction for `/api/endpoints`
+4. Add `do_tunnel_status()` (step 3) — new but small
+5. Wire case dispatch + update usage (step 4)
+6. Verify backward compat (step 5)
+7. Fix SKILL.md (step 6)
+8. Run quality gate (step 7)
+
+## Stage Report: plan
+
+- [x] Read entity file and research report
+  Entity file at `docs/build-pipeline/dashboard-tunnel-hot-attach.md` — all 10 claims verified, 1 minor correction (deprecated `/api/tunnels`)
+- [x] Search context lake for relevant cached insights
+  Context lake returned research correction for `ctl.sh` (deprecated ngrok API) and entity 023 research report — both consistent with entity body
+- [x] Produce TDD checklist with concrete file paths, test-first ordering, and quality gate steps
+  7-step checklist targeting `tools/dashboard/ctl.sh` (steps 1-5, 7) and `skills/dashboard/SKILL.md` (step 6), with implementation order that verifies assertions fail first
+- [x] Incorporate the research correction (deprecated ngrok API)
+  Step 1 explicitly specifies updating `/api/tunnels` to `/api/endpoints` with the field name change (`"public_url"` to `"url"`)
+- [x] Write plan to entity body
+  TDD Checklist section added above this report
+- [x] Commit plan to main
+  Committed as `d82e2b2` on main
+
+### Summary
+
+Produced a 7-step TDD checklist for this Small-scale shell script refactor. The core work is extracting tunnel lifecycle from `do_start()`/`do_stop()` into three standalone functions (`do_tunnel_start`, `do_tunnel_stop`, `do_tunnel_status`), wiring a new `tunnel` top-level subcommand, and fixing the SKILL.md share flow to use `tunnel start` instead of `restart --tunnel`. The deprecated ngrok `/api/tunnels` endpoint is corrected to `/api/endpoints` as part of the extraction. No TypeScript runtime changes needed. Quality gate uses `bash -n` syntax check, `bun test` for existing dashboard tests, and grep-based assertions.
+
 ## Stage Report: research
 
 - [x] Claims extracted from plan (10 claims)
