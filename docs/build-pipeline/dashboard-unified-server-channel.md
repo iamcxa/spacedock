@@ -269,3 +269,17 @@ None — all claims verified from codebase and/or official Bun docs.
 - [x] Research corrections incorporated — CLAIM-2 correction (use `dashboard.port` not hardcoded 8420), all 4 edge cases addressed: (1) `do_tunnel_start()` guard updated to try `is_channel_running()` as alternative, (2) SIGKILL cleanup race handled via `port_in_use()` validation in `is_channel_running()`, (3) worktree hash addressed in `computeStateDir` documentation note, (4) `do_status_all()` updated to scan `channel_port` files
 - [x] Quality gate steps included — `bun test` (channel + ctl), `bun build` type-check, `bash -n` syntax check, backward compatibility verification
 - [x] Plan committed on branch (3da5241)
+
+## Stage Report: execute
+
+1. **Task 1 complete** — DONE. channel.ts failing tests committed (ac0bcfa). Added `Channel State File` describe block with 5 tests: writeChannelState, writeChannelState actual port, cleanChannelState, cleanChannelState no-op, computeStateDir.
+2. **Task 2 complete** — DONE. channel.ts state file implementation committed (f9b9427). Added `computeStateDir()`, `writeChannelState()`, `cleanChannelState()` exports. Wired into CLI entry point with SIGTERM/SIGINT/exit cleanup handlers and mcp.onclose cleanup. Hash consistency verified (bash shasum == Node crypto.createHash("sha1")). All 15 channel tests pass.
+3. **Task 3 complete** — DONE. ctl.sh failing tests committed (a0d79fc). Added `Channel Detection` describe block with 5 tests: status shows channel, stale cleanup, tunnel without PID, status --all, stop safety.
+4. **Task 4 complete** — DONE. ctl.sh channel detection implementation committed (b1784b8). Added `CHANNEL_PORT_FILE`, `is_channel_running()`, `get_channel_port()`, `clean_stale_channel()`. Updated `do_tunnel_start()` to try channel port when no PID file. Replaced `do_status()` with server+channel dual detection. Replaced `do_status_all()` to scan channel_port files. Two test adjustments: stale cleanup message changed to avoid "channel" substring match, tunnel test timeout increased to 20s (ngrok installed in CI). All 13 ctl tests pass.
+5. **Task 5 complete** — DONE. SKILL.md share flow updated and committed (06090be). Step 1 now mentions "server or channel" detection. Step 3 reads `channel_port` as fallback when `port` file is absent.
+6. **Task 6 complete** — DONE. All integration checks pass:
+   - Channel tests: 15 pass, 0 fail
+   - Ctl tests: 13 pass, 0 fail
+   - Type-check: `bun build` bundles successfully, no TS errors
+   - Bash syntax: `bash -n ctl.sh` clean (exit 0)
+   - Backward compat: all original `Dashboard ctl.sh` tests still pass (server-only mode unmodified)
