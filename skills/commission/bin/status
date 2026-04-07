@@ -225,10 +225,31 @@ def print_status_table(entities, stages):
         print(fmt % (e['id'], e['slug'], e['status'], e['title'], e['score'], e['source']))
 
 
+def parse_depends_on(value):
+    """Parse depends-on field like '[007, 016]' into list of int IDs."""
+    if not value:
+        return []
+    import re
+    matches = re.findall(r'\d+', value)
+    return [int(m) for m in matches]
+
+
 def print_next_table(entities, stages):
     """Print the --next dispatchable entities table."""
     stage_by_name = {s['name']: s for s in stages}
     stage_names = [s['name'] for s in stages]
+    terminal_stages = {s['name'] for s in stages if s.get('terminal', False)}
+
+    # Build ID-to-status map for dependency resolution
+    id_to_status = {}
+    for e in entities:
+        eid = e.get('id', '')
+        if eid:
+            try:
+                id_to_status[int(eid)] = e['status']
+            except ValueError:
+                pass
+
     active_counts = {}
     for e in entities:
         if e['worktree']:
@@ -250,6 +271,17 @@ def print_next_table(entities, stages):
             continue
         if e['worktree']:
             continue
+        # Rule 5: dependency check — all depends-on IDs must be in terminal stages
+        dep_ids = parse_depends_on(e.get('depends-on', ''))
+        if dep_ids:
+            all_met = True
+            for dep_id in dep_ids:
+                dep_status = id_to_status.get(dep_id)
+                if dep_status is None or dep_status not in terminal_stages:
+                    all_met = False
+                    break
+            if not all_met:
+                continue
         if stage_idx + 1 >= len(stage_names):
             continue
         next_stage_name = stage_names[stage_idx + 1]
