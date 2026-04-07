@@ -83,9 +83,22 @@
                     </section>
                     <section class="gate-panel" id="gate-panel" style="display:none;">
                         <h3>Gate Review</h3>
+                        <div id="gate-status" class="gate-status">
+                            <span id="gate-status-badge" class="gate-badge pending">Pending Review</span>
+                        </div>
                         <div id="gate-actions" class="gate-actions">
                             <button id="gate-approve-btn" class="btn gate-btn approve">Approve</button>
                             <button id="gate-request-changes-btn" class="btn gate-btn request-changes">Request Changes</button>
+                        </div>
+                        <div id="gate-confirm" class="gate-confirm" style="display:none;">
+                            <p>Are you sure you want to <strong id="gate-confirm-action"></strong> this gate?</p>
+                            <div class="gate-confirm-actions">
+                                <button id="gate-confirm-yes" class="btn gate-btn approve">Confirm</button>
+                                <button id="gate-confirm-cancel" class="btn btn-small btn-secondary">Cancel</button>
+                            </div>
+                        </div>
+                        <div id="gate-resolved" class="gate-resolved" style="display:none;">
+                            <span id="gate-resolved-text"></span>
                         </div>
                     </section>
                 </aside>

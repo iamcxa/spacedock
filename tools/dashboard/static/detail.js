@@ -440,6 +440,31 @@ function renderComments(thread) {
             card.appendChild(renderSuggestionCard(suggestion));
         });
 
+        // Click sidebar comment → scroll to highlight + flash + show popover
+        (function (commentId) {
+            card.addEventListener('click', function (e) {
+                // Don't trigger if clicking resolve button or suggestion actions
+                if (e.target.closest('.comment-resolve-btn') || e.target.closest('.suggestion-actions')) return;
+                var marks = document.querySelectorAll('.comment-highlight');
+                for (var m = 0; m < marks.length; m++) {
+                    var ids = (marks[m].getAttribute('data-comment-ids') || '').split(',');
+                    if (ids.indexOf(commentId) !== -1) {
+                        var targetMark = marks[m];
+                        targetMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        targetMark.classList.add('comment-highlight-flash');
+                        targetMark.addEventListener('animationend', function () {
+                            this.classList.remove('comment-highlight-flash');
+                        }, { once: true });
+                        // Trigger popover via synthetic click (handled by IIFE click listener)
+                        setTimeout(function () {
+                            targetMark.click();
+                        }, 400);
+                        break;
+                    }
+                }
+            });
+        })(comment.id);
+
         commentThreadsContainer.appendChild(card);
     });
 }
@@ -724,6 +749,8 @@ function rejectSuggestionAction(suggestionId) {
 
   // --- WebSocket for Real-time Gate Status ---
 
+  var cachedComments = null;
+
   var detailWs = null;
   var detailRetryCount = 0;
   var detailMaxRetries = 10;
@@ -777,6 +804,255 @@ function rejectSuggestionAction(suggestionId) {
     detailWs.onerror = function () {};
   }
 
+  // --- Comment Highlights ---
+
+  function applyCommentHighlights(comments) {
+    var bodyEl = document.getElementById('entity-body');
+    if (!bodyEl || !comments || !comments.length) return;
+
+    // Remove existing highlights before re-applying
+    var existingMarks = bodyEl.querySelectorAll('.comment-highlight');
+    for (var m = existingMarks.length - 1; m >= 0; m--) {
+      var parent = existingMarks[m].parentNode;
+      while (existingMarks[m].firstChild) parent.insertBefore(existingMarks[m].firstChild, existingMarks[m]);
+      parent.removeChild(existingMarks[m]);
+    }
+    bodyEl.normalize();
+
+    // Build intervals: [{start, end, commentId, resolved}] on flattened text
+    var walker = document.createTreeWalker(bodyEl, NodeFilter.SHOW_TEXT, null);
+    var node;
+    var fullText = '';
+    var nodeOffsets = []; // {node, start, end}
+    while ((node = walker.nextNode())) {
+      var start = fullText.length;
+      fullText += node.textContent;
+      nodeOffsets.push({ node: node, start: start, end: fullText.length });
+    }
+
+    // Find intervals for each comment's selected_text
+    var intervals = [];
+    for (var i = 0; i < comments.length; i++) {
+      var c = comments[i];
+      if (!c.selected_text) continue;
+      var idx = fullText.indexOf(c.selected_text);
+      if (idx === -1) continue;
+      intervals.push({
+        start: idx,
+        end: idx + c.selected_text.length,
+        commentId: c.id,
+        resolved: c.resolved
+      });
+    }
+    if (!intervals.length) return;
+
+    // Build segment breakpoints for overlapping highlights
+    var points = [];
+    for (var i = 0; i < intervals.length; i++) {
+      points.push(intervals[i].start);
+      points.push(intervals[i].end);
+    }
+    points = points.filter(function (v, idx, arr) { return arr.indexOf(v) === idx; });
+    points.sort(function (a, b) { return a - b; });
+
+    // Build segments: each segment is a range [points[i], points[i+1]) with list of covering comment IDs
+    var segments = [];
+    for (var i = 0; i < points.length - 1; i++) {
+      var segStart = points[i];
+      var segEnd = points[i + 1];
+      var ids = [];
+      var allResolved = true;
+      for (var j = 0; j < intervals.length; j++) {
+        if (intervals[j].start <= segStart && intervals[j].end >= segEnd) {
+          ids.push(intervals[j].commentId);
+          if (!intervals[j].resolved) allResolved = false;
+        }
+      }
+      if (ids.length > 0) {
+        segments.push({ start: segStart, end: segEnd, commentIds: ids, resolved: allResolved });
+      }
+    }
+
+    // Apply highlights by walking segments in reverse (to preserve offsets)
+    for (var s = segments.length - 1; s >= 0; s--) {
+      var seg = segments[s];
+      wrapTextRange(nodeOffsets, seg.start, seg.end, seg.commentIds, seg.resolved);
+    }
+  }
+
+  function wrapTextRange(nodeOffsets, rangeStart, rangeEnd, commentIds, resolved) {
+    for (var i = 0; i < nodeOffsets.length; i++) {
+      var info = nodeOffsets[i];
+      if (info.end <= rangeStart || info.start >= rangeEnd) continue;
+
+      var node = info.node;
+      var nodeStart = info.start;
+      var localStart = Math.max(0, rangeStart - nodeStart);
+      var localEnd = Math.min(node.textContent.length, rangeEnd - nodeStart);
+
+      if (localStart > 0) {
+        var before = node.splitText(localStart);
+        var splitLen = node.textContent.length;
+        info.node = before;
+        info.start = nodeStart + splitLen;
+        node = before;
+        localEnd = localEnd - localStart;
+        localStart = 0;
+      }
+      if (localEnd < node.textContent.length) {
+        node.splitText(localEnd);
+      }
+
+      var mark = document.createElement('mark');
+      mark.className = 'comment-highlight' + (resolved ? ' resolved' : '');
+      mark.setAttribute('data-comment-ids', commentIds.join(','));
+      node.parentNode.insertBefore(mark, node);
+      mark.appendChild(node);
+      break;
+    }
+  }
+
+  // --- Comment Popover ---
+
+  var activePopover = null;
+
+  function showCommentPopover(mark, comments) {
+    hideCommentPopover();
+    var ids = (mark.getAttribute('data-comment-ids') || '').split(',');
+    var matching = comments.filter(function (c) { return ids.indexOf(c.id) !== -1; });
+    if (!matching.length) return;
+
+    var popover = document.createElement('div');
+    popover.className = 'comment-popover';
+
+    for (var i = 0; i < matching.length; i++) {
+      var c = matching[i];
+      var div = document.createElement('div');
+      div.className = 'popover-comment';
+
+      var authorSpan = document.createElement('span');
+      authorSpan.className = 'popover-author';
+      authorSpan.textContent = c.author;
+      div.appendChild(authorSpan);
+
+      var timeSpan = document.createElement('span');
+      timeSpan.className = 'popover-time';
+      timeSpan.textContent = new Date(c.timestamp).toLocaleString();
+      div.appendChild(timeSpan);
+
+      var textDiv = document.createElement('div');
+      textDiv.className = 'popover-text';
+      textDiv.textContent = c.content;
+      div.appendChild(textDiv);
+
+      popover.appendChild(div);
+
+      // Thread replies
+      if (c.thread && c.thread.length) {
+        for (var r = 0; r < c.thread.length; r++) {
+          var reply = c.thread[r];
+          var replyDiv = document.createElement('div');
+          replyDiv.className = 'popover-comment';
+
+          var replyAuthor = document.createElement('span');
+          replyAuthor.className = 'popover-author';
+          replyAuthor.textContent = reply.author;
+          replyDiv.appendChild(replyAuthor);
+
+          var replyTime = document.createElement('span');
+          replyTime.className = 'popover-time';
+          replyTime.textContent = new Date(reply.timestamp).toLocaleString();
+          replyDiv.appendChild(replyTime);
+
+          var replyText = document.createElement('div');
+          replyText.className = 'popover-text';
+          replyText.textContent = reply.content;
+          replyDiv.appendChild(replyText);
+
+          popover.appendChild(replyDiv);
+        }
+      }
+
+      // Reply form (only for first/primary comment)
+      if (i === 0) {
+        var form = document.createElement('div');
+        form.className = 'popover-reply-form';
+        var input = document.createElement('input');
+        input.className = 'popover-reply-input';
+        input.placeholder = 'Reply...';
+        input.type = 'text';
+        var btn = document.createElement('button');
+        btn.className = 'popover-reply-btn';
+        btn.textContent = 'Reply';
+        var capturedId = c.id;
+        btn.onclick = function () {
+          var text = input.value.trim();
+          if (!text) return;
+          submitReply(capturedId, text);
+        };
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') btn.click();
+        });
+        form.appendChild(input);
+        form.appendChild(btn);
+        popover.appendChild(form);
+      }
+    }
+
+    // Position relative to mark element
+    var rect = mark.getBoundingClientRect();
+    var bodyEl = document.getElementById('entity-body');
+    var bodyRect = bodyEl.getBoundingClientRect();
+    popover.style.top = (rect.bottom - bodyRect.top + 8) + 'px';
+    popover.style.left = (rect.left - bodyRect.left) + 'px';
+
+    bodyEl.style.position = 'relative';
+    bodyEl.appendChild(popover);
+    activePopover = popover;
+
+    setTimeout(function () {
+      document.addEventListener('click', handlePopoverOutsideClick);
+    }, 0);
+  }
+
+  function hideCommentPopover() {
+    if (activePopover && activePopover.parentNode) {
+      activePopover.parentNode.removeChild(activePopover);
+    }
+    activePopover = null;
+    document.removeEventListener('click', handlePopoverOutsideClick);
+  }
+
+  function handlePopoverOutsideClick(e) {
+    if (activePopover && !activePopover.contains(e.target) && !e.target.classList.contains('comment-highlight')) {
+      hideCommentPopover();
+    }
+  }
+
+  function submitReply(commentId, content) {
+    apiFetch('/api/entity/comment/reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: entityPath,
+        comment_id: commentId,
+        content: content,
+      }),
+    }).then(function () {
+      hideCommentPopover();
+      if (typeof loadComments === 'function') loadComments();
+      window.loadEntity();
+    });
+  }
+
+  document.getElementById('entity-body').addEventListener('click', function (e) {
+    var mark = e.target.closest('.comment-highlight');
+    if (mark && cachedComments) {
+      e.stopPropagation();
+      showCommentPopover(mark, cachedComments);
+    }
+  });
+
   // --- Initialize ---
 
   var _originalLoadEntity = loadEntity;
@@ -792,6 +1068,13 @@ function rejectSuggestionAction(suggestionId) {
         renderTags(data.tags);
         initScore(data.frontmatter.score || '0');
         if (typeof loadComments === 'function') loadComments();
+
+        // Fetch comments and apply highlights
+        apiFetch('/api/entity/comments?path=' + encodeURIComponent(entityPath))
+          .then(function (threadData) {
+            cachedComments = threadData.comments || [];
+            applyCommentHighlights(cachedComments);
+          });
 
         var entityStatus = data.frontmatter.status;
         if (workflowStages) {
@@ -814,6 +1097,15 @@ function rejectSuggestionAction(suggestionId) {
           updateGatePanel(data.frontmatter.status, stages);
         });
     });
+  }
+
+  // Apply highlights for already-loaded page (initial load used original loadEntity)
+  if (entityPath) {
+    apiFetch('/api/entity/comments?path=' + encodeURIComponent(entityPath))
+      .then(function (threadData) {
+        cachedComments = threadData.comments || [];
+        applyCommentHighlights(cachedComments);
+      });
   }
 })();
 
@@ -839,19 +1131,27 @@ function rejectSuggestionAction(suggestionId) {
     modal.style.display = "none";
   });
 
+  var shareError = document.getElementById("share-error");
+
   submitBtn.addEventListener("click", function () {
     var password = document.getElementById("share-password").value;
     var label = document.getElementById("share-label-input").value || "Share Link";
     var ttl = parseInt(document.getElementById("share-ttl").value, 10) || 24;
 
     if (!password) {
-      alert("Password is required.");
+      shareError.textContent = "Password is required.";
+      shareError.style.display = "";
       return;
     }
 
     var params = new URLSearchParams(window.location.search);
     var entityPath = params.get("path");
     if (!entityPath) return;
+
+    // Loading state
+    shareError.style.display = "none";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Creating...";
 
     fetch("/api/share", {
       method: "POST",
@@ -864,14 +1164,38 @@ function rejectSuggestionAction(suggestionId) {
         ttlHours: ttl,
       }),
     })
-      .then(function (res) { return res.json(); })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.text().then(function (text) {
+            throw new Error("Server error (" + res.status + "): " + (text || "Unknown error"));
+          });
+        }
+        return res.json();
+      })
       .then(function (data) {
         if (data.token) {
           var url = window.location.origin + "/share/" + data.token;
           shareUrlInput.value = url;
           shareResult.style.display = "block";
+          // Success feedback: highlight and auto-select URL for easy copy
+          shareUrlInput.style.outline = "2px solid #27ae60";
+          shareUrlInput.focus();
+          shareUrlInput.select();
+          setTimeout(function () { shareUrlInput.style.outline = ""; }, 2000);
           loadShareLinks();
+        } else {
+          shareError.textContent = "Unexpected response — no token returned.";
+          shareError.style.display = "";
         }
+      })
+      .catch(function (err) {
+        shareError.textContent = err.message || "Network error — could not reach server.";
+        shareError.style.display = "";
+        shareResult.style.display = "none";
+      })
+      .finally(function () {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Create";
       });
   });
 

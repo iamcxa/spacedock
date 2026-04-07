@@ -10,9 +10,11 @@ import {
   resolveComment,
   acceptSuggestion as acceptSuggestionAction,
   rejectSuggestion as rejectSuggestionAction,
+  addReply,
 } from "./comments";
 import { EventBuffer } from "./events";
 import { ShareRegistry } from "./auth";
+import { openDb } from "./db";
 import type { AgentEvent, AgentEventType, Stage } from "./types";
 import { telemetryInit, captureException, getPosthogJsConfig } from "./telemetry";
 import { updateWorkflowStages } from "./frontmatter-io";
@@ -23,6 +25,7 @@ interface ServerOptions {
   projectRoot: string;
   staticDir?: string;
   logFile?: string;
+  dbPath?: string;  // defaults to ~/.spacedock/dashboard.db
   onChannelMessage?: (content: string, meta?: Record<string, string>) => void;
 }
 
@@ -46,8 +49,9 @@ function jsonResponse(data: unknown, status = 200): Response {
 export function createServer(opts: ServerOptions) {
   const { projectRoot, logFile } = opts;
   const staticDir = opts.staticDir ?? join(dirname(import.meta.dir), "static");
-  const eventBuffer = new EventBuffer(500);
-  const shareRegistry = new ShareRegistry();
+  const db = openDb(opts.dbPath);
+  const eventBuffer = new EventBuffer(db, 500);
+  const shareRegistry = new ShareRegistry(db);
 
   telemetryInit();
 
@@ -212,6 +216,35 @@ export function createServer(opts: ServerOptions) {
             });
             logRequest(req, 200);
             return jsonResponse(comment);
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/comment/reply": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as {
+              path: string;
+              comment_id: string;
+              content: string;
+              author?: "captain" | "fo" | "guest";
+            };
+            if (!body.path) return jsonResponse({ error: "Missing field: path" }, 400);
+            if (!body.comment_id) return jsonResponse({ error: "Missing field: comment_id" }, 400);
+            if (!body.content) return jsonResponse({ error: "Missing field: content" }, 400);
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const reply = addReply(body.path, body.comment_id, {
+              content: body.content,
+              author: body.author ?? "captain",
+            });
+            logRequest(req, 200);
+            return jsonResponse(reply);
           } catch (err) {
             captureException(err instanceof Error ? err : new Error(String(err)));
             logRequest(req, 500);
@@ -817,6 +850,109 @@ export function createServer(opts: ServerOptions) {
               return jsonResponse({ error: "Internal server error" }, 500);
             }
           }
+
+          if (subRoute === "comment/reply" && req.method === "POST") {
+            try {
+              const body = await req.json() as {
+                path: string;
+                comment_id: string;
+                content: string;
+              };
+              if (!body.path || !body.comment_id || !body.content) {
+                logRequest(req, 400);
+                return jsonResponse({ error: "Missing required fields" }, 400);
+              }
+              if (!shareRegistry.isInScope(token, body.path)) {
+                logRequest(req, 403);
+                return jsonResponse({ error: "Entity not in share scope" }, 403);
+              }
+              if (!validatePath(body.path, projectRoot)) {
+                logRequest(req, 403);
+                return jsonResponse({ error: "Forbidden" }, 403);
+              }
+              const reply = addReply(body.path, body.comment_id, {
+                content: body.content,
+                author: "guest",
+              });
+              logRequest(req, 200);
+              return jsonResponse(reply);
+            } catch (err) {
+              captureException(err instanceof Error ? err : new Error(String(err)));
+              logRequest(req, 500);
+              return jsonResponse({ error: "Internal server error" }, 500);
+            }
+          }
+        }
+
+        // Scoped share gate decision route: /api/share/:token/gate/decision
+        const shareGateMatch = pathname.match(/^\/api\/share\/([a-f0-9]+)\/gate\/decision$/);
+        if (shareGateMatch && req.method === "POST") {
+          const token = shareGateMatch[1];
+          const link = shareRegistry.get(token);
+          if (!link) {
+            logRequest(req, 404);
+            return jsonResponse({ error: "Share link not found or expired" }, 404);
+          }
+          try {
+            const body = await req.json() as {
+              entity_path: string;
+              decision: string;
+              message?: string;
+            };
+            if (!body.entity_path || !body.decision) {
+              logRequest(req, 400);
+              return jsonResponse({ error: "Missing required fields: entity_path, decision" }, 400);
+            }
+            if (body.decision !== "approved" && body.decision !== "changes_requested") {
+              logRequest(req, 400);
+              return jsonResponse({ error: "Invalid decision: must be 'approved' or 'changes_requested'" }, 400);
+            }
+            if (!shareRegistry.isInScope(token, body.entity_path)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Entity not in share scope" }, 403);
+            }
+            if (!validatePath(body.entity_path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            // Derive entity_slug and stage from entity detail
+            const detail = getEntityDetail(body.entity_path);
+            const pathParts = body.entity_path.split("/");
+            const filename = pathParts[pathParts.length - 1];
+            const entitySlug = filename.replace(/\.md$/, "");
+            const stage = detail.frontmatter.status || "";
+
+            // Record gate_decision event
+            const event: AgentEvent = {
+              type: "gate_decision",
+              entity: entitySlug,
+              stage,
+              agent: "guest",
+              timestamp: new Date().toISOString(),
+              detail: body.decision,
+            };
+            const seq = publishEvent(event);
+
+            // Forward gate decision to FO via channel
+            if (opts.onChannelMessage) {
+              const content = body.decision === "approved"
+                ? `Gate approved for ${entitySlug} at stage "${stage}"`
+                : `Changes requested for ${entitySlug} at stage "${stage}"`;
+              opts.onChannelMessage(content, {
+                type: "gate_decision",
+                decision: body.decision,
+                entity_path: body.entity_path,
+                entity_slug: entitySlug,
+                stage,
+              });
+            }
+            logRequest(req, 200);
+            return jsonResponse({ ok: true, seq });
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
         }
 
         // Serve share page for /share/:token
@@ -886,7 +1022,7 @@ export function createServer(opts: ServerOptions) {
     server.publish("activity", JSON.stringify({ type: "channel_status", connected }));
   }
 
-  return Object.assign(server, { eventBuffer, publishEvent, broadcastChannelStatus, shareRegistry });
+  return Object.assign(server, { db, eventBuffer, publishEvent, broadcastChannelStatus, shareRegistry });
 }
 
 // CLI entry point -- only runs when executed directly

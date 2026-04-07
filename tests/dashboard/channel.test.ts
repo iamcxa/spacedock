@@ -260,6 +260,7 @@ describe("Channel Integration", () => {
       hostname: "127.0.0.1",
       projectRoot: tmpDir,
       staticDir: join(tmpDir, "static"),
+      dbPath: ":memory:",
     });
     const baseUrl = `http://localhost:${srv.port}`;
 
