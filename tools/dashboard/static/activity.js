@@ -135,14 +135,27 @@
       var msg = JSON.parse(ev.data);
       if (msg.type === "replay") {
         if (msg.events && msg.events.length > 0) {
-          msg.events.forEach(function (entry) {
+          // Detect DB wipe: server restarted with fresh DB (seq counter reset to 1)
+          // while we still hold entries from the old DB. Without this guard, stored
+          // seqs would phantom-dedup new unrelated events that reuse the same numbers.
+          if (history.detectSeqReset(msg.events, lastSeq)) {
+            history.clear();
+            clearFeedDom();
+            lastSeq = 0;
+          }
+          var fresh = history.dedupReplay(msg.events, lastSeq);
+          fresh.forEach(function (entry) {
             renderEntry(entry);
+            history.append(entry);
             if (entry.seq > lastSeq) lastSeq = entry.seq;
           });
         }
       } else if (msg.type === "event") {
-        renderEntry(msg.data);
-        if (msg.data.seq > lastSeq) lastSeq = msg.data.seq;
+        if (msg.data.seq > lastSeq) {
+          renderEntry(msg.data);
+          history.append(msg.data);
+          lastSeq = msg.data.seq;
+        }
       } else if (msg.type === "channel_status") {
         setChannelStatus(msg.connected);
       }
@@ -592,6 +605,44 @@
 
   if (sendBtn) {
     sendBtn.addEventListener("click", sendMessage);
+  }
+
+  // Safe DOM removal — avoid innerHTML = "" so we never parse attacker-controlled
+  // HTML from stored events. Uses removeChild loop per XSS guardrails.
+  function clearFeedDom() {
+    if (!feedContainer) return;
+    while (feedContainer.firstChild) {
+      feedContainer.removeChild(feedContainer.firstChild);
+    }
+  }
+
+  function clearHistory() {
+    history.clear();
+    clearFeedDom();
+    lastSeq = 0;
+    if (feedContainer) {
+      var empty = document.createElement("p");
+      empty.className = "empty-state";
+      empty.textContent = "No activity yet.";
+      feedContainer.appendChild(empty);
+    }
+  }
+
+  var clearBtn = document.getElementById("clear-history-btn");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", clearHistory);
+  }
+
+  // Hydrate from localStorage BEFORE WebSocket connects — instant-paint UX.
+  // Replay dedup later uses lastSeq seeded here so server-side replay events
+  // with seq <= hydratedLastSeq are skipped.
+  var hydrated = history.hydrate();
+  if (hydrated.length > 0) {
+    removeEmptyState();
+    for (var h = 0; h < hydrated.length; h++) {
+      renderEntry(hydrated[h]);
+      if (hydrated[h].seq > lastSeq) lastSeq = hydrated[h].seq;
+    }
   }
 
   // Start disconnected — channel.ts will broadcast status when connected
