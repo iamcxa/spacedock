@@ -128,6 +128,17 @@ export function parseStagesBlock(filepath: string): Stage[] | null {
   }));
 }
 
+/**
+ * Parse a depends-on frontmatter value like "[007, 016]" into number[].
+ * Returns empty array if the value is empty/undefined.
+ */
+export function parseDependsOn(raw: string | undefined): number[] {
+  if (!raw) return [];
+  const matches = raw.match(/\d+/g);
+  if (!matches) return [];
+  return matches.map(Number);
+}
+
 export function scanEntities(directory: string): Entity[] {
   const glob = new Bun.Glob("*.md");
   const files = Array.from(glob.scanSync({ cwd: directory })).sort();

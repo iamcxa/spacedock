@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { parseStagesBlock } from "./parsing";
+import { parseStagesBlock, parseDependsOn } from "./parsing";
 
 const TMP = join(import.meta.dir, "__test_parsing__");
 
@@ -83,5 +83,31 @@ describe("parseStagesBlock extended fields", () => {
     expect(stages!.find((s) => s.name === "pr-review")!.gate).toBe(true);
     expect(stages!.find((s) => s.name === "shipped")!.terminal).toBe(true);
     expect(stages!.find((s) => s.name === "shipped")!.worktree).toBe(false);
+  });
+});
+
+describe("parseDependsOn", () => {
+  test("parses bracket-wrapped ID list", () => {
+    expect(parseDependsOn("[007, 016]")).toEqual([7, 16]);
+  });
+
+  test("parses single ID", () => {
+    expect(parseDependsOn("[003]")).toEqual([3]);
+  });
+
+  test("returns empty array for empty string", () => {
+    expect(parseDependsOn("")).toEqual([]);
+  });
+
+  test("returns empty array for undefined", () => {
+    expect(parseDependsOn(undefined)).toEqual([]);
+  });
+
+  test("handles no brackets (bare numbers)", () => {
+    expect(parseDependsOn("007, 016")).toEqual([7, 16]);
+  });
+
+  test("handles whitespace variations", () => {
+    expect(parseDependsOn("[ 007 , 016 ]")).toEqual([7, 16]);
   });
 });
