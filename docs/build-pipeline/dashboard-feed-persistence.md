@@ -597,3 +597,10 @@ Delta: **+3 tests, +8 expects, 0 regressions**. New tests are `appendMany` empty
 9. **Write Stage Report listing each numbered checklist item with DONE/SKIPPED/FAILED** — DONE (this section). Evidence: review summary above shows 0 CODE, 2 SUGGESTION fixed, 1 DOC fixed, 2 ADVISORY deferred, 1 round used, quality gates 93/220 pass.
 
 **AWAITING CAPTAIN GATE.** PR #12 remains in draft state. Do not mark ready until FO confirms captain has approved the self-review summary.
+
+### Captain gate addendum (post-approval)
+
+- **Captain gate**: APPROVED after manual UAT (instant-paint verified, clear-history button functional, dashboard restarted from worktree at .worktrees/auto-researcher-dashboard-feed-persistence served the new code via shared state-dir-by-shasum mechanism).
+- **Mark ready**: `gh pr ready 12` — DONE, PR transitioned from draft to ready-for-review.
+- **CI gate**: SKIPPED — no status checks configured for the spacedock repo (verified via gh pr view 12 statusCheckRollup empty).
+- **Announce**: SKIPPED — no demo artifacts (small internal-tooling feature).
