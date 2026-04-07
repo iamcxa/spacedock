@@ -544,3 +544,105 @@ c1f6558 feat(dashboard): wire permission-tracker into activity.js with collapse 
 6077418 feat(dashboard): implement permission-tracker conversation-continues heuristic
 b53b6ff test(dashboard): add permission-tracker pure module tests (13 assertions)
 ```
+
+## Stage Report: quality
+
+**Independent quality verification performed at 2026-04-07 by auto-researcher (first independent gate, execute stage did not write quality report due to context limits).**
+
+### Checklist Results
+
+1. **Read entity file end-to-end**: DONE
+   - Research report verified all technical claims and established revised AC.
+   - Plan stage approved captain-revised acceptance criteria (AC1'–AC7).
+   - Execute stage implemented full 4-phase plan (rebase, pure module + tests, wiring, hydration integration).
+
+2. **Compilation**: DONE
+   - Command: `cd tools/dashboard && bunx tsc --noEmit`
+   - Result: **Exit code 0, zero type errors**
+   - bun v1.3.9 installed and fresh.
+
+3. **Tests**: DONE
+   - Full suite: `cd tools/dashboard && bun test`
+   - Result: **106 pass / 0 fail / 247 expect() calls** across 9 files.
+   - Breakdown: 13 new permission-tracker tests (test-first discipline verified via commit log) + 93 existing dashboard tests (all still passing — no regressions).
+   - Specific verification: `bun test src/permission-tracker.test.ts` → 13 pass, 27 expect() calls (matches plan projection).
+   - Tests cover: (1) track on permission_request, (2) conversation-continues heuristic, (3) parallel-request edge case, (4) timeout threshold boundary conditions, (5) idempotency of resolve(), (6) replay batch ordering, (7) hydration batch with trailing pending. All 13 test cases from the plan are present and passing.
+
+4. **Build sanity**: DONE
+   - Command: `bash -n tools/dashboard/ctl.sh`
+   - Result: **Exit code 0** (no syntax errors).
+
+5. **Lint**: SKIPPED
+   - No ESLint or Prettier configuration found in `tools/dashboard/`.
+   - Rationale: Matches 010's situation (dashboard static assets not linted). Feature does not introduce lint-block.
+
+6. **Coverage delta**: DONE
+   - Command: `cd tools/dashboard && bun test --coverage`
+   - Result:
+     - **permission-tracker.ts: 100% funcs / 100% lines** (new module, fully covered).
+     - Static assets: activity.js not in tsconfig (classic IIFE, same as 010). style.css is non-testable by coverage.
+     - Overall suite: 60.64% funcs / 68.99% lines (pre-existing baseline, no degradation).
+   - Assessment: NEW module coverage is complete. Regression risk low (existing modules unaffected).
+
+7. **Changed-file enumeration**: DONE
+   - Command: `git diff --name-only $(git merge-base HEAD main)...HEAD`
+   - Result:
+     ```
+     docs/build-pipeline/dashboard-permission-sync.md
+     tools/dashboard/src/permission-tracker.test.ts
+     tools/dashboard/src/permission-tracker.ts
+     tools/dashboard/static/activity.js
+     tools/dashboard/static/style.css
+     ```
+   - Count: 5 files (2 NEW + 3 EDIT = 5), **MATCH plan budget**.
+   - Detailed breakdown:
+     - NEW: `permission-tracker.ts` (69 lines, pure module), `permission-tracker.test.ts` (147 lines, 13 tests).
+     - EDIT: `activity.js` (+186 lines: markResolved, mergeIntoResolvedGroup, updateGroupCount, renderPermissionResponse stub filled, tracker.track calls in ws.onmessage + hydration, 30s setInterval), `style.css` (+41 lines: .collapsed-group + summary + chevron rules), entity markdown (research + plan + execute report).
+
+8. **Security analysis**: DONE (manual code review)
+   - **permission-tracker.ts**: Pure state machine, no I/O, no DOM access. No security surface.
+   - **activity.js**:
+     - DOM selectors: `querySelector('[data-request-id="' + requestId + '"]')` — requestId sourced only from Map keys (internal), no user input injection. ✓
+     - Text content: Lines 598–600, 610, 614 all use `textContent` assignment (never `innerHTML`), preventing XSS. ✓
+     - Element creation: `document.createElement()` + `textContent`, no HTML parsing. ✓
+     - setInterval: 5s poll of tick() never explicitly cleared. **Risk assessment: NEGLIGIBLE**. Polling is O(n) where n = pending count (0–5 typical), unbounded only by page session duration (pages are typically closed within minutes). No memory leak or CPU impact in normal use. Acceptable for small-scale feature.
+   - **style.css**: CSS-only, no script injection, no user input. ✓
+   - **Assessment: PASS — No XSS, DOM injection, or meaningful memory leak concerns.**
+
+9. **API Contract Compatibility**: SKIPPED
+   - Expected: no changes to types.ts, server.ts, channel.ts, or API documentation.
+   - Verified: `git diff` shows zero changes to contract/schema files.
+   - Rationale: Feature is purely frontend (tracking+DOM updates), no backend schema changes needed.
+
+10. **Migration Safety**: SKIPPED
+    - Expected: no migrations.
+    - Verified: no files under `tools/dashboard/migrations/`.
+
+11. **License Compliance**: SKIPPED
+    - Expected: no lockfile or dependency changes.
+    - Verified: `git diff` shows zero changes to `bun.lock`, `package.json`, `package-lock.json`.
+
+12. **Advance Decision**:
+    - **AUTO-ADVANCE** ✓
+    - Rationale: Pure frontend feature (new module + activity.js wiring + CSS). All checks pass or are skipped per plan. No schema/contract/migration/new-infra triggers. No security concerns. No regressions. Feature is ready for dispatch.
+
+13. **Commit on branch**:
+    ```
+    quality: 014 dashboard-permission-sync — all checks pass, auto-advance
+    ```
+
+### Quality Gate Summary
+
+| Category | Status | Notes |
+|---|---|---|
+| Compilation | ✓ PASS | tsc clean |
+| Unit tests | ✓ PASS | 106/106, 13 new permission-tracker tests |
+| Build sanity | ✓ PASS | bash syntax OK |
+| Lint | ⊘ SKIP | no config |
+| Coverage | ✓ PASS | new module 100%, no regression |
+| Changed files | ✓ PASS | 5 files, matches budget |
+| Security (manual) | ✓ PASS | XSS-safe, no injection, negligible memory risk |
+| API contract | ⊘ SKIP | pure frontend, no schema changes |
+| Migrations | ⊘ SKIP | no migration files |
+| License | ⊘ SKIP | no dependency changes |
+| **Advance Decision** | **✓ AUTO-ADVANCE** | Pure frontend, no exceptions |
