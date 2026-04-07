@@ -1,7 +1,7 @@
 ---
 id: 010
 title: Dashboard Feed Persistence — localStorage History for Activity Feed
-status: pr-draft
+status: pr-review
 source: channel conversation
 started: 2026-04-07T14:24:24Z
 completed:
@@ -9,7 +9,7 @@ verdict:
 score: 0.8
 worktree: .worktrees/auto-researcher-dashboard-feed-persistence
 issue:
-pr:
+pr: "iamcxa/spacedock#12"
 intent: feature
 scale: Small
 project: spacedock
