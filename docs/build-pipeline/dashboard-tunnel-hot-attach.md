@@ -1,13 +1,13 @@
 ---
 id: 023
 title: Dashboard Tunnel Hot-Attach — ngrok 無需重啟 Server
-status: explore
+status: research
 source: captain feedback (021 share flow testing)
 started: 2026-04-07T09:15:00Z
 completed:
 verdict:
 score: 0.8
-worktree: .worktrees/spacedock-ensign-dashboard-tunnel-hot-attach
+worktree:
 issue:
 pr:
 intent: feature
@@ -35,3 +35,25 @@ RATIONALE:    `/dashboard share` 會觸發 restart 重啟 server，導致 Channe
 - `/dashboard share` 使用 `tunnel start` 而非 `restart --tunnel`
 - 現有 `ctl.sh start --tunnel` 保持 backward compatible
 - Channel WebSocket 連線在 share flow 中不中斷
+
+## Explore Results
+
+**Scale:** Small (2 files to modify)
+
+**File map:**
+
+| File | Layer | Purpose |
+|------|-------|---------|
+| `tools/dashboard/ctl.sh` | infra | Extract tunnel spawn block into `tunnel start/stop/status` subcommands |
+| `skills/dashboard/SKILL.md` | skill | Fix `/dashboard share` flow: `restart --tunnel` → `tunnel start` |
+
+**Notes:**
+- Health check bug fix (`return 0` → `break`) already landed on main (commit `2ac2388`)
+- ngrok is an external OS process — it connects to `localhost:PORT` as a reverse proxy
+- Dashboard MCP channel uses stdio transport, has no `instructions` field, single static `reply` tool
+- ngrok lifecycle is entirely managed by `ctl.sh`, zero references in `server.ts` or `channel.ts`
+- #44731 (MCP instruction delta fork) assessed as **zero risk** — tunnel start/stop does not touch MCP transport
+
+## Coverage Infrastructure
+
+No coverage infrastructure applicable — this is a shell script + skill doc change, no runtime code.
