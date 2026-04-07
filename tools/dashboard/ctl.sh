@@ -187,6 +187,28 @@ do_tunnel_start() {
     fi
 }
 
+do_tunnel_status() {
+    if [[ ! -f "$TUNNEL_PID_FILE" ]]; then
+        echo "Tunnel is not running."
+        return 0
+    fi
+
+    local tunnel_pid
+    tunnel_pid="$(cat "$TUNNEL_PID_FILE")"
+
+    if ! kill -0 "$tunnel_pid" 2>/dev/null; then
+        rm -f "$TUNNEL_PID_FILE" "$TUNNEL_URL_FILE"
+        echo "Tunnel is not running (cleaned stale PID)."
+        return 0
+    fi
+
+    local tunnel_url="(unknown)"
+    if [[ -f "$TUNNEL_URL_FILE" ]]; then
+        tunnel_url="$(cat "$TUNNEL_URL_FILE")"
+    fi
+    echo "Tunnel:  ${tunnel_url} (PID: ${tunnel_pid})"
+}
+
 do_tunnel_stop() {
     if [[ ! -f "$TUNNEL_PID_FILE" ]]; then
         echo "Tunnel is not running."
