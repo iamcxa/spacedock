@@ -4,7 +4,7 @@ title: Dashboard Dependency Graph — Entity 相依性視覺化與 Blocked 偵�
 status: plan
 source: captain direction (pipeline operation observation)
 started: 2026-04-07T10:45:00Z
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-dependency-graph
 completed:
 verdict:
 score: 0.85
