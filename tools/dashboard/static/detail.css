@@ -158,9 +158,11 @@ body {
     position: sticky;
     top: 1.5rem;
     align-self: start;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
 }
 
-.metadata-panel, .management-panel {
+.metadata-panel, .management-panel, .link-sharing {
     background: #161b22;
     border: 1px solid #21262d;
     border-radius: 8px;
@@ -168,7 +170,7 @@ body {
     margin-bottom: 1rem;
 }
 
-.metadata-panel h3, .management-panel h3 {
+.metadata-panel h3, .management-panel h3, .link-sharing h3 {
     font-size: 0.9rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
