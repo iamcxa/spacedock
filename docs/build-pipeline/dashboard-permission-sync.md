@@ -1,13 +1,13 @@
 ---
 id: 014
 title: Dashboard Permission Sync — Auto-resolve Permission Requests Answered in CLI
-status: explore
+status: research
 source: UI testing feedback
-started:
+started: 2026-04-07T14:24:24Z
 completed:
 verdict:
 score: 0.8
-worktree:
+worktree: .worktrees/auto-researcher-dashboard-permission-sync
 issue:
 pr:
 intent: feature
