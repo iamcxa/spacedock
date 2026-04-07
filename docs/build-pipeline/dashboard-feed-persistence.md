@@ -136,6 +136,237 @@ The plan should include:
 9. Edge case: detect DB wipe (seq reset) by storing a server-boot-timestamp or install-id alongside events and clearing localStorage if it changes
 10. Keep existing `capFeedItems()` DOM cap at 100 — localStorage cap (500) is independent
 
+## Acceptance Criteria Reframe (from research corrections)
+
+Applying CLAIM-5 correction: the server-side DB at `~/.spacedock/dashboard.db` already persists events across daemon restart (`tools/dashboard/src/db.ts:39-42`, `server.ts:642` calls `eventBuffer.getAll()` on WS open). Therefore the real user win is **instant-paint UX**, not data-loss recovery.
+
+Revised acceptance criteria framing:
+- ~~Feed survives daemon restart~~ → **Feed appears instantly on page load, before WebSocket replay completes** (zero flash of empty state)
+- Activity feed events persist in localStorage across page refresh / tab close / browser restart
+- On DOMContentLoaded, feed hydrates from localStorage **before** `connect()` is invoked at `activity.js:518`
+- WebSocket replay dedupes against hydrated entries via `lastSeq` comparison (replay events with `seq <= hydratedLastSeq` are not re-rendered)
+- New events (WS `replay` and `event` branches) append to localStorage after `renderEntry`
+- Cap at 500 entries (matching `server.ts:53` `new EventBuffer(db, 500)`) with oldest-first eviction
+- `QuotaExceededError` handled gracefully: evict oldest 50 entries and retry once; if still failing, log and continue (feed still renders in DOM)
+- Clear-history UI control that removes the localStorage key and clears the feed DOM
+- **Seq-reset safety net**: detect DB wipe via `replay.events[0].seq === 1 && storedLastSeq > 0` → clear localStorage before hydrating the fresh replay (avoids phantom-dedup of reused seq numbers)
+
+## TDD Plan
+
+**Scale confirmed**: Small. Affected files:
+- `tools/dashboard/static/activity.js` (1 file edited — 4 concrete edit points)
+- `tools/dashboard/src/activity-history.ts` (NEW — pure module, extracted for testability under bun:test)
+- `tools/dashboard/src/activity-history.test.ts` (NEW — bun:test suite)
+- `tools/dashboard/static/index.html` (minor — add Clear History button element)
+
+Scale is still Small (2 new files + 2 edits). No escalation to captain needed.
+
+### Rationale: extract a pure module for testability
+
+The existing dashboard test infrastructure only covers `src/**/*.ts` via `bun:test` (see `tools/dashboard/tsconfig.json` `"include": ["src/**/*.ts"]` and `tools/dashboard/README.md:164-176`). There is **zero** test tooling for `static/*.js` (no jsdom, no playwright, no Vitest). Rather than introduce new tooling for a Small entity, the plan extracts the persistence logic into a pure `src/activity-history.ts` module that:
+
+- Takes `localStorage` (or a mock `Storage` object) as a constructor dependency — trivially injectable in `bun:test`
+- Exposes pure functions: `hydrate()`, `append(entry)`, `dedupReplay(events, lastSeq)`, `clear()`, `detectSeqReset(replayEvents, lastSeq)`
+- Is imported into `static/activity.js` via a tiny `<script>` shim (bundled via `bun build` into `static/dist/activity-history.js`, OR — simpler for greenfield — transpile-free by authoring the module as browser-compatible ESM and loading via `<script type="module">`)
+
+**Decision**: author `src/activity-history.ts` as a plain ESM module with no Bun-specific APIs, then let the test suite import it directly. For the browser side, the simplest path is to **author the same logic twice** if bundling is absent — once in `src/activity-history.ts` (for tests) and once inline in `static/activity.js` (for runtime). Before executing, the plan's implementer should verify with a single `grep "script.*type=.module" tools/dashboard/static/index.html` whether the dashboard already uses ES modules; if yes, use a shared module; if no, duplicate the logic (acceptable for Small scale; document the duplication with `// ABOUTME` comments pointing to the canonical copy).
+
+### Ordered task list (TDD: tests first)
+
+#### Phase 1 — Pure module + tests (no DOM, no WebSocket)
+
+**Task 1.1**: Create `tools/dashboard/src/activity-history.ts` skeleton
+- Export class `ActivityHistory` with constructor `(storage: Storage, key: string, capacity: number)`
+- Export interface `StoredEntry` matching `SequencedEvent` shape from `tools/dashboard/src/types.ts:91-94` (`{seq: number, event: AgentEvent}`)
+- Stub methods that return empty arrays / noop so the test file compiles
+
+**Task 1.2**: Create `tools/dashboard/src/activity-history.test.ts` with the following concrete assertions (write ALL assertions BEFORE implementing):
+
+```ts
+import { describe, test, expect, beforeEach } from "bun:test";
+import { ActivityHistory } from "./activity-history";
+
+// Mock Storage implementing the Web Storage API surface
+class MockStorage implements Storage { /* Map-backed, throws QuotaExceededError on demand */ }
+
+describe("ActivityHistory.hydrate", () => {
+  test("returns [] when key is empty", () => { /* ... */ });
+  test("returns parsed entries when key contains valid JSON array", () => { /* ... */ });
+  test("returns [] and clears key when JSON is malformed", () => { /* ... */ });
+  test("returns [] when stored value is not an array", () => { /* ... */ });
+});
+
+describe("ActivityHistory.append", () => {
+  test("appends a new entry and persists to storage", () => { /* ... */ });
+  test("evicts oldest entries when count exceeds capacity", () => {
+    // given capacity=3, append 5 entries; expect stored length === 3 and seqs === [3,4,5]
+  });
+  test("on QuotaExceededError, evicts oldest 50 entries and retries setItem", () => {
+    // mock storage throws once then succeeds; expect final count = originalCount - 50 + 1
+  });
+  test("on persistent QuotaExceededError, returns false without throwing", () => { /* ... */ });
+});
+
+describe("ActivityHistory.dedupReplay", () => {
+  test("given seq=5 already in localStorage, when replay sends seq=5 again, returns empty array", () => { /* ... */ });
+  test("given lastSeq=5, when replay sends [3,4,5,6,7], returns only [6,7]", () => { /* ... */ });
+  test("given lastSeq=0 (no history), returns all replay events", () => { /* ... */ });
+});
+
+describe("ActivityHistory.detectSeqReset", () => {
+  test("returns true when replay[0].seq === 1 and storedLastSeq > 0", () => { /* ... */ });
+  test("returns false when replay[0].seq === 1 and storedLastSeq === 0 (fresh install)", () => { /* ... */ });
+  test("returns false when replay[0].seq > 1 (normal resume)", () => { /* ... */ });
+  test("returns false when replay is empty", () => { /* ... */ });
+});
+
+describe("ActivityHistory.clear", () => {
+  test("removes the storage key", () => { /* ... */ });
+  test("subsequent hydrate() returns []", () => { /* ... */ });
+});
+
+describe("ActivityHistory integration scenarios", () => {
+  test("full lifecycle: append 10, hydrate, dedup replay of [5..15], result has 15 entries no duplicates", () => { /* ... */ });
+  test("seq reset scenario: 10 entries stored, replay [1,2,3] triggers clear + fresh hydrate", () => { /* ... */ });
+  test("namespace key `spacedock.dashboard.activity.v1` is used consistently", () => { /* ... */ });
+});
+```
+
+**Task 1.3**: Run `bun test tools/dashboard/src/activity-history.test.ts` — **confirm all tests FAIL** (red phase of TDD).
+
+**Task 1.4**: Implement `ActivityHistory` in `src/activity-history.ts`:
+- Storage key: `"spacedock.dashboard.activity.v1"` (versioned; future schema bumps → `v2`)
+- Capacity: constructor parameter, default 500 (matches `server.ts:53`)
+- `hydrate()`: try/catch around `JSON.parse`; bad data → `clear()` and return `[]`
+- `append(entry)`: push to internal array, slice to capacity, `setItem`; on `QuotaExceededError` (check both `err.name === "QuotaExceededError"` and `err.code === 22 || err.code === 1014` per MDN), evict oldest 50 and retry once
+- `dedupReplay(events, lastSeq)`: `return events.filter(e => e.seq > lastSeq)`
+- `detectSeqReset(events, storedLastSeq)`: `return events.length > 0 && events[0].seq === 1 && storedLastSeq > 0`
+- `clear()`: `storage.removeItem(key)`
+
+**Task 1.5**: Run `bun test tools/dashboard/src/activity-history.test.ts` — confirm all tests PASS (green phase).
+
+#### Phase 2 — Wire into `static/activity.js`
+
+**Task 2.1**: Check if dashboard uses `<script type="module">` (run `grep "script.*module" tools/dashboard/static/index.html`). Based on result:
+- **If yes**: add `import { ActivityHistory } from "./dist/activity-history.js";` and add a `bun build` step
+- **If no** (expected per current IIFE pattern at `activity.js:1-519`): duplicate the pure logic inline inside the IIFE as `var history = (function () { ... })();` with `// ABOUTME` comment pointing to `src/activity-history.ts` as canonical
+
+**Task 2.2**: Edit `tools/dashboard/static/activity.js` — **4 concrete edit points**:
+
+1. **Line 9** — replace `var lastSeq = 0;` with:
+   ```js
+   var lastSeq = 0;
+   var history = new ActivityHistory(window.localStorage, "spacedock.dashboard.activity.v1", 500);
+   ```
+
+2. **Before line 518 `connect()` call** — add hydration hook:
+   ```js
+   // Hydrate from localStorage BEFORE WebSocket connects for instant-paint UX
+   var hydrated = history.hydrate();
+   if (hydrated.length > 0) {
+     removeEmptyState();
+     hydrated.forEach(function (entry) {
+       renderEntry(entry);
+       if (entry.seq > lastSeq) lastSeq = entry.seq;
+     });
+   }
+   connect();
+   ```
+
+3. **Lines 53-68 `ws.onmessage` replay branch** — add seq-reset detection + persistence:
+   ```js
+   if (msg.type === "replay") {
+     if (msg.events && msg.events.length > 0) {
+       // Detect DB wipe: server sent seq=1 while we have stored entries → clear and re-hydrate
+       if (history.detectSeqReset(msg.events, lastSeq)) {
+         history.clear();
+         clearFeedDom();  // safe DOM removal helper (see Task 2.4)
+         lastSeq = 0;
+       }
+       var fresh = history.dedupReplay(msg.events, lastSeq);
+       fresh.forEach(function (entry) {
+         renderEntry(entry);
+         history.append(entry);
+         if (entry.seq > lastSeq) lastSeq = entry.seq;
+       });
+     }
+   } else if (msg.type === "event") {
+     if (msg.data.seq > lastSeq) {
+       renderEntry(msg.data);
+       history.append(msg.data);
+       lastSeq = msg.data.seq;
+     }
+   }
+   ```
+
+4. **After `capFeedItems()` at line 146** — add safe DOM helper and `clearHistory()` function:
+   ```js
+   // Safe DOM removal — avoids innerHTML assignment (XSS-hardening, matches project guardrails)
+   function clearFeedDom() {
+     if (!feedContainer) return;
+     while (feedContainer.firstChild) {
+       feedContainer.removeChild(feedContainer.firstChild);
+     }
+   }
+
+   function clearHistory() {
+     history.clear();
+     clearFeedDom();
+     lastSeq = 0;
+     // Optional: re-render empty-state placeholder here if needed
+   }
+   ```
+
+**Task 2.3**: Edit `tools/dashboard/static/index.html` — add a Clear History button near `<div id="activity-feed">` (research pointed to `index.html:25,37`):
+   ```html
+   <button id="clear-history-btn" type="button" title="Clear local history">Clear history</button>
+   ```
+   Wire the click handler in `activity.js` bottom-of-IIFE initializer block (around line 510):
+   ```js
+   var clearBtn = document.getElementById("clear-history-btn");
+   if (clearBtn) clearBtn.addEventListener("click", clearHistory);
+   ```
+
+#### Phase 3 — Quality gates
+
+**Task 3.1**: Run quality gate commands from `tools/dashboard/README.md:164-176`:
+```bash
+cd tools/dashboard
+bun test                    # all suites incl. activity-history.test.ts must pass
+bunx tsc --noEmit           # no type errors (covers src/activity-history.ts)
+bash -n ctl.sh              # shell syntax check (unchanged file, sanity only)
+```
+
+**Task 3.2**: Manual smoke test (documented but not automated — Small scale):
+1. `tools/dashboard/ctl.sh start --channel`
+2. Open dashboard, trigger a few events
+3. Refresh page → feed should paint **immediately** (before "Connecting..." → "Live" transition)
+4. Click "Clear history" → feed empties → refresh → still empty (until WS replay)
+5. Stop dashboard, delete `~/.spacedock/dashboard.db`, restart → replay sends seq=1 while stored lastSeq>0 → localStorage should clear and re-hydrate from fresh replay
+
+**Task 3.3**: Verify no regressions in existing tests:
+```bash
+cd tools/dashboard && bun test
+# Expected: all existing suites (auth, comments, db, discovery, frontmatter-io, gate, parsing) still pass, plus new activity-history suite
+```
+
+### Quality gate commands (exact, verified)
+
+Verified from `tools/dashboard/README.md:164-176`:
+- `bun test` — runs all `*.test.ts` under `src/` via `bun:test`
+- `bunx tsc --noEmit` — type-check `src/**/*.ts` per `tsconfig.json`
+- `bun test --coverage` — optional coverage report
+- `bash -n ctl.sh` — daemon launcher syntax check
+
+### Files touched summary
+
+| File | Action | Why |
+|------|--------|-----|
+| `tools/dashboard/src/activity-history.ts` | NEW | Pure, testable persistence module |
+| `tools/dashboard/src/activity-history.test.ts` | NEW | bun:test suite (hydrate, append, dedup, reset, clear, integration) |
+| `tools/dashboard/static/activity.js` | EDIT | 4 hooks: init (line 9), hydrate-before-connect (line 518), ws.onmessage dedup+persist (lines 53-68), clearHistory fn + wire-up (near line 510) |
+| `tools/dashboard/static/index.html` | EDIT | Add `<button id="clear-history-btn">` |
+
 ## Stage Report: research
 
 - [x] Read entity file and extract technical claims from brainstorming spec — DONE (10 claims extracted covering localStorage limits, seq dedup, hydration ordering, EventBuffer parity)
@@ -146,3 +377,23 @@ The plan should include:
 - [x] Cache verified patterns and corrections to the context lake — DONE via PreToolUse insight hooks that fired during Read/Grep operations on `events.ts`, `activity.js`, `types.ts`, `server.ts`; findings in this report are the primary cache for plan stage
 - [x] Write Research Report section to the entity file and commit on the auto-researcher branch — DONE (this section); commit to follow
 - [x] Write Stage Report section with DONE/SKIPPED/FAILED per checklist item — DONE (this section)
+
+## Stage Report: plan
+
+- [x] **1. Read entity file end-to-end** — DONE. Read Brainstorming Spec, Acceptance Criteria, 10 Technical Claims, Research Report (10 verified, 4 corrections), and the existing 10-item Plan Stage Checklist left by research.
+- [x] **2. Search context lake for cached patterns** — DONE. Context-lake `PreToolUse:Read` hooks surfaced cached insights for `tools/dashboard/static/activity.js` (entity 015 — DOM IDs are stable), `tools/dashboard/src/events.ts` (EventBuffer ring buffer with seq AUTOINCREMENT), and `tools/dashboard/package.json` (no post-install hook). No additional manual context-lake queries were needed — hooks delivered relevant insights inline.
+- [x] **3. Apply research corrections — reframe acceptance criteria** — DONE. Added a new `## Acceptance Criteria Reframe (from research corrections)` section to the entity body. Reframed "feed survives daemon restart" → "feed appears instantly on page load before WebSocket replay completes", noting that the server DB at `~/.spacedock/dashboard.db` already persists events, so the win is instant-paint UX (per CLAIM-5 correction). Also added explicit clauses for the dedup-by-seq, capacity=500, QuotaExceededError handling, install-id-free seq-reset detection, and Clear History UI.
+- [x] **4. Convert Plan Stage Checklist into TDD-ordered task list** — DONE. Wrote a `## TDD Plan` section organized into three phases:
+    - **Phase 1 (tests-first, pure module)**: Tasks 1.1-1.5 — create `src/activity-history.ts` skeleton, write `src/activity-history.test.ts` with concrete assertions covering hydrate (4 cases), append + capacity eviction (4 cases), dedupReplay (3 cases), detectSeqReset (4 cases), clear (2 cases), integration (3 cases) — total ~20 assertions including the install-id namespace edge case (handled via seq-reset detection rather than a stored install-id), QuotaExceededError fallback, and clear-history. TDD red→green ordering enforced (Task 1.3 = red, Task 1.5 = green).
+    - **Phase 2 (wiring)**: Tasks 2.1-2.3 — concrete edit points in `static/activity.js` with line-number anchors verified against research: line 9 (`lastSeq` init), pre-line-518 hydration before `connect()`, lines 53-68 (`ws.onmessage` replay branch), `renderEntry` integration confirmed at lines 118-133. Storage key `spacedock.dashboard.activity.v1` (versioned). Capacity 500 hardcoded — verified to match server wiring at `tools/dashboard/src/server.ts:53` `new EventBuffer(db, 500)`, no TODO needed. Also added `index.html` button for clear-history. Replaced an `innerHTML = ""` snippet with a safe `clearFeedDom()` helper using `removeChild` loop after security-reminder hook flagged XSS risk.
+    - **Phase 3 (quality gates)**: Tasks 3.1-3.3 — exact verified commands `bun test`, `bunx tsc --noEmit`, `bash -n ctl.sh` from `tools/dashboard/README.md:164-176`. Verified via direct `Read` of README; `package.json` has no scripts so README is the canonical source. Added a manual smoke-test recipe (5 steps) for the instant-paint, clear-history, and seq-reset scenarios since static JS has no automated DOM test infrastructure.
+- [x] **5. Confirm scale: Small** — DONE. Final file count: 2 NEW files (`src/activity-history.ts`, `src/activity-history.test.ts`) + 2 EDITED files (`static/activity.js`, `static/index.html`). Still Small per spacedock scale rubric. **No escalation to captain needed.**
+- [x] **6. Write `## TDD Plan` section + commit** — DONE. The `## TDD Plan` and `## Acceptance Criteria Reframe` sections are now in the entity file. Commit to follow this stage report on branch `auto-researcher/dashboard-feed-persistence`.
+- [x] **7. Write `## Stage Report` section listing each numbered checklist item** — DONE (this section).
+
+### Notes for execute stage
+
+1. **Test infrastructure decision**: Static JS has zero test tooling. The plan extracts persistence logic into a pure `src/activity-history.ts` module so it can be tested under existing `bun:test` infrastructure with a mock `Storage` implementation. The browser side either imports the module (if `<script type="module">` is in use — verify with single `grep` in Task 2.1) or duplicates the logic inline with an `// ABOUTME` reference back to the canonical TS source. Both paths preserve the Small scale.
+2. **Install-id replacement**: Research suggested namespacing seq with an install-id to survive DB wipes. The plan opts for a simpler equivalent: `detectSeqReset()` checks `replay[0].seq === 1 && storedLastSeq > 0`. This avoids touching server code (which would have escalated scale to Medium) while still handling the wipe-and-restart scenario.
+3. **XSS hardening**: A first draft used `feedContainer.innerHTML = ""` to clear the DOM. The pre-edit security hook flagged this; the plan now uses a safe `clearFeedDom()` helper with `removeChild` in a while-loop. Execute stage must follow the safe pattern.
+4. **Dependent edge cases not in scope**: Multi-tab synchronization (one tab clears history, other tab still has it) is intentionally out of scope — single-captain assumption from the brainstorming spec holds. If captain raises this later, follow-up entity can add a `storage` event listener.
