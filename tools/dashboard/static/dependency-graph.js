@@ -146,6 +146,7 @@
         label: ent ? ("#" + String(id).padStart(3, "0")) : ("#" + String(id).padStart(3, "0") + "?"),
         title: ent ? (ent.title || ent.slug) : "unknown",
         status: ent ? ent.status : "unknown",
+        path: ent ? (ent.path || null) : null,
         x: 0,
         y: 0,
       });
@@ -295,10 +296,17 @@
     var g = svgEl("g", {
       class: isHighlight ? "dag-node dag-node-highlighted" : "dag-node",
       "data-id": node.id,
+      style: node.path ? "cursor: pointer;" : "",
     });
     var cx = node.x;
     var cy = node.y;
     var color = nodeColor(node.status);
+
+    if (node.path) {
+      g.addEventListener("click", function () {
+        window.location.href = "/detail?path=" + encodeURIComponent(node.path);
+      });
+    }
 
     g.appendChild(svgEl("rect", {
       x: cx - NODE_W / 2,

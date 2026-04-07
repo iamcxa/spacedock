@@ -341,3 +341,47 @@ The previous `renderDependencySection()` fed the full entity list to `renderDepe
 - Python: 36/36 pass
 - JS syntax: 3/3 clean
 - Branch pushed to origin: `f2f0fa1`
+
+## Stage Report: execute-cycle-2
+
+### Summary
+Cycle 2 UX follow-up complete. DAG nodes in the detail page dependency graph are now clickable (navigate to target entity's detail page). DEPS column badge IDs in the entity table are each individually clickable with `stopPropagation` to avoid triggering the row click. `cursor:pointer` added to both. All tests green, JS syntax clean, pushed to branch.
+
+### Checklist
+
+1. **DONE** — Sync branch with latest main
+   - `git fetch origin main && git merge origin/main --no-edit`: Already up to date.
+
+2. **DONE** — Make DAG nodes clickable in dependency-graph.js (non-focus must navigate)
+   - Added `path` field to node data in `buildGraph` (populated from `ent.path`).
+   - In `renderDagNode`: if `node.path` exists, attached `click` event listener that navigates to `/detail?path=<encoded-path>`.
+
+3. **DONE** — Add cursor:pointer for clickable DAG nodes
+   - `renderDagNode` sets inline `style="cursor: pointer;"` on the `<g>` element when `node.path` is set.
+
+4. **DONE** — Make DEPS badge IDs individually clickable in app.js
+   - Refactored badge rendering in the `deps` column branch: prefix icon/arrow is a non-clickable span; each dep ID is its own `<span>` with click handler navigating to `/detail?path=<encoded-path>`.
+   - Added `path` field to `depStatus()` resolved deps (populated from `dep.path`).
+
+5. **DONE** — Add cursor:pointer for clickable DEPS badge IDs
+   - Each clickable ID span gets `style.cursor = "pointer"` and `style.textDecoration = "underline"`.
+
+6. **DONE** — Click handler must not trigger parent row click (stopPropagation)
+   - Each ID span click handler calls `evt.stopPropagation()` before navigating.
+
+7. **DONE** — TypeScript tests pass
+   - `bun test`: 70/70 pass, 175 expect() calls, 1224ms.
+
+8. **DONE** — Python tests pass
+   - `python3 -m pytest tests/test_status_script.py -q`: 36/36 pass, 1.01s.
+
+9. **DONE** — JS syntax clean
+   - `node --check` on app.js, dependency-graph.js, detail.js: all pass (no output = clean).
+
+10. **DONE** — Commit + push to branch
+
+11. **DONE** — Write ## Stage Report: execute-cycle-2 with summary (this section)
+
+### Files Changed
+- `tools/dashboard/static/dependency-graph.js` — `buildGraph` node now includes `path`; `renderDagNode` adds `cursor:pointer` style and click handler.
+- `tools/dashboard/static/app.js` — `depStatus` resolved deps now include `path`; DEPS badge renders each ID as individually clickable span with `stopPropagation`.

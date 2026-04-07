@@ -95,7 +95,7 @@
       var depName = dep ? (dep.title || dep.slug) : ("entity " + depId);
       var depSt = dep ? dep.status : "unknown";
       var done = depSt === "shipped" || depSt === "done";
-      resolved.push({ id: depId, name: depName, status: depSt, done: done });
+      resolved.push({ id: depId, name: depName, status: depSt, done: done, path: dep ? (dep.path || null) : null });
       if (!done) blocked = true;
     });
     return { status: blocked ? "blocked" : "clear", deps: resolved };
@@ -300,18 +300,37 @@
                 td.textContent = "";
               } else {
                 var depBadge = el("span", { className: "status-badge dep-badge dep-" + ds.status });
-                var depIds = ds.deps.map(function (d) {
-                  return String(d.id).padStart(3, "0");
-                }).join(", ");
-                if (ds.status === "blocked") {
-                  depBadge.style.background = "#f8514922";
-                  depBadge.style.color = "#f85149";
-                  depBadge.textContent = "\u{1F6AB} \u2192 " + depIds;
-                } else {
-                  depBadge.style.background = "#3fb95022";
-                  depBadge.style.color = "#3fb950";
-                  depBadge.textContent = "\u2192 " + depIds;
-                }
+                var badgeColor = ds.status === "blocked" ? "#f85149" : "#3fb950";
+                depBadge.style.background = badgeColor + "22";
+                depBadge.style.color = badgeColor;
+
+                // Prefix icon/arrow (non-clickable)
+                var prefix = document.createElement("span");
+                prefix.textContent = ds.status === "blocked" ? "\u{1F6AB} \u2192 " : "\u2192 ";
+                depBadge.appendChild(prefix);
+
+                // Each dep ID as an individually clickable span
+                ds.deps.forEach(function (d, i) {
+                  if (i > 0) {
+                    var sep = document.createElement("span");
+                    sep.textContent = ", ";
+                    depBadge.appendChild(sep);
+                  }
+                  var idSpan = document.createElement("span");
+                  idSpan.textContent = String(d.id).padStart(3, "0");
+                  if (d.path) {
+                    idSpan.style.cursor = "pointer";
+                    idSpan.style.textDecoration = "underline";
+                    idSpan.addEventListener("click", (function (depPath) {
+                      return function (evt) {
+                        evt.stopPropagation();
+                        window.location.href = "/detail?path=" + encodeURIComponent(depPath);
+                      };
+                    })(d.path));
+                  }
+                  depBadge.appendChild(idSpan);
+                });
+
                 var tooltipLines = ds.deps.map(function (d) {
                   return (d.done ? "\u2713" : "\u2717") + " #" + String(d.id).padStart(3, "0") + " " + d.name + " (" + d.status + ")";
                 });
