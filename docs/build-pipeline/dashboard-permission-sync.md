@@ -684,3 +684,69 @@ b53b6ff test(dashboard): add permission-tracker pure module tests (13 assertions
 10. **Commit entity body update on branch**: DONE (see commit below).
 
 11. **Stage Report written**: DONE (this section).
+
+## Stage Report: pr-review
+
+### Self-Review Summary
+
+**Tooling availability**: pr-review-toolkit — NOT AVAILABLE (ToolSearch returned no match). trailofbits/skills — NOT AVAILABLE. Proceeding with manual pre-scan and security diff review.
+
+### Checklist
+
+1. **Read entity file end-to-end**: DONE. Read all sections: Brainstorming Spec, Acceptance Criteria (original + reframe), 8 Technical Claims, Research Report (4 verified / 3 corrected / 1 unverifiable / Architectural Correction), TDD Plan (4 phases), Stage Reports for research / plan / execute / quality / pr-draft, PR Reference, and the 4 self-review annotations on PR #13.
+
+2. **Self-review (lightweight pre-scan)**: DONE.
+   - **CLAUDE.md compliance**: No violations found. DOM manipulation uses safe `textContent`/`createElement` patterns (no unsafe HTML insertion). No fabricated version numbers. Commit messages follow project conventions.
+   - **TODO/FIXME/XXX scan**: Zero matches across all `tools/dashboard/**/*.{js,ts,css}` files.
+   - **Unused imports/variables**: No unused imports in `permission-tracker.test.ts`. In `activity.js`, `permissionTracker`, `buildTrackedEvent`, and `markResolved` are all used via function hoisting within the IIFE (confirmed: `permissionTracker` used at lines 233-238, 246-250, 679, 705, 834, 844; `buildTrackedEvent` at lines 234, 246, 833; `markResolved` at lines 237, 249, 836, 846). No false positives.
+   - **4 PR comment annotations re-validated**: All 4 comments still point to the correct lines in the current code:
+     - `activity.js:121` — heuristic rationale (IIFE starts at line 121, correct)
+     - `activity.js:634` — sibling merge logic (`next.remove()` at line 634, correct)
+     - `activity.js:833` — hydration timestamp (`new Date(hydrated[h].event.timestamp).getTime()` at line 833, correct)
+     - `activity.js:705` — renderPermissionResponse (`permissionTracker.resolve(requestId)` at line 705, correct)
+
+3. **Security diff review (manual)**: DONE.
+   - **DOM manipulation safety**: All new DOM operations use `textContent` assignments (lines 598-600, 610, 614) and `createElement()` — never unsafe HTML string insertion methods. The only `innerHTML` reference in `activity.js` is a comment (line 795) explaining why `clearFeedDom` avoids it. XSS-safe. PASS.
+   - **setInterval cleanup**: The 5s poll at line 842-848 is never cleared. Assessment: ACCEPTABLE. Dashboard is an SPA — the interval lives for the page lifetime. No teardown path exists or is needed. The poll body is O(n) where n = pending permission count (0-5 typical). No memory leak or CPU concern.
+   - **Collapse-group DOM bookkeeping edge cases**:
+     - Orphaned nodes: `card.parentNode.insertBefore(details, card)` (line 652) followed by `details.appendChild(card)` (line 653) — `appendChild` auto-removes from prior parent. No orphan.
+     - Double-merge: `markResolved` has idempotency guard at line 592 (`classList.contains("resolved")` early return). Same card can never enter `mergeIntoResolvedGroup` twice. Safe.
+     - Sandwiched merge: `while (next.children.length > 1)` (line 631) correctly skips `children[0]` (the `<summary>`) and moves only card children. After loop, `next.remove()` at line 634 cleans up the empty group shell. Sound.
+     - `sendPermissionVerdict` path: adds `.resolved` at line 680, then calls `mergeIntoResolvedGroup` at line 687. If heuristic later tries to resolve same card, `markResolved` idempotency guard blocks. Correct.
+   - **querySelector injection**: `feedContainer.querySelector('[data-request-id="' + requestId + '"]')` at line 590 — `requestId` is sourced from internal Map keys (never user input). Safe.
+   - **Assessment: PASS — No XSS, DOM injection, orphaned nodes, double-merge, or memory leak concerns.**
+
+4. **Classify all findings**: DONE.
+   - CODE findings: 0
+   - SUGGESTION findings: 0
+   - DOC findings: 0
+   - ADVISORY findings: 1 (see below)
+
+5. **Fix CODE/SUGGESTION findings**: SKIPPED — none found.
+
+6. **Review summary**:
+
+| Category | Count | Action |
+|---|---|---|
+| CODE (must fix) | 0 | — |
+| SUGGESTION (should fix) | 0 | — |
+| DOC (nice to fix) | 0 | — |
+| ADVISORY (note only) | 1 | Noted below |
+
+**ADVISORY item (deferred, no fix needed)**:
+- **CSS `.perm-verdict` rule specificity overlap**: `.permission-card .perm-verdict` (lines 361-364) and `.permission-card.resolved .perm-verdict` (lines 403-406) define overlapping rules. The second is a more-specific selector that overrides the color for resolved cards. This is intentional layering (the resolved variant uses `#6e7681` instead of `#8b949e`), not a bug. No action needed.
+
+**Quality gates verified independently**:
+- `bunx tsc --noEmit`: Exit 0, zero type errors.
+- `bun test`: 106 pass / 0 fail / 247 expect() calls across 9 files.
+- `git diff --stat` vs main: 4 code files changed, 443 insertions, 4 deletions. Matches plan budget.
+
+7. **DO NOT run `gh pr ready`**: ACKNOWLEDGED. Gated on captain approval.
+
+8. **Commit entity update on branch**: Pending (this edit).
+
+9. **Stage Report**: DONE (this section).
+
+### AWAITING CAPTAIN GATE
+
+PR #13 self-review complete. Zero CODE/SUGGESTION findings. One ADVISORY item (CSS specificity overlap, intentional). All quality gates pass. 4 PR annotations verified current. Ready for captain review before `gh pr ready 13`.
