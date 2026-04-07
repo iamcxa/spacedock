@@ -44,6 +44,14 @@ Captain UI verification found 2 issues:
 
 2. **Detail page graph shows whole workflow** — Current `renderDependencySection` renders ALL dependency pairs in the system, causing confusion. Fix: only show the subgraph around the current entity (depth 1: direct parents + direct children). Highlight the current entity with a thick border or distinct color. Add a heading like "Dependencies for #018".
 
+**Cycle 2** (2026-04-07) — pr-review → execute
+Captain UI verification of cycle 1 fixes: core graph works great (018 highlight + subgraph filtering is perfect). One UX follow-up:
+
+1. **DAG nodes and DEPS badges should be clickable** — Currently the DAG nodes in the detail page graph are not clickable, and the DEPS column badges in the entity table are static. Fix: make both navigable to the target entity's detail page.
+   - DAG nodes: clicking a non-focus node navigates to `detail.html?id={slug}` for that entity (focus node does nothing since you're already there, or also clickable to refresh — captain's choice but non-focus must work)
+   - DEPS badges: clicking a dependency ID in the badge text should also navigate. Since badges contain multiple IDs, the whole badge could navigate to the first dep, OR each ID within should be individually clickable (preferred).
+   - Hover cursor should change to `pointer` on clickable elements.
+
 ## Technical Claims
 
 CLAIM-1: [type: project-convention] "Entity frontmatter can support `depends-on: [007, 016]` as a new field with inline YAML array syntax"
