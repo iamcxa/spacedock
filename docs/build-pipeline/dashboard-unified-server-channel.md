@@ -183,3 +183,82 @@ Entity 023 的成果（`do_tunnel_start()` hot-attach 邏輯、ngrok `/api/endpo
 - **Comparison script**: 無
 - **Format**: Bun 原生 text table，無 JSON/LCOV 輸出
 - **Baseline strategy**: 無 CI baseline，本地開發用
+
+## Technical Claims
+
+CLAIM-1: [type: project-convention] "channel.ts writes no state files — no pid/port written to STATE_DIR"
+CLAIM-2: [type: project-convention] "channel.ts hardcodes port 8420 with no CLI override"
+CLAIM-3: [type: project-convention] "channel.ts can determine STATE_DIR hash (needs project root for hashing)"
+CLAIM-4: [type: project-convention] "ctl.sh port_in_use() function exists and works"
+CLAIM-5: [type: project-convention] "createServer() is shared between server.ts and channel.ts with same API surface"
+CLAIM-6: [type: library-api] "Bun supports process signal handling (SIGTERM/SIGINT) for cleanup on exit"
+CLAIM-7: [type: project-convention] "ctl.sh stop only kills its own server.ts PID, not channel.ts"
+CLAIM-8: [type: project-convention] "Entity 023 hot-attach tunnel reads port from STATE_DIR and would need channel_port support"
+
+## Research Report
+
+**Claims analyzed**: 8
+**Recommendation**: PROCEED (with 1 minor correction noted)
+
+### Verified (7 claims)
+
+- CLAIM-1: HIGH — channel.ts writes no state files
+  Codebase: Grep for `STATE_DIR|channel_port|writeFile|mkdirSync` in channel.ts returns zero matches. channel.ts only calls `createServer()` and `mcp.connect()`. No filesystem writes for state.
+
+- CLAIM-3: HIGH — channel.ts CAN determine STATE_DIR hash
+  Codebase: channel.ts lines 150-159 resolve `projectRoot` via `git rev-parse --show-toplevel` (same as ctl.sh). Can compute `PROJ_HASH=$(echo -n "$ROOT" | shasum | cut -c1-8)` equivalent in TS using `crypto.createHash("sha1")`.
+
+- CLAIM-4: HIGH — ctl.sh `port_in_use()` exists
+  Codebase: ctl.sh lines 109-111: `port_in_use() { (echo >/dev/tcp/localhost/"$1") 2>/dev/null }`. Also `find_free_port()` at lines 113-124 scans 8420-8429.
+
+- CLAIM-5: HIGH — `createServer()` is shared
+  Codebase: server.ts:49 exports `createServer(opts: ServerOptions)`. channel.ts:8 imports it. channel.ts:49 calls `createServer({port, hostname:"127.0.0.1", ...onChannelMessage})`. server.ts CLI (line 1057) calls `createServer({port, hostname, ...})` without `onChannelMessage`. Same factory, channel adds MCP callback. Return type (line 1025): `Object.assign(server, { db, eventBuffer, publishEvent, broadcastChannelStatus, shareRegistry })`.
+
+- CLAIM-6: HIGH — Bun supports process signal handling
+  Bun docs (bun.sh/guides/process/os-signals): `process.on("SIGINT", () => {...})` supported. Also `process.on("beforeExit")` and `process.on("exit")`. Standard Node.js `process` global works in Bun. Channel.ts can register `process.on("SIGTERM")` to clean up state file on exit.
+
+- CLAIM-7: HIGH — ctl.sh stop only kills its own server.ts
+  Codebase: `do_stop()` (lines 328-369) reads PID from `$PID_FILE` (`$STATE_DIR/pid`). channel.ts never writes `$STATE_DIR/pid`, so `do_stop()` cannot target it. If no PID file exists → "Dashboard is not running." Safe.
+
+- CLAIM-8: HIGH — Tunnel hot-attach reads from STATE_DIR (with important note)
+  Codebase: `do_tunnel_start()` (lines 141-200): line 143 checks `is_running()` (requires PID file), line 150 reads `$PORT_FILE`. Both in STATE_DIR.
+  **Important**: `do_tunnel_start()` currently gates on `is_running()` (PID file check) at line 143-145. Even if channel.ts writes `channel_port`, `do_tunnel_start()` will REJECT with "dashboard is not running" because no PID file exists. The fix must ALSO add an `is_channel_running()` check that reads `channel_port` file and verifies the port responds, and update `do_tunnel_start()` to try channel_port when `is_running()` returns false.
+
+### Corrected (1 claim)
+
+- CLAIM-2: MINOR CORRECTION — channel.ts does NOT hardcode port 8420 without override
+  Codebase: channel.ts lines 140-148 show `parseArgs` with `--port` option (default "8420"). It DOES accept `--port` CLI override via `parseArgs({ options: { port: { type: "string", default: "8420" } } })`.
+  However, `.mcp.json` spawns with no `--port` arg: `"args": ["tools/dashboard/src/channel.ts"]`. In practice always 8420, but the CLI capability exists.
+  Explore report said "no CLI override" — this is incorrect but has no impact on the approach (channel.ts state file should write whatever port it actually binds to, which it knows from `dashboard.port`).
+
+### Unverifiable (0 claims)
+
+None — all claims verified from codebase and/or official Bun docs.
+
+### Edge Cases Discovered
+
+1. **do_tunnel_start() guard**: The `is_running()` guard at line 143 blocks tunnel start when only channel.ts is active (no PID file). Plan must address this — add `is_channel_running()` as alternative path.
+
+2. **State file cleanup race**: If Claude Code kills channel.ts with SIGKILL (no handler runs), `channel_port` file becomes stale. Detection: `port_in_use()` on the stored port. ctl.sh already has this function — reuse for validation.
+
+3. **Hash consistency**: channel.ts uses `git rev-parse --show-toplevel` which resolves symlinks differently in worktrees. Verify that worktree root and main repo root produce the same hash. In practice: worktrees have their own `.git` file → `git rev-parse --show-toplevel` returns worktree root, not main repo root. This means a worktree channel.ts would compute a DIFFERENT hash than `ctl.sh` run from the main repo. **Mitigation**: channel.ts should resolve to the actual repo root (following `.git` file if it's a worktree pointer), OR the STATE_DIR hash should be documented as "per-working-directory" which is actually correct behavior (different worktrees = different dashboard instances).
+
+4. **status --all gap**: `do_status_all()` (lines 416-453) only scans for `pid` files. It won't show channel-only instances. Plan should add `channel_port` file scanning to `do_status_all()`.
+
+### Recommendation Criteria
+
+- 1 minor correction (CLAIM-2: `--port` CLI exists but unused in .mcp.json) — does not affect control flow or data model
+- 0 architectural corrections
+- 3 edge cases discovered (tunnel guard, cleanup race, worktree hash) — all addressable in plan
+- **Recommendation: PROCEED** — all technical assumptions are sound, correction is minor
+
+## Stage Report: research
+
+- [x] Claims extracted from plan (8 claims)
+- [x] Explorer verification — codebase cross-checked for all 8 claims
+- [x] Context7/Library docs verification — Bun signal handling confirmed via official docs
+- [x] Web research verification — Bun process.on() SIGTERM/SIGINT support confirmed
+- [x] Cross-reference synthesis completed — all HIGH confidence
+- [x] Research report written to entity
+- [x] Corrections documented (1 minor: CLAIM-2 --port CLI exists)
+- [x] Edge cases documented (tunnel guard, cleanup race, worktree hash, status --all)
