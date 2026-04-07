@@ -422,5 +422,5 @@ Pass criteria: steps 3, 4, 5, 6, 7, 8, 9 all succeed. Step 10 demonstrates the k
    - Pure frontend addition + new unit test file.
    - **→ The plan stage's conditional gate should auto-advance.** The first officer can proceed directly to the build stage without captain escalation.
 7. **Write `## TDD Plan` section**: DONE. Section written with the 3-phase structure, explicit module surface, 11 concrete test assertions, exact CSS additions, manual smoke test recipe (10 steps covering all 6 revised ACs plus the accepted limitations), and a file budget table. References-to-research subsection ties every file path back to the verified research findings.
-8. **Commit entity file update on `auto-researcher/dashboard-permission-sync`**: PENDING (follows this edit — see git command below).
+8. **Commit entity file update on `auto-researcher/dashboard-permission-sync`**: DONE. Commit `aa84707` on branch `auto-researcher/dashboard-permission-sync` — `plan: 014 dashboard-permission-sync — conversation-continues heuristic + collapse group`. 1 file changed, 267 insertions.
 9. **Write `## Stage Report: plan` section**: DONE (this section).
