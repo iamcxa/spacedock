@@ -1,13 +1,13 @@
 ---
 id: 020
 title: Dashboard Dependency Graph — Entity 相依性視覺化與 Blocked 偵測
-status: explore
+status: research
 source: captain direction (pipeline operation observation)
-started:
+started: 2026-04-07T10:45:00Z
+worktree: .worktrees/auto-researcher-dashboard-dependency-graph
 completed:
 verdict:
 score: 0.85
-worktree:
 issue:
 pr:
 intent: feature
