@@ -1,7 +1,7 @@
 ---
 id: 020
 title: Dashboard Dependency Graph — Entity 相依性視覺化與 Blocked 偵測
-status: pr-review
+status: execute
 source: captain direction (pipeline operation observation)
 started: 2026-04-07T10:45:00Z
 worktree: .worktrees/spacedock-ensign-dashboard-dependency-graph
@@ -34,6 +34,15 @@ RATIONALE:    Pipeline 運作到 20 個 entity 後，相依性管理變成痛點
 - Hover 或 tooltip 顯示依賴清單和各依賴的完成狀態
 - Detail page 顯示 dependency mini-graph（SVG，複用 visualizer.js pattern）
 - 現有無 `depends-on` field 的 entity 不受影響（向後相容）
+
+### Feedback Cycles
+
+**Cycle 1** (2026-04-07) — pr-review → execute
+Captain UI verification found 2 issues:
+
+1. **DEPS column badge missing IDs** — Current badge shows only "blocked" or "clear" but captain can't tell which entity it depends on. Fix: show the dependency ID inside the badge, e.g., `🚫 → 023` (blocked) or `→ 016` (clear). If multiple deps, show all IDs like `→ 015, 016`.
+
+2. **Detail page graph shows whole workflow** — Current `renderDependencySection` renders ALL dependency pairs in the system, causing confusion. Fix: only show the subgraph around the current entity (depth 1: direct parents + direct children). Highlight the current entity with a thick border or distinct color. Add a heading like "Dependencies for #018".
 
 ## Technical Claims
 
