@@ -124,6 +124,21 @@ format_uptime() {
     fi
 }
 
+# --- tunnel lifecycle ---
+
+do_tunnel_stop() {
+    if [[ ! -f "$TUNNEL_PID_FILE" ]]; then
+        echo "Tunnel is not running."
+        return 0
+    fi
+
+    local tunnel_pid
+    tunnel_pid="$(cat "$TUNNEL_PID_FILE")"
+    kill "$tunnel_pid" 2>/dev/null || true
+    rm -f "$TUNNEL_PID_FILE" "$TUNNEL_URL_FILE"
+    echo "Tunnel stopped."
+}
+
 # --- subcommands ---
 
 do_start() {
@@ -276,11 +291,7 @@ do_stop() {
 
     # Stop tunnel if running
     if [[ -f "$TUNNEL_PID_FILE" ]]; then
-        local tunnel_pid
-        tunnel_pid="$(cat "$TUNNEL_PID_FILE")"
-        kill "$tunnel_pid" 2>/dev/null || true
-        rm -f "$TUNNEL_PID_FILE" "$TUNNEL_URL_FILE"
-        echo "Tunnel stopped."
+        do_tunnel_stop
     fi
 
     # SIGTERM
