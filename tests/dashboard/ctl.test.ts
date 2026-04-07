@@ -214,6 +214,7 @@ describe("Channel Detection", () => {
 
   afterEach(() => {
     try { ctl(tmpDir, "stop"); } catch {}
+    try { ctl(tmpDir, "tunnel", "stop"); } catch {}
     channelServer?.stop();
     channelServer = null;
     // Clean up channel_port state file
@@ -276,7 +277,7 @@ describe("Channel Detection", () => {
     if (result.exitCode !== 0) {
       expect(result.stderr).not.toContain("dashboard is not running");
     }
-  });
+  }, 20_000);
 
   test("status --all shows channel-only instances", () => {
     const stateDir = getStateDir(tmpDir);
