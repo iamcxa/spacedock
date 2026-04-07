@@ -1,7 +1,7 @@
 ---
 id: 014
 title: Dashboard Permission Sync — Auto-resolve Permission Requests Answered in CLI
-status: execute
+status: quality
 source: UI testing feedback
 started: 2026-04-07T14:24:24Z
 completed:
