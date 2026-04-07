@@ -168,6 +168,7 @@ The brainstorming spec's original acceptance criteria assumed the Channels proto
 - **AC4 (unchanged)**: On WebSocket reconnect / page refresh, replayed events naturally re-trigger the heuristic in seq order — the resolved state materializes correctly without special replay handling. No new code for replay.
 - **AC5 (unchanged)**: Existing dashboard Approve/Reject buttons (`sendPermissionVerdict` flow) still function. They just become unreachable for cards that the heuristic already marked resolved (acceptable trade-off — the captain can use the CLI for those edge cases).
 - **AC6 (unchanged, already met)**: No duplicate approvals. Daemon's first-write-wins on Claude Code side guarantees this — nothing for us to do.
+- **AC7 (new, post-plan addendum)**: On page hydration from localStorage (entity 010), permission_request events with subsequent activity in the hydrated batch are marked resolved (inferred) before the WebSocket connects. Trailing pending requests (no subsequent events in the batch) remain active until live activity or 30s timeout.
 
 ### Known limitations (accepted by captain)
 
@@ -248,6 +249,8 @@ Concrete tests (test-first, verify these fail without the implementation, then p
 9. `track(req X seq=5); resolve("X"); tick(now=100000)` → returns `[]` (X already removed).
 10. **Replay integration scenario**: replay 5 events in sequence (req A, msg, req B, req C, msg) — after all 5, pending should be `[]` (A resolved by msg, B+C resolved by final msg).
 11. **Reentrance**: calling `track` inside a loop with a mix of types never throws, never leaks entries.
+12. **Hydration batch scenario (Phase 4)**: call `track()` 5 times in sequence simulating a hydrated localStorage batch (req_A, msg, req_B, req_C, msg). Final pending should be `[]`. This is structurally the same as test 10 but explicitly framed for the 010 hydration integration — verifying the tracker behaves identically whether events arrive via live ws.onmessage, replay, or localStorage hydration.
+13. **Hydration with trailing pending (Phase 4)**: call `track()` 4 times in sequence (msg, req_A, msg, req_B). After all 4 calls, pending should be `[req_B]` — req_A was resolved by the second msg, but req_B has no follow-up in the batch so it stays active until live ws activity or the 30s timeout catches it.
 
 **Quality gate for Phase 1**:
 
@@ -382,15 +385,59 @@ Prereqs: start the dashboard with channels enabled. Per `tools/dashboard/README.
 9. **Verify replay on reconnect (AC4)**: with several resolved cards in the feed, refresh the browser (or kill the WebSocket and let it auto-reconnect). The `{type: "replay"}` message re-delivers the full event history. After the reconnect settles, the feed should look substantially the same — all previously-resolved cards should be back in their collapsed groups, because the heuristic re-materializes the state deterministically in seq order.
 10. **Verify parallel-tool-calls edge case (accepted limitation)**: if you can trigger 2 permission requests before answering either, answer only one in the CLI. The heuristic will resolve BOTH cards when the tool-completion event arrives — this is expected and documented. The unanswered tool will still block in Claude Code until you answer it in the CLI; the dashboard's incorrect "resolved" label is the accepted trade-off.
 
-Pass criteria: steps 3, 4, 5, 6, 7, 8, 9 all succeed. Step 10 demonstrates the known limitation (not a failure).
+11. **Verify hydration integration with 010 (Phase 4, AC7)**: trigger 2 permission requests in sequence, answer both in the CLI so both collapse into a resolved group, then refresh the browser. After hydration completes (localStorage `spacedock.dashboard.activity.v1` replay finishes) and BEFORE the WebSocket reconnects, the 2 resolved cards should already be visible in their collapsed group. Open DevTools → Network → throttle to "Offline" before refreshing to exercise the hydration-only path cleanly (WS fails to connect, hydration is the only render path). Expected: both cards appear in a `🔒 Permission resolved (2 items)` collapsed group from the first paint.
+
+Pass criteria: steps 3, 4, 5, 6, 7, 8, 9, 11 all succeed. Step 10 demonstrates the known limitation (not a failure).
+
+### Phase 4 — Integration with 010 hydration loop
+
+**Rebase note**: This phase is contingent on **entity 010 (Dashboard Feed Persistence)** having shipped to `main` first. 010 is currently at the pr-review captain gate; the execute stage of 014 MUST begin by rebasing `auto-researcher/dashboard-permission-sync` onto the updated `main` that includes 010. 010 adds a hydration path + dedup + appendMany in the same `ws.onmessage` block that 014 is wiring tracker.track() into. The expected merge conflict is mechanical — different hunks touching the same general area; resolve by keeping 010's dedup/appendMany logic AND adding 014's tracker.track() calls after `renderEntry`.
+
+**Integration gap being closed**: 010 introduces `history.hydrate()` that runs on `DOMContentLoaded` BEFORE `connect()` is called. It loads stored events from the `spacedock.dashboard.activity.v1` localStorage key and calls `renderEntry(entry)` for each. This is OUTSIDE the `ws.onmessage` hook covered by Phase 2 step 2. Without this phase, hydrated `permission_request` events from a prior session would re-render as ACTIVE permission cards with Approve/Reject buttons, and the tracker would be empty (no `track()` calls during hydration). They would sit "pending" until the 30s timeout fires — a worse UX than the captain's intent.
+
+**Captain decision (already made)**: Hydrated permission_request events should be treated as `resolved (inferred)` by default, IF there are subsequent events in the hydrated batch. Rationale: same physical reasoning as the live heuristic — Claude Code was blocking on them, but since we have stored events from AFTER them, they must have been answered in the prior session. If a hydrated permission_request is the LAST event in the stored array (no subsequent events), it stays pending — the live ws.onmessage flow will resolve it normally when new activity arrives, OR the 30s timeout will catch it.
+
+**Edit (single file): `tools/dashboard/static/activity.js`**
+
+1. **Locate 010's hydration block**: after rebase, find the hydration call (will be near the end of the IIFE, just before `connect()` — exact line depends on 010's final commit shape). Expected shape is something like `history.hydrate(function (entry) { renderEntry(entry); });` or a for-loop over stored events calling `renderEntry(entry)` directly.
+
+2. **Inject `permissionTracker.track()` into the hydration loop**: for each hydrated entry (in stored seq order), after `renderEntry(entry)` runs, call:
+   ```js
+   var tracked = permissionTracker.track({
+     type: entry.event.type,
+     seq: entry.seq,
+     request_id: entry.event.type === 'permission_request'
+       ? (function () { try { return JSON.parse(entry.event.detail || '{}').request_id || undefined; } catch (e) { return undefined; } })()
+       : undefined,
+     timestamp_ms: new Date(entry.event.timestamp).getTime(),
+   });
+   tracked.forEach(function (id) { markResolved(id, 'inferred'); });
+   ```
+   Note: during hydration, use the event's original `timestamp` (not `Date.now()`) so stale events from a prior session don't reset the 30s timeout window — a 2-hour-old permission_request should immediately time out on the next `tick()`, not sit pending for another 30s.
+
+3. **Synchronous execution requirement**: the track()/markResolved() call MUST run synchronously within the hydration loop (same microtask), so the resolved state materializes before the browser paints the feed. Do NOT defer via `setTimeout` or `requestAnimationFrame`. The user should never see a "flash of active permission cards" from prior sessions.
+
+4. **Idempotency guarantee**: `markResolved()` already early-returns on `.resolved` cards (Phase 2 step 3). So if the ws.onmessage `{type: "replay"}` message re-delivers the same permission_request after hydration (a dedup 010 should already handle, but just in case), the second `markResolved()` call is a safe no-op. No new code needed for this — it's a property of the Phase 2 implementation.
+
+5. **Interaction with 010's dedup**: 010 introduces dedup so the same event isn't rendered twice when localStorage hydration + ws replay overlap. That dedup means hydrated permission_requests won't be re-rendered when the WS replay delivers them — but the tracker state is already primed from hydration, so subsequent live events will correctly resolve them via the heuristic. No conflict.
+
+**No new files in Phase 4.** Only touches `tools/dashboard/static/activity.js` (already on the edit list from Phase 2). File budget unchanged: **2 NEW + 2 EDIT = 4 files**.
+
+**Quality gate for Phase 4**:
+
+```
+bun test tools/dashboard/src/permission-tracker.test.ts   # tests 12 and 13 must pass
+bunx tsc --noEmit
+# Manual: Phase 3 smoke test step 11 (above)
+```
 
 ### File budget summary
 
 | File | Status | Purpose |
 |---|---|---|
 | `tools/dashboard/src/permission-tracker.ts` | **NEW** | Pure module — tracker logic source of truth |
-| `tools/dashboard/src/permission-tracker.test.ts` | **NEW** | bun:test unit tests (11 assertions) |
-| `tools/dashboard/static/activity.js` | EDIT | Inline-duplicate tracker, wire ws.onmessage, implement markResolved + renderPermissionResponse + mergeIntoResolvedGroup + 30s tick |
+| `tools/dashboard/src/permission-tracker.test.ts` | **NEW** | bun:test unit tests (13 assertions — includes 2 Phase 4 hydration scenarios) |
+| `tools/dashboard/static/activity.js` | EDIT | Inline-duplicate tracker, wire ws.onmessage, implement markResolved + renderPermissionResponse + mergeIntoResolvedGroup + 30s tick, AND hook tracker into 010's hydration loop (Phase 4) |
 | `tools/dashboard/static/style.css` | EDIT | Add `.collapsed-group` and refinement rules |
 
 **Total: 2 NEW + 2 EDIT = 4 files.** Confirmed Small scale (<5-6 file threshold).
@@ -421,6 +468,12 @@ Pass criteria: steps 3, 4, 5, 6, 7, 8, 9 all succeed. Step 10 demonstrates the k
    - No new infrastructure dependencies (no new npm packages, no new services, no config file changes).
    - Pure frontend addition + new unit test file.
    - **→ The plan stage's conditional gate should auto-advance.** The first officer can proceed directly to the build stage without captain escalation.
-7. **Write `## TDD Plan` section**: DONE. Section written with the 3-phase structure, explicit module surface, 11 concrete test assertions, exact CSS additions, manual smoke test recipe (10 steps covering all 6 revised ACs plus the accepted limitations), and a file budget table. References-to-research subsection ties every file path back to the verified research findings.
-8. **Commit entity file update on `auto-researcher/dashboard-permission-sync`**: DONE. Commit `aa84707` on branch `auto-researcher/dashboard-permission-sync` — `plan: 014 dashboard-permission-sync — conversation-continues heuristic + collapse group`. 1 file changed, 267 insertions.
+7. **Write `## TDD Plan` section**: DONE. Section written with the 3-phase structure (later extended to 4 phases in plan addendum — see item 10), explicit module surface, 13 concrete test assertions (11 original + 2 hydration scenarios), exact CSS additions, manual smoke test recipe (11 steps covering all 7 revised ACs plus the accepted limitations), and a file budget table. References-to-research subsection ties every file path back to the verified research findings.
+8. **Commit entity file update on `auto-researcher/dashboard-permission-sync`**: DONE. Commit `aa84707` on branch `auto-researcher/dashboard-permission-sync` — `plan: 014 dashboard-permission-sync — conversation-continues heuristic + collapse group`. 1 file changed, 267 insertions. Stage Report item 8 status fix: commit `eba505c`.
 9. **Write `## Stage Report: plan` section**: DONE (this section).
+10. **Plan addendum: hydration integration with 010**: DONE. Captain flagged integration gap: 010 adds `history.hydrate()` that runs on `DOMContentLoaded` before `connect()` and calls `renderEntry(entry)` for stored events — OUTSIDE the Phase 2 `ws.onmessage` tracker hook, which would leave hydrated permission_requests stuck as ACTIVE cards until the 30s timeout fires. Added:
+    - **AC7** (new acceptance criterion) — hydrated permission_requests with subsequent activity in the batch are marked resolved (inferred) before WS connects; trailing pending requests remain active until live activity or 30s timeout.
+    - **Phase 4 section** in `## TDD Plan` — rebase note (execute MUST rebase onto main-with-010 first), integration gap explanation, captain decision rationale, single-file edit spec for `activity.js` hydration-loop hook (uses event's original `timestamp` not `Date.now()` so stale events time out immediately), synchronous execution requirement (no setTimeout/rAF — hydration must materialize resolved state before first paint), idempotency guarantee via the existing `markResolved` early-return on `.resolved`, and interaction note with 010's dedup.
+    - **2 new unit tests** (12 and 13) appended to Phase 1 test list — hydration batch scenario (structural twin of test 10 but explicitly framed for hydration) and hydration with trailing pending (req_B stays in pending after batch ends with no follow-up).
+    - **Manual smoke step 11** inserted into Phase 3 recipe — trigger 2 permissions, answer both in CLI, refresh with Network throttled to Offline so hydration is the only render path, verify collapsed group from first paint before WS reconnects.
+    - **File budget unchanged**: Phase 4 only touches `activity.js` (already on the edit list from Phase 2). Still 2 NEW + 2 EDIT = 4 files. No scale escalation.
