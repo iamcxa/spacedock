@@ -3,11 +3,11 @@ id: 024
 title: Dashboard Unified Server + Channel — 消除雙 Instance 問題
 status: explore
 source: captain feedback (021 tunnel + channel testing)
-started:
+started: 2026-04-08T10:00:00+08:00
 completed:
 verdict:
 score: 0.85
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-unified-server-channel
 issue:
 pr:
 intent: feature
