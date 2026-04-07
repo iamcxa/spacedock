@@ -281,6 +281,25 @@ grep -q 'tunnel start' skills/dashboard/SKILL.md    # SKILL.md updated
 
 Implemented the tunnel hot-attach feature across 5 atomic commits. Extracted `do_tunnel_start()`, `do_tunnel_stop()`, and `do_tunnel_status()` from the monolithic `do_start()`/`do_stop()` functions, wired a new `tunnel` top-level subcommand with sub-action dispatch, and fixed the SKILL.md share flow to use `tunnel start` instead of `restart --tunnel`. The deprecated ngrok `/api/tunnels` endpoint was updated to `/api/endpoints` as specified by the research correction. All existing 106 dashboard tests pass unchanged. Backward compatibility for `--tunnel` flag on start/restart is preserved.
 
+## Stage Report: quality
+
+- [x] Shell syntax validation (bash -n)
+  `bash -n tools/dashboard/ctl.sh` PASS — no parse errors, unmatched quotes, or syntax issues
+- [x] Dashboard test suite (bun test)
+  `cd tools/dashboard && bun test` — 106 pass, 0 fail, all tests unchanged from main (no TypeScript runtime changes)
+- [x] Grep assertions (function existence, API endpoint, SKILL.md fix, backward compat)
+  All 8 checks PASS: do_tunnel_start exists, do_tunnel_stop exists, do_tunnel_status exists, /api/endpoints used, /api/tunnels removed, tunnel case dispatch present, tunnel start in SKILL.md, restart --tunnel removed from SKILL.md
+- [x] Diff review for correctness, edge cases, error handling
+  Reviewed 3 files (151 insertions, 54 deletions): (1) ctl.sh tunnel functions have error handling (is_running check, PORT_FILE validation, ngrok PATH check, idempotent stop), (2) do_tunnel_start reads port from PORT_FILE not function variable (correct for hot-attach), (3) /api/endpoints grep pattern uses "url" not "public_url", (4) do_stop calls do_tunnel_stop preserving cleanup, (5) tunnel case dispatch validates TUNNEL_ACTION, (6) SKILL.md line 82 changed from restart --tunnel to tunnel start
+- [ ] SKIP: Security/coverage/contract/migration checks
+  Not applicable — shell script and markdown changes only, no new dependencies, no API changes, no migrations, no runtime code affected
+- [ ] SKIP: TypeScript type-check
+  Not applicable — no TypeScript code changes, all runtime changes are in shell script which has no type system
+
+### Summary
+
+All quality gates pass. Shell syntax is valid, all 106 dashboard tests pass unchanged, and all 8 grep assertions confirm correct implementation. Error handling is robust: do_tunnel_start validates dashboard is running, port is readable, and ngrok is in PATH before spawning; do_tunnel_stop is idempotent and returns cleanly if tunnel not running; do_tunnel_status handles stale PIDs. The deprecated ngrok API endpoint `/api/tunnels` is correctly updated to `/api/endpoints` with the proper field mapping. Backward compatibility for `--tunnel` flag is preserved through TUNNEL_MODE. SKILL.md share flow correctly updated to use `tunnel start` instead of `restart --tunnel` for hot-attach without WebSocket disconnect.
+
 ## Stage Report: plan
 
 - [x] Read entity file and research report
