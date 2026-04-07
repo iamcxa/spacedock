@@ -169,7 +169,8 @@
       item.appendChild(detail);
     }
 
-    feedContainer.insertBefore(item, feedContainer.firstChild);
+    feedContainer.appendChild(item);
+    feedContainer.scrollTop = feedContainer.scrollHeight;
     capFeedItems();
   }
 
@@ -190,7 +191,8 @@
     time.textContent = timeAgo(entry.event.timestamp);
     bubble.appendChild(time);
 
-    feedContainer.insertBefore(bubble, feedContainer.firstChild);
+    feedContainer.appendChild(bubble);
+    feedContainer.scrollTop = feedContainer.scrollHeight;
     capFeedItems();
   }
 
@@ -244,7 +246,8 @@
     time.textContent = timeAgo(entry.event.timestamp);
     bubble.appendChild(time);
 
-    feedContainer.insertBefore(bubble, feedContainer.firstChild);
+    feedContainer.appendChild(bubble);
+    feedContainer.scrollTop = feedContainer.scrollHeight;
     capFeedItems();
   }
 
@@ -284,7 +287,8 @@
     time.textContent = timeAgo(entry.event.timestamp);
     bubble.appendChild(time);
 
-    feedContainer.insertBefore(bubble, feedContainer.firstChild);
+    feedContainer.appendChild(bubble);
+    feedContainer.scrollTop = feedContainer.scrollHeight;
     capFeedItems();
   }
 
@@ -378,7 +382,8 @@
     actions.appendChild(denyBtn);
     card.appendChild(actions);
 
-    feedContainer.insertBefore(card, feedContainer.firstChild);
+    feedContainer.appendChild(card);
+    feedContainer.scrollTop = feedContainer.scrollHeight;
     capFeedItems();
   }
 
@@ -444,7 +449,8 @@
     time.textContent = timeAgo(e.timestamp);
     card.appendChild(time);
 
-    feedContainer.insertBefore(card, feedContainer.firstChild);
+    feedContainer.appendChild(card);
+    feedContainer.scrollTop = feedContainer.scrollHeight;
     capFeedItems();
   }
 
