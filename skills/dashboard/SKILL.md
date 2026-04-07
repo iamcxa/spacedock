@@ -79,7 +79,7 @@ bash {ctl} status --root {project_root}
 ```
 
 - **Not running** → start with tunnel: `bash {ctl} start --tunnel --root {project_root}`
-- **Running, no tunnel** → restart with tunnel: `bash {ctl} restart --tunnel --root {project_root}`
+- **Running, no tunnel** → start tunnel: `bash {ctl} tunnel start --root {project_root}`
 - **Running, tunnel active** → continue to Step 2
 
 Detect tunnel by checking for `{state_dir}/tunnel_url` file:
