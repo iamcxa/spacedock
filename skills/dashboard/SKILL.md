@@ -74,12 +74,12 @@ When the user invokes `/dashboard share`, execute this flow:
 ### Step 1 — Ensure dashboard + tunnel running
 
 ```bash
-# Check status
+# Check status (now shows both server and channel instances)
 bash {ctl} status --root {project_root}
 ```
 
-- **Not running** → start with tunnel: `bash {ctl} start --tunnel --root {project_root}`
-- **Running, no tunnel** → start tunnel: `bash {ctl} tunnel start --root {project_root}`
+- **Not running (neither server nor channel)** → start with tunnel: `bash {ctl} start --tunnel --root {project_root}`
+- **Running (server or channel), no tunnel** → start tunnel: `bash {ctl} tunnel start --root {project_root}`
 - **Running, tunnel active** → continue to Step 2
 
 Detect tunnel by checking for `{state_dir}/tunnel_url` file:
@@ -96,7 +96,8 @@ Otherwise, default to all active entities. Do NOT ask interactively unless the u
 
 ```bash
 STATE_DIR=~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)
-PORT=$(cat "$STATE_DIR/port")
+# Try server port first, fall back to channel port
+PORT=$(cat "$STATE_DIR/port" 2>/dev/null || cat "$STATE_DIR/channel_port" 2>/dev/null | tr -d '[:space:]')
 TUNNEL_URL=$(cat "$STATE_DIR/tunnel_url")
 ```
 
