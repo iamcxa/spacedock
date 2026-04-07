@@ -477,3 +477,70 @@ bunx tsc --noEmit
     - **2 new unit tests** (12 and 13) appended to Phase 1 test list — hydration batch scenario (structural twin of test 10 but explicitly framed for hydration) and hydration with trailing pending (req_B stays in pending after batch ends with no follow-up).
     - **Manual smoke step 11** inserted into Phase 3 recipe — trigger 2 permissions, answer both in CLI, refresh with Network throttled to Offline so hydration is the only render path, verify collapsed group from first paint before WS reconnects.
     - **File budget unchanged**: Phase 4 only touches `activity.js` (already on the edit list from Phase 2). Still 2 NEW + 2 EDIT = 4 files. No scale escalation.
+
+## Stage Report: execute
+
+1. **Phase 0 — Rebase onto main**: DONE. `git rebase origin/main` completed cleanly — 2 commits dropped (already upstream), 4 replayed without conflicts. Verified 010's hydration code present: `ActivityHistory`, `HISTORY_KEY`, `history.hydrate()`, `history.appendMany()`, `clearFeedDom()` all confirmed via grep.
+
+2. **Phase 1 — Pure module + tests (TDD red-then-green)**: DONE.
+   - Task 1.1: Created `tools/dashboard/src/permission-tracker.ts` with `createPermissionTracker()` factory returning `{ track, tick, resolve, _pending }`. Map-based pending state, conversation-continues heuristic, 30s timeout.
+   - Task 1.2: Created `tools/dashboard/src/permission-tracker.test.ts` with all 13 assertions (tests 1-11 base + 12-13 hydration scenarios).
+   - Task 1.3: Red phase confirmed — module not found error, 0 pass / 1 fail.
+   - Task 1.4: Implemented `permission-tracker.ts` per plan.
+   - Task 1.5: Green phase — 13 pass / 0 fail / 27 expect() calls. Committed test before impl:
+     - `b53b6ff test(dashboard): add permission-tracker pure module tests (13 assertions)`
+     - `6077418 feat(dashboard): implement permission-tracker conversation-continues heuristic`
+
+3. **Phase 2 — Wire into static/activity.js + style.css**: DONE.
+   - Inline-duplicated permission-tracker into IIFE using ES5 object pattern (not Map) with `// ABOUTME` breadcrumb.
+   - Added `buildTrackedEvent(entry, timestampMs)` helper for JSON.parse of request_id from event detail.
+   - Hooked `ws.onmessage` replay branch: render all entries first, then batch-track in seq order.
+   - Hooked `ws.onmessage` event branch: render then track per single event.
+   - Implemented `markResolved(requestId, reason)` with idempotency guard, removes `.perm-actions`, appends `.perm-verdict` badge, calls `mergeIntoResolvedGroup`.
+   - Implemented `mergeIntoResolvedGroup(card)` with prev/next/sandwiched merge using `<details class="collapsed-group">`. Summary built via safe DOM methods (no innerHTML).
+   - Implemented `updateGroupCount(group)` to rebuild summary with correct count and pluralization.
+   - Filled in `renderPermissionResponse(entry)` stub to call `permissionTracker.resolve()`.
+   - Added `permissionTracker.resolve(requestId)` in `sendPermissionVerdict` .then() + added `.perm-actions` removal + collapse-group merge to dashboard-side verdict path.
+   - Added 30s timeout tick: `setInterval(5000)` calling `permissionTracker.tick(Date.now())`.
+   - Added CSS: `.collapsed-group`, summary styling, chevron rotation, inside-group card opacity 0.6, `.permission-card.resolved .perm-verdict` color override.
+   - Commits:
+     - `c1f6558 feat(dashboard): wire permission-tracker into activity.js with collapse groups`
+     - `029c2db style(dashboard): add collapsed-group CSS rules for resolved permissions`
+
+4. **Phase 3 — Quality gates**: DONE.
+   - `bun test src/permission-tracker.test.ts`: 13 pass, 0 fail, 27 expect() calls.
+   - `bun test` (full dashboard suite): **106 pass, 0 fail, 247 expect() calls** (93 existing + 13 new).
+   - `bunx tsc --noEmit`: clean (zero type errors).
+   - `bash -n tools/dashboard/ctl.sh`: clean.
+
+5. **Phase 4 — Hydration integration with 010**: DONE.
+   - Injected `permissionTracker.track()` into 010's hydration loop using `new Date(hydrated[h].event.timestamp).getTime()` as timestamp (not `Date.now()`) so stale events time out immediately.
+   - Synchronous within the loop — resolved state materializes before first paint.
+   - Idempotency guaranteed by existing `markResolved` early-return on `.resolved` cards.
+   - Re-ran quality gates: 106 pass, 0 fail, tsc clean.
+   - Commit: `6fb07b8 feat(dashboard): integrate permission-tracker into 010 hydration loop (Phase 4)`
+
+6. **TDD discipline verified**: `git log --oneline` confirms test commit `b53b6ff` precedes implementation commit `6077418` and all Phase 2/3/4 commits.
+
+7. **Context lake caching**: SKIPPED — `store_insight` tool not available in this environment.
+
+8. **Stage Report**: DONE (this section).
+
+### File changes summary
+
+| File | Status | Lines |
+|---|---|---|
+| `tools/dashboard/src/permission-tracker.test.ts` | NEW | 147 |
+| `tools/dashboard/src/permission-tracker.ts` | NEW | 69 |
+| `tools/dashboard/static/activity.js` | EDIT | +186 |
+| `tools/dashboard/static/style.css` | EDIT | +41 |
+
+### Commit log (execute stage)
+
+```
+6fb07b8 feat(dashboard): integrate permission-tracker into 010 hydration loop (Phase 4)
+029c2db style(dashboard): add collapsed-group CSS rules for resolved permissions
+c1f6558 feat(dashboard): wire permission-tracker into activity.js with collapse groups
+6077418 feat(dashboard): implement permission-tracker conversation-continues heuristic
+b53b6ff test(dashboard): add permission-tracker pure module tests (13 assertions)
+```
