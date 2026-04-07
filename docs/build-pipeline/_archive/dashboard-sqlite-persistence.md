@@ -1,13 +1,13 @@
 ---
 id: 021
 title: Dashboard SQLite Persistence — Share Links & Event History 持久化
-status: pr-review
+status: shipped
 source: captain feedback (013 testing session)
 started: 2026-04-07T08:00:00Z
-completed:
-verdict:
+completed: 2026-04-07T09:00:00Z
+verdict: PASSED
 score: 0.9
-worktree: .worktrees/spacedock-ensign-dashboard-sqlite-persistence
+worktree:
 issue:
 pr: '#10'
 intent: feature
