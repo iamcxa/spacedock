@@ -538,3 +538,62 @@ Feature is a **Small UI entity** with **zero breaking changes, zero data-destruc
 9. **Write PR_NUMBER and PR_URL into entity body** — DONE. Added `## PR Reference` section above with PR URL and Number for FO frontmatter handoff.
 10. **Commit entity body update** — DONE. See next commit on branch `auto-researcher/dashboard-feed-persistence`.
 11. **Write Stage Report: pr-draft** — DONE (this section).
+
+## Self-Review Summary
+
+**Findings classified across 1 self-review round:**
+
+| Category | Count | Disposition |
+|----------|-------|-------------|
+| CODE     | 0     | — |
+| SUGGESTION | 2   | Both fixed in `c0e2fbf` |
+| DOC      | 1     | Folded into the SUGGESTION fix (same commit) |
+| ADVISORY | 2     | Noted only — already documented as out-of-scope in execute/pr-draft reports |
+| Pre-existing PR comments | 4 | Re-validated; still apply (design-decision explanations, not issues) |
+
+**Pre-scan coverage** (lightweight main-context — `pr-review-toolkit` and `trailofbits/skills` not installed in this environment):
+
+- CLAUDE.md compliance — N/A (no project-level CLAUDE.md found at worktree root or tools/dashboard; only `node_modules/bun-types/CLAUDE.md` which is vendor)
+- TODO/FIXME/XXX/HACK in changed files — **0 matches**
+- Unused imports — **none** (TS file imports only `SequencedEvent` type, used as `StoredEntry` alias)
+- Function-declaration hoisting in IIFE — verified safe: `clearFeedDom`, `removeEmptyState`, `renderEntry` are all `function name(){}` declarations and hoist to the top of the IIFE regardless of physical line position
+- The 4 existing PR review comments — re-read and confirmed each still applies after the fix commit (none were invalidated)
+
+**SUGGESTION-1 + DOC-1 (combined fix in `c0e2fbf`)**: **JS/TS divergence in `persist` was undocumented despite the ABOUTME comment claiming the two implementations are mirrors**. The TS source `throw`s non-quota errors in both the initial setItem and the eviction-retry catch (`activity-history.ts:71,83`) so unit tests can assert real failures, while the JS source returns `false` in both paths to avoid an uncaught throw inside `ws.onmessage` breaking the live feed mid-replay. A second divergence — `hydrate` and `clear` wrapping `window.localStorage` access in try/catch for browsers where storage is disabled (incognito, blocked cookies) — was also undocumented. **Fix**: expanded the ABOUTME block in `activity.js` to spell out both intentional divergences with reasons, so future maintainers cannot accidentally "sync" the inline copy back to the TS contract and silently change browser behavior. No code changes to the divergent behavior itself — both versions already do the right thing for their respective execution contexts.
+
+**SUGGESTION-2 (fix in `c0e2fbf`)**: **`history.append()` in the ws.onmessage replay branch was O(N²) on JSON serialization cost**. Each call re-hydrated the full stored array from localStorage, pushed one entry, and re-stringified + setItem'd the whole thing. For a 100-event replay (which can happen when a captain reconnects after extended absence), this meant 100 hydrate→stringify→setItem cycles instead of 1. Within the 500-entry / ~500KB cap the wall-clock cost is small, but it's free to fix. **Fix**: added `ActivityHistory.appendMany(entries: StoredEntry[])` to the canonical TS source plus 3 unit tests (empty-batch noop, single-setItem-per-batch via setItem-call counter, capacity trim across batch boundaries — bringing the suite from 20 to 23 tests / 37 to 45 expects). Mirrored the `appendMany` helper in the JS factory and replaced the per-entry loop in `activity.js` ws.onmessage replay branch with one `history.appendMany(fresh)` call. Single-entry path (`event` branch) still uses `append()` which now delegates to `appendMany([entry])`.
+
+**ADVISORY items (no action taken)**:
+
+- `.activity-panel-header` CSS — already documented as out-of-scope in execute report and PR body. Button works, just stacks vertically.
+- Manual smoke test (5 steps) — already deferred to gate stage in execute report.
+- Multi-tab `storage` event listener — already documented as out-of-scope (single-captain assumption from brainstorming spec).
+
+**Quality gate evidence after fix**:
+
+```
+$ cd tools/dashboard && bun test
+93 pass / 0 fail / 220 expect() calls — Ran 93 tests across 8 files [1229.00ms]
+$ bunx tsc --noEmit         # exit 0, zero errors
+$ bash -n ctl.sh            # exit 0, syntax OK
+```
+
+Delta: **+3 tests, +8 expects, 0 regressions**. New tests are `appendMany` empty-batch, single-setItem batch, and capacity trim.
+
+**Self-review rounds used**: **1 of 3**. No additional rounds needed — pre-scan + diff review surfaced everything in a single pass.
+
+**Commit**: `c0e2fbf fix(dashboard): batch-append replay events + document JS/TS divergence` — pushed to `auto-researcher/dashboard-feed-persistence` on origin.
+
+## Stage Report: pr-review
+
+1. **Read entity file end-to-end** — DONE. Re-read Brainstorming Spec, Acceptance Criteria Reframe, Technical Claims, Research Report (10 verified, 4 corrections), TDD Plan (3 phases / 12 tasks), and all four prior stage reports (research / plan / execute / quality / pr-draft). Confirmed the 4 self-review annotations already on PR #12 from pr-draft and re-validated each is still accurate after my fix.
+2. **Detect pr-review-toolkit availability** — SKIPPED toolkit, ran lightweight pre-scan instead. `pr-review-toolkit:review-pr` is listed as a skill but the bundled `code-reviewer` and `comment-analyzer` agents are not surfaced as deferred tools in this environment. Ran main-context pre-scan covering: (a) CLAUDE.md compliance — N/A, no project CLAUDE.md exists; (b) TODO/FIXME/XXX/HACK in changed files — 0 matches; (c) unused imports — none; (d) function-declaration hoisting in IIFE for `clearFeedDom`/`removeEmptyState`/`renderEntry` — verified safe; (e) re-validated the 4 existing PR review comments — all still apply.
+3. **Detect trailofbits/skills availability for differential-review** — SKIPPED. `Skill: "differential-review"` is not in the available skills list and `trailofbits/skills` plugin is not installed in this environment. SKIP rationale: trailofbits/skills not installed. Manual security review of the diff: no XSS (renderEntry uses textContent + appendChild, clearFeedDom uses removeChild loop), no eval, no innerHTML assignment, localStorage key is a compile-time constant, JSON parse is wrapped in try/catch with safe fallback, Storage access is wrapped in try/catch in JS branch.
+4. **Classify all findings** — DONE. See `## Self-Review Summary` section above. Total: 0 CODE, 2 SUGGESTION, 1 DOC (folded into SUGGESTION fix), 2 ADVISORY (no action). The 4 pre-existing PR comments are design-decision rationale, not issues.
+5. **Fix CODE and SUGGESTION findings, atomic commits, push** — DONE in 1 round (under the 3-round budget). Single commit `c0e2fbf fix(dashboard): batch-append replay events + document JS/TS divergence` covers both SUGGESTION-1 (document JS/TS persist + hydrate divergences in ABOUTME) and SUGGESTION-2 (add `appendMany` to TS + JS, replace per-entry append loop in ws.onmessage replay). Committed atomically because the two fixes touch the same files (activity-history.ts, activity-history.test.ts, activity.js) and represent a single logical pr-review pass — splitting them would have produced an intermediate state where the new ABOUTME contract describes a not-yet-existent appendMany helper. Pushed to `origin auto-researcher/dashboard-feed-persistence`.
+6. **Write review summary to entity body** — DONE. See the `## Self-Review Summary` section above with counts table, fix details (with commit hash), pre-scan coverage, advisory items deferred, and quality-gate evidence delta (90/212 → 93/220, no regressions).
+7. **DO NOT run `gh pr ready`** — RESPECTED. Stopping here per stage definition. The FO will dispatch a follow-up step after captain approval to mark the PR ready.
+8. **Commit entity body update** — DONE. This stage report + Self-Review Summary committed in the next commit on `auto-researcher/dashboard-feed-persistence` branch with message `pr-review: 010 self-review summary, awaiting captain gate`.
+9. **Write Stage Report listing each numbered checklist item with DONE/SKIPPED/FAILED** — DONE (this section). Evidence: review summary above shows 0 CODE, 2 SUGGESTION fixed, 1 DOC fixed, 2 ADVISORY deferred, 1 round used, quality gates 93/220 pass.
+
+**AWAITING CAPTAIN GATE.** PR #12 remains in draft state. Do not mark ready until FO confirms captain has approved the self-review summary.
