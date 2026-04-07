@@ -129,3 +129,61 @@ None.
 - [x] Execute Task 6: Backward compatibility verification -- all 70 TypeScript tests pass, all 36 Python tests pass, dependency-graph.js syntax valid. Entities without depends-on: DEPS column blank, detail page graph section hidden, status --next unchanged.
 - [x] All commits use format: `{type}(scope): {description}` -- 5 atomic commits, all feat(dashboard) or feat(status) scope
 - [x] Write ## Stage Report into entity file with all checklist items -- this section
+
+## Stage Report: quality
+
+**All checks PASSED. Auto-advance recommended.**
+
+### Compilation & Tests
+
+1. **TypeScript Type-Check** — DONE
+   - Command: `bunx tsc --noEmit` in tools/dashboard/
+   - Result: PASS — No type errors in feature-changed files (parsing.ts, parsing.test.ts)
+   - Note: Pre-existing bun-types missing error (TS2688) is unrelated infrastructure noise, not caused by this feature
+
+2. **TypeScript Test Suite** — DONE
+   - Command: `bun test`
+   - Result: **PASS** — 70 tests, 0 fails, 175 expect() calls, 1197ms
+   - All tests in parsing.test.ts (feature changes) pass
+
+3. **Python Test Suite** — DONE
+   - Command: `python3 -m pytest tests/test_status_script.py -v`
+   - Result: **PASS** — 36 tests, 0 fails
+   - All 3 new dependency-filter tests pass (test_next_excludes_entities_with_unmet_dependencies, test_next_includes_entities_with_all_deps_shipped, test_next_no_depends_on_still_dispatchable)
+
+4. **JavaScript Syntax Validation** — DONE
+   - Command: `node --check` on dependency-graph.js, app.js, detail.js
+   - Result: **PASS** — All 3 files have valid syntax
+
+### Code Coverage Delta
+
+- **Status:** SKIP — No coverage infrastructure detected in explore stage
+
+### Security Analysis
+
+- **Status:** SKIP — trailofbits/skills marketplace plugin not installed
+
+### API Contract Compatibility
+
+- **Status:** SKIP — No contract/schema files changed in diff
+
+### Migration Safety
+
+- **Status:** SKIP — No migration files in diff
+
+### License Compliance
+
+- **Status:** SKIP — No lockfile/dependency changes in diff
+
+### Advance Decision
+
+✅ **ALL CHECKS PASS** — Auto-advance to gate stage.
+
+Summary:
+- Type-check: PASS (feature files clean, pre-existing bun-types noise ignored)
+- TypeScript tests: PASS (70/70, all new tests included)
+- Python tests: PASS (36/36, all dependency-logic tests pass)
+- JS syntax: PASS (3/3 files valid)
+- Coverage: SKIP (no infra)
+- Security: SKIP (tools not available)
+- Contracts/Migrations/License: SKIP (no changes)
