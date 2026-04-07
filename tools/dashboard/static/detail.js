@@ -162,16 +162,18 @@ function renderTags(tags) {
 function renderDependencySection(frontmatter) {
     var section = document.getElementById('dependency-graph-section');
     var container = document.getElementById('dependency-graph-container');
+    var heading = section ? section.querySelector('h3') : null;
     while (container.firstChild) container.removeChild(container.firstChild);
 
-    // Need depends-on to show anything
-    var hasDeps = frontmatter['depends-on'] && frontmatter['depends-on'].trim();
-    if (!hasDeps) {
+    var currentId = parseInt(frontmatter.id, 10);
+    if (isNaN(currentId)) {
         section.style.display = 'none';
         return;
     }
 
-    // Fetch all entities to build the graph
+    // Fetch all entities to determine parents (this entity's deps) and
+    // children (entities that depend on this one). Hide the section unless
+    // at least one parent or child exists.
     fetch('/api/workflows')
         .then(function (res) { return res.json(); })
         .then(function (workflows) {
@@ -180,14 +182,26 @@ function renderDependencySection(frontmatter) {
                 wf.entities.forEach(function (e) { allEntities.push(e); });
             });
 
-            var currentId = parseInt(frontmatter.id, 10) || null;
-            var svg = window.SpacedockDependencyGraph.renderDependencyGraph(allEntities, currentId);
-            if (svg) {
-                container.appendChild(svg);
-                section.style.display = '';
-            } else {
+            var subgraph = window.SpacedockDependencyGraph.filterSubgraph(allEntities, currentId);
+            // subgraph contains the focus + parents + children. If only the
+            // focus is present (no parents, no children), there is nothing
+            // useful to show — hide the section.
+            if (!subgraph || subgraph.length <= 1) {
                 section.style.display = 'none';
+                return;
             }
+
+            var svg = window.SpacedockDependencyGraph.renderDependencyGraph(allEntities, currentId);
+            if (!svg) {
+                section.style.display = 'none';
+                return;
+            }
+
+            if (heading) {
+                heading.textContent = 'Dependencies for #' + String(currentId).padStart(3, '0');
+            }
+            container.appendChild(svg);
+            section.style.display = '';
         })
         .catch(function () {
             section.style.display = 'none';

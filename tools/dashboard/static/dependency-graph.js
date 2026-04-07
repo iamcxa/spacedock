@@ -50,10 +50,65 @@
   }
 
   /**
+   * Filter entities to a subgraph relevant to a given entity:
+   *   - the entity itself
+   *   - direct parents (entities the given entity depends on, depth 1)
+   *   - direct children (entities that depend on the given entity, depth 1)
+   * Returns the filtered entity list. Each returned entity keeps its
+   * original `depends-on` field, but the renderer will only build edges
+   * between entities present in the filtered set.
+   */
+  function filterSubgraph(entities, focusId) {
+    if (focusId === null || focusId === undefined) return entities;
+    var idToEntity = {};
+    entities.forEach(function (e) {
+      var eid = parseInt(e.id, 10);
+      if (!isNaN(eid)) idToEntity[eid] = e;
+    });
+    var focus = idToEntity[focusId];
+    if (!focus) return [];
+
+    var keep = new Set();
+    keep.add(focusId);
+
+    // Direct parents (what focus depends on)
+    parseDependsOn(focus["depends-on"]).forEach(function (pid) {
+      keep.add(pid);
+    });
+
+    // Direct children (what depends on focus)
+    entities.forEach(function (e) {
+      var deps = parseDependsOn(e["depends-on"]);
+      if (deps.indexOf(focusId) !== -1) {
+        var eid = parseInt(e.id, 10);
+        if (!isNaN(eid)) keep.add(eid);
+      }
+    });
+
+    // Build clones with `depends-on` pruned to only refer to entities in keep,
+    // so the graph builder won't pull in extra ancestors via parent edges.
+    var result = [];
+    keep.forEach(function (id) {
+      var e = idToEntity[id];
+      if (!e) return;
+      var clone = {};
+      Object.keys(e).forEach(function (k) { clone[k] = e[k]; });
+      var prunedDeps = parseDependsOn(e["depends-on"]).filter(function (d) {
+        return keep.has(d);
+      });
+      clone["depends-on"] = prunedDeps.length > 0
+        ? "[" + prunedDeps.map(function (d) { return String(d).padStart(3, "0"); }).join(", ") + "]"
+        : "";
+      result.push(clone);
+    });
+    return result;
+  }
+
+  /**
    * Build adjacency from entities. Returns { nodes, edges, idToIdx }.
    * Only includes entities that participate in dependency relationships.
    */
-  function buildGraph(entities) {
+  function buildGraph(entities, focusId) {
     var idToEntity = {};
     entities.forEach(function (e) {
       var eid = parseInt(e.id, 10);
@@ -70,6 +125,12 @@
         deps.forEach(function (d) { participatingIds.add(d); });
       }
     });
+
+    // Always include the focus entity, even if it has no dependency edges yet,
+    // so the detail page can still render a single highlighted node + heading.
+    if (focusId !== null && focusId !== undefined && idToEntity[focusId]) {
+      participatingIds.add(focusId);
+    }
 
     if (participatingIds.size === 0) return null;
 
@@ -230,11 +291,14 @@
   // --- Render functions ---
 
   function renderDagNode(node, highlightId) {
-    var g = svgEl("g", { class: "dag-node", "data-id": node.id });
+    var isHighlight = node.id === highlightId;
+    var g = svgEl("g", {
+      class: isHighlight ? "dag-node dag-node-highlighted" : "dag-node",
+      "data-id": node.id,
+    });
     var cx = node.x;
     var cy = node.y;
     var color = nodeColor(node.status);
-    var isHighlight = node.id === highlightId;
 
     g.appendChild(svgEl("rect", {
       x: cx - NODE_W / 2,
@@ -242,9 +306,9 @@
       width: NODE_W,
       height: NODE_H,
       rx: 6,
-      fill: isHighlight ? color + "33" : "#161b22",
-      stroke: color,
-      "stroke-width": isHighlight ? "2" : "1",
+      fill: isHighlight ? color + "55" : "#161b22",
+      stroke: isHighlight ? "#f0883e" : color,
+      "stroke-width": isHighlight ? "3" : "1",
     }));
 
     // Node label: #007 truncated title
@@ -303,12 +367,19 @@
   /**
    * Main render function.
    * @param {Array} entities - All entities from /api/workflows
-   * @param {number|null} highlightId - Current entity ID to highlight (on detail page)
-   * @returns {SVGElement|null} - null if no dependencies exist
+   * @param {number|null} highlightId - Current entity ID to highlight (on detail page).
+   *        When provided, the graph is also filtered to the subgraph
+   *        containing the entity, its direct parents, and direct children.
+   *        Pass null/undefined to render the full workflow graph.
+   * @returns {SVGElement|null} - null if no nodes to render
    */
   function renderDependencyGraph(entities, highlightId) {
-    var graph = buildGraph(entities);
+    var hasFocus = highlightId !== null && highlightId !== undefined;
+    var workingEntities = hasFocus ? filterSubgraph(entities, highlightId) : entities;
+
+    var graph = buildGraph(workingEntities, hasFocus ? highlightId : null);
     if (!graph) return null;
+    if (graph.nodes.length === 0) return null;
 
     var layers = assignLayers(graph.nodes, graph.edges);
     var layerNodes = orderWithinLayers(graph.nodes, graph.edges, layers);
@@ -335,5 +406,6 @@
   // Export
   window.SpacedockDependencyGraph = {
     renderDependencyGraph: renderDependencyGraph,
+    filterSubgraph: filterSubgraph,
   };
 })(window);
