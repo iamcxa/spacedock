@@ -117,3 +117,15 @@ None.
 - [x] Plan includes concrete file paths, test-first ordering, and quality gate steps -- 9 files mapped, Tasks 1-2 are test-first, quality gate at end runs full suite
 - [x] Plan references research-verified patterns (especially the 2 corrections about visualizer.js and DAG layout) -- Research Corrections section at top of plan; Task 4 creates NEW `buildDependencyLayout` instead of reusing `buildLayout()`; DAG layout is ~130 lines simplified Sugiyama (topological sort + median heuristic)
 - [x] Write ## Stage Report into entity file with all checklist items -- this section
+
+## Stage Report: execute
+
+- [x] Read and understand the full plan document -- 6 tasks across 9 files, TDD-first ordering, research corrections incorporated
+- [x] Execute Task 1: parseDependsOn() utility with tests (TDD) -- wrote 6 failing tests in parsing.test.ts, implemented 3-line regex parser in parsing.ts, all 11 tests pass. Commit: `feat(dashboard): add parseDependsOn() utility for depends-on frontmatter field`
+- [x] Execute Task 2: Status script 5th dispatch rule with tests (TDD) -- wrote 3 failing tests (unmet deps excluded, shipped deps pass, no deps unaffected), added parse_depends_on() + Rule 5 terminal_stages check to print_next_table, all 36 tests pass. Commit: `feat(status): add 5th dispatch rule — filter entities with unmet depends-on`
+- [x] Execute Task 3: DEPS column with badges in entity table (app.js) -- added parseDependsOn() + depStatus() helpers, "deps" column to columns array, badge rendering with blocked/clear colors and hover tooltip showing dependency status. Commit: `feat(dashboard): add DEPS column with blocked/clear badges to entity table`
+- [x] Execute Task 4: DAG layout engine — NEW buildDependencyLayout() in dependency-graph.js (~339 lines) -- created dependency-graph.js with simplified Sugiyama algorithm: buildGraph (adjacency), assignLayers (Kahn's topological sort), orderWithinLayers (median heuristic), positionNodes (left-to-right layout), renderDagNode/renderDagEdge (SVG). Reused svgEl/svgText helpers and color conventions from visualizer.js pattern but did NOT reuse buildLayout(). Commit: `feat(dashboard): add DAG layout engine with simplified Sugiyama algorithm`
+- [x] Execute Task 5: Integrate DAG graph into detail page (detail.html, detail.js, detail.css) -- added dependency-graph-section container and script tag in detail.html, renderDependencySection() function in detail.js (fetches /api/workflows for full entity list, calls SpacedockDependencyGraph.renderDependencyGraph with highlight), CSS styling for section/container/SVG/hover. Commit: `feat(dashboard): integrate dependency DAG graph into entity detail page`
+- [x] Execute Task 6: Backward compatibility verification -- all 70 TypeScript tests pass, all 36 Python tests pass, dependency-graph.js syntax valid. Entities without depends-on: DEPS column blank, detail page graph section hidden, status --next unchanged.
+- [x] All commits use format: `{type}(scope): {description}` -- 5 atomic commits, all feat(dashboard) or feat(status) scope
+- [x] Write ## Stage Report into entity file with all checklist items -- this section
