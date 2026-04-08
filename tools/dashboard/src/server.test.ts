@@ -180,3 +180,109 @@ describe("captain reply forwards to FO via onChannelMessage", () => {
     }
   });
 });
+
+describe("share-scoped comment routes publish events", () => {
+  test("POST /api/share/:token/entity/comment publishes a comment event", async () => {
+    const server = createServer({
+      port: 0,
+      hostname: "127.0.0.1",
+      projectRoot: TMP,
+      staticDir: join(import.meta.dir, "../static"),
+      logFile: join(TMP, "test.log"),
+    });
+    try {
+      const addr = server.url;
+      // Create a share link first
+      const shareRes = await fetch(`${addr}api/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: "test123",
+          entityPaths: [ENTITY_FULL],
+          stages: [],
+          label: "test share",
+        }),
+      });
+      const shareData = await shareRes.json();
+      const token = shareData.token;
+
+      const beforeCount = server.eventBuffer.getAll().length;
+
+      const res = await fetch(`${addr}api/share/${token}/entity/comment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: ENTITY_FULL,
+          selected_text: "Some text",
+          section_heading: "Spec",
+          content: "Guest comment via share",
+        }),
+      });
+      expect(res.status).toBe(200);
+      const newEvents = server.eventBuffer.getAll().slice(beforeCount);
+      const commentEvents = newEvents.filter((e) => e.event.type === "comment");
+      expect(commentEvents.length).toBeGreaterThanOrEqual(1);
+      expect(commentEvents[0].event.agent).toBe("guest");
+    } finally {
+      server.stop();
+    }
+  });
+
+  test("POST /api/share/:token/entity/comment/reply publishes a comment event", async () => {
+    const server = createServer({
+      port: 0,
+      hostname: "127.0.0.1",
+      projectRoot: TMP,
+      staticDir: join(import.meta.dir, "../static"),
+      logFile: join(TMP, "test.log"),
+    });
+    try {
+      const addr = server.url;
+      // Create comment via main route first
+      const commentRes = await fetch(`${addr}api/entity/comment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: ENTITY_FULL,
+          selected_text: "Some text",
+          section_heading: "Spec",
+          content: "Parent for share reply",
+        }),
+      });
+      const comment = await commentRes.json();
+
+      // Create share link
+      const shareRes = await fetch(`${addr}api/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: "test123",
+          entityPaths: [ENTITY_FULL],
+          stages: [],
+          label: "test share",
+        }),
+      });
+      const shareData = await shareRes.json();
+      const token = shareData.token;
+
+      const beforeCount = server.eventBuffer.getAll().length;
+
+      const res = await fetch(`${addr}api/share/${token}/entity/comment/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: ENTITY_FULL,
+          comment_id: comment.id,
+          content: "Guest reply via share",
+        }),
+      });
+      expect(res.status).toBe(200);
+      const newEvents = server.eventBuffer.getAll().slice(beforeCount);
+      const commentEvents = newEvents.filter((e) => e.event.type === "comment");
+      expect(commentEvents.length).toBeGreaterThanOrEqual(1);
+      expect(commentEvents[0].event.agent).toBe("guest");
+    } finally {
+      server.stop();
+    }
+  });
+});

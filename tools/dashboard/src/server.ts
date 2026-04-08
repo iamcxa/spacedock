@@ -885,6 +885,15 @@ export function createServer(opts: ServerOptions) {
                 content: body.content,
                 author: "guest",
               });
+              const entitySlug = body.path.replace(/\.md$/, "").split("/").pop()!;
+              publishEvent({
+                type: "comment",
+                entity: entitySlug,
+                stage: "",
+                agent: "guest",
+                timestamp: new Date().toISOString(),
+                detail: comment.content,
+              });
               logRequest(req, 200);
               return jsonResponse(comment);
             } catch (err) {
@@ -916,6 +925,15 @@ export function createServer(opts: ServerOptions) {
               const reply = addReply(body.path, body.comment_id, {
                 content: body.content,
                 author: "guest",
+              });
+              const entitySlug = body.path.replace(/\.md$/, "").split("/").pop()!;
+              publishEvent({
+                type: "comment",
+                entity: entitySlug,
+                stage: "",
+                agent: "guest",
+                timestamp: new Date().toISOString(),
+                detail: reply.content,
               });
               logRequest(req, 200);
               return jsonResponse(reply);
