@@ -1045,6 +1045,48 @@ function rejectSuggestionAction(suggestionId) {
     if (el) el.addEventListener('change', renderActivityFeed);
   });
 
+  // --- Chat input ---
+  var chatInput = document.getElementById('chat-input');
+  var chatSend = document.getElementById('chat-send');
+
+  function sendChatMessage() {
+    var content = chatInput.value.trim();
+    if (!content) return;
+
+    chatSend.disabled = true;
+    fetch('/api/channel/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: content,
+        meta: { entity: currentSlug }
+      })
+    })
+    .then(function(res) {
+      if (!res.ok) throw new Error('Send failed');
+      chatInput.value = '';
+    })
+    .catch(function() {
+      // Leave content in textarea so user can retry
+    })
+    .finally(function() {
+      chatSend.disabled = false;
+      chatInput.focus();
+    });
+  }
+
+  if (chatSend) {
+    chatSend.addEventListener('click', sendChatMessage);
+  }
+  if (chatInput) {
+    chatInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage();
+      }
+    });
+  }
+
   var detailWs = null;
   var detailRetryCount = 0;
   var detailMaxRetries = 10;
