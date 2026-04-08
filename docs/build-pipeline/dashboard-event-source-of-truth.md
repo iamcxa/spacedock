@@ -249,3 +249,49 @@ RATIONALE:    Captain 觀察到 Clear history 無法真正清除舊事件。架�
 - 缺少 `request_id` 的舊 permission_request 事件在清除後不再出現
 - share page filtered replay 不受影響
 - 現有 permission tracker 折疊邏輯不變
+
+## Stage Report: pr-review
+
+### Recommendation: APPROVE
+
+### PR diff reviewed
+
+PR #16 — 7 files changed: 3 modified, 2 deleted, 2 test files updated. Entity doc and archive doc are metadata-only.
+
+### Findings
+
+**No CODE findings.** Implementation is clean and correct.
+
+**DOC findings (informational, no action needed):**
+
+1. **DELETE while WebSocket clients connected**: DELETE /api/events clears SQLite but does not broadcast a "cleared" notification to connected WebSocket clients. Connected clients keep their current DOM state; new events post-clear get higher seq (AUTOINCREMENT) so `msg.data.seq > lastSeq` guard works correctly. On reconnect, clients get empty replay. Acceptable behavior.
+
+2. **clearHistory() fire-and-forget**: The DELETE fetch uses `.catch(() => {})`. If the server is unreachable, the user sees a cleared DOM but SQLite retains events. On reconnect, events replay back. Minor UX inconsistency but acceptable — better than silent data loss.
+
+3. **hydrate removal**: Feed is blank for <100ms until WebSocket replay arrives. Acceptable tradeoff — localStorage instant paint added complexity for negligible UX benefit.
+
+4. **Test skip pattern**: `skipCount === 2` in server.test.ts assumes exactly 2 init messages (replay + channel_status). If a third message type is added to `open()`, tests will silently hang on timeout rather than fail fast. Low risk — noted for future awareness.
+
+### Correctness verification
+
+- `EventBuffer.clear()`: `DELETE FROM events` — correct.
+- `DELETE /api/events`: calls `eventBuffer.clear()`, returns `{ ok: true }` — correct.
+- `clearHistory()`: calls DELETE endpoint, clears DOM, resets `lastSeq = 0` — correct.
+- WebSocket replay: renders from `msg.events` directly, updates `lastSeq` inline — correct.
+- Permission tracker: batch-tracks replay events after render, live events tracked after render — correct.
+
+### Completeness verification
+
+- All `localStorage` references: 0 matches across `tools/dashboard/` (grep verified).
+- `activity-history.ts` + `activity-history.test.ts`: both deleted, no remaining imports.
+- No stale `ActivityHistory` references in `src/` or `tests/`.
+- New tests: `clear()` in events.test.ts, `DELETE /api/events` in server.test.ts.
+- All 44 tests pass (0 failures, 113 expect() calls).
+
+### Checklist
+
+- [x] PR diff reviewed
+- [x] Findings classified — 0 CODE, 4 DOC (informational)
+- [x] Fixes committed — none needed
+- [x] Review summary with APPROVE recommendation
+- [x] Stage report committed
