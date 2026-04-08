@@ -881,6 +881,28 @@ function rejectSuggestionAction(suggestionId) {
             foContainer.insertBefore(foDiv, foContainer.firstChild);
           }
         }
+
+        // Rollback — refresh body + version history
+        if (event.type === 'rollback') {
+          if (typeof window.loadEntity === 'function') window.loadEntity();
+          if (typeof window.refreshVersionHistory === 'function') window.refreshVersionHistory();
+        }
+
+        // Permission request from FO — show approval modal
+        if (event.type === 'permission_request' && event.detail) {
+          try {
+            var permData = JSON.parse(event.detail);
+            // Only show tool-level permission requests (prefixed "tool:")
+            if (permData.request_id && permData.request_id.startsWith('tool:') &&
+                typeof window.showPermissionModal === 'function') {
+              window.showPermissionModal(
+                permData.request_id,
+                permData.description || permData.tool_name,
+                permData.input_preview || ''
+              );
+            }
+          } catch (e) { /* malformed detail — ignore */ }
+        }
       }
     };
 
@@ -1459,6 +1481,190 @@ function rejectSuggestionAction(suggestionId) {
 
   loadShareLinks();
 })();
+
+// --- Rollback Modal ---
+(function initRollbackModal() {
+  var modal = document.getElementById('rollback-modal');
+  var confirmBtn = document.getElementById('rollback-confirm-btn');
+  var cancelBtn = document.getElementById('rollback-cancel-btn');
+  var sectionNameEl = modal ? modal.querySelector('.rollback-section-name') : null;
+  var versionInfoEl = modal ? modal.querySelector('.rollback-version-info') : null;
+  var warningEl = document.getElementById('rollback-warning');
+  var errorEl = document.getElementById('rollback-error');
+
+  if (!modal) return;
+
+  var pendingSection = null;
+  var pendingVersion = null;
+
+  window.showRollbackModal = function (sectionHeading, toVersion) {
+    pendingSection = sectionHeading;
+    pendingVersion = toVersion;
+    sectionNameEl.textContent = 'Section: ' + sectionHeading;
+    versionInfoEl.textContent = 'Restore to version ' + toVersion;
+    warningEl.style.display = 'none';
+    warningEl.textContent = '';
+    errorEl.style.display = 'none';
+    errorEl.textContent = '';
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Confirm Rollback';
+    modal.style.display = 'flex';
+  };
+
+  cancelBtn.addEventListener('click', function () {
+    modal.style.display = 'none';
+    pendingSection = null;
+    pendingVersion = null;
+  });
+
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) {
+      modal.style.display = 'none';
+      pendingSection = null;
+      pendingVersion = null;
+    }
+  });
+
+  confirmBtn.addEventListener('click', function () {
+    if (!pendingSection || !pendingVersion || !entityPath) return;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Rolling back\u2026';
+    errorEl.style.display = 'none';
+
+    // Derive entity slug from entityPath
+    var slug = entityPath.replace(/\.md$/, '').split('/').pop();
+
+    apiFetch('/api/entity/rollback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        entity: slug,
+        path: entityPath,
+        section_heading: pendingSection,
+        to_version: pendingVersion,
+        author: 'captain',
+      }),
+    }).then(function (result) {
+      modal.style.display = 'none';
+      pendingSection = null;
+      pendingVersion = null;
+      // Show warning if conflict detected
+      if (result.warning) {
+        showToast('Rolled back. Warning: ' + result.warning, 'warn');
+      } else {
+        showToast('Section rolled back \u2192 v' + result.new_version, 'ok');
+      }
+      // Reload spec body
+      if (typeof window.loadEntity === 'function') window.loadEntity();
+      // Refresh version history if open
+      if (typeof window.refreshVersionHistory === 'function') window.refreshVersionHistory();
+    }).catch(function (err) {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Confirm Rollback';
+      errorEl.textContent = err.message || 'Rollback failed';
+      errorEl.style.display = '';
+    });
+  });
+})();
+
+// --- Permission Request Modal ---
+(function initPermissionModal() {
+  var modal = document.getElementById('permission-modal');
+  var allowBtn = document.getElementById('permission-allow-btn');
+  var denyBtn = document.getElementById('permission-deny-btn');
+  var descEl = document.getElementById('permission-description');
+  var diffEl = document.getElementById('permission-diff-preview');
+  var countdownEl = document.getElementById('permission-countdown');
+
+  if (!modal) return;
+
+  var pendingRequestId = null;
+  var countdownTimer = null;
+  var countdownSec = 0;
+
+  window.showPermissionModal = function (requestId, description, diffPreview) {
+    pendingRequestId = requestId;
+    descEl.textContent = description || '';
+
+    // Render diff preview using same parseDiffHunks approach
+    while (diffEl.firstChild) diffEl.removeChild(diffEl.firstChild);
+    if (diffPreview) {
+      var lines = diffPreview.split('\n');
+      lines.forEach(function (line) {
+        var skip = line.startsWith('---') || line.startsWith('+++') || line.startsWith('@@') || line === '';
+        var lineEl = document.createElement('div');
+        lineEl.style.padding = '0 0.75rem';
+        lineEl.style.lineHeight = '1.5';
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+          lineEl.style.background = 'rgba(63,185,80,0.1)';
+          lineEl.style.color = '#3fb950';
+        } else if (line.startsWith('-') && !line.startsWith('---')) {
+          lineEl.style.background = 'rgba(248,81,73,0.1)';
+          lineEl.style.color = '#f85149';
+        } else if (skip) {
+          lineEl.style.color = '#484f58';
+        } else {
+          lineEl.style.color = '#8b949e';
+        }
+        lineEl.textContent = line || '\u00a0';
+        diffEl.appendChild(lineEl);
+      });
+    }
+
+    // 120s countdown
+    clearInterval(countdownTimer);
+    countdownSec = 120;
+    countdownEl.textContent = 'Auto-deny in ' + countdownSec + 's';
+    countdownTimer = setInterval(function () {
+      countdownSec--;
+      if (countdownSec <= 0) {
+        clearInterval(countdownTimer);
+        modal.style.display = 'none';
+        // Timeout — server already denied
+      } else {
+        countdownEl.textContent = 'Auto-deny in ' + countdownSec + 's';
+      }
+    }, 1000);
+
+    modal.style.display = 'flex';
+  };
+
+  function sendVerdict(verdict) {
+    clearInterval(countdownTimer);
+    modal.style.display = 'none';
+    if (!pendingRequestId) return;
+    fetch('/api/channel/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: verdict,
+        meta: { type: 'permission_response', request_id: pendingRequestId },
+      }),
+    }).catch(function () {});
+    pendingRequestId = null;
+  }
+
+  allowBtn.addEventListener('click', function () { sendVerdict('allow'); });
+  denyBtn.addEventListener('click', function () { sendVerdict('deny'); });
+
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) sendVerdict('deny');
+  });
+})();
+
+// --- Toast notification ---
+function showToast(message, type) {
+  var toast = document.createElement('div');
+  toast.className = 'toast toast-' + (type || 'ok');
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(function () {
+    toast.classList.add('toast-fade');
+    setTimeout(function () {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 400);
+  }, 3000);
+}
 
 // --- Mobile comments toggle ---
 (function initMobileComments() {

@@ -150,6 +150,39 @@
         Comments (<span id="comments-count">0</span>)
     </button>
 
+    <!-- Rollback confirmation modal -->
+    <div id="rollback-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="rollback-modal-title">
+        <div class="modal-box">
+            <h3 id="rollback-modal-title" class="modal-title">Rollback Section</h3>
+            <div class="modal-body">
+                <p class="rollback-section-name"></p>
+                <p class="rollback-version-info"></p>
+                <div id="rollback-warning" class="rollback-warning" style="display:none;"></div>
+            </div>
+            <div class="modal-actions">
+                <button id="rollback-confirm-btn" class="btn gate-btn approve">Confirm Rollback</button>
+                <button id="rollback-cancel-btn" class="btn btn-small btn-secondary">Cancel</button>
+            </div>
+            <div id="rollback-error" class="modal-error" style="display:none;"></div>
+        </div>
+    </div>
+
+    <!-- Permission request modal (for update_entity body/remove operations) -->
+    <div id="permission-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="permission-modal-title">
+        <div class="modal-box modal-box-wide">
+            <h3 id="permission-modal-title" class="modal-title">Permission Request</h3>
+            <div class="modal-body">
+                <p id="permission-description" class="permission-description"></p>
+                <div id="permission-diff-preview" class="permission-diff-preview"></div>
+                <div id="permission-countdown" class="permission-countdown"></div>
+            </div>
+            <div class="modal-actions">
+                <button id="permission-allow-btn" class="btn gate-btn approve">Allow</button>
+                <button id="permission-deny-btn" class="btn gate-btn request-changes">Deny</button>
+            </div>
+        </div>
+    </div>
+
     <div id="comment-tooltip" class="comment-tooltip" style="display:none;">
         <textarea id="comment-input" class="comment-textarea" placeholder="Add a comment..." rows="2"></textarea>
         <div class="tooltip-actions">
