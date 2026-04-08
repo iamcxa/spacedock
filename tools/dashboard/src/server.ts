@@ -440,6 +440,11 @@ export function createServer(opts: ServerOptions) {
             return jsonResponse({ error: e.message }, 400);
           }
         },
+        DELETE: (req) => {
+          eventBuffer.clear();
+          logRequest(req, 200);
+          return jsonResponse({ ok: true });
+        },
       },
       "/api/channel/send": {
         POST: async (req) => {

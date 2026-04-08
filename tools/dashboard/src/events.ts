@@ -59,6 +59,10 @@ export class EventBuffer {
     const rows = this.selectAllStmt.all() as Array<EventRow>;
     return rows.map(rowToSequencedEvent);
   }
+
+  clear(): void {
+    this.db.query("DELETE FROM events").run();
+  }
 }
 
 interface EventRow {
