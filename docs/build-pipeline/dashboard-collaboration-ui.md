@@ -9,7 +9,7 @@ verdict:
 score: 0.8
 worktree:
 issue:
-pr:
+pr: 25
 intent: feature
 scale: Large
 project: spacedock
@@ -96,6 +96,30 @@ See `docs/superpowers/specs/2026-04-08-pipeline-brainstorm-profiles-design.md` â
 - All feed filters work (stage, type, author)
 - Global feed filters work with AND logic and URL querystring
 - Brainstorm approve button triggers gate approval
+
+## Stage Report (pr-draft)
+
+PR iamcxa/spacedock#25 created as draft.
+
+Title: `feat(dashboard): collaboration UI â€” version history, rollback, comment threading`
+
+### Files in PR
+
+New: `static/version-history.js`, `src/diff-utils.ts`, `src/diff-utils.test.ts`
+
+Modified: `detail.html`, `detail.js`, `detail.css`, `src/types.ts`, `src/comments.ts`, `src/server.ts`, `src/channel.ts`, `src/comments.test.ts`, `src/channel.test.ts`
+
+### Worktree Integrity
+
+All edits were applied to `.worktrees/spacedock-ensign-dashboard-collaboration-ui/`. No files were accidentally written to the main worktree (`/Users/kent/Project/spacedock/tools/...`). Verified by reviewing git diff on this branch only.
+
+### Deferred
+
+- 042: Entity activity feed + chat input
+- 043: Global feed filters (home page)
+- 039: Brainstorm gate approve button (existing entity)
+
+---
 
 ## Stage Report (plan)
 
