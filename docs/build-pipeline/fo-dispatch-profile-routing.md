@@ -3,11 +3,11 @@ id: 034
 title: FO Dispatch Logic — Profile-Aware Stage Routing
 status: explore
 source: spec 2026-04-08-pipeline-brainstorm-profiles-design.md (WP4)
-started:
+started: 2026-04-08
 completed:
 verdict:
 score: 0.85
-worktree:
+worktree: .worktrees/spacedock-ensign-fo-dispatch-profile-routing
 issue:
 pr:
 intent: enhancement
