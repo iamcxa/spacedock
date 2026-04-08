@@ -131,3 +131,52 @@ describe("comment routes publish events", () => {
     }
   });
 });
+
+describe("captain reply forwards to FO via onChannelMessage", () => {
+  test("POST /api/entity/comment/reply calls onChannelMessage", async () => {
+    const messages: { content: string; meta?: Record<string, string> }[] = [];
+    const server = createServer({
+      port: 0,
+      hostname: "127.0.0.1",
+      projectRoot: TMP,
+      staticDir: join(import.meta.dir, "../static"),
+      logFile: join(TMP, "test.log"),
+      onChannelMessage: async (content, meta) => {
+        messages.push({ content, meta });
+      },
+    });
+    try {
+      const addr = server.url;
+      // Create a comment first
+      const createRes = await fetch(`${addr}api/entity/comment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: ENTITY_FULL,
+          selected_text: "Some text",
+          section_heading: "Spec",
+          content: "Parent comment",
+        }),
+      });
+      const comment = await createRes.json();
+
+      const res = await fetch(`${addr}api/entity/comment/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: ENTITY_FULL,
+          comment_id: comment.id,
+          content: "Captain reply to FO",
+        }),
+      });
+      expect(res.status).toBe(200);
+      // onChannelMessage should have been called for the reply
+      const replyMessages = messages.filter((m) => m.meta?.type === "comment_reply");
+      expect(replyMessages.length).toBe(1);
+      expect(replyMessages[0].content).toBe("Captain reply to FO");
+      expect(replyMessages[0].meta?.comment_id).toBe(comment.id);
+    } finally {
+      server.stop();
+    }
+  });
+});

@@ -263,6 +263,14 @@ export function createServer(opts: ServerOptions) {
               timestamp: new Date().toISOString(),
               detail: reply.content,
             });
+            // Forward captain reply to FO via channel
+            if (opts.onChannelMessage) {
+              opts.onChannelMessage(body.content, {
+                type: "comment_reply",
+                entity_path: body.path,
+                comment_id: body.comment_id,
+              });
+            }
             logRequest(req, 200);
             return jsonResponse(reply);
           } catch (err) {
