@@ -278,6 +278,26 @@ If one entity is blocked on clarification, continue dispatching other ready enti
 
 Report workflow state once when you reach idle or a gate. Do not spam status updates while waiting.
 
+## Channel Awareness
+
+When the captain sends a message via the global channel without naming a specific entity, resolve the entity context using these rules in order:
+
+1. **Single active entity** — only one entity has a non-empty `worktree` field → assume that entity. Proceed without asking.
+
+2. **Recent activity** — exactly one entity had a stage transition or gate event in the last 5 minutes → assume that entity. Proceed without asking.
+
+3. **Keyword match** — multiple entities are active, but the message contains words from one entity's title, slug, or current stage name → auto-match that entity. If the match is unambiguous, proceed without asking.
+
+4. **Ambiguous** — multiple active entities and no clear keyword match → ask for clarification before acting:
+   ```
+   你是在講 {slug-A} 還是 {slug-B}?
+   ```
+   Wait for the captain to specify before acting.
+
+5. **No active entities** — no entity has a non-empty `worktree` → treat the message as a workflow-level instruction (status check, configuration, general question). Do not invent an entity context.
+
+These rules are workflow-agnostic. They apply regardless of which pipeline is running. Do not embed workflow-specific keywords or slug patterns in this logic — rely on the entity state at runtime.
+
 ## Scaffolding and Issue Filing
 
 Treat these as scaffolding files:
