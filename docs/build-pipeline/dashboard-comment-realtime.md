@@ -1,9 +1,9 @@
 ---
 id: 027
 title: Dashboard Comment Realtime — 即時推送 + Reply 雙向通道
-status: explore
+status: plan
 source: captain observation (026 shipping session — reply 不顯示 + comment 需刷新)
-started:
+started: 2026-04-08T03:26:00Z
 completed:
 verdict:
 score: 0.85
