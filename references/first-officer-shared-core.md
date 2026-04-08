@@ -108,6 +108,69 @@ effective_stages(entity):
 
 **Startup note:** Read `stages.profiles` from the README frontmatter alongside `stages.states`. The `status --next` output now includes PROFILE and DISPATCH columns — use these when deciding whether to dispatch an ensign or handle inline.
 
+## Brainstorm Triage
+
+When `status --next` shows an entity with `DISPATCH = (FO inline)`, handle it inline without dispatching an ensign. Perform triage immediately.
+
+### Executability Assessment
+
+Score the entity spec on 5 criteria (1 point each):
+
+| Check | Pass when |
+|-------|-----------|
+| **Intent clear** | You know the outcome to achieve |
+| **Approach decidable** | A method exists, OR the trade-off is clearly stated for captain to decide |
+| **Scope bounded** | What NOT to touch is explicit — no scope-creep risk |
+| **Verification possible** | Completion can be confirmed (test criteria or observable outcome) |
+| **Size estimable** | Express / standard / full can be determined from the spec |
+
+### Routing
+
+**5/5 + small (express path):**
+Post a profile recommendation to the captain and await gate approval:
+```
+Brainstorm: {entity title}
+
+Executability: 5/5 ✅
+Recommendation: express — {rationale (1-2 sentences)}
+
+Approve to assign profile: express and advance to execute.
+```
+On captain approval: write `profile: express` to entity frontmatter (git commit on main), advance to next effective stage.
+
+**≤4/5 (captain choice path):**
+Present the gap and three options:
+```
+Brainstorm: {entity title}
+
+Executability: {N}/5
+Gap: {which criteria failed and why}
+
+Options:
+  A) Interactive brainstorm — walk through design together (superpowers:brainstorming)
+  B) Ensign analysis — dispatch ensign to explore codebase, post approach options to dashboard
+  C) Direct — you provide the approach, I'll update the spec
+
+Which path? (A/B/C)
+```
+
+**Path A:** Invoke `Skill: "superpowers:brainstorming"`. After spec is produced, present profile recommendation and await gate.
+
+**Path B:** Create a worktree for the entity (standard worktree creation flow). Dispatch an ensign with instructions to produce: codebase exploration, 2–3 approach options with tradeoffs, profile recommendation, and open questions. The ensign posts its analysis as a comment on the entity (read-only on spec body — no `update_entity` calls). After ensign completes, summarize the analysis to the captain. Captain may switch to Path A with ensign's analysis as context. Once captain decides on approach, FO updates spec via `update_entity`, presents profile recommendation, awaits gate.
+
+**Path C:** Captain provides the approach directly in their response. FO updates the spec with the approach, presents profile recommendation, awaits gate.
+
+Paths can sequence: B → captain reviews → switches to A. FO recommends a path based on executability score but captain always decides.
+
+### Gate Resolution
+
+Gate passes when the captain explicitly approves the profile assignment (dashboard button, comment, or channel message). On approval:
+1. Write `profile: {full|standard|express}` to entity frontmatter via git commit on main
+2. Advance entity to next stage per `effective_stages()`
+3. Emit dispatch event for the new stage
+
+Never self-approve the brainstorm gate. Do not infer approval from silence.
+
 ## Dispatch
 
 For each entity reported by `status --next`:
