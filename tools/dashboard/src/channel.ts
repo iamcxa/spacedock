@@ -552,7 +552,7 @@ if (import.meta.main) {
 
   // Write channel state file so ctl.sh can detect this instance
   const stateDir = computeStateDir(projectRoot);
-  writeChannelState(stateDir, dashboard.port);
+  writeChannelState(stateDir, dashboard.port!);
 
   // Clean up state file on exit (graceful)
   const cleanup = () => {

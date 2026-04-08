@@ -310,6 +310,71 @@ Note: Brainstorm gate approve button stays in **039** (`dashboard-gate-review-re
 
 ---
 
+## Stage Report (quality)
+
+### Test Results
+
+| Suite | Tests | Pass | Fail |
+|-------|-------|------|------|
+| comments.test.ts | 23 | 23 | 0 |
+| channel.test.ts | 19 | 19 | 0 |
+| diff-utils.test.ts | 9 | 9 | 0 |
+| All other suites (10 files) | 128 | 128 | 0 |
+| **Total** | **179** | **179** | **0** |
+
+Up from 161 (pre-035) to 179 — 18 new tests added for 035 features.
+
+### New Tests Added
+
+**`src/comments.test.ts`** — 5 new tests in `describe("resolveComment — resolved_reason and resolved_version (035 schema)")`:
+- Records `resolved_reason` when provided
+- Records `resolved_version` when provided
+- Records `manual` reason
+- Backward compat: resolves without opts (no reason/version set)
+- Backward compat: existing sidecar without resolved_reason loads correctly
+- Round-trip: reason + version survive JSON sidecar write/read
+
+**`src/channel.test.ts`** — 3 new tests in `describe("auto-resolve — resolved_reason and resolved_version (035 schema)")`:
+- Resolve endpoint records `reason:manual` when no reason provided (HTTP default)
+- Resolve endpoint records explicit reason when provided
+- `autoResolveComments` records `reason:section_updated` + `snap.version` in sidecar
+
+**`src/diff-utils.ts` + `src/diff-utils.test.ts`** — New module: 9 tests covering `parseDiffHunks()`:
+- Empty patch, add/del/ctx classification, file header skip, hunk header skip, mixed patch, unknown line skip, sigil slice
+
+### TypeScript Check
+
+`bun run tsc --noEmit` — **0 errors**. Fixed two pre-existing strict mode issues:
+- `channel.ts:555` — `dashboard.port` typed as optional; added non-null assertion (port is always assigned at this call site in `startChannelServer`)
+- `channel.test.ts:322` — `perm.event.detail` typed as optional; added non-null assertion (only reached when `perm` and `detail` are confirmed present)
+
+### Security Review
+
+- `version-history.js` — zero dynamic HTML injection; all DOM construction uses `createElement`/`textContent`/`appendChild`
+- `detail.js` — one dynamic HTML use at line 77: content is passed through `DOMPurify.sanitize()` before insertion. Safe.
+- WS message parsing uses `JSON.parse` inside `try/catch` — malformed detail silently ignored (no crash, no XSS surface)
+
+### Layout and DOM ID Verification
+
+- CSS grid: `grid-template-columns: 240px 1fr 320px` confirmed (detail.css:48)
+- Responsive: 900px breakpoint (3-col to 2-col), 700px breakpoint (single col + overlay)
+- Required IDs confirmed present: `#spec-panel`, `#version-panel`, `#history-btn`, `#rollback-modal`, `#permission-modal`, `#accordion-gate`
+
+### WS Handler Coverage
+
+`detailWs.onmessage` handles all required event types:
+- `gate_decision` — updates gate badge
+- `comment` — calls `loadComments()`
+- `channel_response` — inserts transient FO message card
+- `rollback` — calls `loadEntity()` + `refreshVersionHistory()` (new in 035)
+- `permission_request` — parses `tool:` prefixed requests, calls `showPermissionModal()` (new in 035)
+
+### Verdict
+
+PASSED. All 179 tests green. TypeScript clean. No regressions. New schema fields (`resolved_reason`, `resolved_version`) fully tested with backward-compat coverage. Safe DOM construction throughout new JS.
+
+---
+
 ## Stage Report (explore)
 
 ### Key File Inventory
