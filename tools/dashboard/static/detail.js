@@ -839,6 +839,16 @@ function rejectSuggestionAction(suggestionId) {
           }
           startStatusPoll();
         }
+
+        // Realtime comment updates — reload comments when any comment event arrives
+        if (event.type === 'comment' && typeof loadComments === 'function') {
+          loadComments();
+        }
+
+        // Channel response (FO reply) — reload comments to show FO replies in thread
+        if (event.type === 'channel_response' && typeof loadComments === 'function') {
+          loadComments();
+        }
       }
     };
 
