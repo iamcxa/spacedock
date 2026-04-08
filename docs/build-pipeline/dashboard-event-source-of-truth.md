@@ -181,6 +181,32 @@ permission card 卡住的二級原因：早期 session 的 `permission_request` 
    - `grep -c ActivityHistory tools/dashboard/static/activity.js` — 0
    - `grep -r activity-history tools/dashboard/src/` — no matches
 
+## Stage Report: quality
+
+**Quality checks run — ALL PASS**
+
+1. Tests (events): `bun test ../../tests/dashboard/events.test.ts`
+   - **11 pass, 0 fail** ✓
+
+2. Tests (server): `bun test ../../tests/dashboard/server.test.ts`
+   - **33 pass, 0 fail** ✓
+   - Fixed 3 failing WebSocket tests that were expecting live events but receiving `channel_status` init message first. Updated test skip logic to filter both `replay` and `channel_status` messages before collecting live event assertions.
+
+3. No localStorage references: `grep -c 'localStorage' tools/dashboard/static/activity.js`
+   - **0** ✓
+
+4. No ActivityHistory references: `grep -c 'ActivityHistory' tools/dashboard/static/activity.js`
+   - **0** ✓
+
+5. No stale imports: `grep -r 'activity-history' tools/dashboard/src/`
+   - **0 matches** ✓
+
+6. Deleted files confirmed gone:
+   - `tools/dashboard/src/activity-history.ts` — does not exist ✓
+   - `tools/dashboard/src/activity-history.test.ts` — does not exist ✓
+
+7. Security/API/Migration: **SKIP** (internal tooling, no contract/schema/migration changes)
+
 ## Stage Report: plan
 
 1. TDD checklist written — concrete test-first tasks with file paths: **DONE**

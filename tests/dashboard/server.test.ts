@@ -286,17 +286,20 @@ describe("Dashboard Server", () => {
     const ws = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
     await new Promise<void>((resolve) => { ws.onopen = () => resolve(); });
 
-    // Skip the initial replay message
+    // Skip the initial replay and channel_status messages
     const liveMessages: string[] = [];
-    let replayDone = false;
+    let skipCount = 0;
     const gotLive = new Promise<void>((resolve) => {
       ws.onmessage = (ev) => {
         const parsed = JSON.parse(ev.data as string);
-        if (parsed.type === "replay") {
-          replayDone = true;
+        if (parsed.type === "replay" || parsed.type === "channel_status") {
+          skipCount++;
+          if (skipCount === 2) {
+            // Both skipped, now ready for live messages
+          }
           return;
         }
-        if (replayDone) {
+        if (skipCount === 2) {
           liveMessages.push(ev.data as string);
           resolve();
         }
@@ -368,11 +371,15 @@ describe("Dashboard Server", () => {
     const ws = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
     await new Promise<void>((r) => { ws.onopen = () => r(); });
 
-    // Skip replay
+    // Skip replay and channel_status
+    let skipCount = 0;
     await new Promise<void>((r) => {
       ws.onmessage = (ev) => {
         const msg = JSON.parse(ev.data as string);
-        if (msg.type === "replay") r();
+        if (msg.type === "replay" || msg.type === "channel_status") {
+          skipCount++;
+          if (skipCount === 2) r();
+        }
       };
       setTimeout(r, 500);
     });
@@ -588,11 +595,15 @@ describe("Event Pipeline Integration", () => {
     const ws = new WebSocket(`${baseUrl.replace("http", "ws")}/ws/activity`);
     await new Promise<void>((r) => { ws.onopen = () => r(); });
 
-    // Skip replay
+    // Skip replay and channel_status
+    let skipCount = 0;
     await new Promise<void>((r) => {
       ws.onmessage = (ev) => {
         const msg = JSON.parse(ev.data as string);
-        if (msg.type === "replay") r();
+        if (msg.type === "replay" || msg.type === "channel_status") {
+          skipCount++;
+          if (skipCount === 2) r();
+        }
       };
       setTimeout(r, 500);
     });
