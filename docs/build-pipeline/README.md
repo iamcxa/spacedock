@@ -5,19 +5,36 @@ entity-label: feature
 entity-label-plural: features
 id-style: sequential
 stages:
+  profiles:
+    full:     [brainstorm, explore, research, plan, execute, quality, seeding, e2e, docs, pr-draft, pr-review, shipped]
+    standard: [brainstorm, explore, plan, execute, quality, pr-draft, pr-review, shipped]
+    express:  [brainstorm, execute, quality, shipped]
   defaults:
     worktree: true
     concurrency: 2
     # model: inherits from parent (user settings). Override per-stage below.
     # FO reads `model:` property and passes to Agent(model=...) at dispatch.
   states:
-    - name: explore
+    - name: brainstorm
       initial: true
       model: sonnet
+      worktree: false
+      gate: true
+      # FO-inline triage: executability assessment → profile recommendation.
+      # Express (5/5 + small): FO posts recommendation, captain confirms.
+      # Standard/Full (≤4/5): FO asks captain A/B/C path:
+      #   A) Interactive brainstorm (superpowers:brainstorming)
+      #   B) Ensign analysis (dispatch to worktree, posts to dashboard)
+      #   C) Captain provides approach directly
+    - name: explore
+      profiles: [full, standard]
+      model: sonnet
     - name: research
+      profiles: [full]
       agent: auto-researcher
       model: opus
     - name: plan
+      profiles: [full, standard]
       gate: true
       model: opus
       # CONDITIONAL gate: only when plan involves schema change, cross-domain,
@@ -32,10 +49,12 @@ stages:
       # Escalates to captain ONLY for: security findings, breaking API,
       # destructive migration, or 3 failed feedback rounds.
     - name: seeding
+      profiles: [full]
       model: sonnet
       # CONDITIONAL: only when e2e needs test data not yet present
       # FO checks explore results for seed requirements
     - name: e2e
+      profiles: [full]
       gate: true
       model: sonnet
       # Conditional feedback routing (FO decides based on failure reason):
@@ -43,12 +62,15 @@ stages:
       #   code bug → feedback-to: execute
       #   infra failure → escalate to captain
     - name: docs
+      profiles: [full]
       model: sonnet
       # CONDITIONAL: only when feature adds/changes public API, CLI, config,
       # or has breaking changes requiring migration guide
     - name: pr-draft
+      profiles: [full, standard]
       model: sonnet
     - name: pr-review
+      profiles: [full, standard]
       gate: true
       feedback-to: execute
       model: opus
