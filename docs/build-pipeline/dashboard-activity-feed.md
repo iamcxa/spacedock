@@ -112,3 +112,59 @@ Currently:
    - **captain_message type**: spec says `meta: {type: "captain_message"}` but server.ts maps all non-permission_response channel sends to `channel_message` type. Either use `channel_message` type consistently or add `captain_message` to VALID_EVENT_TYPES. Recommend: use `channel_message` type (already valid), no new type needed.
    - **Two-instance WS bridge**: channel.ts events published to channel server (8420) are forwarded to ctl server (8421) via `forwardToCtlServer()` — activity feed on ctl UI will see channel events correctly
    - **No bun:test coverage baseline** — no comparison infrastructure; plan stage should note this is new test coverage only
+
+## Stage Report: plan
+
+1. **Formal plan document created** — DONE
+   Saved to `docs/superpowers/specs/2026-04-09-dashboard-activity-feed.md` via `superpowers:writing-plans` skill. 7 tasks with TDD ordering, complete code blocks, exact file paths.
+
+2. **Plan has concrete file paths referencing explore findings** — DONE
+   All 7 files from explore mapped to tasks: events.ts (Task 1), events.test.ts (Task 1), server.ts (Task 2), server.test.ts (Task 2), detail.html (Task 3), detail.css (Task 3), detail.js (Tasks 4-6). Line numbers referenced where applicable.
+
+3. **Plan uses test-first ordering** — DONE
+   Task 1: tests before getByEntity implementation. Task 2: tests before server filter. Tasks 3-6: frontend (manual verification — no DOM test framework). Task 7: quality gate.
+
+4. **Plan includes quality gate steps** — DONE
+   Task 7: type-check (`bunx tsc --noEmit`), test (`bun test`), build check.
+
+5. **Plan addresses all 4 acceptance criteria** — DONE
+   - Activity feed shows only current entity's events → Tasks 1, 2, 4
+   - New events appear in real-time via WS → Task 5
+   - Chat input sends entity-scoped channel message → Task 6
+   - Filter bar filters by type/stage/author → Task 4 (AND logic)
+
+6. **Gate signal assessment** — DONE
+   - Schema change: NO (no new tables or columns — `getByEntity` queries existing `events` table)
+   - Cross-domain impact: NO (dashboard-internal, no pipeline/plugin changes)
+   - New public API: NO (adds query param to existing endpoint, no new routes)
+   - New infra dependency: NO (no new packages, services, or databases)
+   - **Recommendation: auto-advance** — this is a dashboard-internal UI feature with no architectural risk
+
+## Stage Report: execute
+
+1. **Task 1: EventBuffer.getByEntity — tests + implementation** — DONE
+   Created `events.test.ts` with 3 tests (entity filter, empty result, seq order). Added `getByEntity(entity)` method with prepared statement to `EventBuffer`. All tests pass. Commit: `839aafb`.
+
+2. **Task 2: GET /api/events entity filter — tests + implementation** — DONE
+   Added 2 integration tests to `server.test.ts` (entity filter returns scoped events, no param returns all). Implemented `?entity=` query param in GET /api/events handler with `since` combo support. All tests pass. Commit: `b520c59`.
+
+3. **Task 3: Detail page tabbed panel — HTML + CSS** — DONE
+   Replaced right aside with tabbed Comments/Activity panel in `detail.html`. Added tab bar, activity feed, filter bar (type/stage/author dropdowns), and chat input HTML. Added CSS for tabs, activity feed events, type badges, filter bar, and chat textarea. Commit: `af019c6`.
+
+4. **Task 4: Tab switching + activity feed rendering + filter bar** — DONE
+   Added tab switching logic, `loadActivityFeed()`, `renderActivityFeed()`, `createActivityCard()`, `populateFilterOptions()`, and filter change listeners inside IIFE in `detail.js`. Activity loads on first tab switch. Newest-first rendering. AND-logic filtering. Commit: `98829bf`.
+
+5. **Task 5: WS entity-scoped activity updates** — DONE
+   Added WS handler in `detailWs.onmessage` that checks `event.entity === currentSlug && activityLoaded` before appending to activity feed. Updates filter options and re-renders on each new event. Commit: `91a8017`.
+
+6. **Task 6: Chat input — send entity-scoped captain messages** — DONE
+   Added `sendChatMessage()` handler that POSTs to `/api/channel/send` with `meta: {entity: currentSlug}`. Wired to Send button click and Enter key (Shift+Enter for newline). Disables button during send, clears on success, preserves on error. Commit: `972b4af`.
+
+7. **Task 7: Quality gate — tsc, bun test, build check** — DONE
+   `bunx tsc --noEmit`: 0 errors. `bun test`: 186 pass, 0 fail across 14 files. No fixes needed.
+
+8. **All commits use `{type}(042): {description}` format** — DONE
+   All 6 commits follow `feat(042): ...` convention.
+
+9. **TDD discipline maintained (tests before implementation for Tasks 1-2)** — DONE
+   Task 1: wrote 3 failing tests → implemented `getByEntity` → tests pass. Task 2: wrote 2 failing tests → implemented entity filter → tests pass.
