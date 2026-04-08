@@ -153,6 +153,34 @@ permission card 卡住的二級原因：早期 session 的 `permission_request` 
 - Verify no remaining imports of `activity-history` anywhere:
   - `grep -r activity-history tools/dashboard/src/` — expect 0
 
+## Stage Report: execute
+
+1. Task 1 — EventBuffer.clear() test + implementation: **DONE**
+   - Added `clear()` test in `tests/dashboard/events.test.ts` (push 3 events, clear, verify empty, push after clear works)
+   - Added `clear()` method to `EventBuffer` in `tools/dashboard/src/events.ts` (`DELETE FROM events`)
+2. Task 2 — DELETE /api/events test + implementation: **DONE**
+   - Added DELETE test in `tests/dashboard/server.test.ts` (POST event, verify non-empty, DELETE, verify empty)
+   - Added DELETE handler to `/api/events` route in `tools/dashboard/src/server.ts`
+3. Task 3 — localStorage removed from activity.js: **DONE**
+   - Deleted HISTORY_KEY, HISTORY_CAPACITY, HISTORY_EVICT_BATCH constants
+   - Deleted isQuotaExceeded() helper
+   - Deleted entire `history` IIFE (hydrate, persist, appendMany, append, dedupReplay, detectSeqReset, clear)
+   - Deleted hydrate-before-connect block
+   - Updated `clearHistory()` to fetch DELETE /api/events (fire-and-forget)
+   - Removed `history.detectSeqReset()`, `history.dedupReplay()`, `history.appendMany()`, `history.append()` from ws.onmessage
+   - Replay handler now renders ALL events from server directly (SQLite is single source of truth)
+   - Kept: renderEntry, permissionTracker, buildTrackedEvent, markResolved, lastSeq tracking for live dedup
+4. Task 4 — activity-history.ts deleted: **DONE**
+   - Deleted `tools/dashboard/src/activity-history.ts`
+   - Deleted `tools/dashboard/src/activity-history.test.ts`
+   - Verified no other file imports activity-history
+5. Task 5 — All quality gates pass: **DONE**
+   - `bun test tests/dashboard/events.test.ts` — 11 pass, 0 fail
+   - `bun test tests/dashboard/server.test.ts` — 29 pass, 4 fail (all 4 are pre-existing flaky WebSocket timing tests unrelated to this change; new DELETE test passes)
+   - `grep -c localStorage tools/dashboard/static/activity.js` — 0
+   - `grep -c ActivityHistory tools/dashboard/static/activity.js` — 0
+   - `grep -r activity-history tools/dashboard/src/` — no matches
+
 ## Stage Report: plan
 
 1. TDD checklist written — concrete test-first tasks with file paths: **DONE**

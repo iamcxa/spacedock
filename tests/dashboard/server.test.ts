@@ -448,6 +448,33 @@ describe("Dashboard Server", () => {
     const data = await res.json();
     expect(data.error).toBeDefined();
   });
+
+  test("DELETE /api/events clears all events", async () => {
+    // Ensure at least one event exists
+    await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "dispatch",
+        entity: "del-test",
+        stage: "plan",
+        agent: "e1",
+        timestamp: "2026-04-04T10:00:00Z",
+      }),
+    });
+    const before = await fetch(`${baseUrl}/api/events`);
+    const beforeData = await before.json();
+    expect(beforeData.events.length).toBeGreaterThan(0);
+
+    const delRes = await fetch(`${baseUrl}/api/events`, { method: "DELETE" });
+    expect(delRes.status).toBe(200);
+    const delData = await delRes.json();
+    expect(delData.ok).toBe(true);
+
+    const after = await fetch(`${baseUrl}/api/events`);
+    const afterData = await after.json();
+    expect(afterData.events.length).toBe(0);
+  });
 });
 
 describe("Event Pipeline Integration", () => {

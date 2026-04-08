@@ -143,4 +143,20 @@ describe("EventBuffer", () => {
     expect(entry.seq).toBe(1);
     expect(entry.event.type).toBe("permission_response");
   });
+
+  test("clear() removes all events", () => {
+    const db = openDb(":memory:");
+    const buf = new EventBuffer(db, 100);
+    buf.push({ type: "dispatch", entity: "a", stage: "plan", agent: "e1", timestamp: "t1" });
+    buf.push({ type: "completion", entity: "b", stage: "plan", agent: "e2", timestamp: "t2" });
+    buf.push({ type: "gate", entity: "c", stage: "plan", agent: "e3", timestamp: "t3" });
+
+    buf.clear();
+    expect(buf.getAll().length).toBe(0);
+
+    // Push after clear still works; seq continues from last rowid (AUTOINCREMENT)
+    const after = buf.push({ type: "dispatch", entity: "d", stage: "plan", agent: "e4", timestamp: "t4" });
+    expect(buf.getAll().length).toBe(1);
+    expect(after.seq).toBeGreaterThan(3);
+  });
 });
