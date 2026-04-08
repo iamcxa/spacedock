@@ -14,8 +14,30 @@
             <span id="channel-status" class="indicator paused">Channel: disconnected</span>
             <span id="refresh-indicator" class="indicator">Auto-refresh: ON</span>
             <span id="telemetry-indicator" class="indicator" style="display:none"></span>
+            <button id="notif-settings-btn" type="button" class="indicator notif-settings-btn" title="Notification settings">&#9881;</button>
         </div>
     </header>
+    <div id="notif-settings-panel" hidden>
+        <div class="notif-settings-inner">
+            <div class="notif-settings-row">
+                <label class="notif-toggle-label">
+                    <input type="checkbox" id="notif-enabled-toggle">
+                    Browser Notifications
+                </label>
+                <span id="notif-permission-state" class="notif-permission-badge"></span>
+                <button id="notif-test-btn" type="button" class="btn btn-small">Test</button>
+            </div>
+            <div id="notif-type-checkboxes" class="notif-type-grid">
+                <label><input type="checkbox" data-notif-type="gate"> Gate approval</label>
+                <label><input type="checkbox" data-notif-type="permission_request"> Permission request</label>
+                <label><input type="checkbox" data-notif-type="comment"> FO comment</label>
+                <label><input type="checkbox" data-notif-type="channel_response"> FO channel reply</label>
+                <label><input type="checkbox" data-notif-type="pr_ready"> PR ready</label>
+                <label><input type="checkbox" data-notif-type="pipeline_error"> Pipeline error</label>
+                <label><input type="checkbox" data-notif-type="entity_shipped"> Entity shipped</label>
+            </div>
+        </div>
+    </div>
     <div class="dashboard-layout">
         <main id="workflows-container">
             <p class="loading">Loading workflows...</p>
@@ -34,6 +56,7 @@
             </div>
         </aside>
     </div>
+    <script src="notifications.js"></script>
     <script src="visualizer.js"></script>
     <script src="editor.js"></script>
     <script src="app.js"></script>

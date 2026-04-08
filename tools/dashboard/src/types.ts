@@ -77,7 +77,8 @@ export interface FilterOptions {
 
 export type AgentEventType = "dispatch" | "completion" | "gate" | "feedback" | "merge" | "idle"
   | "channel_message" | "channel_response" | "permission_request" | "permission_response"
-  | "comment" | "suggestion" | "gate_decision" | "share_created" | "rollback";
+  | "comment" | "suggestion" | "gate_decision" | "share_created" | "rollback"
+  | "pr_ready" | "pipeline_error" | "entity_shipped";
 
 export interface AgentEvent {
   type: AgentEventType;
