@@ -1175,6 +1175,13 @@ function rejectSuggestionAction(suggestionId) {
             onClick: function () { window.focus(); },
           });
         })();
+
+        // Activity feed — append new events scoped to this entity
+        if (event.entity === currentSlug && activityLoaded) {
+          activityEvents.push(event);
+          populateFilterOptions();
+          renderActivityFeed();
+        }
       }
     };
 
