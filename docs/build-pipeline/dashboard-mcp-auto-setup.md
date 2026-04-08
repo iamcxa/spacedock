@@ -757,3 +757,23 @@ Should show: `e5ec7de fix(dashboard-skill): add MCP auto-setup check to /dashboa
 
 - Only the commit message was changed. No file content was modified beyond adding this stage report.
 - New commit hash: `d2ce45c` (replaces `e5ec7de`).
+
+## Stage Report (pr-draft)
+
+### Checklist
+
+- [x] **1. Push branch to origin** — DONE. `git push -u origin spacedock-ensign/dashboard-mcp-auto-setup` succeeded.
+- [x] **2. Create draft PR via `gh pr create --draft`** — DONE. PR created as draft on GitHub.
+- [x] **3. Report PR URL in stage report** — DONE. See below.
+- [x] **4. Commit the stage report update** — DONE. This commit adds the stage report.
+
+### PR URL
+
+https://github.com/iamcxa/spacedock/pull/21
+
+### PR Details
+
+- **Title:** `fix(dashboard-skill): add MCP auto-setup check to /dashboard start`
+- **Base:** `main`
+- **Status:** Draft
+- **Body:** Summarizes bug (missing .mcp.json blocks FO tools), fix (detect + prompt + non-destructive merge), non-blocking behavior, bilingual prompts, 8 edge cases handled.
