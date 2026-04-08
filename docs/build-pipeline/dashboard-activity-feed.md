@@ -1,7 +1,7 @@
 ---
 id: 042
 title: Dashboard — Entity Activity Feed + Chat Input
-status: pr-draft
+status: pr-review
 profile: standard
 source: 035 plan scope triage — deferred from dashboard-collaboration-ui
 started: 2026-04-09T03:30:00Z
@@ -10,7 +10,7 @@ verdict:
 score: 0.0
 worktree: .worktrees/spacedock-ensign-dashboard-activity-feed
 issue:
-pr:
+pr: "#26"
 intent: feature
 scale: Medium
 project: spacedock
