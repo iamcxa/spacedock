@@ -1221,7 +1221,6 @@ function rejectSuggestionAction(suggestionId) {
 
   // --- Initialize ---
 
-  var _originalLoadEntity = loadEntity;
   window.loadEntity = function () {
     if (!entityPath) return;
     apiFetch('/api/entity/detail?path=' + encodeURIComponent(entityPath))

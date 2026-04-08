@@ -836,6 +836,10 @@ body {
 /* --- Phase Nav Responsive Collapse --- */
 
 @media (max-width: 768px) {
+    .detail-layout {
+        grid-template-columns: 1fr;
+    }
+
     .phase-nav-toggle {
         display: inline-block;
     }
