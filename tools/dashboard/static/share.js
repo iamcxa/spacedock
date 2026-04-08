@@ -20,7 +20,7 @@
 
   verifyBtn.addEventListener("click", doVerify);
   passwordInput.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") doVerify();
+    if (e.key === "Enter" && !e.isComposing) doVerify();
   });
 
   function doVerify() {
@@ -451,7 +451,7 @@
           submitReply(capturedId, text);
         };
         input.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') btn.click();
+          if (e.key === 'Enter' && !e.isComposing) btn.click();
         });
         form.appendChild(input);
         form.appendChild(btn);
@@ -666,6 +666,36 @@
           // Update gate panel on gate_decision events
           if (msg.data.event.type === "gate_decision" && currentGatePath) {
             refreshGateStatus();
+          }
+          // Channel response (FO reply) — render directly as a transient FO message.
+          if (msg.data.event.type === "channel_response" && msg.data.event.detail) {
+            var foContainer = document.getElementById("comment-threads");
+            if (foContainer) {
+              var foDiv = document.createElement("div");
+              foDiv.className = "comment-card fo-channel-message";
+
+              var foHeader = document.createElement("div");
+              foHeader.className = "fo-channel-header";
+
+              var foBadge = document.createElement("span");
+              foBadge.className = "fo-badge";
+              foBadge.textContent = "FO";
+              foHeader.appendChild(foBadge);
+
+              var foTime = document.createElement("span");
+              foTime.className = "comment-meta";
+              foTime.textContent = new Date(msg.data.event.timestamp || Date.now()).toLocaleString();
+              foHeader.appendChild(foTime);
+
+              foDiv.appendChild(foHeader);
+
+              var foBody = document.createElement("div");
+              foBody.className = "comment-content";
+              foBody.textContent = msg.data.event.detail;
+              foDiv.appendChild(foBody);
+
+              foContainer.insertBefore(foDiv, foContainer.firstChild);
+            }
           }
         }
       } catch (e) { /* ignore parse errors */ }

@@ -1064,14 +1064,23 @@ export function createServer(opts: ServerOptions) {
 
   function publishEvent(event: AgentEvent): number {
     const entry = eventBuffer.push(event);
-    server.publish("activity", JSON.stringify({ type: "event", data: entry }));
+    const payload = JSON.stringify({ type: "event", data: entry });
+    server.publish("activity", payload);
+    // FO replies (channel_response) have no entity context — broadcast them to
+    // every share topic so share-page viewers also see the reply.
+    const isChannelResponseWithoutEntity =
+      event.type === "channel_response" && !event.entity;
     // Forward to scoped share topics
     for (const [token, link] of shareRegistry.entries()) {
+      if (isChannelResponseWithoutEntity) {
+        server.publish(`share:${token}`, payload);
+        continue;
+      }
       const entitySlugs = new Set(
         link.entityPaths.map((p) => p.replace(/\.md$/, "").split("/").pop()!)
       );
       if (entitySlugs.has(event.entity)) {
-        server.publish(`share:${token}`, JSON.stringify({ type: "event", data: entry }));
+        server.publish(`share:${token}`, payload);
       }
     }
     return entry.seq;
