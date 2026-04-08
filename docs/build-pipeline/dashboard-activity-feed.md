@@ -237,3 +237,27 @@ Currently:
 5. **Self-review annotations** — DONE
    5 inline annotations posted to PR #26 review (review ID: 4077917618).
    Annotated: prepared statement rationale (events.ts:29), since+entity combo precedence (server.ts:581), activityLoaded guard semantics (detail.js:916), lazy load on first tab switch (detail.js:932), WS entity scope filter + silent-drop rationale (detail.js:1222).
+
+## Stage Report: pr-review
+
+1. **Self-review completed** — DONE
+   Manual code-level scan of all 8 changed files (702 insertions). Checked: XSS safety, SQL injection, input validation, logic correctness, CSS class safety, filter behavior, WS event scoping.
+
+2. **All CODE/SUGGESTION findings fixed and pushed** — DONE
+   - **CODE fix (detail.js)**: `populateFilterOptions()` was clearing and rebuilding stage/author dropdown options without preserving the current selection. When a WS event arrived with a filter active, the user's filter would silently reset to "All". Fixed by saving/restoring `stageSelect.value` and `authorSelect.value` across rebuilds. Commit: `d545b84`.
+
+3. **Advisory/DOC findings noted (not blocking)** — DONE
+   - **SUGGESTION**: Missing CSS badge color styles for 9 of 18 event types (idle, permission_request, permission_response, comment, suggestion, gate_decision, share_created, pipeline_error, entity_shipped). These render with base badge styling (no color). Non-blocking — visual polish for a follow-up.
+   - **ADVISORY**: `sendChatMessage()` has no visual error feedback on failure (content preserved for retry, but no toast/indicator). Acceptable for MVP scope.
+   - **ADVISORY**: `parsing.test.ts` has 1 pre-existing failure (on main too) — unrelated to this PR.
+
+4. **Review summary written to entity body** — DONE (this section)
+
+5. **Recommendation: APPROVE** — DONE
+   - All 19 PR-specific tests pass (events.test.ts: 3, server.test.ts: 16)
+   - 0 type errors (bunx tsc --noEmit)
+   - 1 code bug found and fixed (filter selection reset)
+   - No security issues (textContent for rendering, prepared statements for SQL, JSON.stringify for POST body)
+   - All 4 acceptance criteria met: entity-scoped feed, real-time WS, chat input, filter bar
+   - Backwards compatible (existing `/api/events` without `?entity=` param unchanged)
+   - PR size: 672+ lines (with fix) — within bounds for a single-feature PR
