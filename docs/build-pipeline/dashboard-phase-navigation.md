@@ -1,7 +1,7 @@
 ---
 id: 029
 title: Dashboard Phase Navigation — Entity Detail 階段導覽與快速跳轉
-status: pr-draft
+status: pr-review
 source: captain observation (026 shipping session — detail page 無法按 phase 導覽)
 started: 2026-04-08T03:25:00Z
 completed:
@@ -9,7 +9,7 @@ verdict:
 score: 0.9
 worktree: .worktrees/spacedock-ensign-dashboard-phase-navigation
 issue:
-pr:
+pr: "#18"
 intent: feature
 scale: Medium
 project: spacedock
