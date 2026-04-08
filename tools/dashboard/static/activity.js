@@ -719,4 +719,112 @@
   // Start disconnected — channel.ts will broadcast status when connected
   setChannelStatus(false);
   connect();
+
+  // --- Notification Settings Panel ---
+
+  (function initNotifSettings() {
+    var N = window.SpacedockNotifications;
+    if (!N) return;
+
+    var settingsBtn = document.getElementById("notif-settings-btn");
+    var settingsPanel = document.getElementById("notif-settings-panel");
+    var enabledToggle = document.getElementById("notif-enabled-toggle");
+    var permBadge = document.getElementById("notif-permission-state");
+    var testBtn = document.getElementById("notif-test-btn");
+
+    if (!settingsBtn || !settingsPanel) return;
+
+    function updatePermBadge() {
+      var state = N.getPermissionState();
+      permBadge.textContent = "Permission: " + state;
+      permBadge.className = "notif-permission-badge notif-perm-" + state;
+      if (state === "denied") {
+        enabledToggle.disabled = true;
+        enabledToggle.title = "Notifications blocked — enable in browser settings";
+      } else if (state === "unsupported") {
+        enabledToggle.disabled = true;
+        enabledToggle.title = "Browser does not support notifications";
+      } else {
+        enabledToggle.disabled = false;
+        enabledToggle.title = "";
+      }
+    }
+
+    function syncCheckboxes() {
+      var cfg = N.getConfig();
+      enabledToggle.checked = cfg.enabled;
+      var boxes = settingsPanel.querySelectorAll("[data-notif-type]");
+      for (var i = 0; i < boxes.length; i++) {
+        var t = boxes[i].getAttribute("data-notif-type");
+        boxes[i].checked = cfg.types[t] !== false;
+        boxes[i].disabled = !cfg.enabled;
+      }
+    }
+
+    function saveFromUI() {
+      var cfg = N.getConfig();
+      cfg.enabled = enabledToggle.checked;
+      var boxes = settingsPanel.querySelectorAll("[data-notif-type]");
+      for (var i = 0; i < boxes.length; i++) {
+        var t = boxes[i].getAttribute("data-notif-type");
+        cfg.types[t] = boxes[i].checked;
+      }
+      N.saveConfig(cfg);
+    }
+
+    settingsBtn.addEventListener("click", function () {
+      if (settingsPanel.hidden) {
+        settingsPanel.hidden = false;
+        syncCheckboxes();
+        updatePermBadge();
+      } else {
+        settingsPanel.hidden = true;
+      }
+    });
+
+    // Master toggle — requestPermission on enable (requires user gesture, satisfied here)
+    enabledToggle.addEventListener("change", function () {
+      if (enabledToggle.checked) {
+        N.requestPermission(
+          function () {
+            saveFromUI();
+            syncCheckboxes();
+            updatePermBadge();
+          },
+          function () {
+            enabledToggle.checked = false;
+            saveFromUI();
+            updatePermBadge();
+          }
+        );
+      } else {
+        saveFromUI();
+        syncCheckboxes();
+      }
+    });
+
+    // Per-type checkboxes
+    var typeBoxes = settingsPanel.querySelectorAll("[data-notif-type]");
+    for (var i = 0; i < typeBoxes.length; i++) {
+      typeBoxes[i].addEventListener("change", saveFromUI);
+    }
+
+    // Test button
+    if (testBtn) {
+      testBtn.addEventListener("click", function () {
+        var cfg = N.getConfig();
+        if (!cfg.enabled) {
+          alert("Enable notifications first.");
+          return;
+        }
+        // Force-fire bypassing visibility/dedup checks by directly calling Notification
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          var n = new Notification("Spacedock Test", { body: "Notifications are working." });
+          setTimeout(function () { n.close(); }, 5000);
+        } else {
+          alert("Notification permission not granted.");
+        }
+      });
+    }
+  })();
 })();
