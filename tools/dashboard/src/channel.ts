@@ -378,7 +378,11 @@ export function createChannelServer(opts: ChannelServerOptions) {
           });
           workingText = replaceBody(workingText, newBody);
           writeFileSync(filepath, workingText);
-          const autoResolved = autoResolveComments(filepath, slug, new Set<string>(), snap.version);
+          // Body replace touches all sections — derive headings from new body so stale comments resolve
+          const newParsed = parseEntity(workingText);
+          const newSections = parseSections(newParsed.body);
+          const allHeadings = new Set(newSections.map((s) => normHeading(s.heading)));
+          const autoResolved = autoResolveComments(filepath, slug, allHeadings, snap.version);
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: autoResolved }) }] };
         }
 

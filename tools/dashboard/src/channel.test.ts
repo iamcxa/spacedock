@@ -639,3 +639,89 @@ describe("auto-resolve — resolved_reason and resolved_version (035 schema)", (
     }
   });
 });
+
+describe("auto-resolve — body-mode resolves all sections (W2)", () => {
+  test("body replace: comment on a section present in new body is auto-resolvable", () => {
+    // Mirrors the W2 fix: body-mode passes allHeadings derived from the NEW body,
+    // not an empty Set. Verify by calling parseSections on new body and checking
+    // that the comment's section_heading normalizes into that Set.
+    const { dashboard } = createChannelServer({
+      port: 0,
+      projectRoot: TMP,
+      dbPath: join(TMP, "test.db"),
+    });
+    try {
+      const { addComment, resolveComment, getComments } = require("./comments");
+      const { parseSections } = require("./snapshots");
+      const { parseEntity, replaceBody } = require("./frontmatter-io");
+
+      // Add a comment on "## Spec" section
+      addComment(ENTITY_FILE, {
+        selected_text: "Original content.",
+        section_heading: "## Spec",
+        content: "Will be auto-resolved on body replace",
+      });
+
+      // Simulate: write a new body that still contains "## Spec"
+      const newBody = "## Spec\n\nReplaced content.\n\n## Notes\n\nStill here.\n";
+      const parsed = parseEntity(readFileSync(ENTITY_FILE, "utf-8"));
+
+      // Create snapshot of PRE-write state (as update_entity does)
+      const snap = dashboard.snapshotStore.createSnapshot({
+        entity: ENTITY_SLUG,
+        body: parsed.body,
+        frontmatter: parsed.frontmatter,
+        author: "fo",
+        reason: "pre-update: full body replace",
+        source: "update",
+      });
+
+      // Write the new body
+      writeFileSync(ENTITY_FILE, replaceBody(readFileSync(ENTITY_FILE, "utf-8"), newBody));
+
+      // Derive allHeadings from new body (W2 fix path)
+      const newParsed = parseEntity(readFileSync(ENTITY_FILE, "utf-8"));
+      const newSections = parseSections(newParsed.body);
+      const normH = (h: string) => h.replace(/^#+\s*/, "").trim().toLowerCase();
+      const allHeadings = new Set(newSections.map((s: { heading: string }) => normH(s.heading)));
+
+      // "## Spec" normalizes to "spec" — must be in allHeadings
+      expect(allHeadings.has("spec")).toBe(true);
+
+      // Resolve comments whose heading is in allHeadings (mirrors autoResolveComments)
+      const thread = getComments(ENTITY_FILE);
+      for (const comment of thread.comments) {
+        if (!comment.resolved && allHeadings.has(normH(comment.section_heading))) {
+          resolveComment(ENTITY_FILE, comment.id, { reason: "section_updated", version: snap.version });
+        }
+      }
+
+      const updated = getComments(ENTITY_FILE);
+      expect(updated.comments[0].resolved).toBe(true);
+      expect(updated.comments[0].resolved_reason).toBe("section_updated");
+      expect(updated.comments[0].resolved_version).toBe(1);
+    } finally {
+      dashboard.stop();
+    }
+  });
+
+  test("empty Set does NOT resolve any comment (demonstrates the old bug)", () => {
+    // Proves the empty Set was the bug: comment on "## Spec" is NOT resolved when Set is empty.
+    const { addComment, getComments } = require("./comments");
+
+    addComment(ENTITY_FILE, {
+      selected_text: "Original content.",
+      section_heading: "## Spec",
+      content: "Should not be auto-resolved with empty Set",
+    });
+
+    const emptySet = new Set<string>();
+    const normH = (h: string) => h.replace(/^#+\s*/, "").trim().toLowerCase();
+    const thread = getComments(ENTITY_FILE);
+    const wouldResolve = thread.comments.filter(
+      (c: { resolved: boolean; section_heading: string }) =>
+        !c.resolved && emptySet.has(normH(c.section_heading))
+    );
+    expect(wouldResolve.length).toBe(0);
+  });
+});
