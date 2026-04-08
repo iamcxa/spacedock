@@ -103,6 +103,112 @@
     });
   }
 
+  // --- Phase Navigation (Share Page) ---
+
+  function renderPhaseNavShare(stages, entityStatus) {
+    var panel = document.getElementById('phase-nav-panel');
+    var list = document.getElementById('phase-nav-list');
+    if (!panel || !list || !stages || !stages.length) {
+      if (panel) panel.style.display = 'none';
+      return;
+    }
+
+    // Scan DOM for completed stage names from h2 "Stage Report: xxx" headings
+    var completedStages = {};
+    var headings = document.getElementById('entity-body').querySelectorAll('h2');
+    for (var h = 0; h < headings.length; h++) {
+      var text = headings[h].textContent || '';
+      var match = text.match(/^Stage Report:\s*(.+)/);
+      if (match) {
+        completedStages[match[1].trim()] = true;
+      }
+    }
+
+    while (list.firstChild) list.removeChild(list.firstChild);
+
+    for (var i = 0; i < stages.length; i++) {
+      var stage = stages[i];
+      var isCurrent = stage.name === entityStatus;
+      var isCompleted = !!completedStages[stage.name];
+      var isGate = !!stage.gate;
+
+      var icon, statusClass;
+      if (isCompleted) {
+        icon = '\u2705';
+        statusClass = 'completed';
+      } else if (isCurrent) {
+        icon = '\uD83D\uDD35';
+        statusClass = 'current';
+      } else if (isGate) {
+        icon = '\uD83D\uDD36';
+        statusClass = 'gate';
+      } else {
+        icon = '\u2B1C';
+        statusClass = 'pending';
+      }
+
+      var li = document.createElement('li');
+      li.className = 'phase-nav-item ' + statusClass;
+      li.setAttribute('data-stage', stage.name);
+
+      var iconSpan = document.createElement('span');
+      iconSpan.className = 'phase-nav-icon';
+      iconSpan.textContent = icon;
+      li.appendChild(iconSpan);
+
+      var label = document.createElement('span');
+      label.className = 'phase-nav-label';
+      label.textContent = stage.name;
+      li.appendChild(label);
+
+      (function (stageName) {
+        li.addEventListener('click', function () {
+          var bodyHeadings = document.getElementById('entity-body').querySelectorAll('h2');
+          for (var c = 0; c < bodyHeadings.length; c++) {
+            if (bodyHeadings[c].textContent.indexOf('Stage Report:') !== -1 &&
+                bodyHeadings[c].textContent.indexOf(stageName) !== -1) {
+              bodyHeadings[c].scrollIntoView({ behavior: 'smooth', block: 'start' });
+              bodyHeadings[c].style.outline = '2px solid #58a6ff';
+              setTimeout(function () {
+                bodyHeadings[c].style.outline = '';
+              }, 1500);
+              return;
+            }
+          }
+        });
+      })(stage.name);
+
+      list.appendChild(li);
+    }
+
+    panel.style.display = '';
+    setupPhaseNavToggleShare();
+  }
+
+  function setupPhaseNavToggleShare() {
+    var toggle = document.getElementById('phase-nav-toggle');
+    var list = document.getElementById('phase-nav-list');
+    if (!toggle || !list) return;
+
+    toggle.textContent = '\u25BC';
+
+    var newToggle = toggle.cloneNode(true);
+    toggle.parentNode.replaceChild(newToggle, toggle);
+
+    newToggle.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var isCollapsed = list.classList.toggle('collapsed');
+      newToggle.textContent = isCollapsed ? '\u25B6' : '\u25BC';
+    });
+
+    var heading = newToggle.parentNode;
+    if (heading && heading.tagName === 'H3') {
+      heading.addEventListener('click', function () {
+        newToggle.click();
+      });
+    }
+  }
+
   function showEntityDetail(path, data) {
     document.getElementById("entity-list").style.display = "none";
     var detailView = document.getElementById("entity-detail-view");
@@ -115,6 +221,32 @@
       bodyEl.innerHTML = sanitized; // Safe: DOMPurify-sanitized output
     } else {
       bodyEl.textContent = data.body || "";
+    }
+
+    // Render phase nav — needs body rendered first for DOM scanning
+    if (gateWorkflowStages) {
+      renderPhaseNavShare(gateWorkflowStages, data.frontmatter && data.frontmatter.status);
+    } else {
+      // Fetch stages if not yet loaded (checkGateStatus will also fetch, but we need them now)
+      fetch("/api/workflows")
+        .then(function (res) { return res.json(); })
+        .then(function (workflows) {
+          var stages = null;
+          for (var i = 0; i < workflows.length; i++) {
+            var wf = workflows[i];
+            for (var j = 0; j < wf.entities.length; j++) {
+              if (wf.entities[j].path === path) {
+                stages = wf.stages;
+                break;
+              }
+            }
+            if (stages) break;
+          }
+          if (stages) {
+            gateWorkflowStages = stages;
+            renderPhaseNavShare(stages, data.frontmatter && data.frontmatter.status);
+          }
+        });
     }
 
     loadComments(path);
@@ -135,6 +267,8 @@
       detailView.style.display = "none";
       document.getElementById("entity-list").style.display = "block";
       resetGatePanel();
+      var phasePanel = document.getElementById('phase-nav-panel');
+      if (phasePanel) phasePanel.style.display = 'none';
     };
   }
 

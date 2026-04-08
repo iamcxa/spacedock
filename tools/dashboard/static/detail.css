@@ -743,3 +743,114 @@ body {
 .dag-node-highlighted:hover rect {
     stroke-width: 3;
 }
+
+/* --- Phase Navigation Panel --- */
+
+.phase-nav-panel {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.phase-nav-panel h3 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #8b949e;
+    margin-bottom: 0.75rem;
+}
+
+.phase-nav-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.phase-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: #8b949e;
+    cursor: pointer;
+    transition: background 0.15s;
+    text-decoration: none;
+}
+
+.phase-nav-item:hover {
+    background: #1c2128;
+    color: #c9d1d9;
+}
+
+.phase-nav-item.current {
+    background: rgba(88, 166, 255, 0.1);
+    color: #58a6ff;
+    font-weight: 600;
+}
+
+.phase-nav-item.completed {
+    color: #8b949e;
+}
+
+.phase-nav-item.gate {
+    color: #f0883e;
+}
+
+.phase-nav-icon {
+    flex-shrink: 0;
+    width: 1.2em;
+    text-align: center;
+    font-size: 0.85em;
+}
+
+.phase-nav-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Phase nav collapse toggle (hidden on wide screens) */
+.phase-nav-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0;
+    margin-left: auto;
+}
+
+.phase-nav-toggle:hover {
+    color: #c9d1d9;
+}
+
+/* --- Phase Nav Responsive Collapse --- */
+
+@media (max-width: 768px) {
+    .detail-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .phase-nav-toggle {
+        display: inline-block;
+    }
+
+    .phase-nav-list.collapsed {
+        display: none;
+    }
+
+    .phase-nav-panel h3 {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+    }
+}
