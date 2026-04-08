@@ -600,3 +600,48 @@ Create `docs/build-pipeline/_test-profile-standard.md` and `_test-profile-expres
 Recommended parallel grouping for execute:
 - Group 1 (parallel): A1 + A4 + B1 + B2 + B3
 - Group 2 (sequential after A1): A2 → A3
+
+## Stage Report (execute)
+
+### Checklist
+
+- [x] DONE — A1: `parse_inline_list()` helper added. `parse_stages_block()` extended to return `{'stages': [...], 'profiles': {...}}`. Parses `profiles:` sub-block with inline list syntax `[item1, item2, ...]`.
+- [x] DONE — A4: `scan_entities()` `setdefault` list extended with `profile`, `skip-stages`, `add-stages` fields.
+- [x] DONE — A2: `effective_stages(entity, profiles, all_stage_names)` function added. Handles: no-profile fallback, skip-stages removal, add-stages canonical insertion, unknown-profile fallback.
+- [x] DONE — A3: `print_next_table()` updated with new signature `(entities, stages, profiles)`. Added PROFILE and DISPATCH columns. FO-inline gate detection (`gate: true` + `worktree: false` → shown as `(FO inline)` instead of filtered). No-profile entities past brainstorm show `(needs profile)`. Profile-aware next-stage lookup replaces positional `stage_names[idx+1]`.
+- [x] DONE — `main()` callers updated: `parse_stages_block()` return value unpacked to `stages` + `profiles`. `print_next_table()` call updated with `profiles` argument.
+- [x] DONE — B1: `## Effective Stages` section added to `references/first-officer-shared-core.md`. Includes pseudocode, mid-pipeline change rule, and startup note about new `status --next` columns.
+- [x] DONE — B2: `## Brainstorm Triage` section added. Covers: 5-criteria executability table, express path (5/5 + small), captain-choice path (≤4/5) with A/B/C options, gate resolution rules.
+- [x] DONE — B3: `## Channel Awareness` section added. 5-rule disambiguation logic for global channel messages, workflow-agnostic.
+
+### Smoke Test Results
+
+All 6 smoke tests passed:
+
+| Test | Input | Expected | Result |
+|------|-------|----------|--------|
+| 1 | no profile | full pipeline order fallback | PASS |
+| 2 | standard | skips research/seeding/e2e/docs | PASS |
+| 3 | express | only brainstorm/execute/quality/shipped | PASS |
+| 4 | standard + `skip-stages: [plan]` | plan absent | PASS |
+| 5 | standard + `add-stages: [e2e]` | e2e inserted between quality and pr-draft | PASS |
+| 6 | `parse_inline_list` | `[a,b,c]`→list, empty→`[]`, non-list→`[]` | PASS |
+
+`status --next` output verified:
+- Existing entities (no profile) → `(needs profile)`, route via full pipeline order
+- `profile: standard` entity at explore → NEXT=`plan` (skips research), DISPATCH=`ensign`
+- `profile: express` entity at execute → NEXT=`quality`, DISPATCH=`ensign`
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `skills/commission/bin/status` | +133 lines: `parse_inline_list`, `effective_stages`, extended `parse_stages_block`, updated `print_next_table`, updated `scan_entities` and `main` callers |
+| `references/first-officer-shared-core.md` | +112 lines: 3 new sections (Effective Stages, Brainstorm Triage, Channel Awareness) |
+
+### Commits
+
+- `034 execute: A1+A4 — parse profiles block, extend scan_entities with profile fields`
+- `034 execute: B1 — add Effective Stages section to FO shared core`
+- `034 execute: B2 — add Brainstorm Triage section (executability + A/B/C routing)`
+- `034 execute: B3 — add Channel Awareness section for ambiguous captain messages`
