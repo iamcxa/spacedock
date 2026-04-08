@@ -1,7 +1,7 @@
 ---
 id: 026
 title: Dashboard Event Single Source of Truth — 移除 localStorage 冗餘快取
-status: plan
+status: execute
 source: captain observation (024 shipping session — stale permission cards)
 started: 2026-04-08T08:50:00+08:00
 completed:
