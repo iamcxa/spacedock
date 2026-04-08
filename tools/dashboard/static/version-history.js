@@ -405,4 +405,7 @@
       loadVersions();
     }
   };
+
+  // Expose parseDiffHunks so other scripts (e.g. permission modal) share one implementation
+  window.spacedock_parseDiffHunks = parseDiffHunks;
 })();
