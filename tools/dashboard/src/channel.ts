@@ -18,10 +18,15 @@ const PermissionRequestNotificationSchema = z.object({
   }),
 });
 
-import { mkdirSync, writeFileSync, unlinkSync, existsSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { mkdirSync, writeFileSync, readFileSync, unlinkSync, existsSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { resolveEntity } from "./entity-resolver";
+import { getComments, addComment, addReply, resolveComment } from "./comments";
+import { parseSections, findSectionByHeading, replaceSection } from "./snapshots";
+import { parseEntity, updateFrontmatterFields, replaceBody } from "./frontmatter-io";
+import { createPatch } from "diff";
 
 export function computeStateDir(projectRoot: string): string {
   const hash = createHash("sha1").update(projectRoot).digest("hex").slice(0, 8);
@@ -68,6 +73,14 @@ export function createChannelServer(opts: ChannelServerOptions) {
     });
   }
 
+  // Permission async infrastructure — tool-level (application) permission gate.
+  // Separate from Claude Code system-level permission (notifications/claude/channel/permission).
+  // Must be declared before createServer so onChannelMessage callback can reference it.
+  const pendingPermissions = new Map<string, {
+    resolve: (allowed: boolean) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }>();
+
   const dashboard = createServer({
     port: opts.port,
     hostname: "127.0.0.1",
@@ -77,8 +90,17 @@ export function createChannelServer(opts: ChannelServerOptions) {
     onChannelMessage: async (content, meta) => {
       try {
         if (meta?.type === "permission_response" && meta?.request_id) {
-          const behavior = content === "allow" ? "allow" : "deny";
-          await sendPermissionVerdict(meta.request_id, behavior as "allow" | "deny");
+          const pending = pendingPermissions.get(meta.request_id);
+          if (pending) {
+            // Tool-level permission: resolve the waiting promise
+            clearTimeout(pending.timer);
+            pendingPermissions.delete(meta.request_id);
+            pending.resolve(content === "allow");
+          } else {
+            // System-level permission (Claude Code tool approval)
+            const behavior = content === "allow" ? "allow" : "deny";
+            await sendPermissionVerdict(meta.request_id, behavior as "allow" | "deny");
+          }
         } else {
           // Forward message to FO session via MCP channel notification
           await mcp.notification({
@@ -91,6 +113,35 @@ export function createChannelServer(opts: ChannelServerOptions) {
       }
     },
   });
+
+  async function requestPermissionAndWait(
+    toolName: string,
+    description: string,
+    diffPreview: string,
+    timeoutMs = 120_000,
+  ): Promise<boolean> {
+    const requestId = randomUUID();
+    dashboard.publishEvent({
+      type: "permission_request",
+      entity: "",
+      stage: "",
+      agent: "fo",
+      timestamp: new Date().toISOString(),
+      detail: JSON.stringify({
+        request_id: requestId,
+        tool_name: toolName,
+        description,
+        input_preview: diffPreview,
+      }),
+    });
+    return new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => {
+        pendingPermissions.delete(requestId);
+        resolve(false);
+      }, timeoutMs);
+      pendingPermissions.set(requestId, { resolve, timer });
+    });
+  }
 
   // Register MCP tools — FO calls these to interact with the dashboard and entities
   mcp.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -117,26 +168,314 @@ export function createChannelServer(opts: ChannelServerOptions) {
             required: ["content"],
           },
         },
+        {
+          name: "get_comments",
+          description: "Read the comment threads for an entity. Returns all comments including resolved ones.",
+          inputSchema: {
+            type: "object" as const,
+            properties: {
+              entity: { type: "string", description: "Entity slug" },
+              workflow: { type: "string", description: "Optional workflow dir basename to disambiguate" },
+            },
+            required: ["entity"],
+          },
+        },
+        {
+          name: "add_comment",
+          description: "Post a comment on an entity. Optionally target a specific section heading.",
+          inputSchema: {
+            type: "object" as const,
+            properties: {
+              entity: { type: "string", description: "Entity slug" },
+              content: { type: "string", description: "Comment content" },
+              section_heading: { type: "string", description: "Optional section heading to attach the comment to" },
+              workflow: { type: "string", description: "Optional workflow dir basename to disambiguate" },
+            },
+            required: ["entity", "content"],
+          },
+        },
+        {
+          name: "reply_to_comment",
+          description: "Reply to a specific comment thread. Optionally resolve the thread in the same action.",
+          inputSchema: {
+            type: "object" as const,
+            properties: {
+              entity: { type: "string", description: "Entity slug" },
+              comment_id: { type: "string", description: "ID of the comment to reply to" },
+              content: { type: "string", description: "Reply content" },
+              resolve: { type: "boolean", description: "Mark the comment as resolved after replying" },
+              workflow: { type: "string", description: "Optional workflow dir basename to disambiguate" },
+            },
+            required: ["entity", "comment_id", "content"],
+          },
+        },
+        {
+          name: "update_entity",
+          description:
+            "Update an entity spec. Three modes (body and sections are mutually exclusive): " +
+            "(A) frontmatter — partial key merge, no permission needed; " +
+            "(B) body — full body replacement, requires captain approval; " +
+            "(C) sections — heading-targeted replace/append/remove, remove requires captain approval. " +
+            "Every update creates a snapshot version.",
+          inputSchema: {
+            type: "object" as const,
+            properties: {
+              entity: { type: "string", description: "Entity slug" },
+              reason: { type: "string", description: "Reason for the update (recorded in snapshot)" },
+              workflow: { type: "string", description: "Optional workflow dir basename to disambiguate" },
+              frontmatter: {
+                type: "object",
+                description: "Partial frontmatter fields to merge (Mode A)",
+                additionalProperties: { type: "string" },
+              },
+              body: { type: "string", description: "Full replacement body (Mode B, requires permission)" },
+              sections: {
+                type: "array",
+                description: "Section operations (Mode C)",
+                items: {
+                  type: "object",
+                  properties: {
+                    heading: { type: "string", description: "Target section heading (fuzzy match)" },
+                    action: { type: "string", enum: ["replace", "append", "remove"] },
+                    content: { type: "string", description: "New content for replace/append" },
+                  },
+                  required: ["heading", "action"],
+                },
+              },
+            },
+            required: ["entity", "reason"],
+          },
+        },
       ],
     };
   });
 
   mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
-    if (request.params.name === "reply") {
-      const args = request.params.arguments as { content: string; entity?: string };
+    const name = request.params.name;
+    const args = request.params.arguments as Record<string, unknown>;
+
+    if (name === "reply") {
       const event: AgentEvent = {
         type: "channel_response",
-        entity: args.entity ?? "",
+        entity: (args.entity as string | undefined) ?? "",
         stage: "",
         agent: "fo",
         timestamp: new Date().toISOString(),
-        detail: args.content,
+        detail: args.content as string,
       };
       dashboard.publishEvent(event);
       return { content: [{ type: "text", text: "Message sent to dashboard" }] };
     }
-    return { content: [{ type: "text", text: `Unknown tool: ${request.params.name}` }], isError: true };
+
+    if (name === "get_comments") {
+      try {
+        const filepath = resolveEntity(args.entity as string, opts.projectRoot, args.workflow as string | undefined);
+        const thread = getComments(filepath);
+        return { content: [{ type: "text", text: JSON.stringify(thread) }] };
+      } catch (err) {
+        return { content: [{ type: "text", text: (err as Error).message }], isError: true };
+      }
+    }
+
+    if (name === "add_comment") {
+      try {
+        const slug = args.entity as string;
+        const filepath = resolveEntity(slug, opts.projectRoot, args.workflow as string | undefined);
+        const comment = addComment(filepath, {
+          selected_text: "",
+          section_heading: (args.section_heading as string | undefined) ?? "",
+          content: args.content as string,
+          author: "fo",
+        });
+        dashboard.publishEvent({
+          type: "comment",
+          entity: slug,
+          stage: "",
+          agent: "fo",
+          timestamp: new Date().toISOString(),
+          detail: comment.content,
+        });
+        if (opts.onChannelMessage) {
+          opts.onChannelMessage(comment.content, {
+            type: "comment_added",
+            entity: slug,
+            comment_id: comment.id,
+          });
+        }
+        return { content: [{ type: "text", text: JSON.stringify(comment) }] };
+      } catch (err) {
+        return { content: [{ type: "text", text: (err as Error).message }], isError: true };
+      }
+    }
+
+    if (name === "reply_to_comment") {
+      try {
+        const slug = args.entity as string;
+        const filepath = resolveEntity(slug, opts.projectRoot, args.workflow as string | undefined);
+        const reply = addReply(filepath, args.comment_id as string, {
+          content: args.content as string,
+          author: "fo",
+        });
+        const resolved = args.resolve === true;
+        if (resolved) {
+          resolveComment(filepath, args.comment_id as string);
+        }
+        dashboard.publishEvent({
+          type: "comment",
+          entity: slug,
+          stage: "",
+          agent: "fo",
+          timestamp: new Date().toISOString(),
+          detail: reply.content,
+        });
+        return { content: [{ type: "text", text: JSON.stringify({ reply, resolved }) }] };
+      } catch (err) {
+        return { content: [{ type: "text", text: (err as Error).message }], isError: true };
+      }
+    }
+
+    if (name === "update_entity") {
+      try {
+        const slug = args.entity as string;
+        const reason = args.reason as string;
+        const filepath = resolveEntity(slug, opts.projectRoot, args.workflow as string | undefined);
+        const hasFrontmatter = args.frontmatter != null;
+        const hasBody = args.body != null;
+        const hasSections = Array.isArray(args.sections) && (args.sections as unknown[]).length > 0;
+
+        if (hasBody && hasSections) {
+          return { content: [{ type: "text", text: "body and sections are mutually exclusive" }], isError: true };
+        }
+
+        const fileText = readFileSync(filepath, "utf-8");
+        const parsed = parseEntity(fileText);
+        let workingText = fileText;
+
+        // Mode A: frontmatter merge (no permission needed)
+        if (hasFrontmatter) {
+          workingText = updateFrontmatterFields(workingText, args.frontmatter as Record<string, string>);
+        }
+
+        // Mode B: full body replacement (requires permission)
+        if (hasBody) {
+          const newBody = args.body as string;
+          const diffPreview = createPatch("entity", parsed.body, newBody, "current", "proposed");
+          const allowed = await requestPermissionAndWait("update_entity", `Replace body of ${slug}`, diffPreview);
+          if (!allowed) {
+            return { content: [{ type: "text", text: "Permission denied or timed out" }], isError: true };
+          }
+          workingText = replaceBody(workingText, newBody);
+          writeFileSync(filepath, workingText);
+          const reParsed = parseEntity(workingText);
+          const snap = dashboard.snapshotStore.createSnapshot({
+            entity: slug,
+            body: reParsed.body,
+            frontmatter: reParsed.frontmatter,
+            author: "fo",
+            reason,
+            source: "update",
+          });
+          const autoResolved = autoResolveComments(filepath, slug, new Set<string>());
+          return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: autoResolved }) }] };
+        }
+
+        // Mode C: section operations
+        if (hasSections) {
+          type SectionOp = { heading: string; action: "replace" | "append" | "remove"; content?: string };
+          const ops = args.sections as SectionOp[];
+          const modifiedHeadings = new Set<string>();
+
+          for (const op of ops) {
+            const currentParsed = parseEntity(workingText);
+            const sections = parseSections(currentParsed.body);
+            const section = findSectionByHeading(sections, op.heading);
+            if (!section) {
+              return { content: [{ type: "text", text: `Section not found: ${op.heading}` }], isError: true };
+            }
+
+            if (op.action === "remove") {
+              const diffPreview = `Remove section: ${section.heading}`;
+              const allowed = await requestPermissionAndWait("update_entity", `Remove section "${section.heading}" from ${slug}`, diffPreview);
+              if (!allowed) {
+                return { content: [{ type: "text", text: `Permission denied or timed out for section remove: ${section.heading}` }], isError: true };
+              }
+              // Remove by rebuilding body without the section lines
+              const lines = currentParsed.body.split("\n");
+              const newBodyLines = [...lines.slice(0, section.start), ...lines.slice(section.end)];
+              workingText = replaceBody(workingText, newBodyLines.join("\n"));
+            } else if (op.action === "replace") {
+              const newBody = replaceSection(currentParsed.body, section, op.content ?? "");
+              workingText = replaceBody(workingText, newBody);
+            } else if (op.action === "append") {
+              const appended = section.body ? section.body + "\n" + (op.content ?? "") : (op.content ?? "");
+              const newBody = replaceSection(currentParsed.body, section, appended);
+              workingText = replaceBody(workingText, newBody);
+            }
+            modifiedHeadings.add(section.heading);
+          }
+
+          writeFileSync(filepath, workingText);
+          const finalParsed = parseEntity(workingText);
+          const snap = dashboard.snapshotStore.createSnapshot({
+            entity: slug,
+            body: finalParsed.body,
+            frontmatter: finalParsed.frontmatter,
+            author: "fo",
+            reason,
+            source: "update",
+          });
+          const autoResolved = autoResolveComments(filepath, slug, modifiedHeadings);
+          return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: autoResolved }) }] };
+        }
+
+        // Mode A only (frontmatter with no body/sections)
+        if (hasFrontmatter) {
+          writeFileSync(filepath, workingText);
+          const reParsed = parseEntity(workingText);
+          const snap = dashboard.snapshotStore.createSnapshot({
+            entity: slug,
+            body: reParsed.body,
+            frontmatter: reParsed.frontmatter,
+            author: "fo",
+            reason,
+            source: "update",
+          });
+          return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: [] }) }] };
+        }
+
+        return { content: [{ type: "text", text: "No update fields provided (frontmatter, body, or sections required)" }], isError: true };
+      } catch (err) {
+        return { content: [{ type: "text", text: (err as Error).message }], isError: true };
+      }
+    }
+
+    return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true };
   });
+
+  // Auto-resolve comments whose section_heading matches any of the modified section headings.
+  function autoResolveComments(filepath: string, slug: string, modifiedHeadings: Set<string>): string[] {
+    const resolved: string[] = [];
+    try {
+      const thread = getComments(filepath);
+      for (const comment of thread.comments) {
+        if (!comment.resolved && modifiedHeadings.has(comment.section_heading)) {
+          resolveComment(filepath, comment.id);
+          resolved.push(comment.id);
+          dashboard.publishEvent({
+            type: "comment",
+            entity: slug,
+            stage: "",
+            agent: "fo",
+            timestamp: new Date().toISOString(),
+            detail: `auto-resolved: ${comment.id}`,
+          });
+        }
+      }
+    } catch {
+      // If no sidecar exists, no comments to resolve
+    }
+    return resolved;
+  }
 
   // Permission relay: Claude Code -> dashboard -> captain -> Claude Code
   mcp.setNotificationHandler(
