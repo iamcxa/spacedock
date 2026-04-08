@@ -973,6 +973,30 @@ function rejectSuggestionAction(suggestionId) {
             }
           } catch (e) { /* malformed detail — ignore */ }
         }
+
+        // Browser notifications — fire for captain-attention events on this entity
+        (function () {
+          var N = window.SpacedockNotifications;
+          if (!N) return;
+          var detailTitles = {
+            gate: 'Gate awaiting approval',
+            comment: 'FO comment',
+            channel_response: 'FO reply',
+            rollback: 'Entity rolled back',
+            permission_request: 'FO permission request',
+          };
+          var title = detailTitles[event.type];
+          if (!title) return;
+          var entityLabel = event.entity ? ' \u2014 ' + event.entity : '';
+          var body = (event.detail || '').slice(0, 80);
+          N.showNotification({
+            type: event.type,
+            entity: event.entity,
+            title: title + entityLabel,
+            body: body,
+            onClick: function () { window.focus(); },
+          });
+        })();
       }
     };
 
