@@ -389,3 +389,37 @@ Posted via `gh api repos/iamcxa/spacedock/pulls/15/reviews` (review ID: 40721133
 
 ### Linear Comment: SKIPPED
 Rationale: no `issue` field set in entity frontmatter.
+
+## Stage Report: pr-review
+
+### Review Method
+- Security diff review: SKIPPED (trailofbits/skills not installed)
+- Self-review agents (pr-review-toolkit): not available — performed lightweight main-context review
+- Approach: full manual review of all 5 changed files (channel.ts, ctl.sh, SKILL.md, channel.test.ts, ctl.test.ts), test execution, hash consistency verification, bash syntax check
+
+### Findings
+
+**CODE fix (1 item — committed 8abf2cf):**
+
+1. **SKILL.md line 100 — pipe precedence bug in share flow port fallback**
+   - Original: `PORT=$(cat "$STATE_DIR/port" 2>/dev/null || cat "$STATE_DIR/channel_port" 2>/dev/null | tr -d '[:space:]')`
+   - Problem: `| tr -d '[:space:]'` binds to the second `cat` only (shell pipe precedence). If `$STATE_DIR/port` exists, `||` short-circuits and `tr` never strips whitespace from the server port value.
+   - Fix: split into two lines — first read port (with fallback), then strip whitespace unconditionally.
+
+**DOC/advisory (0 items):**
+- None.
+
+**Observations (no action needed):**
+- `channel.ts:209-211` — SIGTERM/SIGINT handlers call `cleanup()` then `process.exit(0)`, which triggers the `exit` handler calling `cleanup()` again. This is safe because `cleanChannelState` is idempotent (checks `existsSync` before `unlinkSync`).
+- `ctl.sh:508` — `do_status_all()` inlines `port_in_use()` logic as `(echo >/dev/tcp/localhost/"$ch_port") 2>/dev/null` rather than calling the helper. Works identically; minor style inconsistency but not worth changing since it avoids function scoping issues in the loop.
+- `ctl.sh:417` — Stale channel cleanup message deliberately says "Cleaned stale state file." (not "channel") to avoid false positives in the test that checks `not.toContain("channel")`. Intentional design per execute stage report.
+- Hash consistency: verified `echo -n "/tmp/test-dir" | shasum | cut -c1-8` produces identical output to Node.js `createHash("sha1").update("/tmp/test-dir").digest("hex").slice(0,8)` — both return `94a65a39`.
+
+### Checklist
+
+1. PR diff reviewed — DONE. All 5 changed files examined (channel.ts, ctl.sh, SKILL.md, channel.test.ts, ctl.test.ts)
+2. Self-review agents dispatched — SKIPPED (pr-review-toolkit not available). Performed lightweight main-context pre-scan covering: CLAUDE.md compliance, stale references, unused imports, error handling, bash syntax, hash consistency
+3. Findings classified — DONE. 1 CODE fix (SKILL.md pipe precedence), 0 DOC/advisory
+4. Fixes committed and pushed — DONE. 1 fix committed (8abf2cf) and pushed
+5. Review summary — **APPROVE**. Code is clean, well-tested (28 tests, all pass), edge cases handled (stale files, SIGKILL, stop safety). The pipe precedence bug was the only functional issue found and has been fixed.
+6. Stage report committed — DONE (this commit)
