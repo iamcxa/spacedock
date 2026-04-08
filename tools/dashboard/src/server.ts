@@ -17,7 +17,8 @@ import { ShareRegistry } from "./auth";
 import { openDb } from "./db";
 import type { AgentEvent, AgentEventType, Stage } from "./types";
 import { telemetryInit, captureException, getPosthogJsConfig } from "./telemetry";
-import { updateWorkflowStages } from "./frontmatter-io";
+import { updateWorkflowStages, parseEntity, replaceBody } from "./frontmatter-io";
+import { SnapshotStore } from "./snapshots";
 
 interface ServerOptions {
   port: number;
@@ -52,6 +53,7 @@ export function createServer(opts: ServerOptions) {
   const db = openDb(opts.dbPath);
   const eventBuffer = new EventBuffer(db, 500);
   const shareRegistry = new ShareRegistry(db);
+  const snapshotStore = new SnapshotStore(db);
 
   telemetryInit();
 
@@ -166,6 +168,123 @@ export function createServer(opts: ServerOptions) {
             captureException(err instanceof Error ? err : new Error(String(err)));
             logRequest(req, 500);
             return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/versions": {
+        GET: (req) => {
+          const url = new URL(req.url);
+          const entity = url.searchParams.get("entity");
+          if (!entity) {
+            logRequest(req, 400);
+            return jsonResponse({ error: "entity required" }, 400);
+          }
+          try {
+            const versions = snapshotStore.listVersions(entity);
+            logRequest(req, 200);
+            return jsonResponse({ entity, versions });
+          } catch (err) {
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: "Internal server error" }, 500);
+          }
+        },
+      },
+      "/api/entity/diff": {
+        GET: (req) => {
+          const url = new URL(req.url);
+          const entity = url.searchParams.get("entity");
+          const fromStr = url.searchParams.get("from");
+          const toStr = url.searchParams.get("to");
+          if (!entity || !fromStr || !toStr) {
+            logRequest(req, 400);
+            return jsonResponse({ error: "entity, from, to required" }, 400);
+          }
+          const from = parseInt(fromStr, 10);
+          const to = parseInt(toStr, 10);
+          if (isNaN(from) || isNaN(to)) {
+            logRequest(req, 400);
+            return jsonResponse({ error: "from/to must be integers" }, 400);
+          }
+          try {
+            const result = snapshotStore.diffVersions(entity, from, to);
+            logRequest(req, 200);
+            return jsonResponse(result);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Internal server error";
+            if (msg.startsWith("Snapshot not found")) {
+              logRequest(req, 404);
+              return jsonResponse({ error: msg }, 404);
+            }
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: msg }, 500);
+          }
+        },
+      },
+      "/api/entity/rollback": {
+        POST: async (req) => {
+          try {
+            const body = await req.json() as {
+              entity: string;
+              path: string;
+              section_heading: string;
+              to_version: number;
+              author?: string;
+            };
+            if (!body.entity || !body.path || !body.section_heading || !body.to_version) {
+              logRequest(req, 400);
+              return jsonResponse({ error: "entity, path, section_heading, to_version required" }, 400);
+            }
+            if (!validatePath(body.path, projectRoot)) {
+              logRequest(req, 403);
+              return jsonResponse({ error: "Forbidden" }, 403);
+            }
+            const text = readFileSync(body.path, "utf-8");
+            const parsed = parseEntity(text);
+            const result = snapshotStore.rollbackSection({
+              entity: body.entity,
+              currentBody: parsed.body,
+              currentFrontmatter: parsed.frontmatter,
+              sectionHeading: body.section_heading,
+              toVersion: body.to_version,
+              author: body.author ?? "captain",
+            });
+            // Preserve original frontmatter verbatim; swap only the body.
+            const newFile = replaceBody(text, result.newBody);
+            writeFileSync(body.path, newFile);
+            // Publish rollback event so realtime UI updates.
+            publishEvent({
+              type: "rollback",
+              entity: body.entity,
+              stage: parsed.frontmatter.status ?? "",
+              agent: body.author ?? "captain",
+              timestamp: new Date().toISOString(),
+              detail: JSON.stringify({
+                section: body.section_heading,
+                from_version: body.to_version,
+                new_version: result.newSnapshot.version,
+                warning: result.warning,
+              }),
+            });
+            logRequest(req, 200);
+            return jsonResponse({
+              new_version: result.newSnapshot.version,
+              warning: result.warning,
+            });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Internal server error";
+            if (msg.startsWith("Snapshot not found")) {
+              logRequest(req, 404);
+              return jsonResponse({ error: msg }, 404);
+            }
+            if (msg.startsWith("Section not found") || msg.startsWith("Ambiguous")) {
+              logRequest(req, 400);
+              return jsonResponse({ error: msg }, 400);
+            }
+            captureException(err instanceof Error ? err : new Error(String(err)));
+            logRequest(req, 500);
+            return jsonResponse({ error: msg }, 500);
           }
         },
       },
@@ -1092,7 +1211,7 @@ export function createServer(opts: ServerOptions) {
     server.publish("activity", JSON.stringify({ type: "channel_status", connected }));
   }
 
-  return Object.assign(server, { db, eventBuffer, publishEvent, broadcastChannelStatus, shareRegistry });
+  return Object.assign(server, { db, eventBuffer, publishEvent, broadcastChannelStatus, shareRegistry, snapshotStore });
 }
 
 // CLI entry point -- only runs when executed directly
