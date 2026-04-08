@@ -1113,9 +1113,124 @@ function rejectSuggestionAction(suggestionId) {
     }
   });
 
+  // --- Phase Navigation ---
+
+  function renderPhaseNav(stages, stageReports, entityStatus) {
+    var panel = document.getElementById('phase-nav-panel');
+    var list = document.getElementById('phase-nav-list');
+    if (!panel || !list || !stages || !stages.length) {
+      if (panel) panel.style.display = 'none';
+      return;
+    }
+
+    // Build set of completed stage names from stage_reports
+    var completedStages = {};
+    if (stageReports && stageReports.length) {
+      for (var i = 0; i < stageReports.length; i++) {
+        completedStages[stageReports[i].stage] = true;
+      }
+    }
+
+    while (list.firstChild) list.removeChild(list.firstChild);
+
+    for (var i = 0; i < stages.length; i++) {
+      var stage = stages[i];
+      var isCurrent = stage.name === entityStatus;
+      var isCompleted = !!completedStages[stage.name];
+      var isGate = !!stage.gate;
+
+      // Determine status: completed > current > gate (pending) > pending
+      var icon, statusClass;
+      if (isCompleted) {
+        icon = '\u2705'; // check mark
+        statusClass = 'completed';
+      } else if (isCurrent) {
+        icon = '\uD83D\uDD35'; // blue circle
+        statusClass = 'current';
+      } else if (isGate) {
+        icon = '\uD83D\uDD36'; // orange diamond
+        statusClass = 'gate';
+      } else {
+        icon = '\u2B1C'; // white square
+        statusClass = 'pending';
+      }
+
+      var li = document.createElement('li');
+      li.className = 'phase-nav-item ' + statusClass;
+      li.setAttribute('data-stage', stage.name);
+
+      var iconSpan = document.createElement('span');
+      iconSpan.className = 'phase-nav-icon';
+      iconSpan.textContent = icon;
+      li.appendChild(iconSpan);
+
+      var label = document.createElement('span');
+      label.className = 'phase-nav-label';
+      label.textContent = stage.name;
+      li.appendChild(label);
+
+      // Click handler: scroll to corresponding stage report card
+      (function (stageName) {
+        li.addEventListener('click', function () {
+          // Find matching stage-report-card by heading text
+          var cards = document.querySelectorAll('.stage-report-card h3');
+          for (var c = 0; c < cards.length; c++) {
+            if (cards[c].textContent.indexOf(stageName) !== -1) {
+              cards[c].parentElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              // Brief highlight flash
+              cards[c].parentElement.style.outline = '2px solid #58a6ff';
+              setTimeout(function () {
+                cards[c].parentElement.style.outline = '';
+              }, 1500);
+              return;
+            }
+          }
+          // If no stage report exists yet (pending/gate), scroll to stage-reports section
+          var reportsSection = document.getElementById('stage-reports');
+          if (reportsSection) {
+            reportsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      })(stage.name);
+
+      list.appendChild(li);
+    }
+
+    panel.style.display = '';
+
+    // Setup responsive toggle
+    setupPhaseNavToggle();
+  }
+
+  function setupPhaseNavToggle() {
+    var toggle = document.getElementById('phase-nav-toggle');
+    var list = document.getElementById('phase-nav-list');
+    if (!toggle || !list) return;
+
+    // Set initial toggle arrow text
+    toggle.textContent = '\u25BC'; // down-pointing triangle
+
+    // Remove previous listener by cloning
+    var newToggle = toggle.cloneNode(true);
+    toggle.parentNode.replaceChild(newToggle, toggle);
+
+    newToggle.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var isCollapsed = list.classList.toggle('collapsed');
+      newToggle.textContent = isCollapsed ? '\u25B6' : '\u25BC';
+    });
+
+    // Also allow clicking the h3 header to toggle on mobile
+    var heading = newToggle.parentNode;
+    if (heading && heading.tagName === 'H3') {
+      heading.addEventListener('click', function () {
+        newToggle.click();
+      });
+    }
+  }
+
   // --- Initialize ---
 
-  var _originalLoadEntity = loadEntity;
   window.loadEntity = function () {
     if (!entityPath) return;
     apiFetch('/api/entity/detail?path=' + encodeURIComponent(entityPath))
@@ -1139,9 +1254,11 @@ function rejectSuggestionAction(suggestionId) {
         var entityStatus = data.frontmatter.status;
         if (workflowStages) {
           updateGatePanel(entityStatus, workflowStages);
+          renderPhaseNav(workflowStages, data.stage_reports, entityStatus);
         } else {
           fetchWorkflowStages().then(function (stages) {
             updateGatePanel(entityStatus, stages);
+            renderPhaseNav(stages, data.stage_reports, entityStatus);
           });
         }
       });
@@ -1155,6 +1272,7 @@ function rejectSuggestionAction(suggestionId) {
       apiFetch('/api/entity/detail?path=' + encodeURIComponent(entityPath))
         .then(function (data) {
           updateGatePanel(data.frontmatter.status, stages);
+          renderPhaseNav(stages, data.stage_reports, data.frontmatter.status);
         });
     });
   }
