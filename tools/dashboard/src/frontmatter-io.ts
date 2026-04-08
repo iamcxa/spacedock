@@ -81,6 +81,31 @@ export function updateFrontmatterFields(text: string, updates: Record<string, st
   return ["---", ...out, "---", ...bodyLines].join("\n");
 }
 
+/**
+ * Replace the body of an entity file while preserving the original
+ * frontmatter text verbatim (including comments, whitespace, and key
+ * ordering). The returned string is `frontmatter + "\n" + newBody`.
+ */
+export function replaceBody(text: string, newBody: string): string {
+  const lines = text.split("\n");
+  if (!lines.length || lines[0].trim() !== "---") {
+    throw new Error("Missing YAML frontmatter");
+  }
+  let end: number | null = null;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === "---") {
+      end = i;
+      break;
+    }
+  }
+  if (end === null) {
+    throw new Error("Unterminated YAML frontmatter");
+  }
+  // Keep lines 0..end inclusive (the full frontmatter block), drop the body.
+  const fmBlock = lines.slice(0, end + 1).join("\n");
+  return fmBlock + "\n" + newBody;
+}
+
 export function updateEntityScore(text: string, newScore: number): string {
   return updateFrontmatterFields(text, { score: String(newScore) });
 }
