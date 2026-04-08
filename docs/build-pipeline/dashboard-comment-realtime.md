@@ -1,7 +1,7 @@
 ---
 id: 027
 title: Dashboard Comment Realtime — 即時推送 + Reply 雙向通道
-status: pr-draft
+status: pr-review
 source: captain observation (026 shipping session — reply 不顯示 + comment 需刷新)
 started: 2026-04-08T03:26:00Z
 completed:
@@ -9,7 +9,7 @@ verdict:
 score: 0.85
 worktree: .worktrees/spacedock-ensign-dashboard-comment-realtime
 issue:
-pr:
+pr: "#17"
 intent: bugfix
 scale: Medium
 project: spacedock
