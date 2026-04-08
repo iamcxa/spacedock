@@ -645,3 +645,49 @@ All 6 smoke tests passed:
 - `034 execute: B1 — add Effective Stages section to FO shared core`
 - `034 execute: B2 — add Brainstorm Triage section (executability + A/B/C routing)`
 - `034 execute: B3 — add Channel Awareness section for ambiguous captain messages`
+
+## Stage Report (quality)
+
+### Checklist
+
+- [x] DONE — Status script verification: `python3 skills/commission/bin/status --workflow-dir docs/build-pipeline` runs without errors, table renders correctly with all 14+ entities. Default table unchanged.
+- [x] DONE — `--next` with PROFILE + DISPATCH columns: output correct, existing no-profile entities show `(needs profile)`, FO-inline brainstorm entities would show `(FO inline)`.
+- [x] DONE — Edge case tests: all 6 passed (see results below).
+- [x] DONE — FO reference doc review: 3 sections present, well-structured, no contradictions with existing FO rules.
+- [x] DONE — Commit hygiene: all execute commits use `034 execute:` prefix, atomic, descriptive.
+- [x] DONE — Backward compatibility: `--archived` runs against 40+ entities (including old field shapes) with zero errors.
+
+### Test Results
+
+**Status script — main repo (`--workflow-dir /Users/kent/Project/spacedock/docs/build-pipeline`):**
+
+```
+python3 status --workflow-dir …/docs/build-pipeline       → 40 entities listed, no errors
+python3 status --workflow-dir …/docs/build-pipeline --next → 2 entities shown, PROFILE + DISPATCH columns present
+python3 status --workflow-dir …/docs/build-pipeline --archived → 42 rows (including archived), no errors
+```
+
+**Edge cases (all PASS):**
+
+| # | Input | Expected | Result |
+|---|-------|----------|--------|
+| 1 | `profile: express` | `[draft, brainstorm, execute, quality, shipped]` | PASS |
+| 2 | `profile: express, skip-stages: [quality]` | quality absent | PASS |
+| 3 | `profile: standard, add-stages: [research]` | research inserted after explore | PASS |
+| 4 | `profile: ""` | full pipeline order fallback | PASS |
+| 5 | entity missing skip/add-stages keys | standard profile stages | PASS |
+| 6 | `profile: ultra` (unknown) | full pipeline fallback | PASS |
+
+**FO reference doc section check:**
+
+| Section | Present | Contains required content |
+|---------|---------|--------------------------|
+| `## Effective Stages` | ✓ | pseudocode, mid-pipeline rule, startup note |
+| `## Brainstorm Triage` | ✓ | 5-criteria table, express path, A/B/C options, gate resolution |
+| `## Channel Awareness` | ✓ | 5 disambiguation rules, workflow-agnostic note |
+
+**No contradictions found** — new sections add to existing FO behaviour. Brainstorm Triage handles the `(FO inline)` dispatch type introduced by the gate filter change. Channel Awareness is purely additive (no existing section covers this case).
+
+### Verdict
+
+PASSED — 6 done, 0 skipped, 0 failed.
