@@ -133,14 +133,52 @@
             </div>
         </main>
 
-        <!-- Right column: comments only -->
+        <!-- Right column: tabbed Comments / Activity -->
         <aside class="detail-comments-panel">
             <div class="comments-panel-header">
-                <span class="comments-panel-title">Comments</span>
-                <button id="comments-mobile-close" class="btn-icon comments-mobile-close" aria-label="Close comments" style="display:none;">&#x2715;</button>
+                <div class="tab-bar">
+                    <button class="tab-btn active" data-tab="comments">Comments</button>
+                    <button class="tab-btn" data-tab="activity">Activity</button>
+                </div>
+                <button id="comments-mobile-close" class="btn-icon comments-mobile-close" aria-label="Close panel" style="display:none;">&#x2715;</button>
             </div>
-            <div id="comment-threads" class="comment-threads">
-                <div class="empty-state">Select text to add a comment</div>
+
+            <!-- Comments tab -->
+            <div id="tab-comments" class="tab-pane active">
+                <div id="comment-threads" class="comment-threads">
+                    <div class="empty-state">Select text to add a comment</div>
+                </div>
+            </div>
+
+            <!-- Activity tab -->
+            <div id="tab-activity" class="tab-pane" style="display:none;">
+                <div class="activity-filter-bar" id="activity-filter-bar">
+                    <select id="filter-type" class="filter-select">
+                        <option value="">All Types</option>
+                        <option value="dispatch">Dispatch</option>
+                        <option value="completion">Completion</option>
+                        <option value="gate">Gate</option>
+                        <option value="feedback">Feedback</option>
+                        <option value="channel_message">Message</option>
+                        <option value="channel_response">Response</option>
+                        <option value="merge">Merge</option>
+                        <option value="pr_ready">PR Ready</option>
+                        <option value="rollback">Rollback</option>
+                    </select>
+                    <select id="filter-stage" class="filter-select">
+                        <option value="">All Stages</option>
+                    </select>
+                    <select id="filter-author" class="filter-select">
+                        <option value="">All Authors</option>
+                    </select>
+                </div>
+                <div id="activity-feed" class="activity-feed">
+                    <div class="empty-state">No activity yet</div>
+                </div>
+                <div class="chat-input-container">
+                    <textarea id="chat-input" class="chat-textarea" placeholder="Send a message to FO..." rows="2"></textarea>
+                    <button id="chat-send" class="btn btn-small chat-send-btn">Send</button>
+                </div>
             </div>
         </aside>
     </div>
