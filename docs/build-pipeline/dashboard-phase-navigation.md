@@ -126,3 +126,32 @@ Quality gates complete. Feature is pure frontend implementation (5 static files:
 PR #18 created successfully: https://github.com/iamcxa/spacedock/pull/18
 
 Branch `spacedock-ensign/dashboard-phase-navigation` pushed and PR opened with full quality report embedded. PR is ready for captain review.
+
+## Stage Report: pr-review
+
+### Self-Review Findings
+
+| # | Type | File | Finding | Resolution |
+|---|------|------|---------|------------|
+| 1 | CODE | detail.css | Missing responsive grid collapse: `@media (max-width: 768px)` block only handled phase-nav toggle/collapse but did NOT collapse `.detail-layout` from `1fr 320px` to `1fr`. On narrow screens, sidebar would overflow horizontally. style.css has this for `.dashboard-layout` — detail.css was missing it. | FIXED — added `.detail-layout { grid-template-columns: 1fr; }` inside the 768px breakpoint. Commit `6dd3610`. |
+| 2 | CODE | detail.js:1224 | Unused variable: `var _originalLoadEntity = loadEntity;` declared but never referenced. The IIFE immediately replaces `window.loadEntity` and never calls the saved reference. | FIXED — removed unused variable. Commit `6dd3610`. |
+| 3 | ADVISORY | share.js:164-178 | Phase nav click handler for share page has no fallback when a stage report heading isn't found (unlike detail.js which falls back to scrolling to `#stage-reports` section). | NOTED — share page has no separate `#stage-reports` section, so there's no clear fallback target. Clicking a pending/gate stage is a no-op. Acceptable for MVP; could add toast feedback in future. |
+| 4 | ADVISORY | detail.css | CSS theme consistency verified: all colors match existing dashboard Primer Dark palette (#161b22 bg, #21262d border, #8b949e muted, #58a6ff accent, #f0883e gate orange). Panel styles (.phase-nav-panel) match .metadata-panel, .gate-panel, .comments-panel pattern exactly. | No action needed. |
+| 5 | ADVISORY | detail.js + share.js | Scroll behavior uses `{ behavior: 'smooth', block: 'start' }` — works in all modern browsers. Highlight flash uses inline `style.outline` with `setTimeout` cleanup (1500ms). No risk of leaked styles since timeout always fires. | No action needed. |
+| 6 | ADVISORY | share.js:117-125 | DOM scanning for completed stages (`h2` with "Stage Report:" text) is robust — runs after `bodyEl.innerHTML` is set from DOMPurify-sanitized marked output, so headings are guaranteed present before scan. | No action needed. |
+
+### Verification After Fixes
+
+- Tests: 83/83 pass (0 fail)
+- Type-check: Pre-existing `channel.ts:203` error only (not introduced by this feature)
+- Fixes pushed: commit `6dd3610` on `spacedock-ensign/dashboard-phase-navigation`
+
+### Checklist
+
+| Item | Status |
+|------|--------|
+| Self-review completed | DONE |
+| CODE/SUGGESTION findings fixed and pushed | DONE — 2 CODE findings fixed in commit `6dd3610` |
+| DOC/advisory findings noted | DONE — 4 advisory items documented above |
+| Review summary in entity body | DONE |
+| Gate recommendation | **APPROVE** — Feature is clean, well-structured, CSS-consistent, and all automated checks pass. Two code fixes (responsive grid + unused var) were minor. No security, performance, or correctness concerns. |
