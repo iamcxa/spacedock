@@ -79,6 +79,86 @@ permission card 卡住的二級原因：早期 session 的 `permission_request` 
 
 **修復路徑**：`clearHistory()` 改為先 `fetch("/api/events", { method: "DELETE" })` 清 SQLite，成功後再 `clearFeedDom()` + 重置 lastSeq。同時移除整個 localStorage 層，SQLite 成為唯一 source of truth。
 
+## TDD Checklist
+
+### Task 1: EventBuffer.clear() — test then implement
+
+**Test**: `tests/dashboard/events.test.ts`
+- Add test case `"clear() removes all events"`:
+  - `openDb(":memory:")`, `new EventBuffer(db, 100)`
+  - Push 3 events (dispatch, completion, gate)
+  - Call `buf.clear()`
+  - Assert `buf.getAll()` returns empty array (`length === 0`)
+  - Push a new event after clear — assert `getAll().length === 1` and seq increments correctly (SQLite AUTOINCREMENT continues from last rowid)
+
+**Implement**: `tools/dashboard/src/events.ts`
+- Add `clear()` method to `EventBuffer` class: `this.db.query("DELETE FROM events").run()`
+
+### Task 2: DELETE /api/events — test then implement
+
+**Test**: `tests/dashboard/server.test.ts`
+- Add test case `"DELETE /api/events clears all events"` inside `"Dashboard Server"` describe:
+  - POST an event via `/api/events`
+  - GET `/api/events` — assert events array is non-empty
+  - DELETE `/api/events` — assert status 200, body `{ ok: true }`
+  - GET `/api/events` — assert `events.length === 0`
+
+**Implement**: `tools/dashboard/src/server.ts`
+- Add `DELETE` handler to the existing `/api/events` route object (alongside GET/POST):
+  ```
+  DELETE: (req) => {
+    eventBuffer.clear();
+    logRequest(req, 200);
+    return jsonResponse({ ok: true });
+  },
+  ```
+
+### Task 3: Remove localStorage from activity.js
+
+**File**: `tools/dashboard/static/activity.js`
+
+- **Delete** the IIFE block and related constants (lines ~31-112):
+  - `HISTORY_KEY`, `HISTORY_CAPACITY`, `HISTORY_EVICT_BATCH` constants
+  - `isQuotaExceeded()` helper
+  - Entire `history` IIFE (hydrate, persist, appendMany, append, dedupReplay, detectSeqReset, clear)
+
+- **Delete** hydrate-before-connect block (lines ~821-839):
+  - The `var hydrated = history.hydrate()` block that pre-renders from localStorage
+
+- **Update** `clearHistory()` (lines ~804-814):
+  - Replace `history.clear()` with `fetch("/api/events", { method: "DELETE" })` (fire-and-forget or .then for error handling)
+  - Keep `clearFeedDom()`, `lastSeq = 0`, and empty-state DOM logic
+
+- **Update** ws.onmessage replay handler (lines ~210-257):
+  - Remove `history.detectSeqReset()` / `history.clear()` guard (lines ~217-220)
+  - Remove `history.dedupReplay()` call — render all `msg.events` directly (server is source of truth)
+  - Remove `if (fresh.length > 0) history.appendMany(fresh)` (line ~240)
+  - Remove `history.append(msg.data)` from live event handler (line ~251)
+  - Keep all renderEntry(), permissionTracker.track(), markResolved() calls intact
+
+### Task 4: Delete activity-history.ts and its test
+
+- **Delete** `tools/dashboard/src/activity-history.ts`
+- **Delete** `tools/dashboard/src/activity-history.test.ts`
+- Verify no other file imports or references `activity-history`
+
+### Task 5: Quality gates
+
+- `cd /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-dashboard-event-source-of-truth && bun test tests/dashboard/events.test.ts` — all pass
+- `cd /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-dashboard-event-source-of-truth && bun test tests/dashboard/server.test.ts` — all pass
+- `bash -n tools/dashboard/ctl.sh` — syntax check
+- Verify no remaining references to `localStorage` or `ActivityHistory` in `tools/dashboard/static/activity.js`:
+  - `grep -c localStorage tools/dashboard/static/activity.js` — expect 0
+  - `grep -c ActivityHistory tools/dashboard/static/activity.js` — expect 0
+- Verify no remaining imports of `activity-history` anywhere:
+  - `grep -r activity-history tools/dashboard/src/` — expect 0
+
+## Stage Report: plan
+
+1. TDD checklist written — concrete test-first tasks with file paths: **DONE**
+2. Quality gate commands specified: **DONE**
+3. Committed on branch: **DONE** (see commit below)
+
 ## Dependencies
 
 - None
