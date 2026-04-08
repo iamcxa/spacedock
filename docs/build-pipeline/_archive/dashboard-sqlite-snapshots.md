@@ -1,15 +1,15 @@
 ---
 id: 032
 title: Dashboard SQLite Snapshot System — Entity Version History
-status: plan
+status: shipped
 source: spec 2026-04-08-pipeline-brainstorm-profiles-design.md (WP2)
 started: 2026-04-08
-completed:
-verdict:
+completed: 2026-04-08
+verdict: APPROVED with non-blocking notes
 score: 0.9
 worktree: .worktrees/spacedock-ensign-dashboard-sqlite-snapshots
 issue:
-pr:
+pr: 20
 intent: feature
 scale: Medium
 project: spacedock

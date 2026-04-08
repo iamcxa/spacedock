@@ -3,11 +3,11 @@ id: 033
 title: Dashboard MCP Tool Expansion — Bidirectional Entity Collaboration
 status: explore
 source: spec 2026-04-08-pipeline-brainstorm-profiles-design.md (WP3)
-started:
+started: 2026-04-08
 completed:
 verdict:
 score: 0.85
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-mcp-tool-expansion
 issue:
 pr:
 intent: feature

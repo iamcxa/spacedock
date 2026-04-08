@@ -6,17 +6,25 @@ entity-label-plural: features
 id-style: sequential
 stages:
   profiles:
-    full:     [brainstorm, explore, research, plan, execute, quality, seeding, e2e, docs, pr-draft, pr-review, shipped]
-    standard: [brainstorm, explore, plan, execute, quality, pr-draft, pr-review, shipped]
-    express:  [brainstorm, execute, quality, shipped]
+    full:     [draft, brainstorm, explore, research, plan, execute, quality, seeding, e2e, docs, pr-draft, pr-review, shipped]
+    standard: [draft, brainstorm, explore, plan, execute, quality, pr-draft, pr-review, shipped]
+    express:  [draft, brainstorm, execute, quality, shipped]
   defaults:
     worktree: true
     concurrency: 2
     # model: inherits from parent (user settings). Override per-stage below.
     # FO reads `model:` property and passes to Agent(model=...) at dispatch.
   states:
-    - name: brainstorm
+    - name: draft
       initial: true
+      worktree: false
+      manual: true
+      # Captain captures entity here. Edit body, refine spec, capture intent.
+      # FO does NOT auto-dispatch draft entities (manual: true).
+      # Captain advances status: draft → brainstorm when ready to begin work.
+      # Use draft for: feature ideas, bug captures, design notes, anything
+      # not yet ready for active pipeline work.
+    - name: brainstorm
       model: sonnet
       worktree: false
       gate: true
