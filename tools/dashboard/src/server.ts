@@ -402,14 +402,14 @@ export function createServer(opts: ServerOptions) {
       "/api/entity/comment/resolve": {
         POST: async (req) => {
           try {
-            const body = await req.json() as { path: string; comment_id: string };
+            const body = await req.json() as { path: string; comment_id: string; reason?: string };
             if (!body.path) return jsonResponse({ error: "Missing field: path" }, 400);
             if (!body.comment_id) return jsonResponse({ error: "Missing field: comment_id" }, 400);
             if (!validatePath(body.path, projectRoot)) {
               logRequest(req, 403);
               return jsonResponse({ error: "Forbidden" }, 403);
             }
-            const comment = resolveComment(body.path, body.comment_id);
+            const comment = resolveComment(body.path, body.comment_id, { reason: body.reason ?? "manual" });
             // Broadcast comment event for realtime updates
             const entitySlug = body.path.replace(/\.md$/, "").split("/").pop()!;
             publishEvent({
