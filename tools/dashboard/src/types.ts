@@ -77,7 +77,7 @@ export interface FilterOptions {
 
 export type AgentEventType = "dispatch" | "completion" | "gate" | "feedback" | "merge" | "idle"
   | "channel_message" | "channel_response" | "permission_request" | "permission_response"
-  | "comment" | "suggestion" | "gate_decision" | "share_created";
+  | "comment" | "suggestion" | "gate_decision" | "share_created" | "rollback";
 
 export interface AgentEvent {
   type: AgentEventType;
@@ -159,4 +159,46 @@ export interface ShareLink {
 export interface ShareSession {
   token: string;               // maps back to ShareLink.token
   authenticatedAt: string;     // ISO 8601
+}
+
+// --- Entity Snapshot Types ---
+
+export type SnapshotSource = "update" | "rollback" | "create";
+
+export interface EntitySnapshot {
+  id: number;
+  entity: string;
+  version: number;
+  body: string;
+  frontmatter: string | null;
+  author: string;
+  reason: string;
+  source: SnapshotSource;
+  rollback_from_version: number | null;
+  rollback_section: string | null;
+  created_at: string;
+}
+
+export interface SnapshotVersion {
+  version: number;
+  author: string;
+  reason: string;
+  source: SnapshotSource;
+  created_at: string;
+  rollback_from_version: number | null;
+  rollback_section: string | null;
+}
+
+export interface ParsedSection {
+  heading: string;       // exact heading line text (e.g., "## Bug B")
+  level: number;         // 1-6
+  body: string;          // content after heading until next heading of equal/higher level
+  start: number;         // line index of heading
+  end: number;           // line index AFTER section end (exclusive)
+}
+
+export interface SectionDiff {
+  heading: string;
+  status: "unchanged" | "added" | "removed" | "modified";
+  diff?: string;         // unified diff string when modified
 }
