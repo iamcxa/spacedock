@@ -214,6 +214,16 @@ export function createServer(opts: ServerOptions) {
               section_heading: body.section_heading,
               content: body.content,
             });
+            // Broadcast comment event for realtime updates
+            const entitySlug = body.path.replace(/\.md$/, "").split("/").pop()!;
+            publishEvent({
+              type: "comment",
+              entity: entitySlug,
+              stage: "",
+              agent: "captain",
+              timestamp: new Date().toISOString(),
+              detail: comment.content,
+            });
             logRequest(req, 200);
             return jsonResponse(comment);
           } catch (err) {
@@ -243,6 +253,16 @@ export function createServer(opts: ServerOptions) {
               content: body.content,
               author: body.author ?? "captain",
             });
+            // Broadcast comment event for realtime updates
+            const entitySlug = body.path.replace(/\.md$/, "").split("/").pop()!;
+            publishEvent({
+              type: "comment",
+              entity: entitySlug,
+              stage: "",
+              agent: body.author ?? "captain",
+              timestamp: new Date().toISOString(),
+              detail: reply.content,
+            });
             logRequest(req, 200);
             return jsonResponse(reply);
           } catch (err) {
@@ -263,6 +283,16 @@ export function createServer(opts: ServerOptions) {
               return jsonResponse({ error: "Forbidden" }, 403);
             }
             const comment = resolveComment(body.path, body.comment_id);
+            // Broadcast comment event for realtime updates
+            const entitySlug = body.path.replace(/\.md$/, "").split("/").pop()!;
+            publishEvent({
+              type: "comment",
+              entity: entitySlug,
+              stage: "",
+              agent: "captain",
+              timestamp: new Date().toISOString(),
+              detail: "resolved",
+            });
             logRequest(req, 200);
             return jsonResponse(comment);
           } catch (err) {
