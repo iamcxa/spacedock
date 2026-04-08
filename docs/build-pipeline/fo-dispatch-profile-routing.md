@@ -9,7 +9,7 @@ verdict:
 score: 0.85
 worktree: .worktrees/spacedock-ensign-fo-dispatch-profile-routing
 issue:
-pr:
+pr: "#22"
 intent: enhancement
 scale: Medium
 project: spacedock
@@ -691,3 +691,15 @@ python3 status --workflow-dir …/docs/build-pipeline --archived → 42 rows (in
 ### Verdict
 
 PASSED — 6 done, 0 skipped, 0 failed.
+
+## Stage Report (pr-draft)
+
+### Checklist
+
+- [x] DONE — Branch pushed to origin: `spacedock-ensign/fo-dispatch-profile-routing`
+- [x] DONE — Draft PR created: iamcxa/spacedock#22 — `feat(pipeline): profile-aware stage routing and FO dispatch logic`
+- [x] DONE — Entity `pr:` field updated to `"#22"`
+
+### PR
+
+iamcxa/spacedock#22 (draft) — https://github.com/iamcxa/spacedock/pull/22
