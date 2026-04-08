@@ -2,7 +2,8 @@
 // ABOUTME: Fence-aware markdown section parser + SnapshotStore backed by SQLite entity_snapshots table.
 
 import type { Database } from "bun:sqlite";
-import type { EntitySnapshot, ParsedSection, SnapshotSource, SnapshotVersion } from "./types";
+import { createPatch } from "diff";
+import type { EntitySnapshot, ParsedSection, SectionDiff, SnapshotSource, SnapshotVersion } from "./types";
 
 /**
  * Parse markdown into sections delimited by ATX headings (`#`..`######`).
@@ -160,4 +161,155 @@ export class SnapshotStore {
   listVersions(entity: string): SnapshotVersion[] {
     return this.listVersionsStmt.all(entity) as SnapshotVersion[];
   }
+
+  /**
+   * Compare two snapshot versions section-by-section.
+   * Returns a list of SectionDiff entries, ordered by the `to` version
+   * sections first (so the UI can render them in destination order),
+   * then any `removed` sections appended at the end.
+   */
+  diffVersions(
+    entity: string,
+    fromVersion: number,
+    toVersion: number,
+  ): { from: number; to: number; sections: SectionDiff[] } {
+    const fromSnap = this.getSnapshot(entity, fromVersion);
+    if (!fromSnap) {
+      throw new Error(`Snapshot not found: ${entity} v${fromVersion}`);
+    }
+    const toSnap = this.getSnapshot(entity, toVersion);
+    if (!toSnap) {
+      throw new Error(`Snapshot not found: ${entity} v${toVersion}`);
+    }
+    const fromSections = parseSections(fromSnap.body);
+    const toSections = parseSections(toSnap.body);
+    const fromMap = new Map(fromSections.map((s) => [s.heading, s]));
+    const toMap = new Map(toSections.map((s) => [s.heading, s]));
+
+    const result: SectionDiff[] = [];
+    // Iterate in `to` order so diff output matches destination layout.
+    for (const t of toSections) {
+      const f = fromMap.get(t.heading);
+      if (!f) {
+        result.push({ heading: t.heading, status: "added" });
+        continue;
+      }
+      if (f.body === t.body) {
+        result.push({ heading: t.heading, status: "unchanged" });
+        continue;
+      }
+      const patch = createPatch(
+        t.heading,
+        f.body,
+        t.body,
+        `v${fromVersion}`,
+        `v${toVersion}`,
+      );
+      result.push({ heading: t.heading, status: "modified", diff: patch });
+    }
+    // Append removed sections (present in `from` but not in `to`).
+    for (const f of fromSections) {
+      if (!toMap.has(f.heading)) {
+        result.push({ heading: f.heading, status: "removed" });
+      }
+    }
+    return { from: fromVersion, to: toVersion, sections: result };
+  }
+
+  /**
+   * Rollback a specific section to the content it had in a target version.
+   * Creates a new snapshot recording the rollback and returns the new body
+   * to write back to disk. The caller is responsible for the file write.
+   *
+   * The `warning` field is null here and populated by a conflict-detection
+   * heuristic in a subsequent commit.
+   */
+  rollbackSection(input: {
+    entity: string;
+    currentBody: string;
+    currentFrontmatter: Record<string, string>;
+    sectionHeading: string;
+    toVersion: number;
+    author: string;
+  }): {
+    newBody: string;
+    newSnapshot: EntitySnapshot;
+    warning: string | null;
+  } {
+    const target = this.getSnapshot(input.entity, input.toVersion);
+    if (!target) {
+      throw new Error(`Snapshot not found: ${input.entity} v${input.toVersion}`);
+    }
+    const targetSections = parseSections(target.body);
+    const currentSections = parseSections(input.currentBody);
+
+    const targetSection = findSectionByHeading(targetSections, input.sectionHeading);
+    if (!targetSection) {
+      throw new Error(`Section not found in target version: ${input.sectionHeading}`);
+    }
+    const currentSection = findSectionByHeading(currentSections, input.sectionHeading);
+    if (!currentSection) {
+      throw new Error(
+        `Section not found in current document: ${input.sectionHeading} (restoring deleted sections is out of scope)`,
+      );
+    }
+
+    const newBody = replaceSection(input.currentBody, currentSection, targetSection.body);
+
+    const newSnapshot = this.createSnapshot({
+      entity: input.entity,
+      body: newBody,
+      frontmatter: input.currentFrontmatter,
+      author: input.author,
+      reason: `Rollback ${targetSection.heading} to v${input.toVersion}`,
+      source: "rollback",
+      rollback_from_version: input.toVersion,
+      rollback_section: targetSection.heading,
+    });
+
+    return { newBody, newSnapshot, warning: null };
+  }
+}
+
+/**
+ * Find a section by heading query. Prefers exact match (after whitespace
+ * normalization), falls back to substring match. Throws if the substring
+ * match is ambiguous (>1 candidate).
+ */
+export function findSectionByHeading(
+  sections: ParsedSection[],
+  query: string,
+): ParsedSection | null {
+  const norm = (s: string) => s.trim().replace(/\s+/g, " ");
+  const q = norm(query);
+  // 1. Exact match on normalized heading
+  const exact = sections.find((s) => norm(s.heading) === q);
+  if (exact) return exact;
+  // 2. Substring fallback — case-insensitive
+  const qLower = q.toLowerCase();
+  const candidates = sections.filter((s) => norm(s.heading).toLowerCase().includes(qLower));
+  if (candidates.length === 0) return null;
+  if (candidates.length > 1) {
+    throw new Error(
+      `Ambiguous section heading "${query}": matches ${candidates.map((c) => c.heading).join(", ")}`,
+    );
+  }
+  return candidates[0];
+}
+
+/**
+ * Replace a section's body in a markdown document. The heading line at
+ * `section.start` is preserved; lines between the heading and the section
+ * end are replaced with `newSectionBody` (split on \n).
+ */
+export function replaceSection(
+  body: string,
+  section: ParsedSection,
+  newSectionBody: string,
+): string {
+  const lines = body.split("\n");
+  const before = lines.slice(0, section.start + 1); // keep through heading
+  const after = lines.slice(section.end);
+  const replacement = newSectionBody.split("\n");
+  return [...before, ...replacement, ...after].join("\n");
 }

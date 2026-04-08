@@ -2,7 +2,7 @@
 
 import { describe, test, expect } from "bun:test";
 import { openDb } from "./db";
-import { parseSections, SnapshotStore } from "./snapshots";
+import { parseSections, SnapshotStore, findSectionByHeading, replaceSection } from "./snapshots";
 
 describe("parseSections", () => {
   test("returns empty for headingless markdown", () => {
@@ -214,5 +214,193 @@ describe("SnapshotStore", () => {
     }
     expect(threw).toBe(true);
     db.close();
+  });
+});
+
+describe("diffVersions", () => {
+  function seed(entity: string, bodies: string[]) {
+    const db = openDb(":memory:");
+    const store = new SnapshotStore(db);
+    for (const b of bodies) {
+      store.createSnapshot({ entity, body: b, author: "c", reason: "r" });
+    }
+    return { db, store };
+  }
+
+  test("marks unchanged sections", () => {
+    const { db, store } = seed("foo", [
+      "## A\nalpha\n## B\nbeta\n",
+      "## A\nalpha\n## B\nbeta\n",
+    ]);
+    const result = store.diffVersions("foo", 1, 2);
+    expect(result.sections.length).toBe(2);
+    expect(result.sections.every((s) => s.status === "unchanged")).toBe(true);
+    db.close();
+  });
+
+  test("detects modified sections with patch", () => {
+    const { db, store } = seed("foo", [
+      "## A\nalpha\n## B\nbeta\n",
+      "## A\nalpha-v2\n## B\nbeta\n",
+    ]);
+    const result = store.diffVersions("foo", 1, 2);
+    const sectionA = result.sections.find((s) => s.heading === "## A")!;
+    expect(sectionA.status).toBe("modified");
+    expect(sectionA.diff).toBeDefined();
+    expect(sectionA.diff).toContain("alpha");
+    expect(sectionA.diff).toContain("alpha-v2");
+    const sectionB = result.sections.find((s) => s.heading === "## B")!;
+    expect(sectionB.status).toBe("unchanged");
+    db.close();
+  });
+
+  test("detects added sections", () => {
+    const { db, store } = seed("foo", [
+      "## A\nalpha\n",
+      "## A\nalpha\n## B\nbeta\n",
+    ]);
+    const result = store.diffVersions("foo", 1, 2);
+    const sectionB = result.sections.find((s) => s.heading === "## B")!;
+    expect(sectionB.status).toBe("added");
+    db.close();
+  });
+
+  test("detects removed sections", () => {
+    const { db, store } = seed("foo", [
+      "## A\nalpha\n## B\nbeta\n",
+      "## A\nalpha\n",
+    ]);
+    const result = store.diffVersions("foo", 1, 2);
+    const sectionB = result.sections.find((s) => s.heading === "## B")!;
+    expect(sectionB.status).toBe("removed");
+    db.close();
+  });
+
+  test("throws on missing version", () => {
+    const { db, store } = seed("foo", ["## A\nalpha\n"]);
+    expect(() => store.diffVersions("foo", 1, 99)).toThrow();
+    expect(() => store.diffVersions("foo", 99, 1)).toThrow();
+    db.close();
+  });
+});
+
+describe("rollbackSection", () => {
+  function seed(entity: string, bodies: string[]) {
+    const db = openDb(":memory:");
+    const store = new SnapshotStore(db);
+    for (const b of bodies) {
+      store.createSnapshot({ entity, body: b, author: "c", reason: "r" });
+    }
+    return { db, store };
+  }
+
+  test("creates new version with target body for the rolled-back section", () => {
+    const { db, store } = seed("foo", [
+      "## A\nalpha-v1\n## B\nbeta-v1\n",
+      "## A\nalpha-v2\n## B\nbeta-v2\n",
+    ]);
+    const result = store.rollbackSection({
+      entity: "foo",
+      currentBody: "## A\nalpha-v2\n## B\nbeta-v2\n",
+      currentFrontmatter: {},
+      sectionHeading: "## A",
+      toVersion: 1,
+      author: "captain",
+    });
+    // Section A should revert to v1 (alpha-v1); B should still be v2 (beta-v2)
+    expect(result.newBody).toContain("alpha-v1");
+    expect(result.newBody).toContain("beta-v2");
+    expect(result.newBody).not.toContain("alpha-v2");
+    expect(result.newSnapshot.version).toBe(3);
+    db.close();
+  });
+
+  test("sets source=rollback and rollback_from_version on new snapshot", () => {
+    const { db, store } = seed("foo", [
+      "## A\nv1\n",
+      "## A\nv2\n",
+    ]);
+    const result = store.rollbackSection({
+      entity: "foo",
+      currentBody: "## A\nv2\n",
+      currentFrontmatter: {},
+      sectionHeading: "## A",
+      toVersion: 1,
+      author: "captain",
+    });
+    expect(result.newSnapshot.source).toBe("rollback");
+    expect(result.newSnapshot.rollback_from_version).toBe(1);
+    expect(result.newSnapshot.rollback_section).toBe("## A");
+    db.close();
+  });
+
+  test("throws on missing section in target", () => {
+    const { db, store } = seed("foo", ["## A\nalpha\n"]);
+    expect(() =>
+      store.rollbackSection({
+        entity: "foo",
+        currentBody: "## A\nalpha\n",
+        currentFrontmatter: {},
+        sectionHeading: "## C",
+        toVersion: 1,
+        author: "c",
+      }),
+    ).toThrow(/Section not found in target/);
+    db.close();
+  });
+
+  test("throws on ambiguous section heading (substring matches multiple)", () => {
+    const { db, store } = seed("foo", [
+      "## Bug A\nx\n## Bug B\ny\n",
+      "## Bug A\nxx\n## Bug B\nyy\n",
+    ]);
+    expect(() =>
+      store.rollbackSection({
+        entity: "foo",
+        currentBody: "## Bug A\nxx\n## Bug B\nyy\n",
+        currentFrontmatter: {},
+        sectionHeading: "Bug",
+        toVersion: 1,
+        author: "c",
+      }),
+    ).toThrow(/Ambiguous/);
+    db.close();
+  });
+});
+
+describe("findSectionByHeading", () => {
+  test("prefers exact match over substring match", () => {
+    const md = "## Context\ncontext body\n## Context Addendum\naddendum body\n";
+    const sections = parseSections(md);
+    const found = findSectionByHeading(sections, "## Context");
+    expect(found).not.toBeNull();
+    expect(found!.heading).toBe("## Context");
+  });
+
+  test("falls back to substring match when no exact match", () => {
+    const md = "## Context Addendum\nbody\n";
+    const sections = parseSections(md);
+    const found = findSectionByHeading(sections, "Addendum");
+    expect(found).not.toBeNull();
+    expect(found!.heading).toBe("## Context Addendum");
+  });
+
+  test("returns null when no match", () => {
+    const md = "## Context\nbody\n";
+    const sections = parseSections(md);
+    expect(findSectionByHeading(sections, "Missing")).toBeNull();
+  });
+});
+
+describe("replaceSection", () => {
+  test("preserves surrounding sections", () => {
+    const md = "## A\nalpha\n## B\nbeta\n## C\ngamma\n";
+    const sections = parseSections(md);
+    const sectionB = sections.find((s) => s.heading === "## B")!;
+    const result = replaceSection(md, sectionB, "replaced-body\n");
+    expect(result).toContain("## A\nalpha");
+    expect(result).toContain("## B\nreplaced-body");
+    expect(result).toContain("## C\ngamma");
+    expect(result).not.toContain("\nbeta\n");
   });
 });
