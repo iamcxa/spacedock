@@ -169,6 +169,14 @@ Currently:
 9. **TDD discipline maintained (tests before implementation for Tasks 1-2)** — DONE
    Task 1: wrote 3 failing tests → implemented `getByEntity` → tests pass. Task 2: wrote 2 failing tests → implemented entity filter → tests pass.
 
+## PR Info
+
+- **PR_NUMBER**: 26
+- **PR_URL**: https://github.com/iamcxa/spacedock/pull/26
+- **Status**: Draft
+- **Branch**: spacedock-ensign/dashboard-activity-feed → main
+- **Size**: 666 lines changed (500-1000 range) — consider splitting for easier review
+
 ## Stage Report: quality
 
 1. **Type-check** — DONE
@@ -201,3 +209,31 @@ Currently:
 
 9. **Advance decision** — PASS
    All checks pass. No failures, no escalation needed. Feature is dashboard-internal with no schema/API/migration risk. Auto-advance to shipped stage.
+
+## PR Info
+
+- **PR_NUMBER**: 26
+- **PR_URL**: https://github.com/iamcxa/spacedock/pull/26
+- **Status**: Draft
+- **Branch**: spacedock-ensign/dashboard-activity-feed → main
+- **Size**: 666 lines changed (500-1000 range) — consider splitting for easier review
+
+## Stage Report: pr-draft
+
+1. **Branch pushed to origin** — DONE
+   `git push -u origin spacedock-ensign/dashboard-activity-feed` — pushed successfully.
+
+2. **Draft PR created with conventional commit title and structured body** — DONE
+   PR #26 created as draft: https://github.com/iamcxa/spacedock/pull/26
+   Title: `feat: dashboard entity activity feed with chat input`
+   Body includes: Summary, Reviewer Guide table, files changed by layer, test evidence (186 pass / 0 fail), quality report, PR size note.
+
+3. **PR_NUMBER and PR_URL recorded in entity body** — DONE
+   Recorded in ## PR Info section above (NOT frontmatter — FO handles frontmatter).
+
+4. **PR size noted** — DONE
+   666 lines changed (500-1000 range). "Consider splitting for easier review" note included in PR body with suggested split strategy.
+
+5. **Self-review annotations** — DONE
+   5 inline annotations posted to PR #26 review (review ID: 4077917618).
+   Annotated: prepared statement rationale (events.ts:29), since+entity combo precedence (server.ts:581), activityLoaded guard semantics (detail.js:916), lazy load on first tab switch (detail.js:932), WS entity scope filter + silent-drop rationale (detail.js:1222).
