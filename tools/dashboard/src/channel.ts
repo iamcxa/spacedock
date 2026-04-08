@@ -92,7 +92,7 @@ export function createChannelServer(opts: ChannelServerOptions) {
     },
   });
 
-  // Register the reply tool — FO calls this to send responses back to the browser
+  // Register MCP tools — FO calls these to interact with the dashboard and entities
   mcp.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
       tools: [
@@ -109,6 +109,10 @@ export function createChannelServer(opts: ChannelServerOptions) {
                 type: "string",
                 description: "The message content to display in the dashboard",
               },
+              entity: {
+                type: "string",
+                description: "Optional entity slug to scope the message to that entity's detail feed",
+              },
             },
             required: ["content"],
           },
@@ -119,10 +123,10 @@ export function createChannelServer(opts: ChannelServerOptions) {
 
   mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (request.params.name === "reply") {
-      const args = request.params.arguments as { content: string };
+      const args = request.params.arguments as { content: string; entity?: string };
       const event: AgentEvent = {
         type: "channel_response",
-        entity: "",
+        entity: args.entity ?? "",
         stage: "",
         agent: "fo",
         timestamp: new Date().toISOString(),
