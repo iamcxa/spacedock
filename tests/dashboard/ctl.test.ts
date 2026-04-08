@@ -202,3 +202,113 @@ describe("Dashboard ctl.sh", () => {
     }
   });
 });
+
+describe("Channel Detection", () => {
+  let tmpDir: string;
+  let channelServer: ReturnType<typeof Bun.serve> | null = null;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "ctl-channel-test-"));
+    makeProject(tmpDir);
+  });
+
+  afterEach(() => {
+    try { ctl(tmpDir, "stop"); } catch {}
+    try { ctl(tmpDir, "tunnel", "stop"); } catch {}
+    channelServer?.stop();
+    channelServer = null;
+    // Clean up channel_port state file
+    const stateDir = getStateDir(tmpDir);
+    const channelPortFile = join(stateDir, "channel_port");
+    if (existsSync(channelPortFile)) {
+      rmSync(channelPortFile);
+    }
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test("status shows channel instance when channel_port file exists and port responds", () => {
+    // Simulate a channel.ts instance: write channel_port + serve HTTP
+    const stateDir = getStateDir(tmpDir);
+    mkdirSync(stateDir, { recursive: true });
+    channelServer = Bun.serve({
+      port: 0,
+      fetch() { return new Response("ok"); },
+    });
+    const channelPort = channelServer.port;
+    writeFileSync(join(stateDir, "channel_port"), String(channelPort) + "\n");
+    writeFileSync(join(stateDir, "root"), tmpDir + "\n");
+
+    const result = ctl(tmpDir, "status");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.toLowerCase()).toContain("channel");
+    expect(result.stdout).toContain(String(channelPort));
+  });
+
+  test("status cleans stale channel_port when port is not in use", () => {
+    const stateDir = getStateDir(tmpDir);
+    mkdirSync(stateDir, { recursive: true });
+    // Write a port that nothing is listening on
+    writeFileSync(join(stateDir, "channel_port"), "19999\n");
+    writeFileSync(join(stateDir, "root"), tmpDir + "\n");
+
+    const result = ctl(tmpDir, "status");
+    expect(result.exitCode).toBe(0);
+    // Should NOT show channel as running
+    expect(result.stdout.toLowerCase()).not.toContain("channel");
+    // Stale file should be cleaned
+    expect(existsSync(join(stateDir, "channel_port"))).toBe(false);
+  });
+
+  test("tunnel start works with channel-only instance (no PID file)", () => {
+    // This test requires ngrok, so we just verify ctl.sh doesn't reject
+    // with "dashboard is not running" when channel_port exists
+    const stateDir = getStateDir(tmpDir);
+    mkdirSync(stateDir, { recursive: true });
+    channelServer = Bun.serve({
+      port: 0,
+      fetch() { return new Response("ok"); },
+    });
+    const channelPort = channelServer.port;
+    writeFileSync(join(stateDir, "channel_port"), String(channelPort) + "\n");
+
+    const result = ctl(tmpDir, "tunnel", "start");
+    // Should NOT fail with "dashboard is not running"
+    // It may fail with "ngrok not found" -- that's fine, it means we passed the guard
+    if (result.exitCode !== 0) {
+      expect(result.stderr).not.toContain("dashboard is not running");
+    }
+  }, 20_000);
+
+  test("status --all shows channel-only instances", () => {
+    const stateDir = getStateDir(tmpDir);
+    mkdirSync(stateDir, { recursive: true });
+    channelServer = Bun.serve({
+      port: 0,
+      fetch() { return new Response("ok"); },
+    });
+    const channelPort = channelServer.port;
+    writeFileSync(join(stateDir, "channel_port"), String(channelPort) + "\n");
+    writeFileSync(join(stateDir, "root"), tmpDir + "\n");
+
+    const result = ctl(tmpDir, "status", "--all");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.toLowerCase()).toContain("channel");
+    expect(result.stdout).toContain(String(channelPort));
+  });
+
+  test("stop does NOT kill channel instance (only ctl-managed server)", () => {
+    const stateDir = getStateDir(tmpDir);
+    mkdirSync(stateDir, { recursive: true });
+    channelServer = Bun.serve({
+      port: 0,
+      fetch() { return new Response("ok"); },
+    });
+    const channelPort = channelServer.port;
+    writeFileSync(join(stateDir, "channel_port"), String(channelPort) + "\n");
+
+    const result = ctl(tmpDir, "stop");
+    expect(result.exitCode).toBe(0);
+    // channel_port file should remain (channel is Claude Code-managed)
+    expect(existsSync(join(stateDir, "channel_port"))).toBe(true);
+  });
+});
