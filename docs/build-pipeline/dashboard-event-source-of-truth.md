@@ -3,11 +3,11 @@ id: 026
 title: Dashboard Event Single Source of Truth — 移除 localStorage 冗餘快取
 status: explore
 source: captain observation (024 shipping session — stale permission cards)
-started:
+started: 2026-04-08T08:50:00+08:00
 completed:
 verdict:
 score: 0.75
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-event-source-of-truth
 issue:
 pr:
 intent: bugfix
