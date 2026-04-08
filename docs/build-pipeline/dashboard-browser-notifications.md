@@ -88,6 +88,159 @@ Per MEMORY.md WebSocket cross-instance limitation, the 8420 (channel) and 8421 (
 Captain request during 033 ship session (2026-04-09):
 > "UI 需要串瀏覽器通知，當需要我注意或互動時，應該要跳通知呼叫我，而且可以設定開關"
 
+## Stage Report (plan)
+
+### Gate Type Resolution
+
+**決策：重用 `gate`，不新增 `gate_request`。**
+
+`references/first-officer-shared-core.md` line 52 明確定義：`gate` event 在「呈現 gate 給 captain 批准時」發出，detail = "Awaiting captain approval"。這與 spec 的 `gate_request` 語意完全一致。`gate` 已存在於 VALID_EVENT_TYPES，無需新增 type。
+
+**最終需新增的 event types（3 個）：**
+
+| Type | 語意 | 發出方 |
+|---|---|---|
+| `pr_ready` | PR 準備好供 captain 審閱 | FO（未來）或 pipeline hook |
+| `pipeline_error` | Entity/stage 執行失敗 | FO（未來）或 ensign error handler |
+| `entity_shipped` | Entity 完成 ship | FO（terminal stage 後） |
+
+`pr_ready`、`pipeline_error`、`entity_shipped` 目前沒有 FO 端 emit 實作。本 entity 只負責前端監聽與 VALID_EVENT_TYPES 白名單，emit 邏輯留待未來另一 entity 補充。
+
+---
+
+### Task Breakdown（有序 atomic commits）
+
+**Task 1**: 新增 event types 至後端型別定義
+- `tools/dashboard/src/types.ts` — `AgentEventType` union 加入 `pr_ready | pipeline_error | entity_shipped`
+- `tools/dashboard/src/events.ts` — `VALID_EVENT_TYPES` Set 加入三個新 type
+
+**Task 2**: 新建 `static/notifications.js` 核心模組
+- `tools/dashboard/static/notifications.js` — 封裝：
+  - `getConfig()` / `saveConfig()` — localStorage `dashboard.notifications.config` 讀寫
+  - `requestPermission(onGranted)` — 包裝 `Notification.requestPermission()` promise
+  - `notify(type, title, body, onClick)` — 主要公開介面，內含：
+    - permission 狀態檢查
+    - visibility 檢查（`document.visibilityState === 'visible'` → 不發）
+    - per-type 開關檢查
+    - 30s dedup（`Map<dedup_key, timestamp>`，dedup_key = `${type}:${entity}:${detail_prefix}`）
+    - auto-close timeout（10s 低優先；`gate`/`permission_request` 不自動關）
+
+**Task 3**: 設定面板 UI（index.html + activity.js）
+- `tools/dashboard/static/index.html` — header 加入齒輪按鈕 `#notif-settings-btn`；header 下方加入可收折的 `#notif-settings-panel`
+- `tools/dashboard/static/activity.js` — 設定面板初始化邏輯：toggle 開/關、per-type checkboxes、permission 狀態顯示、Test 按鈕、localStorage 讀寫
+
+**Task 4**: activity.js WS 整合（主頁通知）
+- `tools/dashboard/static/activity.js` — `ws.onmessage` event branch 加入 `notify()` 呼叫
+- 觸發 types：`gate`、`permission_request`、`comment`、`channel_response`、`pr_ready`、`pipeline_error`、`entity_shipped`
+- onClick：`window.focus()`；若有 entity slug 則導向 detail 頁
+
+**Task 5**: detail.js WS 整合（entity 詳情頁通知）
+- `tools/dashboard/static/detail.html` — 加入 `<script src="/notifications.js">`
+- `tools/dashboard/static/detail.js` — `detailWs.onmessage` 加入通知呼叫（`gate`、`comment`）
+
+---
+
+### File-Level Changes Per Task
+
+| Task | 檔案 | 變更性質 |
+|---|---|---|
+| 1 | `src/types.ts` | 修改 AgentEventType union |
+| 1 | `src/events.ts` | 修改 VALID_EVENT_TYPES Set |
+| 2 | `static/notifications.js` | 新建（約 120 行） |
+| 3 | `static/index.html` | 修改 header，加入設定 panel |
+| 3 | `static/activity.js` | 新增設定面板初始化（約 80 行） |
+| 4 | `static/activity.js` | ws.onmessage notify 整合（約 20 行） |
+| 5 | `static/detail.html` | 加入 script tag |
+| 5 | `static/detail.js` | detailWs.onmessage notify 整合（約 15 行） |
+
+share.js / share.html：**不修改**（guest reviewer 不需要 captain 通知）。
+
+---
+
+### Settings UI Design
+
+**位置**：index.html header 右側加入齒輪按鈕，點擊展開/收折 `#notif-settings-panel` div，位於 header 正下方（全寬 banner 風格，不另開 modal）。
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Spacedock Dashboard   [Connecting...] [Channel: ...]  ⚙ │
+├─────────────────────────────────────────────────────────┤
+│ ▼ Notifications  [Permission: granted]                  │
+│   [x] Enabled                           [Test]          │
+│   Notify on: [x] Gate approval  [x] Permission request  │
+│              [x] FO comment     [x] FO channel reply    │
+│              [x] PR ready       [x] Pipeline error      │
+│              [ ] Entity shipped (low priority, opt-in)  │
+└─────────────────────────────────────────────────────────┘
+```
+
+Panel 預設 `hidden`，按鈕 toggle `hidden` attribute。無 modal、無 sidebar — 最小 DOM footprint。
+
+---
+
+### Permission Flow
+
+1. 頁面載入：讀 `Notification.permission`
+   - `granted` → 直接啟用，不呼叫 requestPermission
+   - `denied` → toggle 顯示 disabled + 說明文字
+   - `default` → toggle 顯示 "Click to enable"
+2. **Toggle 開啟點擊**（user gesture）→ 呼叫 `Notification.requestPermission()` → resolve 後更新 config 和 UI
+3. Toggle 關閉 → 只更新 localStorage config（瀏覽器不提供 revoke API）
+
+---
+
+### Deduplication Strategy
+
+```js
+function dedupKey(type, entity, detail) {
+  return type + ':' + (entity || '') + ':' + (detail || '').slice(0, 32);
+}
+// Map<key, timestamp_ms> — 30s 內相同 key suppress
+// 每次 notify 時清除 >60s 舊 entry（避免 Map 無限增長）
+```
+
+不使用 event seq，因為 WS replay 會重放歷史 event（舊 seq），用 `(type, entity, detail)` + 時間窗口更可靠。
+
+---
+
+### Test Plan
+
+**單元測試（bun:test）**：新建 `tests/dashboard/notifications.test.ts`
+- `getConfig()` 回傳預設值（無 localStorage 環境）
+- `saveConfig()` → `getConfig()` round-trip（mock localStorage）
+- `dedupKey()` 產生穩定 key
+- dedup：同 key 30s 內第二次呼叫 → mock Notification 不被建立
+- visibility 抑制：mock `document.visibilityState = 'visible'` → 不通知
+- per-type 過濾：config disable type → 不通知
+
+Mock 策略：`globalThis.Notification = class { static permission = 'granted'; constructor() {...} }` in test setup；localStorage 用 Map shim。
+
+**手動驗證 checklist：**
+- [ ] 點設定按鈕 → panel 展開/收折
+- [ ] Toggle 開啟（permission=default）→ 瀏覽器跳 permission prompt
+- [ ] 授權後 → toggle enabled，permission 狀態顯示 granted
+- [ ] 點 Test 按鈕 → 系統通知出現
+- [ ] `curl POST /api/events` 發出 `gate` event → 背景 tab 收到通知
+- [ ] 點通知 → tab focus + 導向正確 entity detail
+- [ ] Toggle 關閉 → 再發 event → 無通知
+- [ ] Tab 在前景（visibilityState=visible）→ 發 event → 無通知
+- [ ] 30s 內同 event 重複 → 第二次無通知
+- [ ] Permission denied → toggle disabled + 說明文字
+
+---
+
+### Estimated Commits
+
+5 個 atomic commits：
+
+1. `feat(041): add pr_ready, pipeline_error, entity_shipped event types`
+2. `feat(041): add notifications.js module — permission, dedup, visibility, config`
+3. `feat(041): add notification settings panel to dashboard index`
+4. `feat(041): wire browser notifications to activity feed WS`
+5. `feat(041): wire browser notifications to entity detail page WS`
+
+---
+
 ## Stage Report (explore)
 
 ### Key File Inventory
