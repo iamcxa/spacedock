@@ -97,7 +97,8 @@ Otherwise, default to all active entities. Do NOT ask interactively unless the u
 ```bash
 STATE_DIR=~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)
 # Try server port first, fall back to channel port
-PORT=$(cat "$STATE_DIR/port" 2>/dev/null || cat "$STATE_DIR/channel_port" 2>/dev/null | tr -d '[:space:]')
+PORT=$(cat "$STATE_DIR/port" 2>/dev/null || cat "$STATE_DIR/channel_port" 2>/dev/null)
+PORT=$(echo "$PORT" | tr -d '[:space:]')
 TUNNEL_URL=$(cat "$STATE_DIR/tunnel_url")
 ```
 
