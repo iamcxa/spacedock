@@ -64,8 +64,28 @@ def parse_frontmatter(filepath):
     return fields
 
 
+def parse_inline_list(value):
+    """Parse '[item1, item2, item3]' inline YAML list into list of strings.
+
+    Returns [] for empty or malformed input (not starting with '[').
+    """
+    value = value.strip()
+    if not value.startswith('['):
+        return []
+    value = value.strip('[]')
+    if not value.strip():
+        return []
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
 def parse_stages_block(filepath):
-    """Parse the stages block from README frontmatter."""
+    """Parse the stages block from README frontmatter.
+
+    Returns a dict with:
+      'stages': list of stage dicts (name, gate, manual, terminal, worktree, concurrency, initial)
+      'profiles': dict of profile_name -> list of stage name strings
+    Returns None if no stages block found.
+    """
     lines = []
     in_fm = False
     with open(filepath, 'r') as f:
@@ -88,6 +108,7 @@ def parse_stages_block(filepath):
     if stages_start is None:
         return None
 
+    profiles = {}
     defaults = {}
     states = []
     i = stages_start + 1
@@ -105,7 +126,23 @@ def parse_stages_block(filepath):
             break
 
         if indent == stages_indent:
-            if stripped == 'defaults:':
+            if stripped == 'profiles:':
+                i += 1
+                while i < len(lines):
+                    pline = lines[i]
+                    pstripped = pline.lstrip()
+                    if not pstripped:
+                        i += 1
+                        continue
+                    pindent = len(pline) - len(pstripped)
+                    if pindent <= stages_indent:
+                        break
+                    if ':' in pstripped:
+                        k, _, v = pstripped.partition(':')
+                        profiles[k.strip()] = parse_inline_list(v.strip())
+                    i += 1
+                continue
+            elif stripped == 'defaults:':
                 i += 1
                 while i < len(lines):
                     dline = lines[i]
@@ -150,7 +187,7 @@ def parse_stages_block(filepath):
     default_worktree = defaults.get('worktree', 'false').lower() == 'true'
     default_concurrency = int(defaults.get('concurrency', '2'))
 
-    result = []
+    stages_list = []
     for state in states:
         stage = {
             'name': state['name'],
@@ -161,9 +198,9 @@ def parse_stages_block(filepath):
             'initial': state.get('initial', 'false').lower() == 'true',
             'manual': state.get('manual', 'false').lower() == 'true',
         }
-        result.append(stage)
+        stages_list.append(stage)
 
-    return result
+    return {'stages': stages_list, 'profiles': profiles}
 
 
 def scan_entities(directory):
@@ -177,7 +214,8 @@ def scan_entities(directory):
         fields = parse_frontmatter(filepath)
         entity = {k: v for k, v in fields.items()}
         entity['slug'] = slug
-        for key in ('id', 'status', 'title', 'score', 'source', 'worktree'):
+        for key in ('id', 'status', 'title', 'score', 'source', 'worktree',
+                    'profile', 'skip-stages', 'add-stages'):
             entity.setdefault(key, '')
         entities.append(entity)
     return entities
@@ -236,7 +274,47 @@ def parse_depends_on(value):
     return [int(m) for m in matches]
 
 
-def print_next_table(entities, stages):
+def effective_stages(entity, profiles, all_stage_names):
+    """Compute effective stage list for an entity.
+
+    Args:
+        entity: entity dict with keys 'profile', 'skip-stages', 'add-stages'
+        profiles: dict of profile_name -> list[str] from parse_stages_block
+        all_stage_names: canonical full-pipeline stage order (names from states list)
+
+    Returns:
+        Ordered list of stage names this entity will pass through.
+        Falls back to all_stage_names when entity has no profile assigned
+        or the profile name is not found in profiles.
+    """
+    profile_name = entity.get('profile', '').strip()
+    if not profile_name or profile_name not in profiles:
+        return list(all_stage_names)
+
+    base = list(profiles[profile_name])
+
+    skip_raw = entity.get('skip-stages', '')
+    skip = parse_inline_list(skip_raw) if skip_raw else []
+    kept = [s for s in base if s not in skip]
+
+    add_raw = entity.get('add-stages', '')
+    add = parse_inline_list(add_raw) if add_raw else []
+    to_add = [s for s in add if s not in kept]
+
+    if not to_add:
+        return kept
+
+    # Insert added stages at their canonical position from full pipeline order
+    kept_set = set(kept)
+    add_set = set(to_add)
+    result = []
+    for stage in all_stage_names:
+        if stage in kept_set or stage in add_set:
+            result.append(stage)
+    return result
+
+
+def print_next_table(entities, stages, profiles):
     """Print the --next dispatchable entities table."""
     stage_by_name = {s['name']: s for s in stages}
     stage_names = [s['name'] for s in stages]
@@ -265,17 +343,19 @@ def print_next_table(entities, stages):
         status = e['status']
         if status not in stage_by_name:
             continue
-        stage_idx = stage_names.index(status)
         stage = stage_by_name[status]
         if stage.get('terminal', False):
             continue
-        if stage.get('gate', False):
+        # FO-inline stages (gate: true + worktree: false) are shown with dispatch=(FO inline)
+        # rather than filtered out entirely. All other gate-blocked stages are skipped.
+        is_fo_inline = stage.get('gate', False) and not stage.get('worktree', True)
+        if stage.get('gate', False) and not is_fo_inline:
             continue
         if stage.get('manual', False):
             continue
         if e['worktree']:
             continue
-        # Rule 5: dependency check — all depends-on IDs must be in terminal stages
+        # Dependency check — all depends-on IDs must be in terminal stages
         dep_ids = parse_depends_on(e.get('depends-on', ''))
         if dep_ids:
             all_met = True
@@ -286,25 +366,56 @@ def print_next_table(entities, stages):
                     break
             if not all_met:
                 continue
-        if stage_idx + 1 >= len(stage_names):
+
+        # Profile-aware next-stage computation
+        eff = effective_stages(e, profiles, stage_names)
+        if status not in eff:
+            # Current stage removed by override — find first effective stage after current
+            # in canonical order
+            curr_idx = stage_names.index(status) if status in stage_names else -1
+            candidates_after = [s for s in eff if stage_names.index(s) > curr_idx] if curr_idx >= 0 else []
+            if not candidates_after:
+                continue
+            next_stage_name = candidates_after[0]
+        else:
+            eff_idx = eff.index(status)
+            if eff_idx + 1 >= len(eff):
+                continue
+            next_stage_name = eff[eff_idx + 1]
+
+        if next_stage_name not in stage_by_name:
             continue
-        next_stage_name = stage_names[stage_idx + 1]
         next_stage = stage_by_name[next_stage_name]
         current_count = next_stage_counts.get(next_stage_name, 0)
         if current_count >= next_stage['concurrency']:
             continue
         next_stage_counts[next_stage_name] = current_count + 1
+
+        # Compute PROFILE and DISPATCH display labels
+        profile_label = e.get('profile', '') or '(none)'
+        if is_fo_inline:
+            dispatch_label = '(FO inline)'
+        elif not e.get('profile', '').strip() and status != stage.get('name', ''):
+            dispatch_label = '(needs profile)'
+        elif not e.get('profile', '').strip():
+            dispatch_label = '(needs profile)'
+        else:
+            dispatch_label = 'ensign'
+
         dispatchable.append({
             **e,
             'next': next_stage_name,
             'next_worktree': 'yes' if next_stage['worktree'] else 'no',
+            'profile_label': profile_label,
+            'dispatch_label': dispatch_label,
         })
 
-    fmt = '%-6s %-30s %-20s %-20s %s'
-    print(fmt % ('ID', 'SLUG', 'CURRENT', 'NEXT', 'WORKTREE'))
-    print(fmt % ('--', '----', '-------', '----', '--------'))
+    fmt = '%-6s %-28s %-14s %-14s %-12s %-13s %s'
+    print(fmt % ('ID', 'SLUG', 'CURRENT', 'NEXT', 'PROFILE', 'DISPATCH', 'WORKTREE'))
+    print(fmt % ('--', '----', '-------', '----', '-------', '--------', '--------'))
     for e in dispatchable:
-        print(fmt % (e['id'], e['slug'], e['status'], e['next'], e['next_worktree']))
+        print(fmt % (e['id'], e['slug'], e['status'], e['next'],
+                     e['profile_label'], e['dispatch_label'], e['next_worktree']))
 
 
 def parse_where_filters(args):
@@ -405,8 +516,12 @@ def main():
 
     readme_path = os.path.join(pipeline_dir, 'README.md')
     stages = None
+    profiles = {}
     if os.path.exists(readme_path):
-        stages = parse_stages_block(readme_path)
+        parsed = parse_stages_block(readme_path)
+        if parsed is not None:
+            stages = parsed['stages']
+            profiles = parsed['profiles']
 
     if show_next and stages is None:
         print('Error: README.md has no stages block. --next requires stage metadata.', file=sys.stderr)
@@ -421,7 +536,7 @@ def main():
     entities = apply_filters(entities, where_filters)
 
     if show_next:
-        print_next_table(entities, stages)
+        print_next_table(entities, stages, profiles)
     else:
         print_status_table(entities, stages)
 
