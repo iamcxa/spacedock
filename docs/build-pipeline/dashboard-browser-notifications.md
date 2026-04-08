@@ -1,15 +1,15 @@
 ---
 id: 041
 title: Dashboard Browser Notifications — Captain Attention Alerts
-status: explore
+status: pr-draft
 source: captain request 2026-04-09 (during 033 ship session)
-started:
+started: 2026-04-09
 completed:
 verdict:
 score: 0.85
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-browser-notifications
 issue:
-pr:
+pr: 24
 intent: feature
 scale: Small
 project: spacedock
@@ -87,6 +87,14 @@ Per MEMORY.md WebSocket cross-instance limitation, the 8420 (channel) and 8421 (
 
 Captain request during 033 ship session (2026-04-09):
 > "UI 需要串瀏覽器通知，當需要我注意或互動時，應該要跳通知呼叫我，而且可以設定開關"
+
+## Stage Report (pr-draft)
+
+- Branch pushed: `spacedock-ensign/dashboard-browser-notifications`
+- Draft PR created: iamcxa/spacedock#24
+- Frontmatter updated: `status: pr-draft`, `pr: 24`, `started: 2026-04-09`, `worktree` filled
+
+---
 
 ## Stage Report (quality)
 
