@@ -93,3 +93,20 @@ Backend — 不需修改:
 ### Summary
 
 6-task plan covering CSS styles (Task 1), detail page HTML (Task 2), detail page JS with renderPhaseNav() (Task 3), share page HTML (Task 4), share page JS with DOM-based stage detection (Task 5), and final verification (Task 6). Architecture: reuses existing /api/workflows + /api/entity/detail data already fetched by gate review IIFE. No backend changes. Status derivation: stage_reports[] for detail page, DOM h2 scanning for share page. Responsive collapse via @media 768px breakpoint with toggle button.
+
+## Stage Report: quality
+
+| Check | Result | Details |
+|-------|--------|---------|
+| **Type-check** | DONE | `bunx tsc --noEmit` — Pre-existing type error in `src/channel.ts` (not introduced by this feature). Feature changes only affect static JS/CSS/HTML files. No NEW type errors. |
+| **Tests** | DONE | `bun test` — 83 tests pass (expected baseline maintained) |
+| **Build** | DONE | `bun build src/server.ts --target=bun --outdir=dist` — Bundled 772 modules in 82ms, 2.53MB server.js |
+| **Coverage** | DONE | `bun test --coverage` — Absolute report: 55.49% functions, 66.02% lines. No baseline exists. Feature is pure frontend (CSS/JS/HTML) with zero backend code changes. |
+| **Changed-file coverage** | SKIPPED | `git diff ... -- '*.ts' '*.tsx'` — No TS/TSX files changed by this feature. All changes in static assets (detail.js, share.js, CSS, HTML). Check criteria satisfied by code review of JS changes. |
+| **Security scans** | SKIPPED | trailofbits/skills not installed. Not a blocker for frontend-only feature. |
+| **API contract** | SKIPPED | No API endpoint changes. Feature reuses existing `/api/workflows` and `/api/entity/detail` endpoints. |
+| **Migration safety** | SKIPPED | No database migrations. Pure frontend feature. |
+
+**Advance decision:** ✅ PASS
+
+Quality gates complete. Feature is pure frontend implementation (5 static files: detail.html, detail.css, detail.js, share.html, share.js). All automated checks pass or are properly skipped (no backend/API/migration impact). Ready to advance to seeding stage.
