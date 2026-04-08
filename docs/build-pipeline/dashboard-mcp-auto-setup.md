@@ -3,11 +3,11 @@ id: 037
 title: Dashboard MCP Auto-Setup — Detect + Fix Missing .mcp.json Entry
 status: explore
 source: plugin user bug report — .mcp.json missing causes dashboard MCP disconnect
-started:
+started: 2026-04-08
 completed:
 verdict:
 score: 0.95
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-mcp-auto-setup
 issue:
 pr:
 intent: bugfix
