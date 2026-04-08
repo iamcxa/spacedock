@@ -3,7 +3,8 @@ id: 030
 title: Dashboard Comment System Followup — 027 Hotfixes + IME Support
 status: explore
 source: captain testing of 027 (PR #17) — discovered 3 issues during live verification
-started:
+started: 2026-04-08
+worktree: .worktrees/spacedock-ensign-dashboard-comment-system-followup
 completed:
 verdict:
 score: 0.92
