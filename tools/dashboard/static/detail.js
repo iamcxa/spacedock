@@ -1015,6 +1015,9 @@ function rejectSuggestionAction(suggestionId) {
     var stageSelect = document.getElementById('filter-stage');
     var authorSelect = document.getElementById('filter-author');
 
+    var prevStage = stageSelect.value;
+    var prevAuthor = authorSelect.value;
+
     var stages = {};
     var authors = {};
     activityEvents.forEach(function(ev) {
@@ -1038,6 +1041,9 @@ function rejectSuggestionAction(suggestionId) {
       opt.textContent = a;
       authorSelect.appendChild(opt);
     });
+
+    stageSelect.value = prevStage;
+    authorSelect.value = prevAuthor;
   }
 
   ['filter-type', 'filter-stage', 'filter-author'].forEach(function(id) {
