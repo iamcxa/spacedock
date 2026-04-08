@@ -1,7 +1,7 @@
 ---
 id: 033
 title: Dashboard MCP Tool Expansion — Bidirectional Entity Collaboration
-status: explore
+status: pr-draft
 source: spec 2026-04-08-pipeline-brainstorm-profiles-design.md (WP3)
 started: 2026-04-08
 completed:
@@ -9,7 +9,7 @@ verdict:
 score: 0.85
 worktree: .worktrees/spacedock-ensign-dashboard-mcp-tool-expansion
 issue:
-pr:
+pr: 23
 intent: feature
 scale: Large
 project: spacedock
@@ -694,3 +694,10 @@ Note: 11 planned commits became 6 because `pendingPermissions` must be declared 
 - [x] All execute commits use `033 execute:` prefix
 
 **Verdict: PASS**
+
+## Stage Report (pr-draft)
+
+- PR: https://github.com/iamcxa/spacedock/pull/23
+- Branch pushed to origin: `spacedock-ensign/dashboard-mcp-tool-expansion`
+- Draft PR created with full description of 5 MCP tools, permission async pattern, snapshot integration, test results
+- Entity frontmatter updated: `status: pr-draft`, `pr: 23`
