@@ -47,11 +47,17 @@ export function addComment(
   return comment;
 }
 
-export function resolveComment(entityPath: string, commentId: string): Comment {
+export function resolveComment(
+  entityPath: string,
+  commentId: string,
+  opts?: { reason?: string; version?: number },
+): Comment {
   const thread = readSidecar(entityPath);
   const comment = thread.comments.find((c) => c.id === commentId);
   if (!comment) throw new Error("Comment not found: " + commentId);
   comment.resolved = true;
+  if (opts?.reason !== undefined) comment.resolved_reason = opts.reason;
+  if (opts?.version !== undefined) comment.resolved_version = opts.version;
   writeSidecar(entityPath, thread);
   return comment;
 }

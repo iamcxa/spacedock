@@ -274,8 +274,29 @@ function loadEntity() {
             renderTags(data.tags);
             initScore(data.frontmatter.score || '0');
             if (typeof loadComments === 'function') loadComments();
+
+            // Fetch comments and apply highlights
+            apiFetch('/api/entity/comments?path=' + encodeURIComponent(entityPath))
+              .then(function (threadData) {
+                cachedComments = threadData.comments || [];
+                applyCommentHighlights(cachedComments);
+              });
+
+            var entityStatus = data.frontmatter.status;
+            if (workflowStages) {
+              updateGatePanel(entityStatus, workflowStages);
+              renderPhaseNav(workflowStages, data.stage_reports, entityStatus);
+            } else {
+              fetchWorkflowStages().then(function (stages) {
+                updateGatePanel(entityStatus, stages);
+                renderPhaseNav(stages, data.stage_reports, entityStatus);
+              });
+            }
         });
 }
+
+// Expose as window.loadEntity so IIFEs (rollback modal, etc.) can call it
+window.loadEntity = loadEntity;
 
 // -- Event listeners --
 
@@ -434,7 +455,12 @@ function loadComments() {
 function renderComments(thread) {
     while (commentThreadsContainer.firstChild) commentThreadsContainer.removeChild(commentThreadsContainer.firstChild);
 
-    if (thread.comments.length === 0) {
+    // Update mobile counter
+    var countEl = document.getElementById('comments-count');
+    var openCount = (thread.comments || []).filter(function (c) { return !c.resolved; }).length;
+    if (countEl) countEl.textContent = String(openCount);
+
+    if (!thread.comments || thread.comments.length === 0) {
         var empty = document.createElement('div');
         empty.className = 'empty-state';
         empty.textContent = 'Select text to add a comment';
@@ -442,7 +468,7 @@ function renderComments(thread) {
         return;
     }
 
-    // Show unresolved comments first, then resolved
+    // Show unresolved first (newest-first within group), then resolved
     var sorted = thread.comments.slice().sort(function (a, b) {
         if (a.resolved !== b.resolved) return a.resolved ? 1 : -1;
         return new Date(b.timestamp) - new Date(a.timestamp);
@@ -452,22 +478,33 @@ function renderComments(thread) {
         var card = document.createElement('div');
         card.className = 'comment-card' + (comment.resolved ? ' resolved' : '');
 
-        var selectedText = document.createElement('div');
-        selectedText.className = 'comment-selected-text';
-        selectedText.textContent = '"' + comment.selected_text + '"';
-        card.appendChild(selectedText);
+        // Quote of selected text
+        if (comment.selected_text) {
+            var selectedText = document.createElement('div');
+            selectedText.className = 'comment-selected-text';
+            selectedText.textContent = '\u201c' + comment.selected_text + '\u201d';
+            card.appendChild(selectedText);
+        }
 
+        // Comment content
         var content = document.createElement('div');
         content.className = 'comment-content';
         content.textContent = comment.content;
         card.appendChild(content);
 
+        // Meta row: author badge + section + timestamp
         var meta = document.createElement('div');
         meta.className = 'comment-meta';
 
-        var author = document.createElement('span');
-        author.textContent = comment.author + ' \u2022 ' + comment.section_heading.replace('## ', '');
-        meta.appendChild(author);
+        var authorBadge = document.createElement('span');
+        authorBadge.className = 'comment-author-badge comment-author-' + (comment.author || 'captain');
+        authorBadge.textContent = comment.author || 'captain';
+        meta.appendChild(authorBadge);
+
+        var sectionSpan = document.createElement('span');
+        sectionSpan.className = 'comment-section-label';
+        sectionSpan.textContent = (comment.section_heading || '').replace(/^#+\s*/, '');
+        meta.appendChild(sectionSpan);
 
         if (!comment.resolved) {
             var resolveBtn = document.createElement('button');
@@ -482,6 +519,43 @@ function renderComments(thread) {
 
         card.appendChild(meta);
 
+        // Resolve reason tag (for auto-resolved or manually resolved with reason)
+        if (comment.resolved && comment.resolved_reason) {
+            var reasonTag = document.createElement('div');
+            reasonTag.className = 'comment-resolve-tag';
+            var reasonText = comment.resolved_reason === 'section_updated'
+                ? 'auto-resolved: section updated'
+                : comment.resolved_reason;
+            if (comment.resolved_version != null) {
+                reasonText += ' @ v' + comment.resolved_version;
+            }
+            reasonTag.textContent = reasonText;
+            card.appendChild(reasonTag);
+        }
+
+        // Thread replies (indented)
+        if (comment.thread && comment.thread.length > 0) {
+            var threadEl = document.createElement('div');
+            threadEl.className = 'comment-thread-replies';
+            comment.thread.forEach(function (reply) {
+                var replyEl = document.createElement('div');
+                replyEl.className = 'comment-reply';
+
+                var replyAuthor = document.createElement('span');
+                replyAuthor.className = 'comment-author-badge comment-author-' + (reply.author || 'captain');
+                replyAuthor.textContent = reply.author || 'captain';
+                replyEl.appendChild(replyAuthor);
+
+                var replyContent = document.createElement('span');
+                replyContent.className = 'comment-reply-content';
+                replyContent.textContent = reply.content;
+                replyEl.appendChild(replyContent);
+
+                threadEl.appendChild(replyEl);
+            });
+            card.appendChild(threadEl);
+        }
+
         // Render suggestions linked to this comment
         var linkedSuggestions = (thread.suggestions || []).filter(function (s) {
             return s.comment_id === comment.id;
@@ -493,7 +567,6 @@ function renderComments(thread) {
         // Click sidebar comment → scroll to highlight + flash + show popover
         (function (commentId) {
             card.addEventListener('click', function (e) {
-                // Don't trigger if clicking resolve button or suggestion actions
                 if (e.target.closest('.comment-resolve-btn') || e.target.closest('.suggestion-actions')) return;
                 var marks = document.querySelectorAll('.comment-highlight');
                 for (var m = 0; m < marks.length; m++) {
@@ -505,10 +578,7 @@ function renderComments(thread) {
                         targetMark.addEventListener('animationend', function () {
                             this.classList.remove('comment-highlight-flash');
                         }, { once: true });
-                        // Trigger popover via synthetic click (handled by IIFE click listener)
-                        setTimeout(function () {
-                            targetMark.click();
-                        }, 400);
+                        setTimeout(function () { targetMark.click(); }, 400);
                         break;
                     }
                 }
@@ -662,18 +732,22 @@ function rejectSuggestionAction(suggestionId) {
   function updateGatePanel(entityStatus, stages) {
     currentEntityStatus = entityStatus;
     if (!stages) stages = workflowStages;
+    var accordionGate = document.getElementById('accordion-gate');
     if (!stages) {
-      gatePanel.style.display = 'none';
+      if (accordionGate) accordionGate.style.display = 'none';
       return;
     }
 
     var atGate = isEntityAtGate(entityStatus, stages);
     if (!atGate) {
-      gatePanel.style.display = 'none';
+      if (accordionGate) accordionGate.style.display = 'none';
       return;
     }
 
-    gatePanel.style.display = '';
+    if (accordionGate) {
+      accordionGate.style.display = '';
+      accordionGate.open = true;
+    }
 
     if (gateDecisionSent) {
       return;
@@ -878,6 +952,28 @@ function rejectSuggestionAction(suggestionId) {
           }
         }
 
+        // Rollback — refresh body + version history
+        if (event.type === 'rollback') {
+          if (typeof window.loadEntity === 'function') window.loadEntity();
+          if (typeof window.refreshVersionHistory === 'function') window.refreshVersionHistory();
+        }
+
+        // Permission request from FO — show approval modal
+        if (event.type === 'permission_request' && event.detail) {
+          try {
+            var permData = JSON.parse(event.detail);
+            // Only show tool-level permission requests (prefixed "tool:")
+            if (permData.request_id && permData.request_id.startsWith('tool:') &&
+                typeof window.showPermissionModal === 'function') {
+              window.showPermissionModal(
+                permData.request_id,
+                permData.description || permData.tool_name,
+                permData.input_preview || ''
+              );
+            }
+          } catch (e) { /* malformed detail — ignore */ }
+        }
+
         // Browser notifications — fire for captain-attention events on this entity
         (function () {
           var N = window.SpacedockNotifications;
@@ -886,6 +982,8 @@ function rejectSuggestionAction(suggestionId) {
             gate: 'Gate awaiting approval',
             comment: 'FO comment',
             channel_response: 'FO reply',
+            rollback: 'Entity rolled back',
+            permission_request: 'FO permission request',
           };
           var title = detailTitles[event.type];
           if (!title) return;
@@ -1281,60 +1379,7 @@ function rejectSuggestionAction(suggestionId) {
 
   // --- Initialize ---
 
-  window.loadEntity = function () {
-    if (!entityPath) return;
-    apiFetch('/api/entity/detail?path=' + encodeURIComponent(entityPath))
-      .then(function (data) {
-        document.getElementById('entity-title').textContent = data.frontmatter.title || '(untitled)';
-        document.title = (data.frontmatter.title || 'Entity') + ' \u2014 Spacedock';
-        renderMetadata(data.frontmatter);
-        renderBody(data.body);
-        renderStageReports(data.stage_reports);
-        renderTags(data.tags);
-        initScore(data.frontmatter.score || '0');
-        if (typeof loadComments === 'function') loadComments();
-
-        // Fetch comments and apply highlights
-        apiFetch('/api/entity/comments?path=' + encodeURIComponent(entityPath))
-          .then(function (threadData) {
-            cachedComments = threadData.comments || [];
-            applyCommentHighlights(cachedComments);
-          });
-
-        var entityStatus = data.frontmatter.status;
-        if (workflowStages) {
-          updateGatePanel(entityStatus, workflowStages);
-          renderPhaseNav(workflowStages, data.stage_reports, entityStatus);
-        } else {
-          fetchWorkflowStages().then(function (stages) {
-            updateGatePanel(entityStatus, stages);
-            renderPhaseNav(stages, data.stage_reports, entityStatus);
-          });
-        }
-      });
-  };
-
   connectDetailWs();
-
-  if (entityPath) {
-    fetchWorkflowStages().then(function (stages) {
-      if (!stages) return;
-      apiFetch('/api/entity/detail?path=' + encodeURIComponent(entityPath))
-        .then(function (data) {
-          updateGatePanel(data.frontmatter.status, stages);
-          renderPhaseNav(stages, data.stage_reports, data.frontmatter.status);
-        });
-    });
-  }
-
-  // Apply highlights for already-loaded page (initial load used original loadEntity)
-  if (entityPath) {
-    apiFetch('/api/entity/comments?path=' + encodeURIComponent(entityPath))
-      .then(function (threadData) {
-        cachedComments = threadData.comments || [];
-        applyCommentHighlights(cachedComments);
-      });
-  }
 })();
 
 // --- Share Link Creation ---
@@ -1476,5 +1521,206 @@ function rejectSuggestionAction(suggestionId) {
   }
 
   loadShareLinks();
+})();
+
+// --- Rollback Modal ---
+(function initRollbackModal() {
+  var modal = document.getElementById('rollback-modal');
+  var confirmBtn = document.getElementById('rollback-confirm-btn');
+  var cancelBtn = document.getElementById('rollback-cancel-btn');
+  var sectionNameEl = modal ? modal.querySelector('.rollback-section-name') : null;
+  var versionInfoEl = modal ? modal.querySelector('.rollback-version-info') : null;
+  var warningEl = document.getElementById('rollback-warning');
+  var errorEl = document.getElementById('rollback-error');
+
+  if (!modal) return;
+
+  var pendingSection = null;
+  var pendingVersion = null;
+
+  window.showRollbackModal = function (sectionHeading, toVersion) {
+    pendingSection = sectionHeading;
+    pendingVersion = toVersion;
+    sectionNameEl.textContent = 'Section: ' + sectionHeading;
+    versionInfoEl.textContent = 'Restore to version ' + toVersion;
+    warningEl.style.display = 'none';
+    warningEl.textContent = '';
+    errorEl.style.display = 'none';
+    errorEl.textContent = '';
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Confirm Rollback';
+    modal.style.display = 'flex';
+  };
+
+  cancelBtn.addEventListener('click', function () {
+    modal.style.display = 'none';
+    pendingSection = null;
+    pendingVersion = null;
+  });
+
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) {
+      modal.style.display = 'none';
+      pendingSection = null;
+      pendingVersion = null;
+    }
+  });
+
+  confirmBtn.addEventListener('click', function () {
+    if (pendingSection == null || pendingVersion == null || entityPath == null) return;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Rolling back\u2026';
+    errorEl.style.display = 'none';
+
+    // Derive entity slug from entityPath
+    var slug = entityPath.replace(/\.md$/, '').split('/').pop();
+
+    apiFetch('/api/entity/rollback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        entity: slug,
+        path: entityPath,
+        section_heading: pendingSection,
+        to_version: pendingVersion,
+        author: 'captain',
+      }),
+    }).then(function (result) {
+      modal.style.display = 'none';
+      pendingSection = null;
+      pendingVersion = null;
+      // Show warning if conflict detected
+      if (result.warning) {
+        showToast('Rolled back. Warning: ' + result.warning, 'warn');
+      } else {
+        showToast('Section rolled back \u2192 v' + result.new_version, 'ok');
+      }
+      // Reload spec body
+      if (typeof window.loadEntity === 'function') window.loadEntity();
+      // Refresh version history if open
+      if (typeof window.refreshVersionHistory === 'function') window.refreshVersionHistory();
+    }).catch(function (err) {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Confirm Rollback';
+      errorEl.textContent = err.message || 'Rollback failed';
+      errorEl.style.display = '';
+    });
+  });
+})();
+
+// --- Permission Request Modal ---
+(function initPermissionModal() {
+  var modal = document.getElementById('permission-modal');
+  var allowBtn = document.getElementById('permission-allow-btn');
+  var denyBtn = document.getElementById('permission-deny-btn');
+  var descEl = document.getElementById('permission-description');
+  var diffEl = document.getElementById('permission-diff-preview');
+  var countdownEl = document.getElementById('permission-countdown');
+
+  if (!modal) return;
+
+  var pendingRequestId = null;
+  var countdownTimer = null;
+  var countdownSec = 0;
+
+  window.showPermissionModal = function (requestId, description, diffPreview) {
+    pendingRequestId = requestId;
+    descEl.textContent = description || '';
+
+    // Render diff preview using shared parseDiffHunks from version-history.js
+    while (diffEl.firstChild) diffEl.removeChild(diffEl.firstChild);
+    if (diffPreview) {
+      var parseHunks = typeof window.spacedock_parseDiffHunks === 'function'
+        ? window.spacedock_parseDiffHunks
+        : null;
+      var hunks = parseHunks ? parseHunks(diffPreview) : [];
+      hunks.forEach(function (hunk) {
+        var lineEl = document.createElement('div');
+        lineEl.style.padding = '0 0.75rem';
+        lineEl.style.lineHeight = '1.5';
+        if (hunk.type === 'add') {
+          lineEl.style.background = 'rgba(63,185,80,0.1)';
+          lineEl.style.color = '#3fb950';
+        } else if (hunk.type === 'del') {
+          lineEl.style.background = 'rgba(248,81,73,0.1)';
+          lineEl.style.color = '#f85149';
+        } else {
+          lineEl.style.color = '#8b949e';
+        }
+        lineEl.textContent = hunk.text || '\u00a0';
+        diffEl.appendChild(lineEl);
+      });
+    }
+
+    // 120s countdown
+    clearInterval(countdownTimer);
+    countdownSec = 120;
+    countdownEl.textContent = 'Auto-deny in ' + countdownSec + 's';
+    countdownTimer = setInterval(function () {
+      countdownSec--;
+      if (countdownSec <= 0) {
+        clearInterval(countdownTimer);
+        modal.style.display = 'none';
+        // Timeout — server already denied
+      } else {
+        countdownEl.textContent = 'Auto-deny in ' + countdownSec + 's';
+      }
+    }, 1000);
+
+    modal.style.display = 'flex';
+  };
+
+  function sendVerdict(verdict) {
+    clearInterval(countdownTimer);
+    modal.style.display = 'none';
+    if (!pendingRequestId) return;
+    fetch('/api/channel/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: verdict,
+        meta: { type: 'permission_response', request_id: pendingRequestId },
+      }),
+    }).catch(function () {});
+    pendingRequestId = null;
+  }
+
+  allowBtn.addEventListener('click', function () { sendVerdict('allow'); });
+  denyBtn.addEventListener('click', function () { sendVerdict('deny'); });
+
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) sendVerdict('deny');
+  });
+})();
+
+// --- Toast notification ---
+function showToast(message, type) {
+  var toast = document.createElement('div');
+  toast.className = 'toast toast-' + (type || 'ok');
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(function () {
+    toast.classList.add('toast-fade');
+    setTimeout(function () {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 400);
+  }, 3000);
+}
+
+// --- Mobile comments toggle ---
+(function initMobileComments() {
+  var toggleBtn = document.getElementById('comments-mobile-toggle');
+  var closeBtn = document.getElementById('comments-mobile-close');
+  var panel = document.querySelector('.detail-comments-panel');
+  if (!toggleBtn || !panel) return;
+
+  toggleBtn.addEventListener('click', function () {
+    panel.classList.add('open');
+  });
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function () {
+      panel.classList.remove('open');
+    });
+  }
 })();
 

@@ -241,6 +241,101 @@ describe("rejectSuggestion", () => {
   });
 });
 
+describe("resolveComment — resolved_reason and resolved_version (035 schema)", () => {
+  test("records resolved_reason when provided", () => {
+    const comment = addComment(ENTITY_PATH, {
+      selected_text: "first paragraph",
+      section_heading: "## Brainstorming Spec",
+      content: "Check this",
+    });
+    resolveComment(ENTITY_PATH, comment.id, { reason: "section_updated" });
+    const thread = getComments(ENTITY_PATH);
+    const resolved = thread.comments[0];
+    expect(resolved.resolved).toBe(true);
+    expect(resolved.resolved_reason).toBe("section_updated");
+    expect(resolved.resolved_version).toBeUndefined();
+  });
+
+  test("records resolved_version when provided", () => {
+    const comment = addComment(ENTITY_PATH, {
+      selected_text: "first paragraph",
+      section_heading: "## Brainstorming Spec",
+      content: "Check this",
+    });
+    resolveComment(ENTITY_PATH, comment.id, { reason: "section_updated", version: 3 });
+    const thread = getComments(ENTITY_PATH);
+    const resolved = thread.comments[0];
+    expect(resolved.resolved_reason).toBe("section_updated");
+    expect(resolved.resolved_version).toBe(3);
+  });
+
+  test("records manual reason when provided", () => {
+    const comment = addComment(ENTITY_PATH, {
+      selected_text: "first paragraph",
+      section_heading: "## Brainstorming Spec",
+      content: "Check this",
+    });
+    resolveComment(ENTITY_PATH, comment.id, { reason: "manual" });
+    const thread = getComments(ENTITY_PATH);
+    expect(thread.comments[0].resolved_reason).toBe("manual");
+  });
+
+  test("backward compat: resolves without opts (no reason/version set)", () => {
+    const comment = addComment(ENTITY_PATH, {
+      selected_text: "first paragraph",
+      section_heading: "## Brainstorming Spec",
+      content: "Check this",
+    });
+    resolveComment(ENTITY_PATH, comment.id);
+    const thread = getComments(ENTITY_PATH);
+    const resolved = thread.comments[0];
+    expect(resolved.resolved).toBe(true);
+    expect(resolved.resolved_reason).toBeUndefined();
+    expect(resolved.resolved_version).toBeUndefined();
+  });
+
+  test("backward compat: existing sidecar without resolved_reason loads correctly", () => {
+    // Simulate old sidecar format (no resolved_reason/resolved_version fields)
+    const oldSidecar = {
+      comments: [{
+        id: "old-c1",
+        entity_path: ENTITY_PATH,
+        selected_text: "old text",
+        section_heading: "## Brainstorming Spec",
+        content: "Old comment",
+        author: "captain",
+        timestamp: "2026-01-01T00:00:00Z",
+        resolved: true,
+        thread: [],
+        // NOTE: no resolved_reason or resolved_version
+      }],
+      suggestions: [],
+    };
+    const sidecarPath = ENTITY_PATH.replace(/\.md$/, ".comments.json");
+    writeFileSync(sidecarPath, JSON.stringify(oldSidecar));
+    const thread = getComments(ENTITY_PATH);
+    expect(thread.comments[0].resolved).toBe(true);
+    expect(thread.comments[0].resolved_reason).toBeUndefined();
+    expect(thread.comments[0].resolved_version).toBeUndefined();
+  });
+
+  test("round-trip: resolved_reason and resolved_version survive JSON sidecar write/read", () => {
+    const comment = addComment(ENTITY_PATH, {
+      selected_text: "criteria",
+      section_heading: "## Acceptance Criteria",
+      content: "Needs updating",
+    });
+    resolveComment(ENTITY_PATH, comment.id, { reason: "section_updated", version: 7 });
+
+    // Re-read from disk to verify round-trip
+    const sidecarPath = ENTITY_PATH.replace(/\.md$/, ".comments.json");
+    const raw = JSON.parse(readFileSync(sidecarPath, "utf-8"));
+    const saved = raw.comments[0];
+    expect(saved.resolved_reason).toBe("section_updated");
+    expect(saved.resolved_version).toBe(7);
+  });
+});
+
 describe("addReply", () => {
   test("appends reply to comment thread array", () => {
     const comment = addComment(ENTITY_PATH, {
