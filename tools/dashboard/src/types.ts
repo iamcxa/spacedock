@@ -122,6 +122,8 @@ export interface Comment {
   author: "captain" | "fo" | "guest";
   timestamp: string; // ISO 8601
   resolved: boolean;
+  resolved_reason?: string;   // e.g. "section_updated", "manual"
+  resolved_version?: number;  // snapshot version at time of auto-resolve
   thread: CommentReply[];
 }
 

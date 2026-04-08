@@ -378,7 +378,11 @@ export function createChannelServer(opts: ChannelServerOptions) {
           });
           workingText = replaceBody(workingText, newBody);
           writeFileSync(filepath, workingText);
-          const autoResolved = autoResolveComments(filepath, slug, new Set<string>());
+          // Body replace touches all sections — derive headings from new body so stale comments resolve
+          const newParsed = parseEntity(workingText);
+          const newSections = parseSections(newParsed.body);
+          const allHeadings = new Set(newSections.map((s) => normHeading(s.heading)));
+          const autoResolved = autoResolveComments(filepath, slug, allHeadings, snap.version);
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: autoResolved }) }] };
         }
 
@@ -427,7 +431,7 @@ export function createChannelServer(opts: ChannelServerOptions) {
             source: "update",
           });
           writeFileSync(filepath, workingText);
-          const autoResolved = autoResolveComments(filepath, slug, modifiedHeadings);
+          const autoResolved = autoResolveComments(filepath, slug, modifiedHeadings, snap.version);
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: autoResolved }) }] };
         }
 
@@ -462,13 +466,13 @@ export function createChannelServer(opts: ChannelServerOptions) {
   }
 
   // Auto-resolve comments whose section_heading matches any of the modified section headings.
-  function autoResolveComments(filepath: string, slug: string, modifiedHeadings: Set<string>): string[] {
+  function autoResolveComments(filepath: string, slug: string, modifiedHeadings: Set<string>, snapVersion?: number): string[] {
     const resolved: string[] = [];
     try {
       const thread = getComments(filepath);
       for (const comment of thread.comments) {
         if (!comment.resolved && modifiedHeadings.has(normHeading(comment.section_heading))) {
-          resolveComment(filepath, comment.id);
+          resolveComment(filepath, comment.id, { reason: "section_updated", version: snapVersion });
           resolved.push(comment.id);
           dashboard.publishEvent({
             type: "comment",
@@ -552,7 +556,7 @@ if (import.meta.main) {
 
   // Write channel state file so ctl.sh can detect this instance
   const stateDir = computeStateDir(projectRoot);
-  writeChannelState(stateDir, dashboard.port);
+  writeChannelState(stateDir, dashboard.port!);
 
   // Clean up state file on exit (graceful)
   const cleanup = () => {
