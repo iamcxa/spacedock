@@ -347,6 +347,17 @@ export function findSectionByHeading(
 }
 
 /**
+ * Remove a section entirely from a markdown document.
+ * Both the heading line and all body lines up to `section.end` are deleted.
+ */
+export function removeSection(body: string, section: ParsedSection): string {
+  const lines = body.split("\n");
+  const before = lines.slice(0, section.start);
+  const after = lines.slice(section.end);
+  return [...before, ...after].join("\n");
+}
+
+/**
  * Replace a section's body in a markdown document. The heading line at
  * `section.start` is preserved; lines between the heading and the section
  * end are replaced with `newSectionBody` (split on \n).

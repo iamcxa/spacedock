@@ -24,7 +24,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { resolveEntity } from "./entity-resolver";
 import { getComments, addComment, addReply, resolveComment } from "./comments";
-import { parseSections, findSectionByHeading, replaceSection } from "./snapshots";
+import { parseSections, findSectionByHeading, replaceSection, removeSection } from "./snapshots";
 import { parseEntity, updateFrontmatterFields, replaceBody } from "./frontmatter-io";
 import { createPatch } from "diff";
 
@@ -51,6 +51,8 @@ interface ChannelServerOptions {
   staticDir?: string;
   logFile?: string;
   dbPath?: string;
+  /** Override permission request timeout (ms). Default 120_000. Used in tests. */
+  permissionTimeoutMs?: number;
 }
 
 export function createChannelServer(opts: ChannelServerOptions) {
@@ -92,16 +94,21 @@ export function createChannelServer(opts: ChannelServerOptions) {
     onChannelMessage: async (content, meta) => {
       try {
         if (meta?.type === "permission_response" && meta?.request_id) {
-          const pending = pendingPermissions.get(meta.request_id);
-          if (pending) {
-            // Tool-level permission: resolve the waiting promise
-            clearTimeout(pending.timer);
-            pendingPermissions.delete(meta.request_id);
-            pending.resolve(content === "allow");
+          const reqId = meta.request_id;
+          if (reqId.startsWith("tool:")) {
+            // Tool-level permission (application gate) — resolve waiting promise if still pending.
+            // If timed out already, the entry is gone; silently ignore the late response.
+            const pending = pendingPermissions.get(reqId);
+            if (pending) {
+              clearTimeout(pending.timer);
+              pendingPermissions.delete(reqId);
+              pending.resolve(content === "allow");
+            }
+            // else: timed out already — ignore, do NOT fall through to sendPermissionVerdict
           } else {
             // System-level permission (Claude Code tool approval)
             const behavior = content === "allow" ? "allow" : "deny";
-            await sendPermissionVerdict(meta.request_id, behavior as "allow" | "deny");
+            await sendPermissionVerdict(reqId, behavior as "allow" | "deny");
           }
         } else {
           // Forward message to FO session via MCP channel notification
@@ -120,9 +127,10 @@ export function createChannelServer(opts: ChannelServerOptions) {
     toolName: string,
     description: string,
     diffPreview: string,
-    timeoutMs = 120_000,
+    timeoutMs = opts.permissionTimeoutMs ?? 120_000,
   ): Promise<boolean> {
-    const requestId = randomUUID();
+    // Prefix with "tool:" so timed-out IDs can be distinguished from system-level IDs
+    const requestId = "tool:" + randomUUID();
     dashboard.publishEvent({
       type: "permission_request",
       entity: "",
@@ -227,8 +235,8 @@ export function createChannelServer(opts: ChannelServerOptions) {
               workflow: { type: "string", description: "Optional workflow dir basename to disambiguate" },
               frontmatter: {
                 type: "object",
-                description: "Partial frontmatter fields to merge (Mode A)",
-                additionalProperties: { type: "string" },
+                description: "Partial frontmatter fields to merge (Mode A). Values are coerced to strings when written.",
+                additionalProperties: true,
               },
               body: { type: "string", description: "Full replacement body (Mode B, requires permission)" },
               sections: {
@@ -297,13 +305,6 @@ export function createChannelServer(opts: ChannelServerOptions) {
           timestamp: new Date().toISOString(),
           detail: comment.content,
         });
-        if (opts.onChannelMessage) {
-          opts.onChannelMessage(comment.content, {
-            type: "comment_added",
-            entity: slug,
-            comment_id: comment.id,
-          });
-        }
         return { content: [{ type: "text", text: JSON.stringify(comment) }] };
       } catch (err) {
         return { content: [{ type: "text", text: (err as Error).message }], isError: true };
@@ -366,17 +367,17 @@ export function createChannelServer(opts: ChannelServerOptions) {
           if (!allowed) {
             return { content: [{ type: "text", text: "Permission denied or timed out" }], isError: true };
           }
-          workingText = replaceBody(workingText, newBody);
-          writeFileSync(filepath, workingText);
-          const reParsed = parseEntity(workingText);
+          // C1: snapshot PRE-write state for rollback
           const snap = dashboard.snapshotStore.createSnapshot({
             entity: slug,
-            body: reParsed.body,
-            frontmatter: reParsed.frontmatter,
+            body: parsed.body,
+            frontmatter: parsed.frontmatter,
             author: "fo",
-            reason,
+            reason: `pre-update: ${reason}`,
             source: "update",
           });
+          workingText = replaceBody(workingText, newBody);
+          writeFileSync(filepath, workingText);
           const autoResolved = autoResolveComments(filepath, slug, new Set<string>());
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: autoResolved }) }] };
         }
@@ -396,15 +397,14 @@ export function createChannelServer(opts: ChannelServerOptions) {
             }
 
             if (op.action === "remove") {
-              const diffPreview = `Remove section: ${section.heading}`;
+              // W3: meaningful diff preview showing what will be removed
+              const sectionLines = currentParsed.body.split("\n").slice(section.start, section.end).join("\n");
+              const diffPreview = createPatch(section.heading, sectionLines, "", "current", "removed");
               const allowed = await requestPermissionAndWait("update_entity", `Remove section "${section.heading}" from ${slug}`, diffPreview);
               if (!allowed) {
                 return { content: [{ type: "text", text: `Permission denied or timed out for section remove: ${section.heading}` }], isError: true };
               }
-              // Remove by rebuilding body without the section lines
-              const lines = currentParsed.body.split("\n");
-              const newBodyLines = [...lines.slice(0, section.start), ...lines.slice(section.end)];
-              workingText = replaceBody(workingText, newBodyLines.join("\n"));
+              workingText = replaceBody(workingText, removeSection(currentParsed.body, section));
             } else if (op.action === "replace") {
               const newBody = replaceSection(currentParsed.body, section, op.content ?? "");
               workingText = replaceBody(workingText, newBody);
@@ -413,35 +413,36 @@ export function createChannelServer(opts: ChannelServerOptions) {
               const newBody = replaceSection(currentParsed.body, section, appended);
               workingText = replaceBody(workingText, newBody);
             }
-            modifiedHeadings.add(section.heading);
+            // W2: normalize heading for auto-resolve matching
+            modifiedHeadings.add(normHeading(section.heading));
           }
 
-          writeFileSync(filepath, workingText);
-          const finalParsed = parseEntity(workingText);
+          // C1: snapshot PRE-write state for rollback
           const snap = dashboard.snapshotStore.createSnapshot({
             entity: slug,
-            body: finalParsed.body,
-            frontmatter: finalParsed.frontmatter,
+            body: parsed.body,
+            frontmatter: parsed.frontmatter,
             author: "fo",
-            reason,
+            reason: `pre-update: ${reason}`,
             source: "update",
           });
+          writeFileSync(filepath, workingText);
           const autoResolved = autoResolveComments(filepath, slug, modifiedHeadings);
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: autoResolved }) }] };
         }
 
         // Mode A only (frontmatter with no body/sections)
         if (hasFrontmatter) {
-          writeFileSync(filepath, workingText);
-          const reParsed = parseEntity(workingText);
+          // C1: snapshot PRE-write state for rollback
           const snap = dashboard.snapshotStore.createSnapshot({
             entity: slug,
-            body: reParsed.body,
-            frontmatter: reParsed.frontmatter,
+            body: parsed.body,
+            frontmatter: parsed.frontmatter,
             author: "fo",
-            reason,
+            reason: `pre-update: ${reason}`,
             source: "update",
           });
+          writeFileSync(filepath, workingText);
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: [] }) }] };
         }
 
@@ -454,13 +455,19 @@ export function createChannelServer(opts: ChannelServerOptions) {
     return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true };
   });
 
+  // Normalize a heading string for comparison: strip ATX prefix and lowercase.
+  // parseSections() returns "## Spec"; comments store "Spec" — both normalize to "spec".
+  function normHeading(h: string): string {
+    return h.replace(/^#+\s*/, "").trim().toLowerCase();
+  }
+
   // Auto-resolve comments whose section_heading matches any of the modified section headings.
   function autoResolveComments(filepath: string, slug: string, modifiedHeadings: Set<string>): string[] {
     const resolved: string[] = [];
     try {
       const thread = getComments(filepath);
       for (const comment of thread.comments) {
-        if (!comment.resolved && modifiedHeadings.has(comment.section_heading)) {
+        if (!comment.resolved && modifiedHeadings.has(normHeading(comment.section_heading))) {
           resolveComment(filepath, comment.id);
           resolved.push(comment.id);
           dashboard.publishEvent({
