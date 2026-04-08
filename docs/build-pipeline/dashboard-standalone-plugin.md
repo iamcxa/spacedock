@@ -20,13 +20,19 @@ project: spacedock
 - **Requires feature 007 completed** — channel plugin implementation (channel.ts, MCP capabilities, conversation UI)
 - Spacedock plugin system (plugin.json, .mcp.json, marketplace publishing)
 
-## Brainstorming Spec
+## 🧠 Brainstorming Spec 📝
 
 APPROACH:     Extract the dashboard (tools/dashboard/) into its own standalone Claude Code plugin, separate from the spacedock core plugin. The dashboard plugin has its own plugin.json, .mcp.json (with channel server registration), and npm dependencies (@modelcontextprotocol/sdk). Users install it independently and enable it with `--channels plugin:spacedock-dashboard`. This decouples the dashboard lifecycle from the spacedock workflow engine.
 ALTERNATIVE:  Keep dashboard inside spacedock plugin and add tools/dashboard/ to the plugin distribution (rejected: spacedock core is stdlib-only Python/scripts, dashboard is Bun/TypeScript with npm deps — mixing runtimes in one plugin creates install complexity and bloats the core plugin)
 GUARDRAILS:   Dashboard plugin must work with any spacedock workflow, not just build-pipeline. Plugin packaging must handle npm dependencies (bun install step). Channel server registration via .mcp.json must use ${CLAUDE_PLUGIN_ROOT} for portable paths. Must work as both marketplace plugin and local plugin.
 RATIONALE:    Clean separation of concerns — spacedock core handles workflow orchestration (agents, stages, entities), dashboard handles visualization and interactive control (web UI, channels). Different runtimes (Python vs Bun), different dependency models (stdlib vs npm), different release cadences. Similar to how fakechat is a separate plugin from Claude Code core.
 
+
+
+🚀 Key Goal: Clean separation of concerns — spacedock core handles workflow orchestration (agents, stages, entities), dashboard handles visualization and interactive control (web UI, channels). 📦 Different runtimes (Python vs Bun), different dependency models (stdlib vs npm), different release cadences. 🔌 Similar to how fakechat is a separate plugin from Claude Code core.
+
+
+✅ Rollback test marker — this text was appended by FO via MCP update_entity at 2026-04-09 03:03. If you see this after rollback, the rollback didn't work. If this is gone, rollback succeeded.
 ## Affected Files
 
 ### Layer: Dashboard Source (tools/dashboard/) — moves to plugin root

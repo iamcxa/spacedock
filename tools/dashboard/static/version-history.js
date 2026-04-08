@@ -184,13 +184,12 @@
   // --- Version selection logic ---
   function selectVersion(version) {
     if (toVersion === null) {
-      toVersion = version;
+      // Compare selected version against latest (most intuitive for single click)
+      var latestVersion = versions[0].version;
+      fromVersion = version;
+      toVersion = latestVersion;
       highlightSelected();
-      // Auto-select next older version as fromVersion
-      var idx = versions.findIndex(function (v) { return v.version === version; });
-      if (idx < versions.length - 1) {
-        fromVersion = versions[idx + 1].version;
-        highlightSelected();
+      if (fromVersion !== toVersion) {
         loadDiff(fromVersion, toVersion);
       }
       return;
@@ -293,12 +292,13 @@
     }
 
     sections.forEach(function (section) {
-      container.appendChild(renderDiffSection(section, to));
+      container.appendChild(renderDiffSection(section, from, to));
     });
   }
 
   // --- Render a single section diff ---
-  function renderDiffSection(section, targetVersion) {
+  // rollbackVersion = older version to restore to; currentVersion = newer version for labels
+  function renderDiffSection(section, rollbackVersion, currentVersion) {
     var el = document.createElement('div');
     el.className = 'diff-section diff-section-' + section.status;
 
@@ -349,13 +349,13 @@
       // Rollback button for the "to" version's state
       var rollbackBtn = document.createElement('button');
       rollbackBtn.className = 'btn btn-small rollback-btn';
-      rollbackBtn.textContent = '\u23EA Rollback to v' + targetVersion;
+      rollbackBtn.textContent = '\u23EA Rollback to v' + rollbackVersion;
       rollbackBtn.setAttribute('data-section', section.heading);
-      rollbackBtn.setAttribute('data-version', String(targetVersion));
+      rollbackBtn.setAttribute('data-version', String(rollbackVersion));
       rollbackBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         if (typeof window.showRollbackModal === 'function') {
-          window.showRollbackModal(section.heading, targetVersion);
+          window.showRollbackModal(section.heading, rollbackVersion);
         }
       });
       el.appendChild(rollbackBtn);
@@ -364,14 +364,14 @@
     if (section.status === 'added') {
       var addedNote = document.createElement('div');
       addedNote.className = 'diff-added-note';
-      addedNote.textContent = '(new section in v' + targetVersion + ')';
+      addedNote.textContent = '(new section in v' + currentVersion + ')';
       el.appendChild(addedNote);
     }
 
     if (section.status === 'removed') {
       var removedNote = document.createElement('div');
       removedNote.className = 'diff-removed-note';
-      removedNote.textContent = '(section removed in v' + targetVersion + ')';
+      removedNote.textContent = '(section removed in v' + currentVersion + ')';
       el.appendChild(removedNote);
     }
 

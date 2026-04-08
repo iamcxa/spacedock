@@ -38,6 +38,25 @@ export function writeChannelState(stateDir: string, port: number): void {
   writeFileSync(join(stateDir, "channel_port"), String(port) + "\n");
 }
 
+/**
+ * Bridge cross-instance WS gap: forward an event to the ctl server (HTTP dashboard)
+ * so its WebSocket subscribers see it in real-time. Best effort — never blocks/throws.
+ */
+function forwardToCtlServer(event: AgentEvent, stateDir: string): void {
+  try {
+    const portFile = join(stateDir, "port");
+    if (!existsSync(portFile)) return;
+    const ctlPort = readFileSync(portFile, "utf-8").trim();
+    fetch(`http://127.0.0.1:${ctlPort}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(event),
+    }).catch(() => {}); // fire-and-forget
+  } catch {
+    // best effort
+  }
+}
+
 export function cleanChannelState(stateDir: string): void {
   const portFile = join(stateDir, "channel_port");
   if (existsSync(portFile)) {
@@ -297,14 +316,16 @@ export function createChannelServer(opts: ChannelServerOptions) {
           content: args.content as string,
           author: "fo",
         });
-        dashboard.publishEvent({
+        const commentEvent: AgentEvent = {
           type: "comment",
           entity: slug,
           stage: "",
           agent: "fo",
           timestamp: new Date().toISOString(),
           detail: comment.content,
-        });
+        };
+        dashboard.publishEvent(commentEvent);
+        forwardToCtlServer(commentEvent, computeStateDir(opts.projectRoot));
         return { content: [{ type: "text", text: JSON.stringify(comment) }] };
       } catch (err) {
         return { content: [{ type: "text", text: (err as Error).message }], isError: true };
@@ -323,14 +344,16 @@ export function createChannelServer(opts: ChannelServerOptions) {
         if (resolved) {
           resolveComment(filepath, args.comment_id as string);
         }
-        dashboard.publishEvent({
+        const replyEvent: AgentEvent = {
           type: "comment",
           entity: slug,
           stage: "",
           agent: "fo",
           timestamp: new Date().toISOString(),
           detail: reply.content,
-        });
+        };
+        dashboard.publishEvent(replyEvent);
+        forwardToCtlServer(replyEvent, computeStateDir(opts.projectRoot));
         return { content: [{ type: "text", text: JSON.stringify({ reply, resolved }) }] };
       } catch (err) {
         return { content: [{ type: "text", text: (err as Error).message }], isError: true };
@@ -383,6 +406,9 @@ export function createChannelServer(opts: ChannelServerOptions) {
           const newSections = parseSections(newParsed.body);
           const allHeadings = new Set(newSections.map((s) => normHeading(s.heading)));
           const autoResolved = autoResolveComments(filepath, slug, allHeadings, snap.version);
+          const bodyEvent: AgentEvent = { type: "entity_update" as any, entity: slug, stage: "", agent: "fo", timestamp: new Date().toISOString(), detail: `body replaced: ${reason}` };
+          dashboard.publishEvent(bodyEvent);
+          forwardToCtlServer(bodyEvent, computeStateDir(opts.projectRoot));
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: autoResolved }) }] };
         }
 
@@ -432,6 +458,9 @@ export function createChannelServer(opts: ChannelServerOptions) {
           });
           writeFileSync(filepath, workingText);
           const autoResolved = autoResolveComments(filepath, slug, modifiedHeadings, snap.version);
+          const secEvent: AgentEvent = { type: "entity_update" as any, entity: slug, stage: "", agent: "fo", timestamp: new Date().toISOString(), detail: `sections updated: ${reason}` };
+          dashboard.publishEvent(secEvent);
+          forwardToCtlServer(secEvent, computeStateDir(opts.projectRoot));
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: autoResolved }) }] };
         }
 
@@ -447,6 +476,9 @@ export function createChannelServer(opts: ChannelServerOptions) {
             source: "update",
           });
           writeFileSync(filepath, workingText);
+          const fmEvent: AgentEvent = { type: "entity_update" as any, entity: slug, stage: "", agent: "fo", timestamp: new Date().toISOString(), detail: `frontmatter updated: ${reason}` };
+          dashboard.publishEvent(fmEvent);
+          forwardToCtlServer(fmEvent, computeStateDir(opts.projectRoot));
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: [] }) }] };
         }
 

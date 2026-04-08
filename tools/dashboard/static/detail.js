@@ -273,25 +273,19 @@ function loadEntity() {
             renderStageReports(data.stage_reports);
             renderTags(data.tags);
             initScore(data.frontmatter.score || '0');
+            // loadComments fetches + renders sidebar + dispatches 'comments-loaded'
+            // event which triggers applyCommentHighlights inside the IIFE scope.
             if (typeof loadComments === 'function') loadComments();
 
-            // Fetch comments and apply highlights
-            apiFetch('/api/entity/comments?path=' + encodeURIComponent(entityPath))
-              .then(function (threadData) {
-                cachedComments = threadData.comments || [];
-                applyCommentHighlights(cachedComments);
-              });
-
-            var entityStatus = data.frontmatter.status;
-            if (workflowStages) {
-              updateGatePanel(entityStatus, workflowStages);
-              renderPhaseNav(workflowStages, data.stage_reports, entityStatus);
-            } else {
-              fetchWorkflowStages().then(function (stages) {
-                updateGatePanel(entityStatus, stages);
-                renderPhaseNav(stages, data.stage_reports, entityStatus);
-              });
-            }
+            // Dispatch entity-loaded event so IIFE-scoped gate/phase-nav logic can run.
+            // workflowStages, fetchWorkflowStages, updateGatePanel, renderPhaseNav
+            // are all inside initGateReview IIFE — global loadEntity can't call them directly.
+            document.dispatchEvent(new CustomEvent('entity-loaded', {
+                detail: {
+                    entityStatus: data.frontmatter.status,
+                    stageReports: data.stage_reports
+                }
+            }));
         });
 }
 
@@ -347,7 +341,9 @@ function getSelectionContext(range) {
     return '## ' + heading;
 }
 
-document.getElementById('entity-body').addEventListener('mouseup', function () {
+document.getElementById('entity-body').addEventListener('mouseup', function (e) {
+    // Don't trigger new-comment tooltip when selecting inside popover or comment panel
+    if (e.target.closest('.comment-popover') || e.target.closest('.comment-card')) return;
     var sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;
     var selectedText = sel.toString().trim();
@@ -449,6 +445,12 @@ function loadComments() {
     apiFetch('/api/entity/comments?path=' + encodeURIComponent(entityPath))
         .then(function (thread) {
             renderComments(thread);
+            // Dispatch event so IIFE-scoped highlight logic can apply marks.
+            // loadComments is global; applyCommentHighlights is IIFE-scoped —
+            // CustomEvent bridges the scope boundary.
+            document.dispatchEvent(new CustomEvent('comments-loaded', {
+                detail: { comments: thread.comments || [] }
+            }));
         });
 }
 
@@ -719,7 +721,7 @@ function rejectSuggestionAction(suggestionId) {
       for (var i = 0; i < workflows.length; i++) {
         var wf = workflows[i];
         for (var j = 0; j < wf.entities.length; j++) {
-          if (wf.entities[j].path === entityPath) {
+          if (wf.entities[j].path === entityPath || wf.entities[j].path.endsWith('/' + entityPath)) {
             workflowStages = wf.stages;
             return wf.stages;
           }
@@ -875,6 +877,41 @@ function rejectSuggestionAction(suggestionId) {
 
   var cachedComments = null;
 
+  // Bridge global → IIFE scope: loadComments() dispatches this event
+  // after fetching comment data, so we can apply highlights here.
+  document.addEventListener('comments-loaded', function (e) {
+    var reopenIds = activePopoverIds; // save before highlight re-apply destroys marks
+    cachedComments = e.detail.comments;
+    applyCommentHighlights(cachedComments);
+    // Re-open popover if it was active (marks were recreated by applyCommentHighlights)
+    if (reopenIds && cachedComments) {
+      hideCommentPopover();
+      var marks = document.querySelectorAll('.comment-highlight');
+      for (var i = 0; i < marks.length; i++) {
+        if (marks[i].getAttribute('data-comment-ids') === reopenIds) {
+          showCommentPopover(marks[i], cachedComments);
+          break;
+        }
+      }
+    }
+  });
+
+  // Bridge global → IIFE scope: loadEntity() dispatches this event
+  // so gate panel and phase nav can update (they live in this IIFE).
+  document.addEventListener('entity-loaded', function (e) {
+    var entityStatus = e.detail.entityStatus;
+    var stageReports = e.detail.stageReports;
+    if (workflowStages) {
+      updateGatePanel(entityStatus, workflowStages);
+      renderPhaseNav(workflowStages, stageReports, entityStatus);
+    } else {
+      fetchWorkflowStages().then(function (stages) {
+        updateGatePanel(entityStatus, stages);
+        renderPhaseNav(stages, stageReports, entityStatus);
+      });
+    }
+  });
+
   var detailWs = null;
   var detailRetryCount = 0;
   var detailMaxRetries = 10;
@@ -917,6 +954,14 @@ function rejectSuggestionAction(suggestionId) {
         // Realtime comment updates — reload comments when any comment event arrives
         if (event.type === 'comment' && typeof loadComments === 'function') {
           loadComments();
+        }
+
+        // Realtime entity updates — reload entity when MCP update_entity modifies it
+        if (event.type === 'entity_update') {
+          var currentSlug = entityPath ? entityPath.replace(/\.md$/, '').split('/').pop() : '';
+          if (event.entity === currentSlug && typeof window.loadEntity === 'function') {
+            window.loadEntity();
+          }
         }
 
         // Channel response (FO reply) — render directly as a transient FO message.
@@ -1123,10 +1168,12 @@ function rejectSuggestionAction(suggestionId) {
   // --- Comment Popover ---
 
   var activePopover = null;
+  var activePopoverIds = null; // track which comment IDs the popover shows
 
   function showCommentPopover(mark, comments) {
     hideCommentPopover();
     var ids = (mark.getAttribute('data-comment-ids') || '').split(',');
+    activePopoverIds = ids.join(',');
     var matching = comments.filter(function (c) { return ids.indexOf(c.id) !== -1; });
     if (!matching.length) return;
 
@@ -1228,6 +1275,7 @@ function rejectSuggestionAction(suggestionId) {
       activePopover.parentNode.removeChild(activePopover);
     }
     activePopover = null;
+    activePopoverIds = null;
     document.removeEventListener('click', handlePopoverOutsideClick);
   }
 
@@ -1247,9 +1295,16 @@ function rejectSuggestionAction(suggestionId) {
         content: content,
       }),
     }).then(function () {
-      hideCommentPopover();
+      // Clear input — popover stays open and will be refreshed with server
+      // data when loadComments triggers the 'comments-loaded' event.
+      if (activePopover) {
+        var input = activePopover.querySelector('.popover-reply-input');
+        if (input) { input.value = ''; input.disabled = true; }
+        var btn = activePopover.querySelector('.popover-reply-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Sent'; }
+      }
+      // Refresh sidebar + highlights + re-open popover with server data
       if (typeof loadComments === 'function') loadComments();
-      window.loadEntity();
     });
   }
 
@@ -1279,27 +1334,40 @@ function rejectSuggestionAction(suggestionId) {
       }
     }
 
+    // Find current stage index for sequence-aware rendering:
+    // stages before current = completed (even without reports),
+    // stages after current = future (faded/disabled).
+    var currentIdx = -1;
+    for (var i = 0; i < stages.length; i++) {
+      if (stages[i].name === entityStatus) {
+        currentIdx = i;
+        break;
+      }
+    }
+
     while (list.firstChild) list.removeChild(list.firstChild);
 
     for (var i = 0; i < stages.length; i++) {
       var stage = stages[i];
       var isCurrent = stage.name === entityStatus;
       var isCompleted = !!completedStages[stage.name];
+      var isPast = currentIdx >= 0 && i < currentIdx;
+      var isFuture = currentIdx >= 0 && i > currentIdx;
       var isGate = !!stage.gate;
 
-      // Determine status: completed > current > gate (pending) > pending
+      // Priority: completed/past > current > future (faded)
       var icon, statusClass;
-      if (isCompleted) {
+      if (isCompleted || isPast) {
         icon = '\u2705'; // check mark
         statusClass = 'completed';
       } else if (isCurrent) {
         icon = '\uD83D\uDD35'; // blue circle
         statusClass = 'current';
-      } else if (isGate) {
-        icon = '\uD83D\uDD36'; // orange diamond
-        statusClass = 'gate';
+      } else if (isFuture) {
+        icon = isGate ? '\uD83D\uDD36' : '\u2B1C';
+        statusClass = 'future' + (isGate ? ' gate' : '');
       } else {
-        icon = '\u2B1C'; // white square
+        icon = isGate ? '\uD83D\uDD36' : '\u2B1C';
         statusClass = 'pending';
       }
 
@@ -1317,7 +1385,8 @@ function rejectSuggestionAction(suggestionId) {
       label.textContent = stage.name;
       li.appendChild(label);
 
-      // Click handler: scroll to corresponding stage report card
+      // Click handler: scroll to corresponding stage report card (skip for future stages)
+      if (!isFuture) {
       (function (stageName) {
         li.addEventListener('click', function () {
           // Find matching stage-report-card by heading text
@@ -1340,6 +1409,7 @@ function rejectSuggestionAction(suggestionId) {
           }
         });
       })(stage.name);
+      } // end if (!isFuture)
 
       list.appendChild(li);
     }

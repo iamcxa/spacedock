@@ -937,6 +937,16 @@ details[open] .accordion-summary::before {
     color: #f0883e;
 }
 
+.phase-nav-item.future {
+    opacity: 0.35;
+    cursor: default;
+    pointer-events: none;
+}
+
+.phase-nav-item.future.gate {
+    opacity: 0.45;
+}
+
 .phase-nav-icon {
     flex-shrink: 0;
     width: 1.2em;
