@@ -13,7 +13,7 @@ This file captures the shared first-officer semantics. Keep it aligned with `age
 3. Read `{workflow_dir}/README.md` to extract:
    - mission
    - entity labels
-   - stage ordering and defaults from `stages.defaults` / `stages.states`
+   - stage ordering, defaults, and **profile definitions** from `stages.profiles` / `stages.defaults` / `stages.states`
    - stage properties such as `initial`, `terminal`, `gate`, `worktree`, `concurrency`, `feedback-to`, and `agent`
 4. Discover mod hooks by scanning `{workflow_dir}/_mods/*.md` for `## Hook:` sections. Register `startup`, `idle`, and `merge` hooks in alphabetical order by mod filename.
 5. Run startup hooks before normal dispatch.

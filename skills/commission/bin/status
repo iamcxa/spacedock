@@ -395,8 +395,6 @@ def print_next_table(entities, stages, profiles):
         profile_label = e.get('profile', '') or '(none)'
         if is_fo_inline:
             dispatch_label = '(FO inline)'
-        elif not e.get('profile', '').strip() and status != stage.get('name', ''):
-            dispatch_label = '(needs profile)'
         elif not e.get('profile', '').strip():
             dispatch_label = '(needs profile)'
         else:
