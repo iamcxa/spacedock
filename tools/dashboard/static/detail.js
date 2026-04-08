@@ -845,9 +845,37 @@ function rejectSuggestionAction(suggestionId) {
           loadComments();
         }
 
-        // Channel response (FO reply) — reload comments to show FO replies in thread
-        if (event.type === 'channel_response' && typeof loadComments === 'function') {
-          loadComments();
+        // Channel response (FO reply) — render directly as a transient FO message.
+        // FO replies are not persisted as comments; they're inserted at the top
+        // of the comment thread container so the captain sees them immediately.
+        if (event.type === 'channel_response' && event.detail) {
+          var foContainer = document.getElementById('comment-threads');
+          if (foContainer) {
+            var foDiv = document.createElement('div');
+            foDiv.className = 'comment-card fo-channel-message';
+
+            var foHeader = document.createElement('div');
+            foHeader.className = 'fo-channel-header';
+
+            var foBadge = document.createElement('span');
+            foBadge.className = 'fo-badge';
+            foBadge.textContent = 'FO';
+            foHeader.appendChild(foBadge);
+
+            var foTime = document.createElement('span');
+            foTime.className = 'comment-meta';
+            foTime.textContent = new Date(event.timestamp || Date.now()).toLocaleString();
+            foHeader.appendChild(foTime);
+
+            foDiv.appendChild(foHeader);
+
+            var foBody = document.createElement('div');
+            foBody.className = 'comment-content';
+            foBody.textContent = event.detail;
+            foDiv.appendChild(foBody);
+
+            foContainer.insertBefore(foDiv, foContainer.firstChild);
+          }
         }
       }
     };
