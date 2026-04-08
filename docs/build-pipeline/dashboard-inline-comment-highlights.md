@@ -7,7 +7,7 @@ started: 2026-04-06T13:10:00Z
 completed: 2026-04-06T17:30:00Z
 verdict: PASSED
 score: 0.85
-worktree: .worktrees/spacedock-ensign-dashboard-inline-comment-highlights
+worktree:
 issue:
 pr: "iamcxa/spacedock#9"
 intent: feature
