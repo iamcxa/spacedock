@@ -1,7 +1,7 @@
 ---
 id: 042
 title: Dashboard — Entity Activity Feed + Chat Input
-status: plan
+status: execute
 profile: standard
 source: 035 plan scope triage — deferred from dashboard-collaboration-ui
 started: 2026-04-09T03:30:00Z
