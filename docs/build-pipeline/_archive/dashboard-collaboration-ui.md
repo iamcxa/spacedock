@@ -1,11 +1,11 @@
 ---
 id: 035
 title: Dashboard Collaboration UI — Entity Detail Review + Version History
-status: pr-draft
+status: shipped
 source: spec 2026-04-08-pipeline-brainstorm-profiles-design.md (WP5)
 started: 2026-04-09
-completed:
-verdict:
+completed: 2026-04-09
+verdict: APPROVED — 1 feedback round (5 warnings fixed: loadEntity dedup, body-mode auto-resolve, parseDiffHunks share, falsy guards, PR body)
 score: 0.8
 worktree: .worktrees/spacedock-ensign-dashboard-collaboration-ui
 issue:
