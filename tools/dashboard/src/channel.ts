@@ -50,6 +50,7 @@ interface ChannelServerOptions {
   projectRoot: string;
   staticDir?: string;
   logFile?: string;
+  dbPath?: string;
 }
 
 export function createChannelServer(opts: ChannelServerOptions) {
@@ -87,6 +88,7 @@ export function createChannelServer(opts: ChannelServerOptions) {
     projectRoot: opts.projectRoot,
     staticDir: opts.staticDir,
     logFile: opts.logFile,
+    dbPath: opts.dbPath,
     onChannelMessage: async (content, meta) => {
       try {
         if (meta?.type === "permission_response" && meta?.request_id) {
