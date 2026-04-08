@@ -8,7 +8,7 @@ started: 2026-04-09T03:30:00Z
 completed:
 verdict:
 score: 0.0
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-activity-feed
 issue:
 pr:
 intent: feature
