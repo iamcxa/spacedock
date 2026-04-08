@@ -573,3 +573,124 @@ Permission test 策略：`requestPermissionAndWait` 需要能在測試中快速 
 
 ### Estimated Commits：11 個
 
+
+## Stage Report (quality)
+
+### 1. Test Suite
+
+```
+bun test — 156 pass, 0 fail, 399 expect() calls, 12 files, 1.59s
+```
+
+No flaky tests observed across 3 consecutive runs.
+
+**New test files added this entity**:
+- `entity-resolver.test.ts` — 7 tests (slug resolution, ambiguity, workflow filter)
+- `channel.test.ts` — 11 tests (server creation, events, comments, snapshots, permission routing, entity resolution errors)
+
+---
+
+### 2. MCP Tool inputSchema Review
+
+| Tool | required | optional | Schema correct? |
+|------|----------|----------|-----------------|
+| `reply` | `content` | `entity` | PASS |
+| `get_comments` | `entity` | `workflow` | PASS |
+| `add_comment` | `entity`, `content` | `section_heading`, `workflow` | PASS |
+| `reply_to_comment` | `entity`, `comment_id`, `content` | `resolve`, `workflow` | PASS |
+| `update_entity` | `entity`, `reason` | `workflow`, `frontmatter`, `body`, `sections` | PASS |
+
+**Error handling verified** (channel.ts lines 272–451):
+- Missing entity slug → `resolveEntity` throws "Entity not found: <slug>", returned as `isError: true`
+- Ambiguous slug → "Ambiguous entity slug" error, returned as `isError: true`
+- Invalid section heading → `findSectionByHeading` returns null → "Section not found: <heading>", returned as `isError: true`
+- Ambiguous section heading → `findSectionByHeading` throws, caught by outer try/catch → `isError: true`
+- Permission timeout (120s) → `resolve(false)` → "Permission denied or timed out", returned as `isError: true`
+- `body` + `sections` together → "body and sections are mutually exclusive", returned as `isError: true`
+- No update fields at all → "No update fields provided", returned as `isError: true`
+
+**Return format consistency**: All 5 tools return `{ content: [{ type: "text", text: "..." }] }`. Errors include `isError: true`. Success payloads are JSON strings in `text` field. Consistent throughout.
+
+---
+
+### 3. Permission Async Safety
+
+**Timer cleanup** (channel.ts lines 95–100):
+```typescript
+clearTimeout(pending.timer);      // timer cleared before resolve
+pendingPermissions.delete(meta.request_id);  // entry removed before resolve
+pending.resolve(content === "allow");         // resolve called last
+```
+No leak: `clearTimeout` prevents double-fire after captain approval. Map entry deleted before resolve prevents double-resolution if a concurrent timeout fires between delete and resolve (not possible in single-threaded JS, but clean regardless).
+
+**Timeout handler** (channel.ts lines 140–143):
+```typescript
+const timer = setTimeout(() => {
+  pendingPermissions.delete(requestId);  // remove entry first
+  resolve(false);                         // then resolve false
+}, timeoutMs);
+```
+Clean: entry removed before `resolve(false)` so `onChannelMessage` cannot double-resolve a timed-out entry.
+
+**onChannelMessage routing** (channel.ts lines 94–105):
+- `permission_response` + `request_id` present → check `pendingPermissions.get(request_id)`
+- Found → tool-level approval path (resolve promise, clear timer)
+- Not found → system-level path (`sendPermissionVerdict`)
+- No race condition: JavaScript single-threaded event loop, `Map.get` + `Map.delete` + `resolve` are synchronous within the microtask.
+
+**PASS** — no timer leak, no race condition, correct routing.
+
+---
+
+### 4. Snapshot Integration
+
+`createSnapshot` called in all three `update_entity` write paths (channel.ts):
+- Line 372: body mode — after `writeFileSync`
+- Line 421: sections mode — after `writeFileSync`
+- Line 437: frontmatter-only mode — after `writeFileSync`
+
+All three calls use `{ author: "fo", source: "update" }`. Snapshot is created **after** the file write succeeds — no orphan snapshots on write failure (write throws before snapshot call).
+
+**PASS** — snapshot created on every `update_entity` write.
+
+---
+
+### 5. Test Isolation
+
+All 9 `createChannelServer` calls in `channel.test.ts` pass explicit `dbPath: join(TMP, "test.db")` where `TMP = join(import.meta.dir, "__test_channel__")`. No call uses the default path (`~/.spacedock/dashboard.db`).
+
+`beforeEach` / `afterEach` create and destroy the TMP directory around each test, preventing cross-test contamination.
+
+**PASS** — production DB not touched by tests.
+
+---
+
+### 6. Commit Hygiene
+
+All execute commits use `033 execute:` prefix:
+```
+26e1f02 033 execute: channel MCP tools integration tests
+87437d9 033 execute: add_comment, reply_to_comment, permission async, update_entity tools — pass dbPath through channel server
+63885a6 033 execute: get_comments MCP tool
+9d8af20 033 execute: reply tool — add optional entity scoping parameter
+e71dbf7 033 execute: entity resolver unit tests
+89770ee 033 execute: entity resolution module — slug→filepath with workflow disambiguation
+```
+
+Note: 11 planned commits became 6 because `pendingPermissions` must be declared before `createServer()` (referenced in `onChannelMessage`), preventing tool-by-tool splits. All planned functionality is present.
+
+**PASS** — prefix consistent, messages descriptive.
+
+---
+
+### Summary
+
+- [x] 156 tests pass, 0 fail
+- [x] All 5 MCP tool inputSchemas match spec
+- [x] Error paths return `isError: true` with descriptive messages
+- [x] Permission async: timer cleared on approve, no leak, correct routing
+- [x] `createSnapshot` called after every `update_entity` file write
+- [x] All tests use explicit `dbPath` — production DB isolated
+- [x] All execute commits use `033 execute:` prefix
+
+**Verdict: PASS**
