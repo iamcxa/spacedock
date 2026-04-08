@@ -10,27 +10,15 @@
     <nav class="top-bar">
         <a href="/" class="back-link">&larr; Back to Dashboard</a>
         <span id="entity-title" class="nav-title"></span>
-        <span id="telemetry-indicator" class="indicator" style="display:none"></span>
+        <div class="top-bar-actions">
+            <button id="history-btn" class="btn btn-small btn-secondary">History</button>
+            <span id="telemetry-indicator" class="indicator" style="display:none"></span>
+        </div>
     </nav>
 
     <div class="detail-layout">
-        <main class="detail-main">
-            <section id="entity-body" class="entity-body">
-                <!-- Rendered markdown body inserted here by JS -->
-            </section>
-
-            <section id="dependency-graph-section" class="dependency-graph-section" style="display:none;">
-                <h3>Dependencies</h3>
-                <div id="dependency-graph-container" class="dependency-graph-container">
-                </div>
-            </section>
-
-            <section id="stage-reports" class="stage-reports">
-                <!-- Stage report sections inserted here by JS -->
-            </section>
-        </main>
-
-        <aside class="detail-sidebar">
+        <!-- Left column: phase nav + accordion panels -->
+        <aside class="detail-left-panel">
             <section class="phase-nav-panel" id="phase-nav-panel" style="display:none;">
                 <h3>Phases <button class="phase-nav-toggle" id="phase-nav-toggle" aria-label="Toggle phase list"></button></h3>
                 <ul class="phase-nav-list" id="phase-nav-list">
@@ -38,89 +26,129 @@
                 </ul>
             </section>
 
-            <section class="metadata-panel">
-                <h3>Metadata</h3>
-                <dl id="metadata-fields">
-                    <!-- Frontmatter key-value pairs inserted here by JS -->
-                </dl>
-            </section>
-
-            <section class="management-panel">
-                <h3>Score</h3>
-                <div class="score-control">
-                    <input type="range" id="score-slider" min="0" max="1" step="0.05" value="0">
-                    <span id="score-display">0.00</span>
-                    <button id="score-save" class="btn btn-small">Save</button>
+            <details class="accordion-panel" id="accordion-metadata" open>
+                <summary class="accordion-summary">Metadata</summary>
+                <div class="accordion-body">
+                    <dl id="metadata-fields" class="metadata-dl">
+                        <!-- Frontmatter key-value pairs inserted here by JS -->
+                    </dl>
                 </div>
+            </details>
 
-                <h3>Tags</h3>
-                <div class="tag-editor">
-                    <div id="tag-chips" class="tag-chips">
-                        <!-- Tag chips inserted here by JS -->
+            <details class="accordion-panel" id="accordion-manage">
+                <summary class="accordion-summary">Score &amp; Tags</summary>
+                <div class="accordion-body">
+                    <div class="score-control">
+                        <input type="range" id="score-slider" min="0" max="1" step="0.05" value="0">
+                        <span id="score-display">0.00</span>
+                        <button id="score-save" class="btn btn-small">Save</button>
                     </div>
-                    <div class="tag-input-row">
-                        <input type="text" id="tag-input" placeholder="Add tag..." class="tag-input">
-                        <button id="tag-add" class="btn btn-small">Add</button>
-                    </div>
-                </div>
-            </section>
-
-            <section class="gate-panel" id="gate-panel" style="display:none;">
-                <h3>Gate Review</h3>
-                <div id="gate-status" class="gate-status">
-                    <span id="gate-status-badge" class="gate-badge pending">Pending Review</span>
-                </div>
-                <div id="gate-actions" class="gate-actions">
-                    <button id="gate-approve-btn" class="btn gate-btn approve">Approve</button>
-                    <button id="gate-request-changes-btn" class="btn gate-btn request-changes">Request Changes</button>
-                </div>
-                <div id="gate-confirm" class="gate-confirm" style="display:none;">
-                    <p>Are you sure you want to <strong id="gate-confirm-action"></strong> this gate?</p>
-                    <div class="gate-confirm-actions">
-                        <button id="gate-confirm-yes" class="btn gate-btn approve">Confirm</button>
-                        <button id="gate-confirm-cancel" class="btn btn-small btn-secondary">Cancel</button>
+                    <div class="tag-editor">
+                        <div id="tag-chips" class="tag-chips"></div>
+                        <div class="tag-input-row">
+                            <input type="text" id="tag-input" placeholder="Add tag..." class="tag-input">
+                            <button id="tag-add" class="btn btn-small">Add</button>
+                        </div>
                     </div>
                 </div>
-                <div id="gate-resolved" class="gate-resolved" style="display:none;">
-                    <span id="gate-resolved-text"></span>
-                </div>
-            </section>
+            </details>
 
-            <section class="link-sharing" id="link-sharing">
-                <h3>Share</h3>
-                <button id="create-share-btn" class="btn btn-small">Create Share Link</button>
-                <div id="share-links" class="share-links"></div>
-                <div id="share-modal" class="share-modal" style="display:none;">
-                    <label>Password:
-                        <input type="text" id="share-password" class="share-input" placeholder="Set a password">
-                    </label>
-                    <label>Label:
-                        <input type="text" id="share-label-input" class="share-input" placeholder="e.g. Review for Alice">
-                    </label>
-                    <label>Expires in (hours):
-                        <input type="number" id="share-ttl" class="share-input" value="24" min="1" max="168">
-                    </label>
-                    <div class="share-modal-actions">
-                        <button id="share-submit" class="btn btn-small">Create</button>
-                        <button id="share-cancel" class="btn btn-small btn-secondary">Cancel</button>
-                    </div>
-                    <div id="share-error" style="display:none; color:#c0392b; margin-top:6px; font-size:0.9em;"></div>
-                    <div id="share-result" style="display:none;">
-                        <p>Share link created:</p>
-                        <input type="text" id="share-url" class="share-input" readonly>
-                        <button id="share-copy" class="btn btn-small">Copy</button>
-                    </div>
+            <details class="accordion-panel" id="accordion-gate" style="display:none;">
+                <summary class="accordion-summary">Gate Review</summary>
+                <div class="accordion-body">
+                    <section class="gate-panel" id="gate-panel">
+                        <div id="gate-status" class="gate-status">
+                            <span id="gate-status-badge" class="gate-badge pending">Pending Review</span>
+                        </div>
+                        <div id="gate-actions" class="gate-actions">
+                            <button id="gate-approve-btn" class="btn gate-btn approve">Approve</button>
+                            <button id="gate-request-changes-btn" class="btn gate-btn request-changes">Request Changes</button>
+                        </div>
+                        <div id="gate-confirm" class="gate-confirm" style="display:none;">
+                            <p>Are you sure you want to <strong id="gate-confirm-action"></strong> this gate?</p>
+                            <div class="gate-confirm-actions">
+                                <button id="gate-confirm-yes" class="btn gate-btn approve">Confirm</button>
+                                <button id="gate-confirm-cancel" class="btn btn-small btn-secondary">Cancel</button>
+                            </div>
+                        </div>
+                        <div id="gate-resolved" class="gate-resolved" style="display:none;">
+                            <span id="gate-resolved-text"></span>
+                        </div>
+                    </section>
                 </div>
-            </section>
+            </details>
 
-            <section class="comments-panel" id="comments-panel">
-                <h3>Comments</h3>
-                <div id="comment-threads" class="comment-threads">
-                    <div class="empty-state">Select text to add a comment</div>
+            <details class="accordion-panel" id="accordion-share">
+                <summary class="accordion-summary">Share</summary>
+                <div class="accordion-body">
+                    <section class="link-sharing" id="link-sharing">
+                        <button id="create-share-btn" class="btn btn-small">Create Share Link</button>
+                        <div id="share-links" class="share-links"></div>
+                        <div id="share-modal" class="share-modal" style="display:none;">
+                            <label>Password:
+                                <input type="text" id="share-password" class="share-input" placeholder="Set a password">
+                            </label>
+                            <label>Label:
+                                <input type="text" id="share-label-input" class="share-input" placeholder="e.g. Review for Alice">
+                            </label>
+                            <label>Expires in (hours):
+                                <input type="number" id="share-ttl" class="share-input" value="24" min="1" max="168">
+                            </label>
+                            <div class="share-modal-actions">
+                                <button id="share-submit" class="btn btn-small">Create</button>
+                                <button id="share-cancel" class="btn btn-small btn-secondary">Cancel</button>
+                            </div>
+                            <div id="share-error" style="display:none; color:#c0392b; margin-top:6px; font-size:0.9em;"></div>
+                            <div id="share-result" style="display:none;">
+                                <p>Share link created:</p>
+                                <input type="text" id="share-url" class="share-input" readonly>
+                                <button id="share-copy" class="btn btn-small">Copy</button>
+                            </div>
+                        </div>
+                    </section>
                 </div>
-            </section>
+            </details>
+        </aside>
+
+        <!-- Center column: spec panel (default) + version panel (toggled) -->
+        <main class="detail-center">
+            <div id="spec-panel">
+                <section id="entity-body" class="entity-body">
+                    <!-- Rendered markdown body inserted here by JS -->
+                </section>
+
+                <section id="dependency-graph-section" class="dependency-graph-section" style="display:none;">
+                    <h3>Dependencies</h3>
+                    <div id="dependency-graph-container" class="dependency-graph-container"></div>
+                </section>
+
+                <section id="stage-reports" class="stage-reports">
+                    <!-- Stage report sections inserted here by JS -->
+                </section>
+            </div>
+
+            <!-- Version history panel — hidden until [History] toggled -->
+            <div id="version-panel" style="display:none;">
+                <!-- Rendered by version-history.js -->
+            </div>
+        </main>
+
+        <!-- Right column: comments only -->
+        <aside class="detail-comments-panel">
+            <div class="comments-panel-header">
+                <span class="comments-panel-title">Comments</span>
+                <button id="comments-mobile-close" class="btn-icon comments-mobile-close" aria-label="Close comments" style="display:none;">&#x2715;</button>
+            </div>
+            <div id="comment-threads" class="comment-threads">
+                <div class="empty-state">Select text to add a comment</div>
+            </div>
         </aside>
     </div>
+
+    <!-- Mobile: floating comments toggle button -->
+    <button id="comments-mobile-toggle" class="comments-mobile-toggle" style="display:none;">
+        Comments (<span id="comments-count">0</span>)
+    </button>
 
     <div id="comment-tooltip" class="comment-tooltip" style="display:none;">
         <textarea id="comment-input" class="comment-textarea" placeholder="Add a comment..." rows="2"></textarea>
@@ -133,6 +161,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
     <script src="/dependency-graph.js"></script>
+    <script src="/version-history.js"></script>
     <script src="/detail.js"></script>
 </body>
 </html>

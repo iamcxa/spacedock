@@ -662,18 +662,22 @@ function rejectSuggestionAction(suggestionId) {
   function updateGatePanel(entityStatus, stages) {
     currentEntityStatus = entityStatus;
     if (!stages) stages = workflowStages;
+    var accordionGate = document.getElementById('accordion-gate');
     if (!stages) {
-      gatePanel.style.display = 'none';
+      if (accordionGate) accordionGate.style.display = 'none';
       return;
     }
 
     var atGate = isEntityAtGate(entityStatus, stages);
     if (!atGate) {
-      gatePanel.style.display = 'none';
+      if (accordionGate) accordionGate.style.display = 'none';
       return;
     }
 
-    gatePanel.style.display = '';
+    if (accordionGate) {
+      accordionGate.style.display = '';
+      accordionGate.open = true;
+    }
 
     if (gateDecisionSent) {
       return;
@@ -1454,5 +1458,22 @@ function rejectSuggestionAction(suggestionId) {
   }
 
   loadShareLinks();
+})();
+
+// --- Mobile comments toggle ---
+(function initMobileComments() {
+  var toggleBtn = document.getElementById('comments-mobile-toggle');
+  var closeBtn = document.getElementById('comments-mobile-close');
+  var panel = document.querySelector('.detail-comments-panel');
+  if (!toggleBtn || !panel) return;
+
+  toggleBtn.addEventListener('click', function () {
+    panel.classList.add('open');
+  });
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function () {
+      panel.classList.remove('open');
+    });
+  }
 })();
 
