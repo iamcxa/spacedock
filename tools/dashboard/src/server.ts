@@ -232,7 +232,7 @@ export function createServer(opts: ServerOptions) {
               to_version: number;
               author?: string;
             };
-            if (!body.entity || !body.path || !body.section_heading || !body.to_version) {
+            if (!body.entity || !body.path || !body.section_heading || body.to_version == null || typeof body.to_version !== "number") {
               logRequest(req, 400);
               return jsonResponse({ error: "entity, path, section_heading, to_version required" }, 400);
             }
