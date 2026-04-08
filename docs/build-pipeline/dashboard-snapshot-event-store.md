@@ -1,7 +1,7 @@
 ---
 id: 044
 title: Dashboard — Snapshot Event Store (fmodel) + Diff Engine Fix
-status: draft
+status: brainstorm
 source: session testing — v5 diff always shows same "### Summary modified" due to heading collision
 started:
 completed:
