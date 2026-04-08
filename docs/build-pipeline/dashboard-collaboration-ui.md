@@ -1,7 +1,7 @@
 ---
 id: 035
 title: Dashboard Collaboration UI — Entity Detail Review + Version History
-status: execute
+status: pr-draft
 source: spec 2026-04-08-pipeline-brainstorm-profiles-design.md (WP5)
 started: 2026-04-09
 completed:
