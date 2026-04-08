@@ -1,7 +1,7 @@
 ---
 id: 039
 title: Dashboard Gate Review — Redesign for Brainstorm Era
-status: needs-brainstorm
+status: draft
 source: captain UI review during 030/032/037 dispatch — gate review feels too simple
 started:
 completed:
@@ -15,9 +15,9 @@ scale: Large
 project: spacedock
 ---
 
-## Status: needs-brainstorm
+## Draft status
 
-**DO NOT auto-dispatch.** This entity captures UI feedback that needs captain brainstorm before any implementation work begins.
+This entity is in `draft` stage — captured but not yet ready for active pipeline work. FO will not auto-dispatch (`manual: true` on draft stage). Captain advances `status: draft → brainstorm` when ready to discuss.
 
 ## Problem (raw captain feedback)
 

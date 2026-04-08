@@ -30,8 +30,9 @@
 # --next dispatch rules: An entity is dispatchable if ALL of:
 #   1. Not terminal — its current stage has a defined next stage
 #   2. Not gate-blocked — its current stage does NOT have gate: true
-#   3. Not actively worked — entity does NOT have a non-empty worktree field
-#   4. Concurrency available — count of actively-worked entities (non-empty worktree) in the next stage < that stage's concurrency limit
+#   3. Not manual-only — its current stage does NOT have manual: true (e.g., draft)
+#   4. Not actively worked — entity does NOT have a non-empty worktree field
+#   5. Concurrency available — count of actively-worked entities (non-empty worktree) in the next stage < that stage's concurrency limit
 #
 # constraints: Python 3 stdlib only (no PyYAML), resolves paths relative to this script, skips README.md.
 # valid status values: {stage1}, {stage2}, ..., {last_stage}.
@@ -158,6 +159,7 @@ def parse_stages_block(filepath):
             'gate': state.get('gate', 'false').lower() == 'true',
             'terminal': state.get('terminal', 'false').lower() == 'true',
             'initial': state.get('initial', 'false').lower() == 'true',
+            'manual': state.get('manual', 'false').lower() == 'true',
         }
         result.append(stage)
 
@@ -268,6 +270,8 @@ def print_next_table(entities, stages):
         if stage.get('terminal', False):
             continue
         if stage.get('gate', False):
+            continue
+        if stage.get('manual', False):
             continue
         if e['worktree']:
             continue
