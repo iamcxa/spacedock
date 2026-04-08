@@ -247,3 +247,329 @@ replaceSection(body, section, newSectionBody)  // 行精確替換
 **不建議跳過任何 stage**。`design` 階段特別重要，因為：
 - Permission async 等待 pattern 需要與 FO 溝通協議達成共識
 - `update_entity` sections API 合約（`action` 欄位語義）需要明確文件
+
+## Stage Report (plan)
+
+### MCP Tool Schemas（API 合約）
+
+#### Tool 1: `reply`（增強現有工具）
+
+```typescript
+// Input
+{
+  content: string;       // required — message to display
+  entity?: string;       // optional — scope event to entity detail feed
+}
+// Output: { content: [{ type: "text", text: "Message sent to dashboard" }] }
+// Behaviour: AgentEvent.entity = args.entity ?? ""
+```
+
+#### Tool 2: `get_comments`
+
+```typescript
+// Input
+{
+  entity: string;        // required — entity slug
+  workflow?: string;     // optional — workflow dir basename for disambiguation
+}
+// Output: CommentThread  { comments: Comment[], suggestions: Suggestion[] }
+// Errors: "Entity not found: <slug>" | "Ambiguous entity slug: matches <a>, <b>"
+```
+
+#### Tool 3: `add_comment`
+
+```typescript
+// Input
+{
+  entity: string;        // required
+  content: string;       // required
+  section_heading?: string;
+  workflow?: string;
+}
+// Output: Comment (the created comment object)
+// Side effects: publishEvent({type:"comment", agent:"fo"}), onChannelMessage({type:"comment_added"})
+```
+
+#### Tool 4: `reply_to_comment`
+
+```typescript
+// Input
+{
+  entity: string;        // required
+  comment_id: string;    // required
+  content: string;       // required
+  resolve?: boolean;     // optional, default false
+  workflow?: string;
+}
+// Output: { reply: CommentReply, resolved: boolean }
+```
+
+#### Tool 5: `update_entity`
+
+```typescript
+// Input — body 與 sections 互斥；frontmatter 可與 sections 同時存在
+{
+  entity: string;        // required
+  reason: string;        // required — snapshot reason string
+  workflow?: string;
+  frontmatter?: Record<string, string>;  // Mode A: partial merge, no permission needed
+  body?: string;                          // Mode B: full replace, requires permission
+  sections?: Array<{                      // Mode C: section operations
+    heading: string;
+    action: "replace" | "append" | "remove";
+    content?: string;   // required for replace/append
+  }>;
+}
+// Output:
+{
+  ok: true;
+  new_version: number;
+  warning?: string | null;
+  auto_resolved_comments?: string[];
+}
+// Errors: "Entity not found" | "Ambiguous section heading" | "Permission denied" | "Permission timeout"
+```
+
+---
+
+### Permission Async Pattern 設計
+
+**問題**：MCP `CallToolRequestSchema` handler 是 `async (request) => Response`，但 captain 的核准是透過獨立的 `onChannelMessage` callback 傳入，兩者在不同的非同步路徑。
+
+**解法：pending-promise Map（在 `createChannelServer()` 閉包內）**
+
+```typescript
+const pendingPermissions = new Map<string, {
+  resolve: (allowed: boolean) => void;
+  timer: ReturnType<typeof setTimeout>;
+}>();
+
+async function requestPermissionAndWait(
+  toolName: string,
+  description: string,
+  diffPreview: string,
+  timeoutMs = 120_000,
+): Promise<boolean> {
+  const requestId = crypto.randomUUID();
+  // 發送 permission_request event 顯示在 dashboard UI
+  dashboard.publishEvent({
+    type: "permission_request",
+    entity: "", stage: "", agent: "fo",
+    timestamp: new Date().toISOString(),
+    detail: JSON.stringify({ request_id: requestId, tool_name: toolName,
+                             description, input_preview: diffPreview }),
+  });
+  return new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => {
+      pendingPermissions.delete(requestId);
+      resolve(false); // timeout → treat as deny
+    }, timeoutMs);
+    pendingPermissions.set(requestId, { resolve, timer });
+  });
+}
+```
+
+**核准路徑**（`onChannelMessage` callback 修改）：
+
+```typescript
+onChannelMessage: async (content, meta) => {
+  if (meta?.type === "permission_response" && meta?.request_id) {
+    const pending = pendingPermissions.get(meta.request_id);
+    if (pending) {
+      // Tool-level permission: resolve the waiting promise
+      clearTimeout(pending.timer);
+      pendingPermissions.delete(meta.request_id);
+      pending.resolve(content === "allow");
+      return;
+    }
+    // No pending entry → system-level permission (Claude Code tool approval)
+    const behavior = content === "allow" ? "allow" : "deny";
+    await sendPermissionVerdict(meta.request_id, behavior as "allow" | "deny");
+  } else {
+    await mcp.notification({ method: "notifications/claude/channel",
+                             params: { content, meta: meta ?? {} } });
+  }
+}
+```
+
+**Timeout 行為**：120 秒後自動 deny，tool call 回傳 `{ isError: true, content: [{ type: "text", text: "Permission request timed out after 120s" }] }`。
+
+**重要區分**：這是應用層 permission（FO 請求修改實體規格，captain 審批），與 Claude Code 系統層的 `notifications/claude/channel/permission`（Claude Code tool 呼叫審批）是不同層。兩者共存，以 `pendingPermissions` Map 是否有對應 `request_id` 區分。
+
+---
+
+### Task Breakdown（原子 commits）
+
+#### Commit 1：Entity resolution 模組
+
+**新建** `tools/dashboard/src/entity-resolver.ts`
+
+```typescript
+export function resolveEntity(slug: string, projectRoot: string, workflow?: string): string
+// 邏輯：discoverWorkflows() → 各 workflow aggregateWorkflow() → 收集 entities
+// slug 比對：entity.slug 或 basename(entity.path).replace(/\.md$/,"")
+// 無結果 → throw "Entity not found: <slug>"
+// 多結果且無 workflow 過濾 → throw "Ambiguous entity slug: <slug> matches: <paths>"
+// workflow 過濾後仍多結果 → throw "Ambiguous entity slug in workflow <w>: matches: <paths>"
+```
+
+---
+
+#### Commit 2：`reply` 工具增強
+
+**修改** `tools/dashboard/src/channel.ts`
+
+- `inputSchema.properties` 加 `entity?: { type: "string" }`
+- Handler 解構 `entity?: string`，`AgentEvent.entity = args.entity ?? ""`
+
+---
+
+#### Commit 3：`get_comments` 工具
+
+**修改** `tools/dashboard/src/channel.ts`
+
+- 加 `get_comments` tool definition
+- Handler：`resolveEntity` → `getComments(filepath)` → 回傳 JSON
+
+---
+
+#### Commit 4：`add_comment` 工具
+
+**修改** `tools/dashboard/src/channel.ts`
+
+- Handler：`resolveEntity` → `addComment(filepath, { selected_text: "", section_heading: args.section_heading ?? "", content, author: "fo" })` → `publishEvent` → `onChannelMessage({ type: "comment_added", entity, comment_id })`
+
+---
+
+#### Commit 5：`reply_to_comment` 工具
+
+**修改** `tools/dashboard/src/channel.ts`
+
+- Handler：`resolveEntity` → `addReply(filepath, comment_id, { content, author: "fo" })` → 若 `resolve === true` → `resolveComment(filepath, comment_id)` → `publishEvent`
+
+---
+
+#### Commit 6：Permission async 基礎設施
+
+**修改** `tools/dashboard/src/channel.ts`
+
+- 加入 `pendingPermissions` Map 和 `requestPermissionAndWait()` 函數
+- 修改 `onChannelMessage`：先查 Map，found → resolve promise；not found → 走原 `sendPermissionVerdict` 路徑
+
+---
+
+#### Commit 7：`update_entity` — frontmatter 模式
+
+**修改** `tools/dashboard/src/channel.ts`
+
+- 加 `update_entity` tool definition（完整 inputSchema）
+- 驗證互斥：`body` 和 `sections` 不可同時存在
+- Frontmatter mode：`resolveEntity` → `readFileSync` → `parseEntity` → `updateFrontmatterFields` → `writeFileSync` → `snapshotStore.createSnapshot` → 回傳 `{ ok: true, new_version }`
+
+需要 import：`dashboard.snapshotStore`（已由 `Object.assign` 公開於 createServer 回傳值）、`parseEntity`、`updateFrontmatterFields`、`readFileSync`、`writeFileSync`
+
+---
+
+#### Commit 8：`update_entity` — sections 模式（含 auto-resolve）
+
+**修改** `tools/dashboard/src/channel.ts`
+
+- Sections mode：
+  1. `readFileSync` → `parseEntity`
+  2. 按序處理每個 section operation（全在 memory）：
+     - `parseSections(body)` + `findSectionByHeading(sections, heading)`（throws on ambiguous）
+     - `replace`：`replaceSection(body, section, content)`
+     - `append`：`replaceSection(body, section, section.body + "\n" + content)`
+     - `remove`：await `requestPermissionAndWait(...)` → denied → early return error；allowed → 重建 body 略過該 section（lines `section.start..section.end`）
+  3. `writeFileSync(filepath, newFile)`
+  4. `snapshotStore.createSnapshot(...)` on final body
+  5. Auto-resolve：`getComments(filepath).comments.filter(c => modifiedHeadings.has(c.section_heading) && !c.resolved)` → 各呼叫 `resolveComment`
+
+---
+
+#### Commit 9：`update_entity` — body 模式
+
+**修改** `tools/dashboard/src/channel.ts`
+
+- Body mode：
+  1. `readFileSync` → `parseEntity`
+  2. `createPatch("entity", parsedBody, args.body, "current", "proposed")` → diff preview
+  3. `await requestPermissionAndWait("update_entity body", "Replace full entity body", diffPreview)`
+  4. Denied → `{ isError: true, content: [{ type: "text", text: "Permission denied" }] }`
+  5. Allowed：`replaceBody(text, args.body)` → `writeFileSync` → `snapshotStore.createSnapshot` → auto-resolve → 回傳
+
+---
+
+#### Commit 10：Entity resolver 單元測試
+
+**新建** `tools/dashboard/src/entity-resolver.test.ts`
+
+使用 `tmp` 目錄建立假 workflow（含 `README.md` 有 `commissioned-by: spacedock@test`）和假 entity `.md` 檔。
+
+Cases：找到唯一、not found、ambiguous（無 workflow）、workflow 縮窄成功、workflow 縮窄後仍 ambiguous。
+
+---
+
+#### Commit 11：Channel MCP 工具整合測試
+
+**新建** `tools/dashboard/src/channel.test.ts`
+
+使用 `createChannelServer({ port: 0, dbPath: ":memory:", projectRoot: TMP })`，直接 HTTP fetch 或呼叫 `dashboard.snapshotStore`/`eventBuffer` 驗證。
+
+Permission test 策略：`requestPermissionAndWait` 需要能在測試中快速 resolve。方案：建立 channel server 後，測試直接呼叫 `onChannelMessage("allow", { type: "permission_response", request_id: "..." })`（透過 `dashboard.port` 的 `POST /api/channel/send`）在背景 trigger permission resolve。
+
+---
+
+### 檔案異動總覽
+
+| 檔案 | 操作 | Commits |
+|------|------|---------|
+| `tools/dashboard/src/entity-resolver.ts` | 新建 | 1 |
+| `tools/dashboard/src/entity-resolver.test.ts` | 新建 | 10 |
+| `tools/dashboard/src/channel.ts` | 修改（加 imports + 8 tool handlers + permission infra） | 2–9 |
+| `tools/dashboard/src/channel.test.ts` | 新建 | 11 |
+
+`channel.ts` 新增 imports：
+- `resolveEntity` from `./entity-resolver`
+- `getComments`, `addComment`, `addReply`, `resolveComment` from `./comments`
+- `parseSections`, `findSectionByHeading`, `replaceSection` from `./snapshots`
+- `parseEntity`, `updateFrontmatterFields`, `replaceBody` from `./frontmatter-io`
+- `readFileSync`, `writeFileSync` from `node:fs`
+- `createPatch` from `diff`（already a dependency of snapshots.ts）
+
+---
+
+### Test Plan
+
+| 工具 / 情境 | 測試檔 | 關鍵 edge cases |
+|------------|--------|----------------|
+| Entity resolution | `entity-resolver.test.ts` | not found, ambiguous, workflow filter |
+| `reply` entity scoping | `channel.test.ts` | entity="" default, entity set → AgentEvent.entity |
+| `get_comments` | `channel.test.ts` | empty thread, populated thread |
+| `add_comment` | `channel.test.ts` | event broadcast, onChannelMessage metadata |
+| `reply_to_comment` | `channel.test.ts` | resolve=true, resolve=false, unknown comment_id |
+| `update_entity` frontmatter | `channel.test.ts` | partial merge, new key, snapshot version |
+| `update_entity` sections replace | `channel.test.ts` | fuzzy heading, ambiguous → error |
+| `update_entity` sections remove | `channel.test.ts` | timeout → deny, allow path |
+| `update_entity` body | `channel.test.ts` | allow path, deny path |
+| auto-resolve | `channel.test.ts` | exact heading match resolves, non-matching preserved |
+| body+sections 互斥 | `channel.test.ts` | both present → error before any write |
+
+---
+
+### Risk Mitigations
+
+| 風險 | 緩解措施 |
+|------|---------|
+| Permission async 等待 — captain 離開 | 120s timeout → deny，明確錯誤訊息，不靜默失敗 |
+| Permission async 等待 — 測試困難 | 測試透過 `POST /api/channel/send` 模擬 captain approve，在背景 fire |
+| Entity resolution 掃描效能 | 先不做 cache（workflow scan 已被 API 路由每次呼叫，可接受）；未來按需加 cache |
+| Slug 衝突跨 workflow | 錯誤訊息列出所有衝突路徑；`workflow?` 提供消歧手段 |
+| `selected_text` 語義 | MCP 情境傳 `""`，`comments.ts` 無驗證。若 UI 需區分來源，可用 `author === "fo"` 判斷 |
+| sections remove 半途失敗 | 所有 section 操作在 memory 完成後才 `writeFileSync`；snapshot 在 write 後才建立 |
+| `channel.ts` 膨脹 | entity-resolver 已抽出；可視情況抽 `mcp-tools.ts`，但不在本 entity scope |
+
+---
+
+### Estimated Commits：11 個
+
