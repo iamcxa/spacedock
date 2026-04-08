@@ -1,7 +1,7 @@
 ---
 id: 032
 title: Dashboard SQLite Snapshot System — Entity Version History
-status: plan
+status: execute
 source: spec 2026-04-08-pipeline-brainstorm-profiles-design.md (WP2)
 started: 2026-04-08
 completed:
