@@ -1,6 +1,38 @@
 import { describe, test, expect } from "bun:test";
-import { updateWorkflowStages } from "./frontmatter-io";
+import { updateWorkflowStages, replaceBody } from "./frontmatter-io";
 import type { Stage } from "./types";
+
+describe("replaceBody", () => {
+  test("preserves frontmatter verbatim and swaps the body", () => {
+    const input = [
+      "---",
+      "id: 001",
+      "title: Something",
+      "# a yaml-ish comment inside fm",
+      "status: plan",
+      "---",
+      "",
+      "old body",
+      "still old",
+    ].join("\n");
+    const result = replaceBody(input, "brand new body\nsecond line\n");
+    expect(result).toContain("id: 001");
+    expect(result).toContain("title: Something");
+    expect(result).toContain("# a yaml-ish comment inside fm");
+    expect(result).toContain("brand new body");
+    expect(result).toContain("second line");
+    expect(result).not.toContain("old body");
+    expect(result).not.toContain("still old");
+  });
+
+  test("throws when frontmatter is missing", () => {
+    expect(() => replaceBody("no frontmatter here\n", "x")).toThrow(/Missing YAML frontmatter/);
+  });
+
+  test("throws when frontmatter is unterminated", () => {
+    expect(() => replaceBody("---\nid: 1\nbody without close\n", "x")).toThrow(/Unterminated/);
+  });
+});
 
 const SAMPLE_README = [
   "---",

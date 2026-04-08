@@ -292,3 +292,212 @@ describe("share-scoped comment routes publish events", () => {
     }
   });
 });
+
+describe("snapshot HTTP endpoints", () => {
+  const SNAP_TMP = join(import.meta.dir, "__test_snapshots__");
+  const SNAP_ENTITY = join(SNAP_TMP, "snap-entity.md");
+  const SNAP_DB = join(SNAP_TMP, "snap.db");
+
+  function freshServer() {
+    try { rmSync(SNAP_TMP, { recursive: true, force: true }); } catch {}
+    mkdirSync(SNAP_TMP, { recursive: true });
+    writeFileSync(
+      SNAP_ENTITY,
+      "---\nid: 999\ntitle: Snap Test\nstatus: plan\n---\n\n## Alpha\nalpha-current\n\n## Beta\nbeta-current\n",
+    );
+    return createServer({
+      port: 0,
+      hostname: "127.0.0.1",
+      projectRoot: SNAP_TMP,
+      staticDir: join(import.meta.dir, "../static"),
+      logFile: join(SNAP_TMP, "test.log"),
+      dbPath: SNAP_DB,
+    });
+  }
+
+  test("GET /api/entity/versions returns 400 when entity missing", async () => {
+    const server = freshServer();
+    try {
+      const res = await fetch(`${server.url}api/entity/versions`);
+      expect(res.status).toBe(400);
+    } finally {
+      server.stop();
+      rmSync(SNAP_TMP, { recursive: true, force: true });
+    }
+  });
+
+  test("GET /api/entity/versions returns empty array for unknown entity", async () => {
+    const server = freshServer();
+    try {
+      const res = await fetch(`${server.url}api/entity/versions?entity=nope`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { entity: string; versions: unknown[] };
+      expect(body.entity).toBe("nope");
+      expect(body.versions).toEqual([]);
+    } finally {
+      server.stop();
+      rmSync(SNAP_TMP, { recursive: true, force: true });
+    }
+  });
+
+  test("GET /api/entity/versions returns versions after direct snapshot create", async () => {
+    const server = freshServer();
+    try {
+      server.snapshotStore.createSnapshot({
+        entity: "snap-entity",
+        body: "## Alpha\nv1\n",
+        author: "fo",
+        reason: "initial",
+      });
+      server.snapshotStore.createSnapshot({
+        entity: "snap-entity",
+        body: "## Alpha\nv2\n",
+        author: "fo",
+        reason: "update",
+      });
+      const res = await fetch(`${server.url}api/entity/versions?entity=snap-entity`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { versions: Array<{ version: number }> };
+      expect(body.versions.length).toBe(2);
+      expect(body.versions[0].version).toBe(1);
+      expect(body.versions[1].version).toBe(2);
+    } finally {
+      server.stop();
+      rmSync(SNAP_TMP, { recursive: true, force: true });
+    }
+  });
+
+  test("GET /api/entity/diff returns 400 on missing params", async () => {
+    const server = freshServer();
+    try {
+      const res = await fetch(`${server.url}api/entity/diff?entity=x`);
+      expect(res.status).toBe(400);
+    } finally {
+      server.stop();
+      rmSync(SNAP_TMP, { recursive: true, force: true });
+    }
+  });
+
+  test("GET /api/entity/diff returns SectionDiff[] for valid versions", async () => {
+    const server = freshServer();
+    try {
+      server.snapshotStore.createSnapshot({
+        entity: "snap-entity",
+        body: "## Alpha\nold\n",
+        author: "fo",
+        reason: "r",
+      });
+      server.snapshotStore.createSnapshot({
+        entity: "snap-entity",
+        body: "## Alpha\nnew\n",
+        author: "fo",
+        reason: "r",
+      });
+      const res = await fetch(`${server.url}api/entity/diff?entity=snap-entity&from=1&to=2`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as {
+        from: number;
+        to: number;
+        sections: Array<{ heading: string; status: string; diff?: string }>;
+      };
+      expect(body.from).toBe(1);
+      expect(body.to).toBe(2);
+      const alpha = body.sections.find((s) => s.heading === "## Alpha")!;
+      expect(alpha.status).toBe("modified");
+      expect(alpha.diff).toBeDefined();
+    } finally {
+      server.stop();
+      rmSync(SNAP_TMP, { recursive: true, force: true });
+    }
+  });
+
+  test("POST /api/entity/rollback returns 403 on path outside projectRoot", async () => {
+    const server = freshServer();
+    try {
+      const res = await fetch(`${server.url}api/entity/rollback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity: "snap-entity",
+          path: "/etc/passwd",
+          section_heading: "## Alpha",
+          to_version: 1,
+        }),
+      });
+      expect(res.status).toBe(403);
+    } finally {
+      server.stop();
+      rmSync(SNAP_TMP, { recursive: true, force: true });
+    }
+  });
+
+  test("POST /api/entity/rollback writes new body and creates new version", async () => {
+    const server = freshServer();
+    try {
+      // Seed v1 with "old alpha" content
+      server.snapshotStore.createSnapshot({
+        entity: "snap-entity",
+        body: "## Alpha\nold-alpha\n\n## Beta\nbeta-old\n",
+        author: "fo",
+        reason: "v1",
+      });
+      const res = await fetch(`${server.url}api/entity/rollback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity: "snap-entity",
+          path: SNAP_ENTITY,
+          section_heading: "## Alpha",
+          to_version: 1,
+          author: "captain",
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as { new_version: number; warning: string | null };
+      expect(body.new_version).toBe(2);
+      // File should have rolled back Alpha section but left Beta intact
+      const { readFileSync } = await import("node:fs");
+      const disk = readFileSync(SNAP_ENTITY, "utf-8");
+      expect(disk).toContain("old-alpha");
+      expect(disk).toContain("beta-current"); // Beta was not touched
+      expect(disk).not.toContain("alpha-current");
+      // Frontmatter preserved
+      expect(disk).toContain("id: 999");
+      expect(disk).toContain("status: plan");
+    } finally {
+      server.stop();
+      rmSync(SNAP_TMP, { recursive: true, force: true });
+    }
+  });
+
+  test("POST /api/entity/rollback emits rollback event to event buffer", async () => {
+    const server = freshServer();
+    try {
+      server.snapshotStore.createSnapshot({
+        entity: "snap-entity",
+        body: "## Alpha\nold-alpha\n\n## Beta\nbeta-old\n",
+        author: "fo",
+        reason: "v1",
+      });
+      const beforeCount = server.eventBuffer.getAll().length;
+      const res = await fetch(`${server.url}api/entity/rollback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity: "snap-entity",
+          path: SNAP_ENTITY,
+          section_heading: "## Alpha",
+          to_version: 1,
+        }),
+      });
+      expect(res.status).toBe(200);
+      const newEvents = server.eventBuffer.getAll().slice(beforeCount);
+      const rollbackEvents = newEvents.filter((e) => e.event.type === "rollback");
+      expect(rollbackEvents.length).toBe(1);
+      expect(rollbackEvents[0].event.entity).toBe("snap-entity");
+    } finally {
+      server.stop();
+      rmSync(SNAP_TMP, { recursive: true, force: true });
+    }
+  });
+});

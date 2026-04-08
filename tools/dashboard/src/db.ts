@@ -33,6 +33,25 @@ export function openDb(dbPath?: string): Database {
       detail TEXT
     )
   `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS entity_snapshots (
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity                TEXT NOT NULL,
+      version               INTEGER NOT NULL,
+      body                  TEXT NOT NULL,
+      frontmatter           TEXT,
+      author                TEXT NOT NULL,
+      reason                TEXT NOT NULL,
+      source                TEXT NOT NULL DEFAULT 'update',
+      rollback_from_version INTEGER,
+      rollback_section      TEXT,
+      created_at            TEXT NOT NULL
+    )
+  `);
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_entity_version
+      ON entity_snapshots(entity, version)
+  `);
   return db;
 }
 
