@@ -15,6 +15,7 @@ export class EventBuffer {
   private readonly selectAllStmt;
   private readonly selectSinceStmt;
   private readonly countStmt;
+  private readonly selectByEntityStmt;
 
   constructor(db: Database, capacity: number) {
     this.db = db;
@@ -25,6 +26,7 @@ export class EventBuffer {
     this.selectAllStmt = db.query("SELECT * FROM events ORDER BY seq ASC");
     this.selectSinceStmt = db.query("SELECT * FROM events WHERE seq > ? ORDER BY seq ASC");
     this.countStmt = db.query("SELECT COUNT(*) as cnt FROM events");
+    this.selectByEntityStmt = db.query("SELECT * FROM events WHERE entity = ? ORDER BY seq ASC");
   }
 
   push(event: AgentEvent): SequencedEvent {
@@ -58,6 +60,11 @@ export class EventBuffer {
 
   getAll(): SequencedEvent[] {
     const rows = this.selectAllStmt.all() as Array<EventRow>;
+    return rows.map(rowToSequencedEvent);
+  }
+
+  getByEntity(entity: string): SequencedEvent[] {
+    const rows = this.selectByEntityStmt.all(entity) as Array<EventRow>;
     return rows.map(rowToSequencedEvent);
   }
 
