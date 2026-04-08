@@ -1,7 +1,7 @@
 ---
 id: 029
 title: Dashboard Phase Navigation — Entity Detail 階段導覽與快速跳轉
-status: plan
+status: execute
 source: captain observation (026 shipping session — detail page 無法按 phase 導覽)
 started: 2026-04-08T03:25:00Z
 completed:
