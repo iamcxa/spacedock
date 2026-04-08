@@ -7,7 +7,7 @@ started:
 completed:
 verdict:
 score: 0.9
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-phase-navigation
 issue:
 pr:
 intent: feature

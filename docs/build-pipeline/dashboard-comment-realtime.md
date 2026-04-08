@@ -7,7 +7,7 @@ started:
 completed:
 verdict:
 score: 0.85
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-comment-realtime
 issue:
 pr:
 intent: bugfix
