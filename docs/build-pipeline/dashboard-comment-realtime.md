@@ -15,6 +15,48 @@ scale: Medium
 project: spacedock
 ---
 
+## pr-draft Stage Report
+
+### 1. PR created as draft on GitHub — DONE
+
+PR #17 created as draft: https://github.com/iamcxa/spacedock/pull/17
+
+### 2. PR title follows conventional commits (<70 chars) — DONE
+
+Title: `fix(dashboard): comment realtime push + reply bidirectional channel`
+Length: 68 characters. Format: `fix(dashboard): <description>` — type=fix, scope=dashboard, imperative, no period.
+
+### 3. PR body includes summary, test plan, quality report — DONE
+
+Body includes:
+- Summary: 4 bullet points describing root causes and fixes
+- Root Cause Summary table (Bug / Root Cause / File)
+- Test Plan: 4 checked items (89/89 tests, type-check, build, coverage)
+- Quality Report table (7 gates with results)
+- PR size note: 1,220 lines total but 866 are documentation; functional code ~354 lines
+
+### 4. PR_NUMBER and PR_URL recorded in entity body — DONE
+
+- PR_NUMBER: 17
+- PR_URL: https://github.com/iamcxa/spacedock/pull/17
+
+### 5. PR size check (diff lines count) — DONE
+
+Total diff: 1,220 lines (additions: 1,218, deletions: 2)
+- Documentation (entity file + spec): ~866 lines
+- Functional code (server.ts +56, detail.js +10, server.test.ts +288): ~354 lines
+
+**Assessment**: Total exceeds 1,000 lines threshold. However, functional code changes are 354 lines (well under 500). The documentation bulk is a Spacedock pipeline artifact (entity tracking + TDD spec). No split recommended — changes are tightly coupled (server routes + WS handler + integration tests).
+
+### Self-Review Annotations — DONE
+
+3 inline review comments posted to PR #17:
+1. `server.ts:217` — Why `type: "comment"` is used for all 3 CRUD operations (not distinct types)
+2. `server.ts:266` — Why `opts.onChannelMessage` is guarded with `if`  (standalone vs channel mode)
+3. `detail.js:843` — Why `loadComments()` does full reload (not incremental DOM patch)
+
+---
+
 ## Quality Stage Report
 
 ### 1. Type-check — DONE
@@ -327,3 +369,61 @@ RATIONALE:    Comment 是 captain 與 agent 之間最直接的協作管道。即
 - Captain 在 UI 的 reply 被轉發到 Claude Code session
 - Share page 也能即時收到 comment 更新
 - 現有 comment 功能（新增、回覆、resolve）行為不變
+
+---
+
+## pr-review Stage Report
+
+### 1. Self-review completed (manual pre-scan) — DONE
+
+Full manual review performed across all 3 changed functional files + 1 new test file. Review covered: code quality, comment accuracy, error handling, type safety, unused imports, stale references, feedback loop analysis, pattern consistency.
+
+### 2. CODE/SUGGESTION findings fixed and pushed — DONE (no findings)
+
+No CODE or SUGGESTION-level issues found. Details:
+
+**Code Quality**:
+- All 5 `publishEvent()` calls follow the exact same pattern as the existing `gate_decision` handler (server.ts:987-995): construct `AgentEvent`, call `publishEvent()`, which writes to EventBuffer + broadcasts to WS topics including share scopes.
+- `entitySlug` extraction pattern (`body.path.replace(/\.md$/, "").split("/").pop()!`) is consistent across all 5 new call sites and matches the existing pattern at server.ts:983.
+- `onChannelMessage` call in reply route (server.ts:267-272) correctly mirrors the gate_decision handler pattern (server.ts:998-1008).
+- Test file uses proper setup/teardown (`beforeAll`/`afterAll` with temp directory), `try/finally` for server cleanup, and `port: 0` for random port allocation — no resource leaks.
+
+**Unused Imports**: None found. All imports in server.ts and server.test.ts are used.
+
+**Type Safety**: `onChannelMessage` signature matches interface definition (server.ts:29): `(content: string, meta?: Record<string, string>) => void`. The meta object passed at line 268-272 uses `{type, entity_path, comment_id}` — all string values, conforming to `Record<string, string>`.
+
+**Error Handling**: All new code is inside existing `try/catch` blocks that call `captureException()` and return 500. No silent failures introduced.
+
+**Comment Accuracy**: 3 inline comments added are accurate:
+- "Broadcast comment event for realtime updates" — correct, publishEvent broadcasts via WS
+- "Forward captain reply to FO via channel" — correct, onChannelMessage triggers MCP notification
+- "Realtime comment updates" / "Channel response (FO reply)" in detail.js — correct descriptions
+
+### 3. DOC/advisory findings noted — DONE
+
+**Advisory 1**: `onChannelMessage` in reply route (server.ts:267) fires for ALL authors, not just captain. Comment says "Forward captain reply to FO" but if `body.author` were `"fo"`, it would still forward. **Not a bug**: the main `/api/entity/comment/reply` route is only called by the captain UI (default author is "captain"). FO replies come through MCP `reply` tool → `channel.ts:120-133` → `publishEvent({type:"channel_response"})`, which does NOT go through the comment/reply HTTP route. No feedback loop possible. Share-scoped reply route also does NOT call `onChannelMessage`. No code change needed.
+
+**Advisory 2**: `detail.js` WS handlers (lines 843-851) use two separate `if` blocks for `comment` and `channel_response` that both call `loadComments()`. Could be combined with `||`, but the current form is more readable and mirrors the existing pattern of separate blocks per event type. No change recommended.
+
+### 4. Review summary in entity body — DONE
+
+(This section serves as the review summary.)
+
+**Files reviewed**:
+- `tools/dashboard/src/server.ts` — 5 publishEvent calls + 1 onChannelMessage call across 5 routes (3 main + 2 share-scoped)
+- `tools/dashboard/static/detail.js` — 2 WS event handlers (comment + channel_response)
+- `tools/dashboard/src/server.test.ts` — 6 integration tests (3 publishEvent + 1 onChannelMessage + 2 share-scoped)
+
+**Verification**:
+- Tests: 89/89 pass (0 fail)
+- Type-check: Only pre-existing bun-types warning, no new errors
+- No unused imports, no stale references, no security issues
+- Pattern consistency verified against gate_decision handler
+
+### 5. Gate recommendation — APPROVE
+
+**PR**: #17
+**Self-review rounds**: 1 (no findings requiring fixes)
+**Fixed items**: 0 (none needed)
+**Advisory items**: 2 (documented above — no code changes required)
+**Assessment**: Recommend APPROVE — clean bugfix with proper test coverage, consistent patterns, no regressions
