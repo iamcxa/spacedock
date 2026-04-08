@@ -3,11 +3,11 @@ id: 041
 title: Dashboard Browser Notifications — Captain Attention Alerts
 status: explore
 source: captain request 2026-04-09 (during 033 ship session)
-started:
+started: 2026-04-09
 completed:
 verdict:
 score: 0.85
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-browser-notifications
 issue:
 pr:
 intent: feature
