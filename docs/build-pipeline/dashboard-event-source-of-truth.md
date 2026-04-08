@@ -181,6 +181,15 @@ permission card 卡住的二級原因：早期 session 的 `permission_request` 
    - `grep -c ActivityHistory tools/dashboard/static/activity.js` — 0
    - `grep -r activity-history tools/dashboard/src/` — no matches
 
+## Stage Report: pr-draft
+
+1. Branch pushed: `spacedock-ensign/dashboard-event-source-of-truth` → origin — **DONE**
+2. Draft PR created: **iamcxa/spacedock#16** — https://github.com/iamcxa/spacedock/pull/16
+   - Title: `fix(dashboard): remove localStorage cache, use SQLite as single event source`
+   - Body includes: summary (dual state source problem), changes (EventBuffer.clear, DELETE endpoint, removed ActivityHistory, deleted activity-history.ts, -471 lines), test plan (events.test.ts, server.test.ts, grep verification)
+3. PR number captured: **#16**
+4. Stage report committed on branch
+
 ## Stage Report: quality
 
 **Quality checks run — ALL PASS**
