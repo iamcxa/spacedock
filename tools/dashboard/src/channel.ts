@@ -18,6 +18,28 @@ const PermissionRequestNotificationSchema = z.object({
   }),
 });
 
+import { mkdirSync, writeFileSync, unlinkSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { join } from "node:path";
+import { homedir } from "node:os";
+
+export function computeStateDir(projectRoot: string): string {
+  const hash = createHash("sha1").update(projectRoot).digest("hex").slice(0, 8);
+  return join(homedir(), ".spacedock", "dashboard", hash);
+}
+
+export function writeChannelState(stateDir: string, port: number): void {
+  mkdirSync(stateDir, { recursive: true });
+  writeFileSync(join(stateDir, "channel_port"), String(port) + "\n");
+}
+
+export function cleanChannelState(stateDir: string): void {
+  const portFile = join(stateDir, "channel_port");
+  if (existsSync(portFile)) {
+    try { unlinkSync(portFile); } catch {}
+  }
+}
+
 interface ChannelServerOptions {
   port: number;
   projectRoot: string;
@@ -176,8 +198,22 @@ if (import.meta.main) {
   // Notify browser clients that channel is now active
   dashboard.broadcastChannelStatus(true);
 
+  // Write channel state file so ctl.sh can detect this instance
+  const stateDir = computeStateDir(projectRoot);
+  writeChannelState(stateDir, dashboard.port);
+
+  // Clean up state file on exit (graceful)
+  const cleanup = () => {
+    cleanChannelState(stateDir);
+  };
+  process.on("SIGTERM", () => { cleanup(); process.exit(0); });
+  process.on("SIGINT", () => { cleanup(); process.exit(0); });
+  process.on("exit", cleanup);
+
+  // Update mcp.onclose to also clean state
   mcp.onclose = () => {
     dashboard.broadcastChannelStatus(false);
+    cleanup();
   };
 
   const banner = `[${new Date().toISOString().slice(0, 19).replace("T", " ")}] Spacedock Channel started on http://127.0.0.1:${dashboard.port}/ (root: ${projectRoot})`;

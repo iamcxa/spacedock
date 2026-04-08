@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { tmpdir, homedir } from "node:os";
 
 describe("Channel Server", () => {
   let tmpDir: string;
@@ -277,5 +277,75 @@ describe("Channel Integration", () => {
     expect(wfRes.status).toBe(200);
 
     srv.stop();
+  });
+});
+
+describe("Channel State File", () => {
+  let tmpDir: string;
+  let stateDir: string;
+
+  beforeAll(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "channel-state-test-"));
+    const wfDir = join(tmpDir, "docs", "build-pipeline");
+    mkdirSync(wfDir, { recursive: true });
+    writeFileSync(join(wfDir, "README.md"), "---\ncommissioned-by: spacedock@v1\n---\n");
+    const staticDir = join(tmpDir, "static");
+    mkdirSync(staticDir);
+    writeFileSync(join(staticDir, "index.html"), "<html></html>");
+
+    // Compute state dir using same hash as ctl.sh
+    const hash = Bun.spawnSync(["bash", "-c", `echo -n "${tmpDir}" | shasum | cut -c1-8`])
+      .stdout.toString().trim();
+    stateDir = join(homedir(), ".spacedock", "dashboard", hash);
+  });
+
+  afterAll(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+    // Clean up state dir
+    rmSync(stateDir, { recursive: true, force: true });
+  });
+
+  test("writeChannelState writes channel_port file to correct state dir", async () => {
+    const { writeChannelState } = await import("../../tools/dashboard/src/channel");
+    mkdirSync(stateDir, { recursive: true });
+    writeChannelState(stateDir, 8420);
+
+    const portFile = join(stateDir, "channel_port");
+    expect(existsSync(portFile)).toBe(true);
+    expect(readFileSync(portFile, "utf-8").trim()).toBe("8420");
+  });
+
+  test("writeChannelState writes actual bound port, not default", async () => {
+    const { writeChannelState } = await import("../../tools/dashboard/src/channel");
+    mkdirSync(stateDir, { recursive: true });
+    writeChannelState(stateDir, 8425);
+
+    const portFile = join(stateDir, "channel_port");
+    expect(readFileSync(portFile, "utf-8").trim()).toBe("8425");
+  });
+
+  test("cleanChannelState removes channel_port file", async () => {
+    const { writeChannelState, cleanChannelState } = await import("../../tools/dashboard/src/channel");
+    mkdirSync(stateDir, { recursive: true });
+    writeChannelState(stateDir, 8420);
+
+    const portFile = join(stateDir, "channel_port");
+    expect(existsSync(portFile)).toBe(true);
+
+    cleanChannelState(stateDir);
+    expect(existsSync(portFile)).toBe(false);
+  });
+
+  test("cleanChannelState is no-op when file does not exist", async () => {
+    const { cleanChannelState } = await import("../../tools/dashboard/src/channel");
+    mkdirSync(stateDir, { recursive: true });
+    // Should not throw
+    cleanChannelState(stateDir);
+  });
+
+  test("computeStateDir returns correct hash-based path", async () => {
+    const { computeStateDir } = await import("../../tools/dashboard/src/channel");
+    const result = computeStateDir(tmpDir);
+    expect(result).toBe(stateDir);
   });
 });

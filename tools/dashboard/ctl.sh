@@ -92,6 +92,7 @@ ROOT_FILE="$STATE_DIR/root"
 LOG_FILE="$STATE_DIR/dashboard.log"
 TUNNEL_URL_FILE="$STATE_DIR/tunnel_url"
 TUNNEL_PID_FILE="$STATE_DIR/tunnel_pid"
+CHANNEL_PORT_FILE="$STATE_DIR/channel_port"
 
 # --- helper functions ---
 
@@ -108,6 +109,22 @@ clean_stale() {
 
 port_in_use() {
     (echo >/dev/tcp/localhost/"$1") 2>/dev/null
+}
+
+is_channel_running() {
+    [[ -f "$CHANNEL_PORT_FILE" ]] || return 1
+    local ch_port
+    ch_port="$(cat "$CHANNEL_PORT_FILE" | tr -d '[:space:]')"
+    [[ -n "$ch_port" ]] || return 1
+    port_in_use "$ch_port"
+}
+
+get_channel_port() {
+    cat "$CHANNEL_PORT_FILE" 2>/dev/null | tr -d '[:space:]'
+}
+
+clean_stale_channel() {
+    rm -f "$CHANNEL_PORT_FILE"
 }
 
 find_free_port() {
@@ -139,17 +156,24 @@ format_uptime() {
 # --- tunnel lifecycle ---
 
 do_tunnel_start() {
-    # Require dashboard to be running
-    if ! is_running; then
-        echo "Error: dashboard is not running. Start it first with: ctl.sh start" >&2
+    # Determine which instance to tunnel to: server.ts (PID) or channel.ts (channel_port)
+    local selected_port=""
+
+    if is_running; then
+        # Server.ts daemon is running -- use its port
+        selected_port="$(cat "$PORT_FILE" 2>/dev/null)"
+    elif is_channel_running; then
+        # Channel.ts instance detected -- use channel port
+        selected_port="$(get_channel_port)"
+    else
+        echo "Error: no dashboard instance running (neither server nor channel)." >&2
+        echo "  Start server: ctl.sh start" >&2
+        echo "  Or launch channel via Claude Code MCP" >&2
         return 1
     fi
 
-    # Read port from state file (dashboard is already running)
-    local selected_port
-    selected_port="$(cat "$PORT_FILE" 2>/dev/null)"
     if [[ -z "$selected_port" ]]; then
-        echo "Error: cannot read dashboard port from $PORT_FILE" >&2
+        echo "Error: cannot determine dashboard port" >&2
         return 1
     fi
 
@@ -374,33 +398,58 @@ do_status() {
         return
     fi
 
-    if ! is_running; then
+    local has_server=false
+    local has_channel=false
+
+    # Check server.ts (ctl-managed)
+    if is_running; then
+        has_server=true
+    elif [[ -f "$PID_FILE" ]]; then
+        clean_stale
+        echo "(Cleaned stale server PID file.)"
+    fi
+
+    # Check channel.ts (Claude Code-managed)
+    if is_channel_running; then
+        has_channel=true
+    elif [[ -f "$CHANNEL_PORT_FILE" ]]; then
+        clean_stale_channel
+        echo "(Cleaned stale state file.)"
+    fi
+
+    if [[ "$has_server" == "false" && "$has_channel" == "false" ]]; then
         echo "Dashboard is not running."
-        if [[ -f "$PID_FILE" ]]; then
-            clean_stale
-            echo "(Cleaned stale PID file.)"
-        fi
         return 0
     fi
 
-    local pid port root_path
-    pid="$(cat "$PID_FILE")"
-    port="$(cat "$PORT_FILE" 2>/dev/null || echo '?')"
-    root_path="$(cat "$ROOT_FILE" 2>/dev/null || echo '?')"
-
-    # Compute uptime from PID file mtime
-    local now mtime seconds uptime_str
-    now="$(date +%s)"
-    mtime="$(stat -f %m "$PID_FILE" 2>/dev/null || stat -c %Y "$PID_FILE" 2>/dev/null || echo "$now")"
-    seconds=$((now - mtime))
-    uptime_str="$(format_uptime "$seconds")"
-
     echo "Spacedock Dashboard"
-    echo "  Status:  running (PID ${pid})"
-    echo "  URL:     http://127.0.0.1:${port}/"
-    echo "  Root:    ${root_path}"
-    echo "  Uptime:  ${uptime_str}"
-    echo "  Log:     ${LOG_FILE}"
+
+    if [[ "$has_server" == "true" ]]; then
+        local pid port root_path
+        pid="$(cat "$PID_FILE")"
+        port="$(cat "$PORT_FILE" 2>/dev/null || echo '?')"
+        root_path="$(cat "$ROOT_FILE" 2>/dev/null || echo '?')"
+
+        local now mtime seconds uptime_str
+        now="$(date +%s)"
+        mtime="$(stat -f %m "$PID_FILE" 2>/dev/null || stat -c %Y "$PID_FILE" 2>/dev/null || echo "$now")"
+        seconds=$((now - mtime))
+        uptime_str="$(format_uptime "$seconds")"
+
+        echo "  Server:  running (PID ${pid})"
+        echo "  URL:     http://127.0.0.1:${port}/"
+        echo "  Root:    ${root_path}"
+        echo "  Uptime:  ${uptime_str}"
+        echo "  Log:     ${LOG_FILE}"
+    fi
+
+    if [[ "$has_channel" == "true" ]]; then
+        local ch_port
+        ch_port="$(get_channel_port)"
+        echo "  Channel: running (port ${ch_port}, Claude Code managed)"
+        echo "  URL:     http://127.0.0.1:${ch_port}/"
+    fi
+
     if [[ -f "$TUNNEL_URL_FILE" ]]; then
         local tunnel_url
         tunnel_url="$(cat "$TUNNEL_URL_FILE")"
@@ -424,26 +473,47 @@ do_status_all() {
     local found=false
     for dir in "$base_dir"/*/; do
         [[ -d "$dir" ]] || continue
-        found=true
         local dir_pid_file="$dir/pid"
         local dir_port_file="$dir/port"
         local dir_root_file="$dir/root"
+        local dir_channel_port_file="$dir/channel_port"
 
         local proj_name="?"
         if [[ -f "$dir_root_file" ]]; then
             proj_name="$(basename "$(cat "$dir_root_file")")"
         fi
 
+        local shown=false
+
+        # Check server.ts instance
         if [[ -f "$dir_pid_file" ]]; then
             local pid
             pid="$(cat "$dir_pid_file")"
             if kill -0 "$pid" 2>/dev/null; then
+                found=true
+                shown=true
                 local port
                 port="$(cat "$dir_port_file" 2>/dev/null || echo '?')"
-                echo "  [running]  ${proj_name}  http://127.0.0.1:${port}/  PID ${pid}"
+                echo "  [server]   ${proj_name}  http://127.0.0.1:${port}/  PID ${pid}"
             else
                 echo "  [stale]    ${proj_name}  PID file exists but process dead — cleaned up"
                 rm -f "$dir_pid_file" "$dir_port_file" "$dir_root_file"
+            fi
+        fi
+
+        # Check channel.ts instance
+        if [[ -f "$dir_channel_port_file" ]]; then
+            local ch_port
+            ch_port="$(cat "$dir_channel_port_file" | tr -d '[:space:]')"
+            if [[ -n "$ch_port" ]] && (echo >/dev/tcp/localhost/"$ch_port") 2>/dev/null; then
+                found=true
+                shown=true
+                echo "  [channel]  ${proj_name}  http://127.0.0.1:${ch_port}/  (Claude Code)"
+            else
+                if [[ "$shown" == "false" ]]; then
+                    echo "  [stale]    ${proj_name}  channel_port file exists but port not responding — cleaned up"
+                fi
+                rm -f "$dir_channel_port_file"
             fi
         fi
     done
