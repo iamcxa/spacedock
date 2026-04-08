@@ -536,3 +536,20 @@ This plan involves **no schema changes, no new APIs, no new infrastructure depen
 All quality checks pass. No regressions. File scope, test results, and commit discipline all within specification. The execute stage output is clean and ready for the next gate.
 
 **Recommended next action**: Auto-advance to gate review or subsequent stage.
+
+## Stage Report (pr-draft)
+
+### Checklist
+
+1. **Push branch to origin** — DONE. `git push -u origin spacedock-ensign/dashboard-comment-system-followup` succeeded (clean, no conflicts).
+2. **Create PR** — DONE. Draft PR created via `gh pr create --draft`.
+3. **PR URL** — https://github.com/iamcxa/spacedock/pull/19
+4. **Frontmatter `pr` field** — SKIPPED per instructions (FO owns frontmatter).
+
+### PR Details
+
+- **Title**: `fix(dashboard): 027 followup — test isolation + FO reply rendering + IME guard`
+- **Base**: `main`
+- **Status**: Draft
+- **Assignee**: @me
+- **URL**: https://github.com/iamcxa/spacedock/pull/19
