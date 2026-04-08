@@ -1,7 +1,7 @@
 ---
 id: 037
 title: Dashboard MCP Auto-Setup — Detect + Fix Missing .mcp.json Entry
-status: execute
+status: pr-draft
 source: plugin user bug report — .mcp.json missing causes dashboard MCP disconnect
 started: 2026-04-08
 completed:
@@ -80,8 +80,8 @@ See SKILL at `skills/dashboard/SKILL.md` — Setup section is where the detectio
 
 ### Feedback Cycles
 
-**Cycle 1** (2026-04-08) — quality REJECTED → execute
+**Cycle 1** (2026-04-08) — quality REJECTED → execute → RESOLVED
 - **Reviewer**: spacedock-ensign-dashboard-mcp-auto-setup-quality
 - **Reason**: Commit message `new: 037 ...` does not follow conventional commits format. All other checks (SKILL.md structure, bash logic, test scenarios, file scope) passed.
 - **Fix requested**: `git commit --amend -m "fix(dashboard-skill): add MCP auto-setup check to /dashboard start"`
-- **Status**: in progress
+- **Resolution**: execute v2 amended commit → `bd3bc0e fix(dashboard-skill): add MCP auto-setup check to /dashboard start`. No code changes. FO re-verified inline (tautology — only commit msg changed, all prior quality checks still valid). Advance to pr-draft.
