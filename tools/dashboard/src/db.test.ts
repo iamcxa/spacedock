@@ -32,6 +32,33 @@ describe("openDb", () => {
     db.close();
   });
 
+  test("creates entity_snapshots table with all required columns", () => {
+    const db = openDb(":memory:");
+    const info = db.query("PRAGMA table_info(entity_snapshots)").all() as Array<{ name: string }>;
+    const columns = info.map((c) => c.name);
+    expect(columns).toContain("id");
+    expect(columns).toContain("entity");
+    expect(columns).toContain("version");
+    expect(columns).toContain("body");
+    expect(columns).toContain("frontmatter");
+    expect(columns).toContain("author");
+    expect(columns).toContain("reason");
+    expect(columns).toContain("source");
+    expect(columns).toContain("rollback_from_version");
+    expect(columns).toContain("rollback_section");
+    expect(columns).toContain("created_at");
+    db.close();
+  });
+
+  test("creates unique index idx_entity_version on entity_snapshots", () => {
+    const db = openDb(":memory:");
+    const indexes = db.query("PRAGMA index_list(entity_snapshots)").all() as Array<{ name: string; unique: number }>;
+    const idx = indexes.find((i) => i.name === "idx_entity_version");
+    expect(idx).toBeDefined();
+    expect(idx!.unique).toBe(1);
+    db.close();
+  });
+
   test("does NOT set WAL mode on :memory: database", () => {
     const db = openDb(":memory:");
     const result = db.query("PRAGMA journal_mode").get() as { journal_mode: string };
