@@ -79,6 +79,35 @@ Your working directory stays at the project root. Do not `cd` into worktrees. Us
 - `git -C {path}` for git operations outside the root
 - worktree-local file paths only when operating inside that worktree
 
+## Effective Stages
+
+Before dispatching any entity, compute its effective stage list. This determines which stages the entity will pass through and what its next stage is.
+
+```
+effective_stages(entity):
+  if entity has no profile assigned (profile field is empty):
+    return full_pipeline_stage_order   # all stages from README states list
+
+  if entity.profile not in known profiles:
+    return full_pipeline_stage_order   # unknown profile — safe fallback
+
+  base = profiles[entity.profile]      # e.g. ['brainstorm', 'explore', 'plan', 'execute', ...]
+  kept = base - entity.skip_stages     # remove any skip-stages overrides
+
+  # add-stages: insert at canonical position from full-pipeline order
+  for stage in full_pipeline_order:
+    if stage in kept OR stage in entity.add_stages:
+      include it in result
+
+  return result
+```
+
+**Recompute on every dispatch** — `effective_stages()` is stateless. Call it fresh at each advancement. This means profile or override changes take effect at the next transition without any special handling.
+
+**Mid-pipeline profile changes:** Profile and override changes only affect stages **after** `current_stage`. Never re-dispatch a stage that already has a completed stage report. When determining the next stage, compare `entity.status` against the freshly-computed `effective_stages()` result — if `entity.status` is in the list, the next stage is the following entry. If `entity.status` is not in the list (stage was removed by an override applied after dispatch), find the first effective stage whose canonical index is greater than `entity.status`'s canonical index.
+
+**Startup note:** Read `stages.profiles` from the README frontmatter alongside `stages.states`. The `status --next` output now includes PROFILE and DISPATCH columns — use these when deciding whether to dispatch an ensign or handle inline.
+
 ## Dispatch
 
 For each entity reported by `status --next`:
