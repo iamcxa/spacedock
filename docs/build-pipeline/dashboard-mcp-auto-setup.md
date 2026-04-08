@@ -1,7 +1,7 @@
 ---
 id: 037
 title: Dashboard MCP Auto-Setup — Detect + Fix Missing .mcp.json Entry
-status: execute
+status: quality
 source: plugin user bug report — .mcp.json missing causes dashboard MCP disconnect
 started: 2026-04-08
 completed:
