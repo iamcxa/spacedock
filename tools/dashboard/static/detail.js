@@ -274,8 +274,29 @@ function loadEntity() {
             renderTags(data.tags);
             initScore(data.frontmatter.score || '0');
             if (typeof loadComments === 'function') loadComments();
+
+            // Fetch comments and apply highlights
+            apiFetch('/api/entity/comments?path=' + encodeURIComponent(entityPath))
+              .then(function (threadData) {
+                cachedComments = threadData.comments || [];
+                applyCommentHighlights(cachedComments);
+              });
+
+            var entityStatus = data.frontmatter.status;
+            if (workflowStages) {
+              updateGatePanel(entityStatus, workflowStages);
+              renderPhaseNav(workflowStages, data.stage_reports, entityStatus);
+            } else {
+              fetchWorkflowStages().then(function (stages) {
+                updateGatePanel(entityStatus, stages);
+                renderPhaseNav(stages, data.stage_reports, entityStatus);
+              });
+            }
         });
 }
+
+// Expose as window.loadEntity so IIFEs (rollback modal, etc.) can call it
+window.loadEntity = loadEntity;
 
 // -- Event listeners --
 
@@ -1334,60 +1355,7 @@ function rejectSuggestionAction(suggestionId) {
 
   // --- Initialize ---
 
-  window.loadEntity = function () {
-    if (!entityPath) return;
-    apiFetch('/api/entity/detail?path=' + encodeURIComponent(entityPath))
-      .then(function (data) {
-        document.getElementById('entity-title').textContent = data.frontmatter.title || '(untitled)';
-        document.title = (data.frontmatter.title || 'Entity') + ' \u2014 Spacedock';
-        renderMetadata(data.frontmatter);
-        renderBody(data.body);
-        renderStageReports(data.stage_reports);
-        renderTags(data.tags);
-        initScore(data.frontmatter.score || '0');
-        if (typeof loadComments === 'function') loadComments();
-
-        // Fetch comments and apply highlights
-        apiFetch('/api/entity/comments?path=' + encodeURIComponent(entityPath))
-          .then(function (threadData) {
-            cachedComments = threadData.comments || [];
-            applyCommentHighlights(cachedComments);
-          });
-
-        var entityStatus = data.frontmatter.status;
-        if (workflowStages) {
-          updateGatePanel(entityStatus, workflowStages);
-          renderPhaseNav(workflowStages, data.stage_reports, entityStatus);
-        } else {
-          fetchWorkflowStages().then(function (stages) {
-            updateGatePanel(entityStatus, stages);
-            renderPhaseNav(stages, data.stage_reports, entityStatus);
-          });
-        }
-      });
-  };
-
   connectDetailWs();
-
-  if (entityPath) {
-    fetchWorkflowStages().then(function (stages) {
-      if (!stages) return;
-      apiFetch('/api/entity/detail?path=' + encodeURIComponent(entityPath))
-        .then(function (data) {
-          updateGatePanel(data.frontmatter.status, stages);
-          renderPhaseNav(stages, data.stage_reports, data.frontmatter.status);
-        });
-    });
-  }
-
-  // Apply highlights for already-loaded page (initial load used original loadEntity)
-  if (entityPath) {
-    apiFetch('/api/entity/comments?path=' + encodeURIComponent(entityPath))
-      .then(function (threadData) {
-        cachedComments = threadData.comments || [];
-        applyCommentHighlights(cachedComments);
-      });
-  }
 })();
 
 // --- Share Link Creation ---
@@ -1575,7 +1543,7 @@ function rejectSuggestionAction(suggestionId) {
   });
 
   confirmBtn.addEventListener('click', function () {
-    if (!pendingSection || !pendingVersion || !entityPath) return;
+    if (pendingSection == null || pendingVersion == null || entityPath == null) return;
     confirmBtn.disabled = true;
     confirmBtn.textContent = 'Rolling back\u2026';
     errorEl.style.display = 'none';
@@ -1635,27 +1603,27 @@ function rejectSuggestionAction(suggestionId) {
     pendingRequestId = requestId;
     descEl.textContent = description || '';
 
-    // Render diff preview using same parseDiffHunks approach
+    // Render diff preview using shared parseDiffHunks from version-history.js
     while (diffEl.firstChild) diffEl.removeChild(diffEl.firstChild);
     if (diffPreview) {
-      var lines = diffPreview.split('\n');
-      lines.forEach(function (line) {
-        var skip = line.startsWith('---') || line.startsWith('+++') || line.startsWith('@@') || line === '';
+      var parseHunks = typeof window.spacedock_parseDiffHunks === 'function'
+        ? window.spacedock_parseDiffHunks
+        : null;
+      var hunks = parseHunks ? parseHunks(diffPreview) : [];
+      hunks.forEach(function (hunk) {
         var lineEl = document.createElement('div');
         lineEl.style.padding = '0 0.75rem';
         lineEl.style.lineHeight = '1.5';
-        if (line.startsWith('+') && !line.startsWith('+++')) {
+        if (hunk.type === 'add') {
           lineEl.style.background = 'rgba(63,185,80,0.1)';
           lineEl.style.color = '#3fb950';
-        } else if (line.startsWith('-') && !line.startsWith('---')) {
+        } else if (hunk.type === 'del') {
           lineEl.style.background = 'rgba(248,81,73,0.1)';
           lineEl.style.color = '#f85149';
-        } else if (skip) {
-          lineEl.style.color = '#484f58';
         } else {
           lineEl.style.color = '#8b949e';
         }
-        lineEl.textContent = line || '\u00a0';
+        lineEl.textContent = hunk.text || '\u00a0';
         diffEl.appendChild(lineEl);
       });
     }
