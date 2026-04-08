@@ -101,6 +101,40 @@
     }
   }
 
+  var NOTIF_TITLES = {
+    gate: "Gate awaiting approval",
+    permission_request: "Permission requested",
+    comment: "FO comment",
+    channel_response: "FO reply",
+    pr_ready: "PR ready for review",
+    pipeline_error: "Pipeline error",
+    entity_shipped: "Entity shipped",
+  };
+
+  function maybeNotify(event) {
+    var N = window.SpacedockNotifications;
+    if (!N) return;
+    var title = NOTIF_TITLES[event.type];
+    if (!title) return;
+    var entityLabel = event.entity ? " — " + event.entity : "";
+    var body = (event.detail || "").slice(0, 80);
+    var entitySlug = event.entity;
+    N.showNotification({
+      type: event.type,
+      entity: event.entity,
+      title: title + entityLabel,
+      body: body,
+      onClick: function () {
+        window.focus();
+        if (entitySlug) {
+          window.location.href = "/detail.html?path=" + encodeURIComponent(
+            "docs/build-pipeline/" + entitySlug + ".md"
+          );
+        }
+      },
+    });
+  }
+
   function connect() {
     setStatus("connecting");
     ws = new WebSocket(getWsUrl());
@@ -139,6 +173,7 @@
             markResolved(resolved[ri], "inferred");
           }
           lastSeq = msg.data.seq;
+          maybeNotify(msg.data.event);
         }
       } else if (msg.type === "channel_status") {
         setChannelStatus(msg.connected);
