@@ -353,3 +353,39 @@ None — all claims verified from codebase and/or official Bun docs.
 - ⏭️ License: SKIPPED (no deps changed)
 
 **Status**: Quality gates PASS. Pre-existing test failures (4 in downstream tests) do not block 024. Recommend advancing to ship stage.
+
+## Stage Report: pr-draft
+
+1. **PR created** — DONE. Draft PR #15 created on GitHub: https://github.com/iamcxa/spacedock/pull/15
+   - Title: `feat(dashboard): detect channel instance for unified tunnel/status` (66 chars, conventional commit format)
+   - Flags: `--draft --assignee @me`
+   - No DCO/signoff requirement found in CLAUDE.md or AGENTS.md
+
+2. **PR body** — DONE. Body includes:
+   - Summary: problem statement + approach (state file strategy, backward compat)
+   - Test plan: all 4 quality gate commands with pass/fail results
+   - Coverage data: channel.ts 58.90%, ctl.sh 100% via integration tests
+   - Pre-existing failure disclosure (parsing.test.ts, server.test.ts)
+   - Diff size note (1303 total, ~285 source)
+
+3. **Diff size check** — DONE. Total diff: 1303 lines (>1000 — flagged for captain).
+   - Breakdown: 980 lines are docs/plan artifacts (entity md + spec md), not production code
+   - Source code changes: ~285 lines (ctl.sh 130, channel.ts 36, tests 184, SKILL.md 9)
+   - Captain acknowledgment: source changes are Medium-scale; doc artifact inflation is expected for spacedock build pipeline entities
+
+4. **PR number captured** — DONE.
+   - PR_NUMBER: 15
+   - PR_URL: https://github.com/iamcxa/spacedock/pull/15
+
+5. **Stage report committed** — DONE (this commit)
+
+### Self-Review Annotations (4 comments posted)
+
+Posted via `gh api repos/iamcxa/spacedock/pulls/15/reviews` (review ID: 4072113391):
+- `channel.ts:27` — SHA-1 hash algorithm identity with ctl.sh bash shasum
+- `channel.ts:211` — Three cleanup paths (SIGTERM/SIGINT/exit) rationale and SIGKILL stale-file handling
+- `ctl.sh:119` — Two-stage validation (file + live port) design
+- `ctl.sh:165` — Server-over-channel priority logic when both instances running
+
+### Linear Comment: SKIPPED
+Rationale: no `issue` field set in entity frontmatter.
