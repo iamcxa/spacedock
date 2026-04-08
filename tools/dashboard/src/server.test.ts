@@ -24,6 +24,7 @@ describe("comment routes publish events", () => {
       projectRoot: TMP,
       staticDir: join(import.meta.dir, "../static"),
       logFile: join(TMP, "test.log"),
+      dbPath: join(TMP, "test.db"),
     });
     try {
       const addr = server.url;
@@ -55,6 +56,7 @@ describe("comment routes publish events", () => {
       projectRoot: TMP,
       staticDir: join(import.meta.dir, "../static"),
       logFile: join(TMP, "test.log"),
+      dbPath: join(TMP, "test.db"),
     });
     try {
       const addr = server.url;
@@ -97,6 +99,7 @@ describe("comment routes publish events", () => {
       projectRoot: TMP,
       staticDir: join(import.meta.dir, "../static"),
       logFile: join(TMP, "test.log"),
+      dbPath: join(TMP, "test.db"),
     });
     try {
       const addr = server.url;
@@ -141,6 +144,7 @@ describe("captain reply forwards to FO via onChannelMessage", () => {
       projectRoot: TMP,
       staticDir: join(import.meta.dir, "../static"),
       logFile: join(TMP, "test.log"),
+      dbPath: join(TMP, "test.db"),
       onChannelMessage: async (content, meta) => {
         messages.push({ content, meta });
       },
@@ -189,6 +193,7 @@ describe("share-scoped comment routes publish events", () => {
       projectRoot: TMP,
       staticDir: join(import.meta.dir, "../static"),
       logFile: join(TMP, "test.log"),
+      dbPath: join(TMP, "test.db"),
     });
     try {
       const addr = server.url;
@@ -235,6 +240,7 @@ describe("share-scoped comment routes publish events", () => {
       projectRoot: TMP,
       staticDir: join(import.meta.dir, "../static"),
       logFile: join(TMP, "test.log"),
+      dbPath: join(TMP, "test.db"),
     });
     try {
       const addr = server.url;
