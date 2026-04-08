@@ -738,3 +738,18 @@ All quality checks completed successfully:
 - ✅ Build: Successful without errors
 
 The execute work is ready for handoff to captain/next stage.
+
+## Stage Report (pr-draft)
+
+1. **Push branch to origin** — DONE
+   `git push -u origin spacedock-ensign/dashboard-sqlite-snapshots` succeeded. Branch is tracked at `origin/spacedock-ensign/dashboard-sqlite-snapshots`.
+
+2. **Create draft PR** — DONE
+   PR created via `gh pr create --draft`.
+   URL: https://github.com/iamcxa/spacedock/pull/20
+   Title: `feat(dashboard): entity snapshot system with section-level diff and rollback`
+   Base: `main`
+
+3. **PR URL** — https://github.com/iamcxa/spacedock/pull/20
+
+4. **Stage report commit** — DONE (this commit)
