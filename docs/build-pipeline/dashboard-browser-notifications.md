@@ -88,6 +88,131 @@ Per MEMORY.md WebSocket cross-instance limitation, the 8420 (channel) and 8421 (
 Captain request during 033 ship session (2026-04-09):
 > "UI 需要串瀏覽器通知，當需要我注意或互動時，應該要跳通知呼叫我，而且可以設定開關"
 
+## Stage Report (quality)
+
+### Test Suite
+
+**notifications.test.ts**: 18/18 pass (bun test tests/dashboard/notifications.test.ts)
+
+**tools/dashboard bun test**: 83 pass, 4 fail — all 4 failures are pre-existing tech debt:
+- `error: Cannot find package 'diff'` (snapshots.ts dependency not installed)
+- `error: Cannot find module '@modelcontextprotocol/sdk/server/index.js'` (channel.ts dependency not installed)
+
+Zero new failures introduced by 041.
+
+---
+
+### Code Review: notifications.js
+
+| Check | Result |
+|---|---|
+| `requestPermission` wired to user gesture only (no onload) | PASS — only called inside `enabledToggle.addEventListener("change", ...)` in activity.js. Never called on page load. |
+| Dedup window 30s, keyed by (type, entity, body) | PASS — `dedupKey(type, entity, body.slice(0,32))`, `DEDUP_WINDOW_MS = 30000`. |
+| Visibility check `document.visibilityState === "visible"` | PASS — `var doc = global.document; if (doc && doc.visibilityState === "visible") return;` |
+| Config from `localStorage.dashboard.notifications.config` | PASS — `CONFIG_KEY = "dashboard.notifications.config"`, read via `global.localStorage`. |
+| No unbounded Maps — dedup cleanup | PASS — `cleanDedupMap()` called on every `showNotification()`, evicts entries older than 60s. Map stays bounded. |
+| `NotifAPI` captured at IIFE init | PASS — `var NotifAPI = global.Notification`. `permission` is a live class property (not snapshotted), so `NotifAPI.permission` reflects runtime state correctly. |
+
+---
+
+### Code Review: Settings UI
+
+| Check | Result |
+|---|---|
+| Master toggle triggers `requestPermission()` on click | PASS — `enabledToggle.addEventListener("change", ...)` calls `N.requestPermission()` only when `checked === true`. |
+| Per-event-type checkboxes persist independently | PASS — each checkbox's `change` event calls `saveFromUI()` which reads all checkboxes and writes full config to localStorage. |
+| Test button works without real event | PASS — directly constructs `new Notification("Spacedock Test", ...)`, bypasses dedup/visibility. |
+| Permission state indicator | PASS — `updatePermBadge()` reads `N.getPermissionState()`, updates text + CSS class. Called on panel open and after permission request resolves. |
+| Toggle disabled when permission denied/unsupported | PASS — `updatePermBadge()` sets `enabledToggle.disabled = true` for denied/unsupported states. |
+
+---
+
+### Code Review: WS Integration
+
+| Check | Result |
+|---|---|
+| activity.js: calls `maybeNotify` for all captain-attention types | PASS — `maybeNotify(msg.data.event)` called in `msg.type === "event"` branch. `NOTIF_TITLES` covers: gate, permission_request, comment, channel_response, pr_ready, pipeline_error, entity_shipped. |
+| detail.js: calls for detail-scoped events | PASS — IIFE after each WS event processes gate, comment, channel_response. |
+| Both dedup via shared singleton | PASS — both pages load `/notifications.js` first. `SpacedockNotifications` is a singleton on `window`. `dedupMap` is shared. If captain has both pages open, same key within 30s suppresses duplicate. |
+| share.js untouched | PASS — no changes to share.js or share.html. |
+
+---
+
+### Commit Hygiene
+
+All 5 execute commits use `041 execute:` prefix, atomic, each covering exactly one logical change:
+
+```
+77753ae 041 execute: wire browser notifications to entity detail page WS
+1c0cad3 041 execute: wire browser notifications to activity feed WS
+02ff9ba 041 execute: add notification settings panel to dashboard index
+bf81948 041 execute: add notifications.js module — permission, dedup, visibility, config
+437003b 041 execute: add pr_ready, pipeline_error, entity_shipped event types
+```
+
+---
+
+### Issues Found
+
+**Minor**: Test button in activity.js (line 856) uses bare `Notification` and `new Notification(...)` rather than going through `SpacedockNotifications.showNotification`. This is intentional — the test button bypasses dedup/visibility to guarantee a visible notification. However, it also bypasses the `global.Notification` abstraction in notifications.js. In a browser context this is fine (`Notification` is the same as `window.Notification`). Not a bug, acceptable trade-off for a test utility.
+
+**None blocking**.
+
+---
+
+### Manual Test Plan (Browser)
+
+Prerequisites: Start dashboard (`bun run tools/dashboard/src/server.ts` or via `spacedock dashboard`), open `http://localhost:8420` in Chrome/Firefox.
+
+1. **Settings panel open/close**
+   - Click the ⚙ button in the header → settings panel expands
+   - Click again → panel collapses
+
+2. **Enable notifications (permission=default)**
+   - Open panel, check "Browser Notifications" toggle
+   - Browser shows native permission prompt → click "Allow"
+   - Permission badge shows "Permission: granted", toggle stays checked
+
+3. **Test button**
+   - With notifications enabled, click "Test" button
+   - System notification appears: "Spacedock Test — Notifications are working."
+   - Notification auto-dismisses after 5s
+
+4. **Gate notification (background tab)**
+   - Open a second browser window, put dashboard tab in background
+   - In terminal: `curl -s -X POST http://localhost:8420/api/events -H 'Content-Type: application/json' -d '{"type":"gate","entity":"041","stage":"quality","agent":"test","timestamp":"2026-04-09T00:00:00Z","detail":"Awaiting captain approval"}'`
+   - System notification appears: "Gate awaiting approval — 041"
+
+5. **Click notification → focus + navigate**
+   - Click the notification from step 4
+   - Browser tab focuses
+   - URL navigates to `/detail.html?path=docs%2Fbuild-pipeline%2F041.md`
+
+6. **Disable notifications**
+   - Uncheck master toggle
+   - Post another gate event (curl as above)
+   - No notification appears
+
+7. **Tab visible suppression**
+   - Re-enable notifications, keep tab in foreground (visible)
+   - Post a gate event → no notification (tab is visible)
+   - Switch to another app (tab hidden), post gate event → notification appears
+
+8. **Per-type filter**
+   - Enable notifications, uncheck "Gate approval"
+   - Post a gate event → no notification
+   - Post a comment event → notification appears
+
+9. **Dedup (30s window)**
+   - Post the same gate event twice within 30s
+   - Only first notification appears; second is suppressed
+
+10. **macOS Safari caveat**
+    - Safari requires dashboard to be added as a Web App (File → Add to Dock) for notifications to work
+    - Test in Chrome/Firefox for reliable verification
+
+---
+
 ## Stage Report (plan)
 
 ### Gate Type Resolution
