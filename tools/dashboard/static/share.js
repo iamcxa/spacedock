@@ -20,7 +20,7 @@
 
   verifyBtn.addEventListener("click", doVerify);
   passwordInput.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") doVerify();
+    if (e.key === "Enter" && !e.isComposing) doVerify();
   });
 
   function doVerify() {
@@ -451,7 +451,7 @@
           submitReply(capturedId, text);
         };
         input.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') btn.click();
+          if (e.key === 'Enter' && !e.isComposing) btn.click();
         });
         form.appendChild(input);
         form.appendChild(btn);

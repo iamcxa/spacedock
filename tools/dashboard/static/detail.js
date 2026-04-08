@@ -282,7 +282,7 @@ function loadEntity() {
 document.getElementById('score-save').addEventListener('click', saveScore);
 document.getElementById('tag-add').addEventListener('click', addTag);
 document.getElementById('tag-input').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') addTag();
+    if (e.key === 'Enter' && !e.isComposing) addTag();
 });
 
 // -- Initial load --
@@ -1051,7 +1051,7 @@ function rejectSuggestionAction(suggestionId) {
           submitReply(capturedId, text);
         };
         input.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') btn.click();
+          if (e.key === 'Enter' && !e.isComposing) btn.click();
         });
         form.appendChild(input);
         form.appendChild(btn);
