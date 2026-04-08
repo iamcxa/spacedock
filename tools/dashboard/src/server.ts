@@ -575,7 +575,16 @@ export function createServer(opts: ServerOptions) {
           const url = new URL(req.url);
           const sinceStr = url.searchParams.get("since");
           const since = sinceStr ? parseInt(sinceStr, 10) : 0;
-          const events = since > 0 ? eventBuffer.getSince(since) : eventBuffer.getAll();
+          const entity = url.searchParams.get("entity");
+          let events;
+          if (entity) {
+            events = eventBuffer.getByEntity(entity);
+            if (since > 0) {
+              events = events.filter(e => e.seq > since);
+            }
+          } else {
+            events = since > 0 ? eventBuffer.getSince(since) : eventBuffer.getAll();
+          }
           logRequest(req, 200);
           return jsonResponse({ events });
         },

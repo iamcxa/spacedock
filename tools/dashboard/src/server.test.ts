@@ -501,3 +501,72 @@ describe("snapshot HTTP endpoints", () => {
     }
   });
 });
+
+describe("GET /api/events entity filter", () => {
+  test("returns only events for the specified entity", async () => {
+    const server = createServer({
+      port: 0,
+      hostname: "127.0.0.1",
+      projectRoot: TMP,
+      staticDir: join(import.meta.dir, "../static"),
+      logFile: join(TMP, "test.log"),
+      dbPath: join(TMP, "test-events-filter.db"),
+    });
+    try {
+      const addr = server.url;
+      await fetch(`${addr}api/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "dispatch", entity: "alpha", stage: "build", agent: "fo", timestamp: "2026-01-01T00:00:00Z" }),
+      });
+      await fetch(`${addr}api/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "completion", entity: "beta", stage: "build", agent: "fo", timestamp: "2026-01-01T00:01:00Z" }),
+      });
+      await fetch(`${addr}api/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "gate", entity: "alpha", stage: "quality", agent: "fo", timestamp: "2026-01-01T00:02:00Z" }),
+      });
+
+      const res = await fetch(`${addr}api/events?entity=alpha`);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.events).toHaveLength(2);
+      expect(data.events.every((e: any) => e.event.entity === "alpha")).toBe(true);
+    } finally {
+      server.stop();
+    }
+  });
+
+  test("returns all events when no entity param", async () => {
+    const server = createServer({
+      port: 0,
+      hostname: "127.0.0.1",
+      projectRoot: TMP,
+      staticDir: join(import.meta.dir, "../static"),
+      logFile: join(TMP, "test.log"),
+      dbPath: join(TMP, "test-events-nofilter.db"),
+    });
+    try {
+      const addr = server.url;
+      await fetch(`${addr}api/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "dispatch", entity: "alpha", stage: "build", agent: "fo", timestamp: "2026-01-01T00:00:00Z" }),
+      });
+      await fetch(`${addr}api/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "completion", entity: "beta", stage: "build", agent: "fo", timestamp: "2026-01-01T00:01:00Z" }),
+      });
+
+      const res = await fetch(`${addr}api/events`);
+      const data = await res.json();
+      expect(data.events.length).toBeGreaterThanOrEqual(2);
+    } finally {
+      server.stop();
+    }
+  });
+});
