@@ -254,6 +254,17 @@ export class SnapshotStore {
       );
     }
 
+    // Conflict heuristic (non-blocking): flag other sections whose body has
+    // changed between the target version and the current on-disk document.
+    // We compare the target snapshot's sections to the current body's sections,
+    // ignoring the section that is being rolled back.
+    const warning = computeConflictWarning(
+      targetSections,
+      currentSections,
+      targetSection.heading,
+      input.toVersion,
+    );
+
     const newBody = replaceSection(input.currentBody, currentSection, targetSection.body);
 
     const newSnapshot = this.createSnapshot({
@@ -267,8 +278,46 @@ export class SnapshotStore {
       rollback_section: targetSection.heading,
     });
 
-    return { newBody, newSnapshot, warning: null };
+    return { newBody, newSnapshot, warning };
   }
+}
+
+/**
+ * Non-blocking conflict heuristic. Returns a human-readable warning string
+ * listing any sections (other than the rolled-back one) whose body differs
+ * between the target snapshot and the current document. Returns null when
+ * only the target section has diverged.
+ */
+export function computeConflictWarning(
+  targetSections: ParsedSection[],
+  currentSections: ParsedSection[],
+  rolledBackHeading: string,
+  targetVersion: number,
+): string | null {
+  const currentMap = new Map(currentSections.map((s) => [s.heading, s]));
+  const modified: string[] = [];
+  for (const ts of targetSections) {
+    if (ts.heading === rolledBackHeading) continue;
+    const cs = currentMap.get(ts.heading);
+    if (!cs) {
+      // Section present in target but missing in current → drift
+      modified.push(ts.heading);
+      continue;
+    }
+    if (cs.body !== ts.body) {
+      modified.push(ts.heading);
+    }
+  }
+  // Also catch sections added to current but not in target (other drift).
+  const targetHeadings = new Set(targetSections.map((s) => s.heading));
+  for (const cs of currentSections) {
+    if (cs.heading === rolledBackHeading) continue;
+    if (!targetHeadings.has(cs.heading)) {
+      modified.push(cs.heading);
+    }
+  }
+  if (modified.length === 0) return null;
+  return `Other sections modified since v${targetVersion}: ${modified.join(", ")}`;
 }
 
 /**

@@ -2,7 +2,13 @@
 
 import { describe, test, expect } from "bun:test";
 import { openDb } from "./db";
-import { parseSections, SnapshotStore, findSectionByHeading, replaceSection } from "./snapshots";
+import {
+  parseSections,
+  SnapshotStore,
+  findSectionByHeading,
+  replaceSection,
+  computeConflictWarning,
+} from "./snapshots";
 
 describe("parseSections", () => {
   test("returns empty for headingless markdown", () => {
@@ -402,5 +408,86 @@ describe("replaceSection", () => {
     expect(result).toContain("## B\nreplaced-body");
     expect(result).toContain("## C\ngamma");
     expect(result).not.toContain("\nbeta\n");
+  });
+});
+
+describe("computeConflictWarning", () => {
+  test("returns null when only the rolled-back section differs", () => {
+    const target = parseSections("## A\nalpha-v1\n## B\nbeta\n## C\ngamma\n");
+    const current = parseSections("## A\nalpha-v5\n## B\nbeta\n## C\ngamma\n");
+    const warning = computeConflictWarning(target, current, "## A", 1);
+    expect(warning).toBeNull();
+  });
+
+  test("returns warning listing other modified sections", () => {
+    const target = parseSections("## A\nalpha-v1\n## B\nbeta-v1\n## C\ngamma\n");
+    const current = parseSections("## A\nalpha-v5\n## B\nbeta-v5\n## C\ngamma\n");
+    const warning = computeConflictWarning(target, current, "## A", 1);
+    expect(warning).not.toBeNull();
+    expect(warning).toContain("v1");
+    expect(warning).toContain("## B");
+    expect(warning).not.toContain("## A"); // A is the rolled-back section
+  });
+
+  test("flags sections added after the target version as drift", () => {
+    const target = parseSections("## A\nalpha\n## B\nbeta\n");
+    const current = parseSections("## A\nalpha-v2\n## B\nbeta\n## NewInCurrent\nnew\n");
+    const warning = computeConflictWarning(target, current, "## A", 1);
+    expect(warning).not.toBeNull();
+    expect(warning).toContain("## NewInCurrent");
+  });
+
+  test("flags sections removed after the target version as drift", () => {
+    const target = parseSections("## A\nalpha\n## B\nbeta\n## C\ngamma\n");
+    const current = parseSections("## A\nalpha-v2\n## B\nbeta\n");
+    const warning = computeConflictWarning(target, current, "## A", 1);
+    expect(warning).not.toBeNull();
+    expect(warning).toContain("## C");
+  });
+});
+
+describe("rollbackSection warning", () => {
+  function seed(entity: string, bodies: string[]) {
+    const db = openDb(":memory:");
+    const store = new SnapshotStore(db);
+    for (const b of bodies) {
+      store.createSnapshot({ entity, body: b, author: "c", reason: "r" });
+    }
+    return { db, store };
+  }
+
+  test("emits warning when other sections changed since target", () => {
+    const { db, store } = seed("foo", [
+      "## A\nalpha-v1\n## B\nbeta-v1\n",
+      "## A\nalpha-v2\n## B\nbeta-v2\n",
+    ]);
+    const result = store.rollbackSection({
+      entity: "foo",
+      currentBody: "## A\nalpha-v2\n## B\nbeta-v2\n",
+      currentFrontmatter: {},
+      sectionHeading: "## A",
+      toVersion: 1,
+      author: "captain",
+    });
+    expect(result.warning).not.toBeNull();
+    expect(result.warning).toContain("## B");
+    db.close();
+  });
+
+  test("emits no warning when only the target section changed", () => {
+    const { db, store } = seed("foo", [
+      "## A\nalpha-v1\n## B\nbeta\n",
+      "## A\nalpha-v2\n## B\nbeta\n",
+    ]);
+    const result = store.rollbackSection({
+      entity: "foo",
+      currentBody: "## A\nalpha-v2\n## B\nbeta\n",
+      currentFrontmatter: {},
+      sectionHeading: "## A",
+      toVersion: 1,
+      author: "captain",
+    });
+    expect(result.warning).toBeNull();
+    db.close();
   });
 });
