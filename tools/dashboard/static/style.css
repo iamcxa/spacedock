@@ -663,6 +663,7 @@ tr:hover td { background: #1c2128; }
     color: #52c41a;
 }
 
+.notif-perm-granted { background: #1a3e1e; color: #3fb950; }
 .notif-perm-denied { background: #4a1c24; color: #f87171; }
 .notif-perm-default { background: #3b2e00; color: #d4a017; }
 .notif-perm-unsupported { background: #21262d; color: #8b949e; }
