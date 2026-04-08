@@ -1412,3 +1412,76 @@ details[open] .accordion-summary::before {
 .toast-fade {
     opacity: 0;
 }
+
+/* --- Comment panel upgrade: author badges, threading, resolve reason --- */
+
+.comment-author-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-right: 0.35rem;
+    flex-shrink: 0;
+}
+
+.comment-author-captain {
+    background: rgba(88, 166, 255, 0.15);
+    color: #58a6ff;
+}
+
+.comment-author-fo {
+    background: rgba(240, 136, 62, 0.15);
+    color: #f0883e;
+}
+
+.comment-author-guest {
+    background: rgba(139, 148, 158, 0.15);
+    color: #8b949e;
+}
+
+.comment-section-label {
+    font-size: 0.75rem;
+    color: #484f58;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.comment-resolve-tag {
+    display: inline-block;
+    font-size: 0.72rem;
+    color: #3fb950;
+    background: rgba(63, 185, 80, 0.08);
+    border: 1px solid rgba(63, 185, 80, 0.2);
+    border-radius: 3px;
+    padding: 0.1rem 0.4rem;
+    margin-top: 0.35rem;
+}
+
+.comment-thread-replies {
+    border-left: 2px solid #21262d;
+    margin-top: 0.5rem;
+    padding-left: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.comment-reply {
+    font-size: 0.82rem;
+    color: #c9d1d9;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.comment-reply-content {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+}

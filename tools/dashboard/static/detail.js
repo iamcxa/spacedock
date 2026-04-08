@@ -434,7 +434,12 @@ function loadComments() {
 function renderComments(thread) {
     while (commentThreadsContainer.firstChild) commentThreadsContainer.removeChild(commentThreadsContainer.firstChild);
 
-    if (thread.comments.length === 0) {
+    // Update mobile counter
+    var countEl = document.getElementById('comments-count');
+    var openCount = (thread.comments || []).filter(function (c) { return !c.resolved; }).length;
+    if (countEl) countEl.textContent = String(openCount);
+
+    if (!thread.comments || thread.comments.length === 0) {
         var empty = document.createElement('div');
         empty.className = 'empty-state';
         empty.textContent = 'Select text to add a comment';
@@ -442,7 +447,7 @@ function renderComments(thread) {
         return;
     }
 
-    // Show unresolved comments first, then resolved
+    // Show unresolved first (newest-first within group), then resolved
     var sorted = thread.comments.slice().sort(function (a, b) {
         if (a.resolved !== b.resolved) return a.resolved ? 1 : -1;
         return new Date(b.timestamp) - new Date(a.timestamp);
@@ -452,22 +457,33 @@ function renderComments(thread) {
         var card = document.createElement('div');
         card.className = 'comment-card' + (comment.resolved ? ' resolved' : '');
 
-        var selectedText = document.createElement('div');
-        selectedText.className = 'comment-selected-text';
-        selectedText.textContent = '"' + comment.selected_text + '"';
-        card.appendChild(selectedText);
+        // Quote of selected text
+        if (comment.selected_text) {
+            var selectedText = document.createElement('div');
+            selectedText.className = 'comment-selected-text';
+            selectedText.textContent = '\u201c' + comment.selected_text + '\u201d';
+            card.appendChild(selectedText);
+        }
 
+        // Comment content
         var content = document.createElement('div');
         content.className = 'comment-content';
         content.textContent = comment.content;
         card.appendChild(content);
 
+        // Meta row: author badge + section + timestamp
         var meta = document.createElement('div');
         meta.className = 'comment-meta';
 
-        var author = document.createElement('span');
-        author.textContent = comment.author + ' \u2022 ' + comment.section_heading.replace('## ', '');
-        meta.appendChild(author);
+        var authorBadge = document.createElement('span');
+        authorBadge.className = 'comment-author-badge comment-author-' + (comment.author || 'captain');
+        authorBadge.textContent = comment.author || 'captain';
+        meta.appendChild(authorBadge);
+
+        var sectionSpan = document.createElement('span');
+        sectionSpan.className = 'comment-section-label';
+        sectionSpan.textContent = (comment.section_heading || '').replace(/^#+\s*/, '');
+        meta.appendChild(sectionSpan);
 
         if (!comment.resolved) {
             var resolveBtn = document.createElement('button');
@@ -482,6 +498,43 @@ function renderComments(thread) {
 
         card.appendChild(meta);
 
+        // Resolve reason tag (for auto-resolved or manually resolved with reason)
+        if (comment.resolved && comment.resolved_reason) {
+            var reasonTag = document.createElement('div');
+            reasonTag.className = 'comment-resolve-tag';
+            var reasonText = comment.resolved_reason === 'section_updated'
+                ? 'auto-resolved: section updated'
+                : comment.resolved_reason;
+            if (comment.resolved_version != null) {
+                reasonText += ' @ v' + comment.resolved_version;
+            }
+            reasonTag.textContent = reasonText;
+            card.appendChild(reasonTag);
+        }
+
+        // Thread replies (indented)
+        if (comment.thread && comment.thread.length > 0) {
+            var threadEl = document.createElement('div');
+            threadEl.className = 'comment-thread-replies';
+            comment.thread.forEach(function (reply) {
+                var replyEl = document.createElement('div');
+                replyEl.className = 'comment-reply';
+
+                var replyAuthor = document.createElement('span');
+                replyAuthor.className = 'comment-author-badge comment-author-' + (reply.author || 'captain');
+                replyAuthor.textContent = reply.author || 'captain';
+                replyEl.appendChild(replyAuthor);
+
+                var replyContent = document.createElement('span');
+                replyContent.className = 'comment-reply-content';
+                replyContent.textContent = reply.content;
+                replyEl.appendChild(replyContent);
+
+                threadEl.appendChild(replyEl);
+            });
+            card.appendChild(threadEl);
+        }
+
         // Render suggestions linked to this comment
         var linkedSuggestions = (thread.suggestions || []).filter(function (s) {
             return s.comment_id === comment.id;
@@ -493,7 +546,6 @@ function renderComments(thread) {
         // Click sidebar comment → scroll to highlight + flash + show popover
         (function (commentId) {
             card.addEventListener('click', function (e) {
-                // Don't trigger if clicking resolve button or suggestion actions
                 if (e.target.closest('.comment-resolve-btn') || e.target.closest('.suggestion-actions')) return;
                 var marks = document.querySelectorAll('.comment-highlight');
                 for (var m = 0; m < marks.length; m++) {
@@ -505,10 +557,7 @@ function renderComments(thread) {
                         targetMark.addEventListener('animationend', function () {
                             this.classList.remove('comment-highlight-flash');
                         }, { once: true });
-                        // Trigger popover via synthetic click (handled by IIFE click listener)
-                        setTimeout(function () {
-                            targetMark.click();
-                        }, 400);
+                        setTimeout(function () { targetMark.click(); }, 400);
                         break;
                     }
                 }
