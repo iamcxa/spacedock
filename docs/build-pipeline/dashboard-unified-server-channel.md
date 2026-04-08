@@ -1,7 +1,7 @@
 ---
 id: 024
 title: Dashboard Unified Server + Channel — 消除雙 Instance 問題
-status: quality
+status: pr-draft
 source: captain feedback (021 tunnel + channel testing)
 started: 2026-04-08T10:00:00+08:00
 completed:
