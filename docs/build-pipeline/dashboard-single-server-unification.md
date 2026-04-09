@@ -130,3 +130,36 @@ Exhaustive file map produced for 10 files across 5 layers. Scale is Medium (conf
 ### Summary
 
 Formal implementation plan produced with 12 tasks across 6 waves following TDD ordering. Wave 1 writes tests for getChannelMessagesSince and get_pending_messages infrastructure. Wave 2 demolishes ctl.sh, forwardToCtlServer bridge, and server.ts CLI entry point. Wave 3 implements the new EventBuffer method and MCP tool. Wave 4 adds CSS card gap and auto-scroll to detail.js. Wave 5 updates SKILL.md and records first-officer-shared-core.md replacement for FO. Wave 6 runs full verification suite. Three explore gaps resolved: channel_port kept as-is, test baseline corrected to 105, fo-state.json marked out of scope. Captain approval gate triggered by new MCP tool surface (get_pending_messages).
+
+## Stage Report: execute
+
+- [x] Wave 1 -- Foundation Tests: Write failing tests for getChannelMessagesSince (events.test.ts) and get_pending_messages infrastructure (channel.test.ts). Verify they fail. Commit.
+  5 failing tests added to events.test.ts (getChannelMessagesSince not a function). 2 infrastructure tests added to channel.test.ts (these passed immediately since /api/channel/send endpoint already exists). Plan noted this was expected. Adapted test entity field from top-level to meta.entity to match /api/channel/send contract. Commits: 24a3b4d, d1c6e8d.
+- [x] Wave 2 -- Demolition: Delete ctl.sh. Remove forwardToCtlServer function + 5 call sites from channel.ts. Remove CLI entry point from server.ts. Clean up unused imports. Commit per task.
+  ctl.sh deleted (568 lines). forwardToCtlServer function (14 lines) + 5 call sites removed from channel.ts. Comment at line 566 updated from "ctl.sh" to "skills and tools". server.ts CLI entry point (38 lines) + unused parseArgs import removed. All existing tests pass after each step. Commits: e6683bc, 84121c4, 038163b.
+- [x] Wave 3 -- Extension: Implement getChannelMessagesSince in events.ts. Register get_pending_messages MCP tool in channel.ts. Verify Wave 1 tests now pass. Commit per task.
+  Added 2 prepared statements + getChannelMessagesSince method to EventBuffer. All 5 events.test.ts tests now pass. get_pending_messages tool registered in ListToolsRequestSchema (tool definition) and CallToolRequestSchema (handler). All 23 channel tests pass. Commits: a51a91f, 767d2df.
+- [x] Wave 4 -- UI Polish: Add 8px card gap CSS in detail.css. Add auto-scroll + 3s pause to detail.js. Commit per task.
+  margin-bottom: 8px added to .activity-event rule. Auto-scroll implemented with: autoScrollPaused/autoScrollTimer variables, scroll event listener IIFE, scrollActivityToBottom() helper, two call sites (loadActivityFeed + WS onmessage). Commits: a08eaf1, b3a581a.
+- [x] Wave 5 -- Docs/Skills: Update SKILL.md to remove all ctl.sh references and simplify port resolution. Record first-officer-shared-core.md replacement text (DO NOT EDIT the file). Commit SKILL.md changes.
+  SKILL.md: description, setup, MCP check invariant, start/stop/status/logs/restart subcommands, share flow (Critical port choice, Step 1, Step 3) all updated. No ctl.sh, {ctl}, 8421, or forwardToCtlServer references remain. first-officer-shared-core.md NOT edited (scaffolding). Replacement text for FO: line 21 should change from ctl.sh status/start commands to channel_port file check + curl health probe. Commit: ac88281.
+- [x] Wave 6 -- Verification: Run all 8 quality gate checks from the plan's Quality Gate Summary table. Document results.
+  All 8 checks pass: (1) Test suite: 202 pass, 0 fail (baseline was 105 tests/101 pass/4 fail; now 202/202/0 -- pre-existing failures resolved by bun install). (2) ctl.sh deleted: No such file. (3) No ctl.sh in source: 0 matches. (4) No 8421 in source: 0 matches. (5) No forwardToCtlServer: 0 matches. (6) get_pending_messages registered: 2 matches (definition + handler). (7) Auto-scroll present: 7 matches. (8) Card gap CSS: 1 match.
+- [x] Write Stage Report into entity file. Commit the entity update.
+  This section.
+
+### Task 11 Record: first-officer-shared-core.md Replacement Text
+
+**Current text** (line 21 of `references/first-officer-shared-core.md`):
+```
+6.5. Check dashboard -- run `tools/dashboard/ctl.sh status --root {project_root}`. If not running, prompt captain: "Dashboard is not running. Start it? (http://localhost:8420/)" Wait for captain response. Yes -- run `tools/dashboard/ctl.sh start --root {project_root}`. No -- skip.
+```
+
+**Replacement text:**
+```
+6.5. Check dashboard -- read `~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)/channel_port`. If the file exists and the port responds to `curl -sf http://127.0.0.1:$PORT/api/events`, dashboard is running. If not running, prompt captain: "Dashboard is not running. It requires an active Claude Code session with the spacedock-dashboard MCP channel. Start Claude Code with --channels? (http://localhost:8420/)" Wait for captain response. Yes -- guide captain to ensure .mcp.json has the spacedock-dashboard entry, then restart CC. No -- skip.
+```
+
+### Summary
+
+All 12 tasks across 6 waves executed successfully with TDD discipline. Wave 1 wrote 7 new tests (5 failing for getChannelMessagesSince, 2 passing infrastructure tests for channel_message storage). Wave 2 demolished 620+ lines: ctl.sh (568 lines deleted), forwardToCtlServer bridge (14 lines + 5 call sites), server.ts CLI entry point (38 lines + 1 unused import). Wave 3 implemented getChannelMessagesSince (17 new lines in events.ts) and get_pending_messages MCP tool (39 new lines in channel.ts), making all Wave 1 tests pass. Wave 4 added 8px card gap and auto-scroll with 3s pause to the detail page activity feed. Wave 5 updated SKILL.md (28 insertions, 45 deletions) and recorded the first-officer-shared-core.md replacement text without editing the scaffolding file. Wave 6 verified all 8 quality gates pass. Final test count: 202 pass, 0 fail (up from baseline 105 total / 101 pass). 11 atomic commits on branch spacedock-ensign/dashboard-single-server-unification. One adaptation from plan: channel.test.ts entity field moved to meta.entity to match the /api/channel/send contract (plan had top-level entity field).
