@@ -947,7 +947,7 @@ function rejectSuggestionAction(suggestionId) {
           .filter(function(ev) { return ev.entity === currentSlug; });
         populateFilterOptions();
         renderActivityFeed();
-        scrollActivityToBottom();
+        scrollActivityToLatest();
         activityLoaded = true;
       })
       .catch(function() { /* silent */ });
@@ -981,13 +981,15 @@ function rejectSuggestionAction(suggestionId) {
     }
   }
 
+  // Activity feed renders newest-first (renderActivityFeed iterates in reverse),
+  // so the "latest" message is at scrollTop = 0, not scrollHeight.
   (function initAutoScroll() {
     var container = document.getElementById('activity-feed');
     if (!container) return;
     container.addEventListener('scroll', function() {
-      // If user scrolled up (not at bottom), pause auto-scroll for 3s
-      var atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 30;
-      if (!atBottom) {
+      // If user scrolled away from the top (latest), pause auto-scroll for 3s
+      var atLatest = container.scrollTop < 30;
+      if (!atLatest) {
         autoScrollPaused = true;
         if (autoScrollTimer) clearTimeout(autoScrollTimer);
         autoScrollTimer = setTimeout(function() {
@@ -998,11 +1000,11 @@ function rejectSuggestionAction(suggestionId) {
     });
   })();
 
-  function scrollActivityToBottom() {
+  function scrollActivityToLatest() {
     if (autoScrollPaused) return;
     var container = document.getElementById('activity-feed');
     if (container) {
-      container.scrollTop = container.scrollHeight;
+      container.scrollTop = 0;
     }
   }
 
@@ -1257,7 +1259,7 @@ function rejectSuggestionAction(suggestionId) {
           activityEvents.push(event);
           populateFilterOptions();
           renderActivityFeed();
-          scrollActivityToBottom();
+          scrollActivityToLatest();
         }
       }
     };
