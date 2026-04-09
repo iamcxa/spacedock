@@ -196,6 +196,22 @@ All 12 tasks across 6 waves executed successfully with TDD discipline. Wave 1 wr
 - [ ] SKIP: License compliance
   No lockfile or dependency changes. No new third-party code introduced. License compliance OK.
 
+## Stage Report: pr-draft
+
+- [x] Check PR diff size
+  +1625/-706 across 12 changed files (2331 total lines). Over 1000-line threshold but inflated by: ctl.sh deletion (568 lines), test additions (~500 lines), entity body stage reports (~300 lines), plan document (~400 lines). Actual implementation diff is ~500 lines. Noted but not blocking.
+- [x] Push branch to origin
+  Branch spacedock-ensign/dashboard-single-server-unification pushed to origin (iamcxa/spacedock).
+- [x] Create draft PR
+  PR #27 created via gh pr create --draft. Title: `feat(dashboard): eliminate ctl.sh and unify on :8420 (ADR-001)`. URL: https://github.com/iamcxa/spacedock/pull/27
+- [x] Capture PR_NUMBER and PR_URL
+  PR_NUMBER: 27, PR_URL: https://github.com/iamcxa/spacedock/pull/27. FO will write to entity frontmatter.
+- [x] Write Stage Report (this section, completed by FO inline after ensign rate limit)
+
+### Summary
+
+Draft PR #27 created on GitHub. +1625/-706 across 12 files (inflated by test additions, ctl.sh deletion, entity docs). Ready for pr-review stage.
+
 ### Summary
 
 All mandatory quality checks passed: 202 tests pass with zero failures, demolition targets completely removed (ctl.sh deleted, zero mentions of ctl.sh/8421/forwardToCtlServer in source code), and new features implemented and verified (get_pending_messages MCP tool registered, auto-scroll infrastructure present, activity card gap CSS added). Optional checks skipped with documented rationale: no lint/build scripts configured (Bun projects use bun:test for validation), no coverage infrastructure (no baseline to compare against), security analysis tooling unavailable, API/migration/license surfaces unchanged. ADR-001 unification complete: single-server architecture on port 8420, no two-instance sync debt, no ctl.sh fallback required. Ready for PR review gate.
