@@ -90,7 +90,7 @@ Written when the entity is large enough to warrant splitting into child entities
 ```markdown
 ## Decomposition Recommendation
 
-:warning: This entity touches 4 domains and has 8+ gray areas. Consider splitting:
+⚠️ This entity touches 4 domains and has 8+ gray areas. Consider splitting:
 
 1. `explore-gray-area-templates` -- reference doc for domain templates (Readable/Textual)
 2. `explore-classification-engine` -- hybrid classification logic (Behavioral/Callable)
@@ -101,7 +101,7 @@ Dependencies:
 - 3 depends on 2 (output format determined by classification results)
 ```
 
-Use the `:warning:` shortcode (renders as the warning emoji in GitHub markdown). List child entity slugs as numbered items with domain tags. Include a Dependencies section when children have ordering constraints.
+Use the `⚠️` emoji (matches spec convention and build-brainstorm usage). List child entity slugs as numbered items with domain tags. Include a Dependencies section when children have ordering constraints.
 
 ---
 
