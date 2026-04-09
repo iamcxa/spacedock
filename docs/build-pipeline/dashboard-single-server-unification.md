@@ -163,3 +163,39 @@ Formal implementation plan produced with 12 tasks across 6 waves following TDD o
 ### Summary
 
 All 12 tasks across 6 waves executed successfully with TDD discipline. Wave 1 wrote 7 new tests (5 failing for getChannelMessagesSince, 2 passing infrastructure tests for channel_message storage). Wave 2 demolished 620+ lines: ctl.sh (568 lines deleted), forwardToCtlServer bridge (14 lines + 5 call sites), server.ts CLI entry point (38 lines + 1 unused import). Wave 3 implemented getChannelMessagesSince (17 new lines in events.ts) and get_pending_messages MCP tool (39 new lines in channel.ts), making all Wave 1 tests pass. Wave 4 added 8px card gap and auto-scroll with 3s pause to the detail page activity feed. Wave 5 updated SKILL.md (28 insertions, 45 deletions) and recorded the first-officer-shared-core.md replacement text without editing the scaffolding file. Wave 6 verified all 8 quality gates pass. Final test count: 202 pass, 0 fail (up from baseline 105 total / 101 pass). 11 atomic commits on branch spacedock-ensign/dashboard-single-server-unification. One adaptation from plan: channel.test.ts entity field moved to meta.entity to match the /api/channel/send contract (plan had top-level entity field).
+
+## Stage Report: quality
+
+- [x] Tests: bun test → 202 pass, 0 fail
+  `bun test` ran all 14 test files. Pass criteria met: 202+ pass, 0 fail (vs. baseline 105 total / 101 pass / 4 pre-existing failures — all resolved after execute stage).
+
+- [ ] SKIP: Lint
+  No `lint` script in tools/dashboard/package.json. Bun projects typically rely on runtime type checking via bun:test. Linting infrastructure not configured.
+
+- [ ] SKIP: Build
+  No `build` script in tools/dashboard/package.json. Bun does not require a separate build step (works directly from .ts source). No build infrastructure configured.
+
+- [x] Demolition Verification: ctl.sh deleted; no ctl.sh, 8421, or forwardToCtlServer references in source
+  `ls tools/dashboard/ctl.sh` → No such file. `grep -rn "ctl\.sh" tools/dashboard/src/ skills/dashboard/` → 0 matches. `grep -rn "8421" tools/dashboard/src/ skills/dashboard/` → 0 matches. `grep -rn "forwardToCtlServer" tools/dashboard/` → 0 matches. All demolition targets confirmed removed.
+
+- [x] New Feature Verification: get_pending_messages registered; scrollActivityToBottom present; margin-bottom 8px added
+  `grep -n "get_pending_messages" tools/dashboard/src/channel.ts` → 2 matches (definition + handler). `grep -n "scrollActivityToBottom" tools/dashboard/static/detail.js` → 3 matches (declaration + 2 call sites). `grep -n "margin-bottom.*8px" tools/dashboard/static/detail.css` → 1 match on .activity-event rule. All new features verified.
+
+- [ ] SKIP: Coverage delta
+  No coverage infrastructure detected: no `test:coverage` script in package.json, no `.github/scripts/coverage-*` files, no committed baseline file. Coverage command (if needed): `bun test --coverage` produces text-only output with no JSON/LCOV. Coverage comparison skipped per plan's Coverage Infrastructure section.
+
+- [ ] SKIP: Security analysis
+  trailofbits/skills plugin not installed. Static analysis via `Skill: "static-analysis"` unavailable. No security findings to report (demolition removes HTTP bridge, reduces attack surface). Skipped due to unavailable tooling.
+
+- [ ] SKIP: API contract compatibility
+  No HTTP contract or schema files changed. New `get_pending_messages` is an internal MCP tool (stdio transport only), not an HTTP API endpoint. No contract breaking changes.
+
+- [ ] SKIP: Migration safety
+  No migration files in diff. No schema changes (EventBuffer methods are additive, use existing table structure). No lockfile or dependency changes. No data migration required.
+
+- [ ] SKIP: License compliance
+  No lockfile or dependency changes. No new third-party code introduced. License compliance OK.
+
+### Summary
+
+All mandatory quality checks passed: 202 tests pass with zero failures, demolition targets completely removed (ctl.sh deleted, zero mentions of ctl.sh/8421/forwardToCtlServer in source code), and new features implemented and verified (get_pending_messages MCP tool registered, auto-scroll infrastructure present, activity card gap CSS added). Optional checks skipped with documented rationale: no lint/build scripts configured (Bun projects use bun:test for validation), no coverage infrastructure (no baseline to compare against), security analysis tooling unavailable, API/migration/license surfaces unchanged. ADR-001 unification complete: single-server architecture on port 8420, no two-instance sync debt, no ctl.sh fallback required. Ready for PR review gate.
