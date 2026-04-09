@@ -112,15 +112,15 @@ Summary block written at the end of the explore stage output. The FO and status 
 ```markdown
 ## Stage Report: explore
 
-- Files mapped: 14
-- Assumptions (Track A): 6 (4 Confident, 1 Likely, 1 Unclear)
-- Option comparisons (Track B): 2
-- Open questions (Track C): 3
-- Unresolved alpha markers: 0
-- Scale assessment: moderate -- localized feature, touches 2 domains
+- Files mapped: 14 across domain, contract, view, frontend
+- Assumptions formed: 6 (Confident: 4, Likely: 1, Unclear: 1)
+- Options surfaced: 2
+- Questions generated: 3
+- α markers resolved: 2 / 3
+- Scale assessment: revised from Small to Medium
 ```
 
-Six lines, always in this order. Scale assessment uses one of: `trivial`, `moderate`, `significant`, `structural`. Include a short qualifier after the dash.
+Six lines, always in this order. Field names must match exactly (the FO and status script parse these). Scale assessment uses one of: `confirmed` (no change from brainstorm's estimate) or `revised from X to Y` (where X and Y are `Small`, `Medium`, or `Large`).
 
 ---
 
@@ -134,7 +134,7 @@ Build-explore annotates the original brainstorming spec inline to confirm or cha
 APPROACH: Use WebSocket bridge for cross-instance sync (confirmed by explore: src/bridge.ts:15 -- existing bridge handles 3 event types)
 ```
 
-Format: `(confirmed by explore: {evidence})`
+Format: `(✓ confirmed by explore: {evidence})`
 
 Replaces any alpha marker on the same line. Used when exploration found codebase evidence supporting the brainstorming spec's claim.
 

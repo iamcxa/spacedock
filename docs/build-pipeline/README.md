@@ -42,6 +42,11 @@ stages:
       # Hybrid classification: assumptions (Track A), options (Track B), questions (Track C).
       # Writes to entity body: ## Assumptions, ## Option Comparisons, ## Open Questions.
       #
+      # NAMESPACE NOTE: Spec §7 defines this skill as belonging to the spacebridge
+      # plugin. During Phase B it's hosted in spacedock (since spacebridge plugin
+      # doesn't exist yet). Will migrate to `spacebridge:build-explore` in Phase D
+      # (plugin split).
+      #
       # FALLBACK (skill not found):
       # Ensign uses inline explore definition below (basic file mapping, no question generation).
     - name: clarify
