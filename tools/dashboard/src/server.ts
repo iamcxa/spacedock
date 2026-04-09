@@ -201,12 +201,33 @@ export function createServer(opts: ServerOptions) {
             return jsonResponse({ error: "entity, from, to required" }, 400);
           }
           const from = parseInt(fromStr, 10);
-          const to = parseInt(toStr, 10);
-          if (isNaN(from) || isNaN(to)) {
+          if (isNaN(from)) {
             logRequest(req, 400);
-            return jsonResponse({ error: "from/to must be integers" }, 400);
+            return jsonResponse({ error: "from must be an integer" }, 400);
           }
           try {
+            // Support to=live — diff snapshot against current on-disk file
+            if (toStr === "live") {
+              const path = url.searchParams.get("path");
+              if (!path) {
+                logRequest(req, 400);
+                return jsonResponse({ error: "path required when to=live" }, 400);
+              }
+              if (!validatePath(path, projectRoot)) {
+                logRequest(req, 403);
+                return jsonResponse({ error: "Forbidden" }, 403);
+              }
+              const text = readFileSync(path, "utf-8");
+              const parsed = parseEntity(text);
+              const result = snapshotStore.diffWithLive(entity, from, parsed.body);
+              logRequest(req, 200);
+              return jsonResponse(result);
+            }
+            const to = parseInt(toStr, 10);
+            if (isNaN(to)) {
+              logRequest(req, 400);
+              return jsonResponse({ error: "to must be an integer or 'live'" }, 400);
+            }
             const result = snapshotStore.diffVersions(entity, from, to);
             logRequest(req, 200);
             return jsonResponse(result);

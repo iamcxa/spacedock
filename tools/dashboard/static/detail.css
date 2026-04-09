@@ -1154,6 +1154,20 @@ details[open] .accordion-summary::before {
     color: #f0883e;
 }
 
+.live-badge {
+    background: rgba(56, 173, 169, 0.15);
+    color: #38ada9;
+}
+
+.version-live {
+    border-left: 3px solid #38ada9;
+}
+
+.version-num-live {
+    color: #38ada9;
+    font-style: italic;
+}
+
 .version-loading, .version-error, .version-empty {
     padding: 1rem;
     color: #8b949e;

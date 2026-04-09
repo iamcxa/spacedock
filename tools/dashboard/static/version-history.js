@@ -112,6 +112,35 @@
     timeline.className = 'version-timeline';
     timeline.id = 'version-timeline';
 
+    // "current (live)" virtual entry — shows unsnapshot changes
+    if (versions.length > 0) {
+      var liveItem = document.createElement('div');
+      liveItem.className = 'version-item version-live';
+      liveItem.setAttribute('data-version', 'live');
+
+      var liveNum = document.createElement('span');
+      liveNum.className = 'version-num version-num-live';
+      liveNum.textContent = 'current';
+      liveItem.appendChild(liveNum);
+
+      var liveMeta = document.createElement('div');
+      liveMeta.className = 'version-meta';
+      var liveLabel = document.createElement('span');
+      liveLabel.className = 'version-author';
+      liveLabel.textContent = 'live on disk';
+      liveMeta.appendChild(liveLabel);
+      var liveBadge = document.createElement('span');
+      liveBadge.className = 'version-badge live-badge';
+      liveBadge.textContent = 'unsnapshot';
+      liveMeta.appendChild(liveBadge);
+      liveItem.appendChild(liveMeta);
+
+      liveItem.addEventListener('click', function () {
+        selectVersion('live');
+      });
+      timeline.appendChild(liveItem);
+    }
+
     versions.forEach(function (v) {
       timeline.appendChild(renderVersionItem(v));
     });
@@ -184,10 +213,16 @@
   // --- Version selection logic ---
   function selectVersion(version) {
     if (toVersion === null) {
-      // Compare selected version against latest (most intuitive for single click)
-      var latestVersion = versions[0].version;
-      fromVersion = version;
-      toVersion = latestVersion;
+      if (version === 'live') {
+        // Click on "current" — compare latest snapshot vs live
+        fromVersion = versions[0].version;
+        toVersion = 'live';
+      } else {
+        // Compare selected version against latest (most intuitive for single click)
+        var latestVersion = versions[0].version;
+        fromVersion = version;
+        toVersion = latestVersion;
+      }
       highlightSelected();
       if (fromVersion !== toVersion) {
         loadDiff(fromVersion, toVersion);
@@ -203,10 +238,22 @@
       return;
     }
 
-    var newFrom = Math.min(version, toVersion);
-    var newTo = Math.max(version, toVersion);
-    fromVersion = newFrom;
-    toVersion = newTo;
+    // When "live" is involved, it's always the "to" side
+    if (version === 'live') {
+      toVersion = 'live';
+      // fromVersion stays as is (or use latest if none)
+      if (fromVersion === null || fromVersion === 'live') {
+        fromVersion = versions[0].version;
+      }
+    } else if (toVersion === 'live') {
+      // Clicking a version while live is selected — set it as from
+      fromVersion = version;
+    } else {
+      var newFrom = Math.min(version, toVersion);
+      var newTo = Math.max(version, toVersion);
+      fromVersion = newFrom;
+      toVersion = newTo;
+    }
     highlightSelected();
     loadDiff(fromVersion, toVersion);
   }
@@ -214,11 +261,13 @@
   function highlightSelected() {
     var items = versionPanel.querySelectorAll('.version-item');
     items.forEach(function (el) {
-      var v = parseInt(el.getAttribute('data-version'), 10);
+      var rawV = el.getAttribute('data-version');
+      var v = rawV === 'live' ? 'live' : parseInt(rawV, 10);
       el.classList.remove('selected', 'in-range');
       if (fromVersion !== null && toVersion !== null) {
         if (v === fromVersion || v === toVersion) el.classList.add('selected');
-        else if (v > fromVersion && v < toVersion) el.classList.add('in-range');
+        else if (toVersion !== 'live' && typeof v === 'number' && v > fromVersion && v < toVersion) el.classList.add('in-range');
+        else if (toVersion === 'live' && typeof v === 'number' && v > fromVersion) el.classList.add('in-range');
       } else if (toVersion !== null && v === toVersion) {
         el.classList.add('selected');
       }
@@ -245,8 +294,12 @@
     loading.textContent = 'Loading diff\u2026';
     diffArea.appendChild(loading);
 
-    fetch('/api/entity/diff?entity=' + encodeURIComponent(entitySlug) +
-          '&from=' + from + '&to=' + to)
+    var diffUrl = '/api/entity/diff?entity=' + encodeURIComponent(entitySlug) +
+          '&from=' + from + '&to=' + to;
+    if (to === 'live' && entityPath) {
+      diffUrl += '&path=' + encodeURIComponent(entityPath);
+    }
+    fetch(diffUrl)
       .then(function (res) { return res.json(); })
       .then(function (data) {
         renderDiff(diffArea, data, from, to);
@@ -277,7 +330,7 @@
 
     var toLabel = document.createElement('span');
     toLabel.className = 'diff-to-label';
-    toLabel.textContent = 'v' + to;
+    toLabel.textContent = to === 'live' ? 'current (live)' : 'v' + to;
     header.appendChild(toLabel);
 
     container.appendChild(header);

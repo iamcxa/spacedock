@@ -256,6 +256,55 @@ export class SnapshotStore {
   }
 
   /**
+   * Diff a snapshot version against the current live body (not yet snapshotted).
+   * Returns the same format as diffVersions but with `to: "live"`.
+   */
+  diffWithLive(
+    entity: string,
+    fromVersion: number,
+    liveBody: string,
+  ): { from: number; to: "live"; sections: SectionDiff[] } {
+    const fromSnap = this.getSnapshot(entity, fromVersion);
+    if (!fromSnap) {
+      throw new Error(`Snapshot not found: ${entity} v${fromVersion}`);
+    }
+    const fromSections = parseSections(fromSnap.body);
+    const toSections = parseSections(liveBody);
+    const fromMap = buildSectionMap(fromSections);
+    const toMap = buildSectionMap(toSections);
+
+    const result: SectionDiff[] = [];
+    for (let i = 0; i < toSections.length; i++) {
+      const t = toSections[i];
+      const key = sectionPathKey(toSections, i);
+      const f = fromMap.get(key);
+      if (!f) {
+        result.push({ heading: t.heading, status: "added", pathKey: key });
+        continue;
+      }
+      if (f.body === t.body) {
+        result.push({ heading: t.heading, status: "unchanged", pathKey: key });
+        continue;
+      }
+      const patch = createPatch(
+        t.heading,
+        f.body,
+        t.body,
+        `v${fromVersion}`,
+        "live",
+      );
+      result.push({ heading: t.heading, status: "modified", diff: patch, pathKey: key });
+    }
+    for (let i = 0; i < fromSections.length; i++) {
+      const key = sectionPathKey(fromSections, i);
+      if (!toMap.has(key)) {
+        result.push({ heading: fromSections[i].heading, status: "removed", pathKey: key });
+      }
+    }
+    return { from: fromVersion, to: "live", sections: result };
+  }
+
+  /**
    * Rollback a specific section to the content it had in a target version.
    * Creates a new snapshot recording the rollback and returns the new body
    * to write back to disk. The caller is responsible for the file write.
