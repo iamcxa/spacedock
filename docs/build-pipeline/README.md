@@ -37,6 +37,13 @@ stages:
     - name: explore
       profiles: [full, standard]
       model: sonnet
+      skill: spacedock:build-explore
+      # Ensign loads build-explore skill for codebase mapping + question generation.
+      # Hybrid classification: assumptions (Track A), options (Track B), questions (Track C).
+      # Writes to entity body: ## Assumptions, ## Option Comparisons, ## Open Questions.
+      #
+      # FALLBACK (skill not found):
+      # Ensign uses inline explore definition below (basic file mapping, no question generation).
     - name: clarify
       profiles: [full, standard]
       worktree: false
