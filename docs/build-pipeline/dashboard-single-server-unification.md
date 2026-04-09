@@ -103,3 +103,30 @@ Exhaustive file map produced for 10 files across 5 layers. Scale is Medium (conf
 - Activity feed auto-scrolls to the latest message on initial load and on every WS realtime push; manual scroll-up by the user pauses auto-scroll for 3 seconds then resumes
 - All existing dashboard tests pass (195 baseline); new tests added for `get_pending_messages` and auto-scroll behavior
 - FO startup check in `references/first-officer-shared-core.md` line 21 updated to detect MCP transport instead of polling `ctl.sh status`
+
+## Stage Report: plan
+
+- [x] Read the entity file including the full explore stage report. Cross-reference with the ADR-001 design spec. Resolve any gaps between them.
+  Both files read in full. Three gaps identified by explore resolved in plan: channel_port rename (keep as-is), test baseline (105 not 195), fo-state.json (out of scope).
+- [x] Search context lake for all insights stored by the explore ensign -- incorporate verified patterns into the plan.
+  File-path lookups returned insights for channel.ts, events.ts, ctl.sh, server.ts, detail.js, detail.css, SKILL.md, first-officer-shared-core.md. Verified line numbers and patterns incorporated into task steps.
+- [x] Produce a formal plan document using `Skill: "superpowers:writing-plans"`. Save it to `docs/superpowers/specs/` with a descriptive filename.
+  Saved to `docs/superpowers/specs/2026-04-09-adr-001-single-server-8420-plan.md`. 12 tasks across 6 waves, TDD ordering, complete code blocks.
+- [x] Plan must have concrete file paths and line numbers from the explore report. Every file in the explore's 5-layer grouping must appear in the plan.
+  All 10 files from explore's file map appear in the plan's File Structure table with specific line numbers for each edit target.
+- [x] Plan must use TDD ordering: write tests before implementation where applicable.
+  Wave 1 (Tasks 1-2) writes tests. Wave 2 (Tasks 3-5) demolishes code. Wave 3 (Tasks 6-7) implements features that make Wave 1 tests pass. Waves 4-5 are UI/docs. Wave 6 verifies everything.
+- [x] Plan must address all 3 gaps flagged by explore: (a) channel_port rename decision, (b) test baseline is 105 not 195, (c) fo-state.json is out of scope.
+  All three resolved in "Resolved Gaps from Explore" section. (a) Keep channel_port as-is, (b) baseline 105 with 101 pass / 4 pre-existing fail, (c) documented as FO responsibility in Out of Scope section.
+- [x] Plan must include quality gate steps: what commands to run, what pass criteria look like.
+  Task 12 (Wave 6) has full verification. Quality Gate Summary table lists 8 checks with exact commands and pass criteria.
+- [x] Plan must note that references/first-officer-shared-core.md is scaffolding and cannot be edited by the ensign -- record the exact replacement text for the FO to apply post-merge.
+  Task 11 records the current text (line 21) and exact replacement text. Explicitly marked "DO NOT EDIT" and "No file edit. No commit."
+- [x] Write Stage Report into entity file with checklist results.
+  This section.
+- [x] Commit the plan document AND the entity body update with message `plan: 045 -- dashboard single-server unification implementation plan` on branch spacedock-ensign/dashboard-single-server-unification.
+  Committed as 3c2ea58.
+
+### Summary
+
+Formal implementation plan produced with 12 tasks across 6 waves following TDD ordering. Wave 1 writes tests for getChannelMessagesSince and get_pending_messages infrastructure. Wave 2 demolishes ctl.sh, forwardToCtlServer bridge, and server.ts CLI entry point. Wave 3 implements the new EventBuffer method and MCP tool. Wave 4 adds CSS card gap and auto-scroll to detail.js. Wave 5 updates SKILL.md and records first-officer-shared-core.md replacement for FO. Wave 6 runs full verification suite. Three explore gaps resolved: channel_port kept as-is, test baseline corrected to 105, fo-state.json marked out of scope. Captain approval gate triggered by new MCP tool surface (get_pending_messages).
