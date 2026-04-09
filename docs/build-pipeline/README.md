@@ -194,8 +194,10 @@ Every feature file has YAML frontmatter with these fields:
 ---
 id:
 title: Human-readable name
-status: explore
-source:
+status: draft
+context_status: pending
+source: /build
+created:
 started:
 completed:
 verdict:
@@ -206,6 +208,10 @@ pr:
 intent: feature
 scale: Medium
 project:
+profile:
+auto_advance:
+parent:
+children:
 ---
 ```
 
@@ -215,18 +221,24 @@ project:
 |-------|------|-------------|
 | `id` | string | Unique identifier, format determined by id-style in README frontmatter |
 | `title` | string | Human-readable feature name |
-| `status` | enum | One of: explore, research, plan, execute, quality, seeding, e2e, docs, pr-draft, pr-review, shipped |
-| `source` | string | Where this feature came from (e.g., "commission seed", "brainstorming session") |
-| `started` | ISO 8601 | When active work began |
+| `status` | enum | One of: draft, brainstorm, explore, clarify, research, plan, execute, quality, seeding, e2e, docs, pr-draft, pr-review, shipped, epic |
+| `context_status` | enum | `pending`, `exploring`, `awaiting-clarify`, `ready`. Orthogonal to `status`. Tracks context maturity during draft/explore/clarify phases. |
+| `source` | string | Where this feature came from (e.g., `/build`, `commission seed`) |
+| `created` | ISO 8601 | Entity creation timestamp (set by `/build`) |
+| `started` | ISO 8601 | When active work began (first move beyond draft) |
 | `completed` | ISO 8601 | When the feature reached terminal status |
-| `verdict` | enum | PASSED or REJECTED — set at final stage |
-| `score` | number | Priority score, 0.0–1.0 (optional) |
+| `verdict` | enum | PASSED or REJECTED -- set at final stage |
+| `score` | number | Priority score, 0.0-1.0 (optional) |
 | `worktree` | string | Worktree path while a dispatched agent is active, empty otherwise |
 | `issue` | string | GitHub issue reference (e.g., `#42` or `owner/repo#42`). Optional. |
 | `pr` | string | GitHub PR reference (e.g., `#57` or `owner/repo#57`). Set when a PR is created. |
-| `intent` | enum | `feature` or `bugfix` — determines whether explore includes root cause diagnosis |
-| `scale` | enum | `Small` (<5 files, TDD-direct) or `Medium` (5-15 files, formal plan) |
+| `intent` | enum | `feature` or `bugfix` -- determines whether explore includes root cause diagnosis |
+| `scale` | enum | `Small` (<5 files, TDD-direct), `Medium` (5-15 files, formal plan), or `Large` (>15 files, decomposition candidate) |
 | `project` | string | Target project name (e.g., "spacedock", "carlove", "recce") |
+| `profile` | enum | `full`, `standard`, or `express`. Assigned after clarify; determines which stages run. |
+| `auto_advance` | bool | If true, Science Officer advances status from clarify to plan without waiting for captain approval. |
+| `parent` | string | Slug of parent epic (if this entity was decomposed from a larger one). |
+| `children` | list | `[slug1, slug2, ...]` (if this entity is an epic/tracker with child entities). |
 
 ## Stages
 
@@ -637,12 +649,16 @@ grep -l "status: explore" docs/build-pipeline/*.md
 
 ## Feature Template
 
+Produced by `/build` invoking `spacedock:build-brainstorm`:
+
 ```yaml
 ---
 id:
 title: Feature name here
-status: explore
-source:
+status: draft
+context_status: pending
+source: /build
+created:
 started:
 completed:
 verdict:
@@ -653,18 +669,59 @@ pr:
 intent: feature
 scale: Medium
 project:
+profile:
+auto_advance:
+parent:
+children:
 ---
+
+## Directive
+
+> {captain's verbatim directive}
+
+## Captain Context Snapshot
+
+- **Repo**: {branch} @ {sha}
+- **Session**: {recent journal summary}
+- **Domain**: {classified domain(s)}
+- **Related entities**: {matches or "None found"}
+- **Created**: {ISO 8601 timestamp}
 
 ## Brainstorming Spec
 
-APPROACH:     ...
-ALTERNATIVE:  ...
-GUARDRAILS:   ...
-RATIONALE:    ...
+**APPROACH**: ...
+
+**ALTERNATIVE**: ... -- D-01 {rejection reason}
+
+**GUARDRAILS**:
+- ...
+
+**RATIONALE**: ...
 
 ## Acceptance Criteria
 
+- {criterion} (how to verify: {method})
 - ...
+
+## Open Questions
+
+(explore stage will populate)
+
+## Assumptions
+
+(explore stage will populate)
+
+## Option Comparisons
+
+(explore stage will populate)
+
+## Decomposition Recommendation
+
+(explore stage will populate if scope warrants it)
+
+## Canonical References
+
+(clarify stage will populate)
 ```
 
 ## Commit Discipline
