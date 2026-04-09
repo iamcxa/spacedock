@@ -912,6 +912,187 @@ function rejectSuggestionAction(suggestionId) {
     }
   });
 
+  // --- Activity feed state ---
+  var activityLoaded = false;
+  var activityEvents = [];
+  var currentSlug = entityPath ? entityPath.replace(/\.md$/, '').split('/').pop() : '';
+
+  // --- Tab switching ---
+  var tabBtns = document.querySelectorAll('.tab-btn');
+  var tabPanes = { comments: document.getElementById('tab-comments'), activity: document.getElementById('tab-activity') };
+
+  tabBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var target = btn.getAttribute('data-tab');
+      tabBtns.forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      Object.keys(tabPanes).forEach(function(key) {
+        tabPanes[key].style.display = key === target ? '' : 'none';
+      });
+      if (target === 'activity' && !activityLoaded) {
+        loadActivityFeed();
+      }
+    });
+  });
+
+  // --- Activity feed ---
+  function loadActivityFeed() {
+    if (!currentSlug) return;
+    fetch('/api/events?entity=' + encodeURIComponent(currentSlug))
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        activityEvents = (data.events || []).map(function(e) { return e.event; });
+        populateFilterOptions();
+        renderActivityFeed();
+        activityLoaded = true;
+      })
+      .catch(function() { /* silent */ });
+  }
+
+  function renderActivityFeed() {
+    var container = document.getElementById('activity-feed');
+    while (container.firstChild) container.removeChild(container.firstChild);
+
+    var filterType = document.getElementById('filter-type').value;
+    var filterStage = document.getElementById('filter-stage').value;
+    var filterAuthor = document.getElementById('filter-author').value;
+
+    var filtered = activityEvents.filter(function(ev) {
+      if (filterType && ev.type !== filterType) return false;
+      if (filterStage && ev.stage !== filterStage) return false;
+      if (filterAuthor && ev.agent !== filterAuthor) return false;
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = 'No matching activity';
+      container.appendChild(empty);
+      return;
+    }
+
+    for (var i = filtered.length - 1; i >= 0; i--) {
+      container.appendChild(createActivityCard(filtered[i]));
+    }
+  }
+
+  function createActivityCard(ev) {
+    var card = document.createElement('div');
+    card.className = 'activity-event';
+
+    var header = document.createElement('div');
+    header.className = 'activity-event-header';
+
+    var badge = document.createElement('span');
+    badge.className = 'activity-type-badge ' + ev.type;
+    badge.textContent = ev.type.replace(/_/g, ' ');
+    header.appendChild(badge);
+
+    var agent = document.createElement('span');
+    agent.className = 'activity-agent';
+    agent.textContent = ev.agent || '';
+    header.appendChild(agent);
+
+    var time = document.createElement('span');
+    time.className = 'activity-time';
+    time.textContent = ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString() : '';
+    header.appendChild(time);
+
+    card.appendChild(header);
+
+    if (ev.detail) {
+      var detail = document.createElement('div');
+      detail.className = 'activity-detail';
+      detail.textContent = ev.detail.length > 200 ? ev.detail.slice(0, 200) + '...' : ev.detail;
+      card.appendChild(detail);
+    }
+
+    return card;
+  }
+
+  function populateFilterOptions() {
+    var stageSelect = document.getElementById('filter-stage');
+    var authorSelect = document.getElementById('filter-author');
+
+    var prevStage = stageSelect.value;
+    var prevAuthor = authorSelect.value;
+
+    var stages = {};
+    var authors = {};
+    activityEvents.forEach(function(ev) {
+      if (ev.stage) stages[ev.stage] = true;
+      if (ev.agent) authors[ev.agent] = true;
+    });
+
+    while (stageSelect.options.length > 1) stageSelect.remove(1);
+    while (authorSelect.options.length > 1) authorSelect.remove(1);
+
+    Object.keys(stages).sort().forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s;
+      opt.textContent = s;
+      stageSelect.appendChild(opt);
+    });
+
+    Object.keys(authors).sort().forEach(function(a) {
+      var opt = document.createElement('option');
+      opt.value = a;
+      opt.textContent = a;
+      authorSelect.appendChild(opt);
+    });
+
+    stageSelect.value = prevStage;
+    authorSelect.value = prevAuthor;
+  }
+
+  ['filter-type', 'filter-stage', 'filter-author'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', renderActivityFeed);
+  });
+
+  // --- Chat input ---
+  var chatInput = document.getElementById('chat-input');
+  var chatSend = document.getElementById('chat-send');
+
+  function sendChatMessage() {
+    var content = chatInput.value.trim();
+    if (!content) return;
+
+    chatSend.disabled = true;
+    fetch('/api/channel/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: content,
+        meta: { entity: currentSlug }
+      })
+    })
+    .then(function(res) {
+      if (!res.ok) throw new Error('Send failed');
+      chatInput.value = '';
+    })
+    .catch(function() {
+      // Leave content in textarea so user can retry
+    })
+    .finally(function() {
+      chatSend.disabled = false;
+      chatInput.focus();
+    });
+  }
+
+  if (chatSend) {
+    chatSend.addEventListener('click', sendChatMessage);
+  }
+  if (chatInput) {
+    chatInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage();
+      }
+    });
+  }
+
   var detailWs = null;
   var detailRetryCount = 0;
   var detailMaxRetries = 10;
@@ -1042,6 +1223,13 @@ function rejectSuggestionAction(suggestionId) {
             onClick: function () { window.focus(); },
           });
         })();
+
+        // Activity feed — append new events scoped to this entity
+        if (event.entity === currentSlug && activityLoaded) {
+          activityEvents.push(event);
+          populateFilterOptions();
+          renderActivityFeed();
+        }
       }
     };
 
