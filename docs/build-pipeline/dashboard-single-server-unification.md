@@ -215,3 +215,50 @@ Draft PR #27 created on GitHub. +1625/-706 across 12 files (inflated by test add
 ### Summary
 
 All mandatory quality checks passed: 202 tests pass with zero failures, demolition targets completely removed (ctl.sh deleted, zero mentions of ctl.sh/8421/forwardToCtlServer in source code), and new features implemented and verified (get_pending_messages MCP tool registered, auto-scroll infrastructure present, activity card gap CSS added). Optional checks skipped with documented rationale: no lint/build scripts configured (Bun projects use bun:test for validation), no coverage infrastructure (no baseline to compare against), security analysis tooling unavailable, API/migration/license surfaces unchanged. ADR-001 unification complete: single-server architecture on port 8420, no two-instance sync debt, no ctl.sh fallback required. Ready for PR review gate.
+
+## Stage Report: pr-review
+
+- [x] Read and review all modified source files (channel.ts, server.ts, events.ts, detail.js, detail.css, SKILL.md)
+  Full diffs read via `git diff main -- <path>`. channel.ts: forwardToCtlServer removed cleanly, get_pending_messages tool defined and handler implemented. server.ts: CLI entry point block removed, parseArgs import removed, `resolve` from node:path still used at line 1182 (correctly kept). events.ts: 2 prepared statements + getChannelMessagesSince method, uses existing rowToSequencedEvent helper. detail.js: auto-scroll infra added but direction was INVERTED (see findings). detail.css: `margin-bottom: 8px` added to `.activity-event` — will render correctly since layout is block flow. SKILL.md: all ctl.sh invocations replaced with state-file checks.
+- [x] Read and review all modified test files (events.test.ts, channel.test.ts)
+  events.test.ts: 5 thorough tests covering since_seq, entity filter, empty array, empty-string entity edge case, returns-only-channel_message. channel.test.ts: 2 integration tests via POST /api/channel/send verify infrastructure (not the MCP tool directly, which is acceptable since the tool just delegates to eventBuffer.getChannelMessagesSince which is unit-tested).
+- [x] CLAUDE.md compliance check
+  Neither `<worktree>/CLAUDE.md` nor `<worktree>/.claude/CLAUDE.md` exists — no project-level rules to enforce beyond the global ones. No emoji usage in any edits. No version pins fabricated.
+- [x] Stale reference scan (4 grep patterns)
+  `grep ctl\.sh` in tools/dashboard/src, skills/dashboard, tests → 0 matches after fixes. `grep 8421` in tools/dashboard/src, skills/dashboard → 0 matches. `grep forwardToCtlServer` in tools/dashboard → 0 matches. `grep standalone` in tools/dashboard/src/**/*.ts → 0 matches. All clean.
+- [x] Fix CODE/SUGGESTION findings (commit + push if any)
+  3 findings fixed in commit 9de50b6 (pushed to origin). See classified findings below.
+- [x] Write review summary with classified findings
+  See Review Summary below.
+- [x] Write ## Stage Report into entity file
+  This section.
+- [x] Commit entity update: `pr-review: 045 — self-review complete`
+  Committed and pushed after writing this section.
+- [x] Push all commits
+  Commit 9de50b6 (review fixes) pushed. Entity update commit will be pushed after this section.
+
+### Review Summary — Findings
+
+**Finding 1 (CODE, FIXED)** — Auto-scroll direction was inverted.
+`renderActivityFeed()` at lines 979–981 iterates `for (var i = filtered.length - 1; i >= 0; i--)` which appends the LAST (newest) event first, making it the first DOM child (top of the container). `activityEvents` is populated from `/api/events?entity=...` which uses `eventBuffer.getByEntity()` (seq ASC, oldest-first). Result: newest-on-top visual order. The original `scrollActivityToBottom()` set `scrollTop = scrollHeight`, scrolling AWAY from the latest message to show the oldest. The scroll listener's `atBottom` check (`scrollHeight - scrollTop - clientHeight < 30`) was also inverted. Fix: renamed function to `scrollActivityToLatest()`, set `scrollTop = 0`, and changed the listener to `atLatest = scrollTop < 30`. Added explanatory comment above `initAutoScroll()`. Two call sites updated (loadActivityFeed + WS onmessage handler).
+
+**Finding 2 (CODE, FIXED)** — Obsolete test file `tests/dashboard/ctl.test.ts` was not deleted with ctl.sh.
+The execute stage deleted `tools/dashboard/ctl.sh` but left `tests/dashboard/ctl.test.ts` in place. Running `bun test` against the PR branch showed 12 new failures in the "Dashboard ctl.sh" and "Channel Detection" describe blocks — all trying to exec the now-nonexistent ctl.sh. On main, these 13 tests pass; on the PR branch (before fix), 12 fail. Fix: deleted the entire file (314 lines). The quality stage's 202 pass / 0 fail claim was based on `tools/dashboard/src/*.test.ts` only — the wider suite under `tests/dashboard/` was not exercised. Lesson for future: quality stage should invoke `bun test` (no path filter) to catch cross-directory impact.
+
+**Finding 3 (SUGGESTION, FIXED)** — Stale comment in `tests/dashboard/channel.test.ts:296`.
+Comment read "Compute state dir using same hash as ctl.sh". Since ctl.sh is gone, updated to "same hash as computeStateDir() in channel.ts".
+
+**Finding 4 (DOC/advisory, noted)** — Pre-existing flaky WS integration test.
+`tests/dashboard/server.test.ts` "POST /api/events -> WebSocket broadcast -> multiple clients receive in order" fails intermittently (1/5 runs). Root cause is the test's `setTimeout(r, 2000)` fallback resolving the promise before messages arrive when the suite runs under load. This failure exists on main and in the worktree equally. NOT caused by this PR. Should be tracked as a separate tech-debt item.
+
+**Finding 5 (DOC/advisory, noted)** — Pre-existing `parseStagesBlock` failure.
+`tests/dashboard/parsing.test.ts` "parses stages with defaults and states" fails consistently. Diff shows new fields (`conditional`, `feedback_to`, `model`) present in parser output but absent from test fixture. Exists on main too. NOT caused by this PR. Should be fixed in a separate commit.
+
+**Finding 6 (DOC/advisory, noted)** — 3-second pause UX trade-off.
+The `scrollActivityToLatest()` pause-on-user-scroll is time-based (3s), not position-based. If the user scrolls away then immediately scrolls back to the top, auto-scroll remains paused until the timer fires. A position-based resume (detect user returning to top) would feel more responsive but adds complexity. Current implementation matches the plan's acceptance criterion and is acceptable.
+
+**Post-fix test count**: 341 pass, 1 persistent fail (pre-existing parseStagesBlock), +1 intermittent flaky WS test. Down from 14 fail in the initial self-review scan. All CODE findings resolved. Demolition surface remains 100% clean.
+
+### Summary
+
+Self-review caught one load-bearing bug (auto-scroll direction inverted — feature would have shipped broken), one cleanup miss (obsolete ctl.test.ts still in tree causing 12 false-negative test failures), and one stale comment. All fixed in commit 9de50b6 and pushed. Test suite reduced from 14 fail → 1-2 fail (all pre-existing and unrelated). Ready for captain gate.
