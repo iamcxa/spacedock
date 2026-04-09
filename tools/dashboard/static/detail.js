@@ -941,7 +941,8 @@ function rejectSuggestionAction(suggestionId) {
     fetch('/api/events?entity=' + encodeURIComponent(currentSlug))
       .then(function(res) { return res.json(); })
       .then(function(data) {
-        activityEvents = (data.events || []).map(function(e) { return e.event; });
+        activityEvents = (data.events || []).map(function(e) { return e.event; })
+          .filter(function(ev) { return ev.entity === currentSlug; });
         populateFilterOptions();
         renderActivityFeed();
         activityLoaded = true;
@@ -1139,7 +1140,6 @@ function rejectSuggestionAction(suggestionId) {
 
         // Realtime entity updates — reload entity when MCP update_entity modifies it
         if (event.type === 'entity_update') {
-          var currentSlug = entityPath ? entityPath.replace(/\.md$/, '').split('/').pop() : '';
           if (event.entity === currentSlug && typeof window.loadEntity === 'function') {
             window.loadEntity();
           }
