@@ -16,6 +16,8 @@ export class EventBuffer {
   private readonly selectSinceStmt;
   private readonly countStmt;
   private readonly selectByEntityStmt;
+  private readonly selectChannelMsgSinceStmt;
+  private readonly selectChannelMsgSinceEntityStmt;
 
   constructor(db: Database, capacity: number) {
     this.db = db;
@@ -27,6 +29,12 @@ export class EventBuffer {
     this.selectSinceStmt = db.query("SELECT * FROM events WHERE seq > ? ORDER BY seq ASC");
     this.countStmt = db.query("SELECT COUNT(*) as cnt FROM events");
     this.selectByEntityStmt = db.query("SELECT * FROM events WHERE entity = ? ORDER BY seq ASC");
+    this.selectChannelMsgSinceStmt = db.query(
+      "SELECT * FROM events WHERE type = 'channel_message' AND seq > ? ORDER BY seq ASC"
+    );
+    this.selectChannelMsgSinceEntityStmt = db.query(
+      "SELECT * FROM events WHERE type = 'channel_message' AND seq > ? AND entity = ? ORDER BY seq ASC"
+    );
   }
 
   push(event: AgentEvent): SequencedEvent {
@@ -70,6 +78,15 @@ export class EventBuffer {
 
   clear(): void {
     this.db.query("DELETE FROM events").run();
+  }
+
+  getChannelMessagesSince(afterSeq: number, entity?: string): SequencedEvent[] {
+    if (entity !== undefined && entity !== "") {
+      const rows = this.selectChannelMsgSinceEntityStmt.all(afterSeq, entity) as Array<EventRow>;
+      return rows.map(rowToSequencedEvent);
+    }
+    const rows = this.selectChannelMsgSinceStmt.all(afterSeq) as Array<EventRow>;
+    return rows.map(rowToSequencedEvent);
   }
 }
 
