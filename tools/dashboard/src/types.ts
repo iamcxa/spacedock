@@ -204,4 +204,5 @@ export interface SectionDiff {
   heading: string;
   status: "unchanged" | "added" | "removed" | "modified";
   diff?: string;         // unified diff string when modified
+  pathKey?: string;      // parent-prefixed key for disambiguation (e.g., "## Stage Report: explore > ### Summary")
 }

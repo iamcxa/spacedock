@@ -350,12 +350,14 @@
       var rollbackBtn = document.createElement('button');
       rollbackBtn.className = 'btn btn-small rollback-btn';
       rollbackBtn.textContent = '\u23EA Rollback to v' + rollbackVersion;
-      rollbackBtn.setAttribute('data-section', section.heading);
+      // Use pathKey for disambiguation when available, fall back to heading
+      var rollbackKey = section.pathKey || section.heading;
+      rollbackBtn.setAttribute('data-section', rollbackKey);
       rollbackBtn.setAttribute('data-version', String(rollbackVersion));
       rollbackBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         if (typeof window.showRollbackModal === 'function') {
-          window.showRollbackModal(section.heading, rollbackVersion);
+          window.showRollbackModal(rollbackKey, rollbackVersion);
         }
       });
       el.appendChild(rollbackBtn);

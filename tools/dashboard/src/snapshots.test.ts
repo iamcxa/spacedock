@@ -4,6 +4,7 @@ import { describe, test, expect } from "bun:test";
 import { openDb } from "./db";
 import {
   parseSections,
+  sectionPathKey,
   SnapshotStore,
   findSectionByHeading,
   replaceSection,
@@ -288,6 +289,91 @@ describe("diffVersions", () => {
     expect(() => store.diffVersions("foo", 99, 1)).toThrow();
     db.close();
   });
+
+  test("handles duplicate heading names under different parents", () => {
+    const v1Body = [
+      "## Stage Report: explore",
+      "### Summary",
+      "explore summary v1",
+      "## Stage Report: research",
+      "### Summary",
+      "research summary v1",
+    ].join("\n");
+    const v2Body = [
+      "## Stage Report: explore",
+      "### Summary",
+      "explore summary v2",  // changed
+      "## Stage Report: research",
+      "### Summary",
+      "research summary v1",  // unchanged
+    ].join("\n");
+    const { db, store } = seed("foo", [v1Body, v2Body]);
+    const result = store.diffVersions("foo", 1, 2);
+
+    // Both ### Summary sections should be present with unique pathKeys
+    const summaries = result.sections.filter((s) => s.heading === "### Summary");
+    expect(summaries).toHaveLength(2);
+
+    // First ### Summary (under explore) should be modified
+    const exploreSummary = result.sections.find(
+      (s) => s.pathKey === "## Stage Report: explore > ### Summary"
+    );
+    expect(exploreSummary).toBeDefined();
+    expect(exploreSummary!.status).toBe("modified");
+
+    // Second ### Summary (under research) should be unchanged
+    const researchSummary = result.sections.find(
+      (s) => s.pathKey === "## Stage Report: research > ### Summary"
+    );
+    expect(researchSummary).toBeDefined();
+    expect(researchSummary!.status).toBe("unchanged");
+
+    db.close();
+  });
+
+  test("different version pairs produce different diffs with duplicate headings", () => {
+    const v1Body = [
+      "## Stage Report: explore",
+      "### Summary",
+      "explore v1",
+      "## Stage Report: research",
+      "### Summary",
+      "research v1",
+    ].join("\n");
+    const v2Body = [
+      "## Stage Report: explore",
+      "### Summary",
+      "explore v2",
+      "## Stage Report: research",
+      "### Summary",
+      "research v1",
+    ].join("\n");
+    const v3Body = [
+      "## Stage Report: explore",
+      "### Summary",
+      "explore v2",
+      "## Stage Report: research",
+      "### Summary",
+      "research v3",
+    ].join("\n");
+    const { db, store } = seed("foo", [v1Body, v2Body, v3Body]);
+
+    const diff_3_vs_1 = store.diffVersions("foo", 1, 3);
+    const diff_3_vs_2 = store.diffVersions("foo", 2, 3);
+
+    // v3 vs v1: both summaries + both parents changed (parent body includes child content)
+    const modified_3v1 = diff_3_vs_1.sections.filter((s) => s.status === "modified");
+    expect(modified_3v1).toHaveLength(4);
+
+    // v3 vs v2: only research summary + its parent changed
+    const modified_3v2 = diff_3_vs_2.sections.filter((s) => s.status === "modified");
+    expect(modified_3v2).toHaveLength(2);
+    const modifiedKeys = modified_3v2.map((s) => s.pathKey).sort();
+    expect(modifiedKeys).toContain("## Stage Report: research");
+    expect(modifiedKeys).toContain("## Stage Report: research > ### Summary");
+
+    db.close();
+  });
 });
 
 describe("rollbackSection", () => {
@@ -395,6 +481,61 @@ describe("findSectionByHeading", () => {
     const md = "## Context\nbody\n";
     const sections = parseSections(md);
     expect(findSectionByHeading(sections, "Missing")).toBeNull();
+  });
+
+  test("resolves duplicate headings via path key", () => {
+    const md = [
+      "## Stage Report: explore",
+      "### Summary",
+      "explore summary",
+      "## Stage Report: research",
+      "### Summary",
+      "research summary",
+    ].join("\n");
+    const sections = parseSections(md);
+    const found = findSectionByHeading(
+      sections,
+      "## Stage Report: research > ### Summary"
+    );
+    expect(found).not.toBeNull();
+    expect(found!.body.trim()).toBe("research summary");
+  });
+});
+
+describe("sectionPathKey", () => {
+  test("returns heading for top-level sections", () => {
+    const sections = parseSections("## A\nalpha\n## B\nbeta\n");
+    expect(sectionPathKey(sections, 0)).toBe("## A");
+    expect(sectionPathKey(sections, 1)).toBe("## B");
+  });
+
+  test("prefixes parent for nested sections", () => {
+    const md = [
+      "## Parent",
+      "### Child",
+      "body",
+    ].join("\n");
+    const sections = parseSections(md);
+    expect(sectionPathKey(sections, 1)).toBe("## Parent > ### Child");
+  });
+
+  test("disambiguates duplicate headings under different parents", () => {
+    const md = [
+      "## Stage Report: explore",
+      "### Summary",
+      "explore summary",
+      "## Stage Report: research",
+      "### Summary",
+      "research summary",
+    ].join("\n");
+    const sections = parseSections(md);
+    const keys = sections.map((_, i) => sectionPathKey(sections, i));
+    expect(keys).toEqual([
+      "## Stage Report: explore",
+      "## Stage Report: explore > ### Summary",
+      "## Stage Report: research",
+      "## Stage Report: research > ### Summary",
+    ]);
   });
 });
 

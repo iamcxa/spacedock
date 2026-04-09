@@ -80,6 +80,42 @@ export function parseSections(markdown: string): ParsedSection[] {
 }
 
 /**
+ * Build a unique path key for a section by walking backwards through
+ * the section list to find ancestor headings at each lower level.
+ *
+ * Example: for `### Summary` under `## Stage Report: explore`,
+ * returns `## Stage Report: explore > ### Summary`.
+ *
+ * Sections with unique headings get just their heading as key.
+ * This is used by diffVersions and rollback to disambiguate
+ * duplicate heading names (e.g., multiple `### Summary` sections).
+ */
+export function sectionPathKey(sections: ParsedSection[], index: number): string {
+  const section = sections[index];
+  const ancestors: string[] = [];
+  // Walk backwards to find nearest ancestor at each lower level
+  for (let targetLevel = section.level - 1; targetLevel >= 1; targetLevel--) {
+    for (let j = index - 1; j >= 0; j--) {
+      if (sections[j].level === targetLevel) {
+        ancestors.unshift(sections[j].heading);
+        break;
+      }
+    }
+  }
+  if (ancestors.length === 0) return section.heading;
+  return ancestors.join(" > ") + " > " + section.heading;
+}
+
+/**
+ * Build a Map from section path key → ParsedSection.
+ * Unlike `new Map(sections.map(s => [s.heading, s]))`, this handles
+ * duplicate heading names by using parent-prefixed path keys.
+ */
+export function buildSectionMap(sections: ParsedSection[]): Map<string, ParsedSection> {
+  return new Map(sections.map((s, i) => [sectionPathKey(sections, i), s]));
+}
+
+/**
  * SnapshotStore manages versioned entity snapshots in the SQLite
  * `entity_snapshots` table. Each `createSnapshot` call auto-assigns
  * the next version number for the entity inside a transaction.
@@ -183,19 +219,21 @@ export class SnapshotStore {
     }
     const fromSections = parseSections(fromSnap.body);
     const toSections = parseSections(toSnap.body);
-    const fromMap = new Map(fromSections.map((s) => [s.heading, s]));
-    const toMap = new Map(toSections.map((s) => [s.heading, s]));
+    const fromMap = buildSectionMap(fromSections);
+    const toMap = buildSectionMap(toSections);
 
     const result: SectionDiff[] = [];
     // Iterate in `to` order so diff output matches destination layout.
-    for (const t of toSections) {
-      const f = fromMap.get(t.heading);
+    for (let i = 0; i < toSections.length; i++) {
+      const t = toSections[i];
+      const key = sectionPathKey(toSections, i);
+      const f = fromMap.get(key);
       if (!f) {
-        result.push({ heading: t.heading, status: "added" });
+        result.push({ heading: t.heading, status: "added", pathKey: key });
         continue;
       }
       if (f.body === t.body) {
-        result.push({ heading: t.heading, status: "unchanged" });
+        result.push({ heading: t.heading, status: "unchanged", pathKey: key });
         continue;
       }
       const patch = createPatch(
@@ -205,12 +243,13 @@ export class SnapshotStore {
         `v${fromVersion}`,
         `v${toVersion}`,
       );
-      result.push({ heading: t.heading, status: "modified", diff: patch });
+      result.push({ heading: t.heading, status: "modified", diff: patch, pathKey: key });
     }
     // Append removed sections (present in `from` but not in `to`).
-    for (const f of fromSections) {
-      if (!toMap.has(f.heading)) {
-        result.push({ heading: f.heading, status: "removed" });
+    for (let i = 0; i < fromSections.length; i++) {
+      const key = sectionPathKey(fromSections, i);
+      if (!toMap.has(key)) {
+        result.push({ heading: fromSections[i].heading, status: "removed", pathKey: key });
       }
     }
     return { from: fromVersion, to: toVersion, sections: result };
@@ -331,6 +370,17 @@ export function findSectionByHeading(
 ): ParsedSection | null {
   const norm = (s: string) => s.trim().replace(/\s+/g, " ");
   const q = norm(query);
+
+  // 0. Path key match — if query contains " > ", treat as parent-prefixed path key
+  if (q.includes(" > ")) {
+    for (let i = 0; i < sections.length; i++) {
+      if (norm(sectionPathKey(sections, i)) === q) {
+        return sections[i];
+      }
+    }
+    return null;
+  }
+
   // 1. Exact match on normalized heading
   const exact = sections.find((s) => norm(s.heading) === q);
   if (exact) return exact;
