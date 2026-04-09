@@ -915,6 +915,8 @@ function rejectSuggestionAction(suggestionId) {
   // --- Activity feed state ---
   var activityLoaded = false;
   var activityEvents = [];
+  var autoScrollPaused = false;
+  var autoScrollTimer = null;
   var currentSlug = entityPath ? entityPath.replace(/\.md$/, '').split('/').pop() : '';
 
   // --- Tab switching ---
@@ -941,9 +943,11 @@ function rejectSuggestionAction(suggestionId) {
     fetch('/api/events?entity=' + encodeURIComponent(currentSlug))
       .then(function(res) { return res.json(); })
       .then(function(data) {
-        activityEvents = (data.events || []).map(function(e) { return e.event; });
+        activityEvents = (data.events || []).map(function(e) { return e.event; })
+          .filter(function(ev) { return ev.entity === currentSlug; });
         populateFilterOptions();
         renderActivityFeed();
+        scrollActivityToLatest();
         activityLoaded = true;
       })
       .catch(function() { /* silent */ });
@@ -974,6 +978,33 @@ function rejectSuggestionAction(suggestionId) {
 
     for (var i = filtered.length - 1; i >= 0; i--) {
       container.appendChild(createActivityCard(filtered[i]));
+    }
+  }
+
+  // Activity feed renders newest-first (renderActivityFeed iterates in reverse),
+  // so the "latest" message is at scrollTop = 0, not scrollHeight.
+  (function initAutoScroll() {
+    var container = document.getElementById('activity-feed');
+    if (!container) return;
+    container.addEventListener('scroll', function() {
+      // If user scrolled away from the top (latest), pause auto-scroll for 3s
+      var atLatest = container.scrollTop < 30;
+      if (!atLatest) {
+        autoScrollPaused = true;
+        if (autoScrollTimer) clearTimeout(autoScrollTimer);
+        autoScrollTimer = setTimeout(function() {
+          autoScrollPaused = false;
+          autoScrollTimer = null;
+        }, 3000);
+      }
+    });
+  })();
+
+  function scrollActivityToLatest() {
+    if (autoScrollPaused) return;
+    var container = document.getElementById('activity-feed');
+    if (container) {
+      container.scrollTop = 0;
     }
   }
 
@@ -1139,7 +1170,6 @@ function rejectSuggestionAction(suggestionId) {
 
         // Realtime entity updates — reload entity when MCP update_entity modifies it
         if (event.type === 'entity_update') {
-          var currentSlug = entityPath ? entityPath.replace(/\.md$/, '').split('/').pop() : '';
           if (event.entity === currentSlug && typeof window.loadEntity === 'function') {
             window.loadEntity();
           }
@@ -1229,6 +1259,7 @@ function rejectSuggestionAction(suggestionId) {
           activityEvents.push(event);
           populateFilterOptions();
           renderActivityFeed();
+          scrollActivityToLatest();
         }
       }
     };

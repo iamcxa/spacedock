@@ -38,24 +38,6 @@ export function writeChannelState(stateDir: string, port: number): void {
   writeFileSync(join(stateDir, "channel_port"), String(port) + "\n");
 }
 
-/**
- * Bridge cross-instance WS gap: forward an event to the ctl server (HTTP dashboard)
- * so its WebSocket subscribers see it in real-time. Best effort — never blocks/throws.
- */
-function forwardToCtlServer(event: AgentEvent, stateDir: string): void {
-  try {
-    const portFile = join(stateDir, "port");
-    if (!existsSync(portFile)) return;
-    const ctlPort = readFileSync(portFile, "utf-8").trim();
-    fetch(`http://127.0.0.1:${ctlPort}/api/events`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(event),
-    }).catch(() => {}); // fire-and-forget
-  } catch {
-    // best effort
-  }
-}
 
 export function cleanChannelState(stateDir: string): void {
   const portFile = join(stateDir, "channel_port");
@@ -275,6 +257,23 @@ export function createChannelServer(opts: ChannelServerOptions) {
             required: ["entity", "reason"],
           },
         },
+        {
+          name: "get_pending_messages",
+          description: "Retrieve channel_message events since a given sequence number. Use after reconnecting the MCP transport to recover messages sent while disconnected.",
+          inputSchema: {
+            type: "object" as const,
+            properties: {
+              since_seq: {
+                type: "number",
+                description: "Return messages with seq > since_seq. Default 0 returns all.",
+              },
+              entity: {
+                type: "string",
+                description: "Filter by entity slug. Empty string or omitted returns all entities.",
+              },
+            },
+          },
+        },
       ],
     };
   });
@@ -325,7 +324,6 @@ export function createChannelServer(opts: ChannelServerOptions) {
           detail: comment.content,
         };
         dashboard.publishEvent(commentEvent);
-        forwardToCtlServer(commentEvent, computeStateDir(opts.projectRoot));
         return { content: [{ type: "text", text: JSON.stringify(comment) }] };
       } catch (err) {
         return { content: [{ type: "text", text: (err as Error).message }], isError: true };
@@ -353,7 +351,6 @@ export function createChannelServer(opts: ChannelServerOptions) {
           detail: reply.content,
         };
         dashboard.publishEvent(replyEvent);
-        forwardToCtlServer(replyEvent, computeStateDir(opts.projectRoot));
         return { content: [{ type: "text", text: JSON.stringify({ reply, resolved }) }] };
       } catch (err) {
         return { content: [{ type: "text", text: (err as Error).message }], isError: true };
@@ -408,7 +405,6 @@ export function createChannelServer(opts: ChannelServerOptions) {
           const autoResolved = autoResolveComments(filepath, slug, allHeadings, snap.version);
           const bodyEvent: AgentEvent = { type: "entity_update" as any, entity: slug, stage: "", agent: "fo", timestamp: new Date().toISOString(), detail: `body replaced: ${reason}` };
           dashboard.publishEvent(bodyEvent);
-          forwardToCtlServer(bodyEvent, computeStateDir(opts.projectRoot));
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: autoResolved }) }] };
         }
 
@@ -460,7 +456,6 @@ export function createChannelServer(opts: ChannelServerOptions) {
           const autoResolved = autoResolveComments(filepath, slug, modifiedHeadings, snap.version);
           const secEvent: AgentEvent = { type: "entity_update" as any, entity: slug, stage: "", agent: "fo", timestamp: new Date().toISOString(), detail: `sections updated: ${reason}` };
           dashboard.publishEvent(secEvent);
-          forwardToCtlServer(secEvent, computeStateDir(opts.projectRoot));
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: autoResolved }) }] };
         }
 
@@ -478,7 +473,6 @@ export function createChannelServer(opts: ChannelServerOptions) {
           writeFileSync(filepath, workingText);
           const fmEvent: AgentEvent = { type: "entity_update" as any, entity: slug, stage: "", agent: "fo", timestamp: new Date().toISOString(), detail: `frontmatter updated: ${reason}` };
           dashboard.publishEvent(fmEvent);
-          forwardToCtlServer(fmEvent, computeStateDir(opts.projectRoot));
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: [] }) }] };
         }
 
@@ -486,6 +480,28 @@ export function createChannelServer(opts: ChannelServerOptions) {
       } catch (err) {
         return { content: [{ type: "text", text: (err as Error).message }], isError: true };
       }
+    }
+
+    if (name === "get_pending_messages") {
+      const sinceSeq = (args.since_seq as number | undefined) ?? 0;
+      const entity = args.entity as string | undefined;
+      const messages = dashboard.eventBuffer.getChannelMessagesSince(sinceSeq, entity);
+      const lastSeq = messages.length > 0 ? messages[messages.length - 1].seq : sinceSeq;
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            messages: messages.map(m => ({
+              seq: m.seq,
+              content: m.event.detail ?? "",
+              entity: m.event.entity,
+              agent: m.event.agent,
+              timestamp: m.event.timestamp,
+            })),
+            last_seq: lastSeq,
+          }),
+        }],
+      };
     }
 
     return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true };
@@ -586,7 +602,7 @@ if (import.meta.main) {
   // Notify browser clients that channel is now active
   dashboard.broadcastChannelStatus(true);
 
-  // Write channel state file so ctl.sh can detect this instance
+  // Write channel state file so skills and tools can detect this instance
   const stateDir = computeStateDir(projectRoot);
   writeChannelState(stateDir, dashboard.port!);
 

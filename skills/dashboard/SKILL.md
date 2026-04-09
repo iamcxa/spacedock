@@ -4,23 +4,22 @@ description: >
   Use when user says 'dashboard', 'start dashboard', 'stop dashboard',
   'dashboard status', 'dashboard share', '看 dashboard', '開 dashboard',
   '關 dashboard', '分享 dashboard'. Manages the Spacedock workflow
-  dashboard daemon.
+  dashboard.
 user-invocable: true
 ---
 
-Manage the Spacedock workflow dashboard daemon via `ctl.sh`.
+Manage the Spacedock workflow dashboard via the MCP channel server on port 8420.
 
 ## Setup
 
 1. Detect project root: `git rev-parse --show-toplevel`
-2. Resolve ctl.sh path: `{project_root}/tools/dashboard/ctl.sh`
-3. Resolve state dir: `~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)`
+2. Resolve state dir: `~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)`
 
 ## MCP Setup Check
 
 Run this check **only on `/dashboard start`** (not on stop/status/logs/restart). It detects a missing or wrong `spacedock-dashboard` entry in `{project_root}/.mcp.json` and offers to fix it before starting the daemon.
 
-**Critical invariant:** This check is **best-effort and non-blocking**. If anything goes wrong (missing `channel.ts`, not a git repo, malformed JSON, user declines), log a warning and continue to `bash {ctl} start --root {project_root}`. The dashboard HTTP channel still works; only the MCP bidirectional path is degraded.
+**Critical invariant:** This check is **best-effort and non-blocking**. If anything goes wrong (missing `channel.ts`, not a git repo, malformed JSON, user declines), log a warning and skip. The dashboard requires the MCP channel to be active.
 
 ### Step A — Resolve paths
 
@@ -240,7 +239,7 @@ When the user types just `/dashboard` with no subcommand, present available comm
 | `/dashboard start` | Start dashboard daemon |
 | `/dashboard stop` | Stop dashboard |
 | `/dashboard status` | Show running status |
-| `/dashboard share` | Start tunnel + create share link |
+| `/dashboard share` | Expose full dashboard UI via ngrok tunnel (public URL) |
 | `/dashboard logs` | Show logs |
 | `/dashboard restart` | Restart |
 
@@ -250,117 +249,156 @@ Wait for user to choose. Do not auto-start.
 
 Parse the user's intent from their message:
 
-- `/dashboard start` — start the dashboard daemon:
+- `/dashboard start` — The dashboard starts automatically when Claude Code activates the spacedock-dashboard MCP channel. If the channel entry is missing from `.mcp.json`, run the [MCP Setup Check](#mcp-setup-check) above, then restart Claude Code.
 
-  **First run the [MCP Setup Check](#mcp-setup-check)** (above) to detect/fix the `spacedock-dashboard` entry in `.mcp.json`. The check is best-effort and non-blocking — proceed to the start command regardless of outcome.
+- `/dashboard stop` — The dashboard stops when Claude Code exits (the channel server lifecycle is tied to the CC session). To force-stop, the user can quit and restart Claude Code.
 
+- `/dashboard status` — Check whether the channel server is active:
   ```bash
-  bash {ctl} start --root {project_root}
+  STATE_DIR=~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)
+  if [ -f "$STATE_DIR/channel_port" ]; then
+    PORT=$(cat "$STATE_DIR/channel_port" | tr -d '[:space:]')
+    curl -sf "http://127.0.0.1:$PORT/api/events" >/dev/null && echo "Dashboard running on :$PORT" || echo "Dashboard not responding"
+  else
+    echo "Dashboard not running (no channel_port state file)"
+  fi
   ```
 
-- `/dashboard stop` — stop the dashboard daemon:
+- `/dashboard logs` — show dashboard logs:
   ```bash
-  bash {ctl} stop --root {project_root}
+  STATE_DIR=~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)
+  cat "$STATE_DIR/dashboard.log" 2>/dev/null || echo "No log file found"
   ```
 
-- `/dashboard status` — show dashboard status:
-  ```bash
-  bash {ctl} status --root {project_root}
-  ```
+- `/dashboard restart` — To restart the dashboard, restart Claude Code (the channel server is tied to the CC session lifecycle).
 
-- `/dashboard status --all` — show all dashboard instances:
-  ```bash
-  bash {ctl} status --all
-  ```
-
-- `/dashboard logs` — show dashboard logs (timeout after 10 seconds if using --follow):
-  ```bash
-  bash {ctl} logs --root {project_root}
-  ```
-
-- `/dashboard restart` — restart the dashboard:
-  ```bash
-  bash {ctl} restart --root {project_root}
-  ```
-
-- `/dashboard share` — create a shareable public link (see Share flow below)
+- `/dashboard share` — expose the full dashboard UI via an ngrok tunnel (see Share flow below)
 
 ## Share Flow
 
-When the user invokes `/dashboard share`, execute this flow:
+When the user invokes `/dashboard share`, execute this flow.
 
-### Step 1 — Ensure dashboard + tunnel running
+### Hint — what `/dashboard share` does
 
-```bash
-# Check status (now shows both server and channel instances)
-bash {ctl} status --root {project_root}
-```
+`/dashboard share` exposes the **full dashboard UI** via an `ngrok` tunnel. It does NOT create scoped share links or passwords — anyone with the URL can see and interact with everything in the dashboard exactly like the local user. Only share with trusted collaborators.
 
-- **Not running (neither server nor channel)** → start with tunnel: `bash {ctl} start --tunnel --root {project_root}`
-- **Running (server or channel), no tunnel** → start tunnel: `bash {ctl} tunnel start --root {project_root}`
-- **Running, tunnel active** → continue to Step 2
+**Port:** Always tunnel the channel port (8420). This is the only dashboard server — it has a direct MCP stdio transport to the running Claude Code session.
 
-Detect tunnel by checking for `{state_dir}/tunnel_url` file:
-```bash
-cat ~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)/tunnel_url 2>/dev/null
-```
+If the user wants scoped, password-protected share links to specific entities, they should use the dashboard UI's "Share" panel inside the detail page instead.
 
-### Step 2 — Ask scope (optional, quick)
-
-If user provided args (e.g., `/dashboard share 021`), use that as scope.
-Otherwise, default to all active entities. Do NOT ask interactively unless the user seems to want scoped access — bias toward "share everything, move fast."
-
-### Step 3 — Get dashboard port and tunnel URL
+### Step 1 — Ensure dashboard is running
 
 ```bash
 STATE_DIR=~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)
-# Try server port first, fall back to channel port
-PORT=$(cat "$STATE_DIR/port" 2>/dev/null || cat "$STATE_DIR/channel_port" 2>/dev/null)
-PORT=$(echo "$PORT" | tr -d '[:space:]')
-TUNNEL_URL=$(cat "$STATE_DIR/tunnel_url")
+PORT=$(cat "$STATE_DIR/channel_port" 2>/dev/null | tr -d '[:space:]')
+if [ -z "$PORT" ] || ! curl -sf "http://127.0.0.1:$PORT/api/events" >/dev/null 2>&1; then
+  echo "[Share] Dashboard not running. The dashboard requires an active Claude Code session with the spacedock-dashboard MCP channel."
+  exit 1
+fi
 ```
 
-### Step 4 — Discover entity paths for scope
+### Step 2 — Check ngrok is installed
 
 ```bash
-# All active entities (default)
-python3 {project_root}/skills/commission/bin/status --workflow-dir {workflow_dir} 2>/dev/null \
-  | awk 'NR>2 {print $2}' \
-  | sed 's|^|{workflow_dir}/|; s|$|.md|'
+if ! command -v ngrok >/dev/null 2>&1; then
+  NGROK_MISSING=1
+fi
 ```
 
-Or if scoped to specific entity IDs, filter accordingly.
+If `NGROK_MISSING` is set, prompt the user:
 
-### Step 5 — Create share link via API
+```
+[Share] ngrok 未安裝 / ngrok is not installed.
+
+/dashboard share 需要 ngrok 把本機 dashboard 暴露到 public URL。
+/dashboard share needs ngrok to expose the local dashboard to a public URL.
+
+要透過 homebrew 安裝嗎？/ Install via homebrew? (y/n)
+  → y: 將執行 / Will run: brew install ngrok
+  → n: 略過 — 請手動安裝後重試 / Skip — please install manually and retry
+```
+
+If user says `y`: run `brew install ngrok`. If the install fails (non-zero exit), show the error and stop — do NOT proceed.
+If user says `n`: stop the share flow. Print a hint: "安裝後重試 `/dashboard share` / After install, retry `/dashboard share`".
+
+On macOS without homebrew, point user to `https://ngrok.com/download`.
+
+### Step 3 — Resolve dashboard port
 
 ```bash
-# Generate a random password
-PASSWORD=$(openssl rand -hex 4)
-
-curl -s -X POST http://127.0.0.1:${PORT}/api/share \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "password": "'${PASSWORD}'",
-    "entityPaths": [<entity paths from Step 4>],
-    "stages": [],
-    "label": "Share Link",
-    "ttlHours": 24
-  }'
+STATE_DIR=~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)
+PORT=$(cat "$STATE_DIR/channel_port" 2>/dev/null | tr -d '[:space:]')
+if [ -z "$PORT" ]; then
+  echo "[Share] Cannot determine dashboard port — ensure Claude Code is running with the spacedock-dashboard channel"
+  exit 1
+fi
 ```
 
-Capture the `token` from the response.
+### Step 4 — Check if ngrok is already tunneling this port
+
+```bash
+EXISTING_URL=$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    for t in d.get('tunnels', []):
+        addr = t.get('config', {}).get('addr', '')
+        if addr.endswith(':$PORT'):
+            print(t['public_url'])
+            break
+except Exception:
+    pass
+")
+```
+
+If `EXISTING_URL` is set, reuse it and skip to Step 6.
+
+### Step 5 — Start ngrok tunnel
+
+```bash
+nohup ngrok http "$PORT" --log=stdout > "$STATE_DIR/ngrok.log" 2>&1 &
+NGROK_PID=$!
+echo "$NGROK_PID" > "$STATE_DIR/ngrok.pid"
+
+# Poll ngrok API for up to 10s until tunnel URL is ready
+URL=""
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  sleep 1
+  URL=$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    tunnels = d.get('tunnels', [])
+    if tunnels:
+        print(tunnels[0]['public_url'])
+except Exception:
+    pass
+")
+  [ -n "$URL" ] && break
+done
+
+if [ -z "$URL" ]; then
+  echo "[Share] ngrok started but tunnel URL not captured within 10s."
+  echo "  Check: $STATE_DIR/ngrok.log"
+  echo "  Or query: curl http://127.0.0.1:4040/api/tunnels"
+  exit 1
+fi
+
+echo "$URL" > "$STATE_DIR/tunnel_url"
+```
 
 ### Step 6 — Present result
 
 ```
-🔗 Shareable Dashboard Link
-   URL:      {TUNNEL_URL}/share/{token}
-   Password: {PASSWORD}
-   Expires:  24h
-   Scope:    {N} entities (all active)
+🔗 Dashboard Share URL
+   URL:  {URL}
+   Port: {PORT} (full dashboard UI)
 
-Send the URL + password to your reviewer.
+⚠️  Public access — anyone with this URL can read/write the dashboard.
+    Only share with trusted collaborators.
+
 Note: ngrok free tier shows an interstitial on first visit.
+Stop tunnel: /dashboard tunnel stop (or kill ngrok: $(cat {STATE_DIR}/ngrok.pid))
 ```
 
 ## Output

@@ -1556,6 +1556,7 @@ details[open] .accordion-summary::before {
 .activity-event {
     padding: 0.5rem 0.6rem;
     border-bottom: 1px solid #21262d;
+    margin-bottom: 8px;
     font-size: 0.82rem;
     line-height: 1.4;
 }
