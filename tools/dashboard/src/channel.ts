@@ -257,6 +257,23 @@ export function createChannelServer(opts: ChannelServerOptions) {
             required: ["entity", "reason"],
           },
         },
+        {
+          name: "get_pending_messages",
+          description: "Retrieve channel_message events since a given sequence number. Use after reconnecting the MCP transport to recover messages sent while disconnected.",
+          inputSchema: {
+            type: "object" as const,
+            properties: {
+              since_seq: {
+                type: "number",
+                description: "Return messages with seq > since_seq. Default 0 returns all.",
+              },
+              entity: {
+                type: "string",
+                description: "Filter by entity slug. Empty string or omitted returns all entities.",
+              },
+            },
+          },
+        },
       ],
     };
   });
@@ -463,6 +480,28 @@ export function createChannelServer(opts: ChannelServerOptions) {
       } catch (err) {
         return { content: [{ type: "text", text: (err as Error).message }], isError: true };
       }
+    }
+
+    if (name === "get_pending_messages") {
+      const sinceSeq = (args.since_seq as number | undefined) ?? 0;
+      const entity = args.entity as string | undefined;
+      const messages = dashboard.eventBuffer.getChannelMessagesSince(sinceSeq, entity);
+      const lastSeq = messages.length > 0 ? messages[messages.length - 1].seq : sinceSeq;
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            messages: messages.map(m => ({
+              seq: m.seq,
+              content: m.event.detail ?? "",
+              entity: m.event.entity,
+              agent: m.event.agent,
+              timestamp: m.event.timestamp,
+            })),
+            last_seq: lastSeq,
+          }),
+        }],
+      };
     }
 
     return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true };
