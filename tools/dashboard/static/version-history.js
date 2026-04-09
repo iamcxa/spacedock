@@ -87,10 +87,10 @@
     title.textContent = 'Version History';
     header.appendChild(title);
 
-    if (versions.length > 1) {
+    if (versions.length > 0) {
       var compareHint = document.createElement('span');
       compareHint.className = 'version-compare-hint';
-      compareHint.textContent = 'Click two versions to compare';
+      compareHint.textContent = 'Click a version to compare with current';
       header.appendChild(compareHint);
     }
 
@@ -111,35 +111,6 @@
     var timeline = document.createElement('div');
     timeline.className = 'version-timeline';
     timeline.id = 'version-timeline';
-
-    // "current (live)" virtual entry — shows unsnapshot changes
-    if (versions.length > 0) {
-      var liveItem = document.createElement('div');
-      liveItem.className = 'version-item version-live';
-      liveItem.setAttribute('data-version', 'live');
-
-      var liveNum = document.createElement('span');
-      liveNum.className = 'version-num version-num-live';
-      liveNum.textContent = 'current';
-      liveItem.appendChild(liveNum);
-
-      var liveMeta = document.createElement('div');
-      liveMeta.className = 'version-meta';
-      var liveLabel = document.createElement('span');
-      liveLabel.className = 'version-author';
-      liveLabel.textContent = 'live on disk';
-      liveMeta.appendChild(liveLabel);
-      var liveBadge = document.createElement('span');
-      liveBadge.className = 'version-badge live-badge';
-      liveBadge.textContent = 'unsnapshot';
-      liveMeta.appendChild(liveBadge);
-      liveItem.appendChild(liveMeta);
-
-      liveItem.addEventListener('click', function () {
-        selectVersion('live');
-      });
-      timeline.appendChild(liveItem);
-    }
 
     versions.forEach(function (v) {
       timeline.appendChild(renderVersionItem(v));
@@ -210,50 +181,20 @@
     return item;
   }
 
-  // --- Version selection logic ---
+  // --- Version selection logic (Notion-style) ---
+  // Single click: always compare selected version vs current (live) on disk.
+  // Click again to deselect.
   function selectVersion(version) {
-    if (toVersion === null) {
-      if (version === 'live') {
-        // Click on "current" — compare latest snapshot vs live
-        fromVersion = versions[0].version;
-        toVersion = 'live';
-      } else {
-        // Compare selected version against latest (most intuitive for single click)
-        var latestVersion = versions[0].version;
-        fromVersion = version;
-        toVersion = latestVersion;
-      }
-      highlightSelected();
-      if (fromVersion !== toVersion) {
-        loadDiff(fromVersion, toVersion);
-      }
-      return;
-    }
-
-    if (version === toVersion) {
-      toVersion = null;
+    if (fromVersion === version) {
+      // Deselect
       fromVersion = null;
+      toVersion = null;
       highlightSelected();
       clearDiff();
       return;
     }
-
-    // When "live" is involved, it's always the "to" side
-    if (version === 'live') {
-      toVersion = 'live';
-      // fromVersion stays as is (or use latest if none)
-      if (fromVersion === null || fromVersion === 'live') {
-        fromVersion = versions[0].version;
-      }
-    } else if (toVersion === 'live') {
-      // Clicking a version while live is selected — set it as from
-      fromVersion = version;
-    } else {
-      var newFrom = Math.min(version, toVersion);
-      var newTo = Math.max(version, toVersion);
-      fromVersion = newFrom;
-      toVersion = newTo;
-    }
+    fromVersion = version;
+    toVersion = 'live';
     highlightSelected();
     loadDiff(fromVersion, toVersion);
   }
@@ -261,14 +202,9 @@
   function highlightSelected() {
     var items = versionPanel.querySelectorAll('.version-item');
     items.forEach(function (el) {
-      var rawV = el.getAttribute('data-version');
-      var v = rawV === 'live' ? 'live' : parseInt(rawV, 10);
-      el.classList.remove('selected', 'in-range');
-      if (fromVersion !== null && toVersion !== null) {
-        if (v === fromVersion || v === toVersion) el.classList.add('selected');
-        else if (toVersion !== 'live' && typeof v === 'number' && v > fromVersion && v < toVersion) el.classList.add('in-range');
-        else if (toVersion === 'live' && typeof v === 'number' && v > fromVersion) el.classList.add('in-range');
-      } else if (toVersion !== null && v === toVersion) {
+      var v = parseInt(el.getAttribute('data-version'), 10);
+      el.classList.remove('selected');
+      if (fromVersion !== null && v === fromVersion) {
         el.classList.add('selected');
       }
     });
@@ -322,7 +258,7 @@
 
     var fromLabel = document.createElement('span');
     fromLabel.className = 'diff-from-label';
-    fromLabel.textContent = 'v' + from;
+    fromLabel.textContent = from === 'live' ? 'current (live)' : 'v' + from;
     header.appendChild(fromLabel);
 
     var arrow = document.createTextNode(' \u2192 ');
@@ -350,7 +286,7 @@
   }
 
   // --- Render a single section diff ---
-  // rollbackVersion = older version to restore to; currentVersion = newer version for labels
+  // rollbackVersion = snapshot version to restore from; currentVersion = 'live' or version number
   function renderDiffSection(section, rollbackVersion, currentVersion) {
     var el = document.createElement('div');
     el.className = 'diff-section diff-section-' + section.status;

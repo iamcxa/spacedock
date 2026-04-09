@@ -376,6 +376,52 @@ describe("diffVersions", () => {
   });
 });
 
+describe("diffWithLive", () => {
+  function seed(entity: string, bodies: string[]) {
+    const db = openDb(":memory:");
+    const store = new SnapshotStore(db);
+    for (const b of bodies) {
+      store.createSnapshot({ entity, body: b, author: "c", reason: "r" });
+    }
+    return { db, store };
+  }
+
+  test("diffs latest snapshot against live body", () => {
+    const snapshotBody = "## A\nalpha\n## B\nbeta\n";
+    const liveBody = "## A\nalpha-changed\n## B\nbeta\n";
+    const { db, store } = seed("foo", [snapshotBody]);
+
+    const result = store.diffWithLive("foo", 1, liveBody);
+    expect(result.from).toBe(1);
+    expect(result.to).toBe("live");
+    const sectionA = result.sections.find((s) => s.heading === "## A");
+    expect(sectionA!.status).toBe("modified");
+    const sectionB = result.sections.find((s) => s.heading === "## B");
+    expect(sectionB!.status).toBe("unchanged");
+    db.close();
+  });
+
+  test("detects added content in live body", () => {
+    const snapshotBody = "## A\nalpha\n";
+    const liveBody = "## A\nalpha\n## B\nnew section\n";
+    const { db, store } = seed("foo", [snapshotBody]);
+
+    const result = store.diffWithLive("foo", 1, liveBody);
+    const sectionB = result.sections.find((s) => s.heading === "## B");
+    expect(sectionB!.status).toBe("added");
+    db.close();
+  });
+
+  test("returns empty diff when live matches snapshot", () => {
+    const body = "## A\nalpha\n## B\nbeta\n";
+    const { db, store } = seed("foo", [body]);
+
+    const result = store.diffWithLive("foo", 1, body);
+    expect(result.sections.every((s) => s.status === "unchanged")).toBe(true);
+    db.close();
+  });
+});
+
 describe("rollbackSection", () => {
   function seed(entity: string, bodies: string[]) {
     const db = openDb(":memory:");
