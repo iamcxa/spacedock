@@ -182,6 +182,33 @@ After `context_status: ready`, the field becomes inert — downstream stages don
 | `clarify`+`awaiting-clarify` | `clarify`+`ready` | All questions resolved | Science Officer gate | (no separate commit — included in next) |
 | `clarify`+`ready` | `plan` | Captain: "execute 046" OR auto_advance flag | Science Officer writes status | `clarify: {slug} — context ready` |
 | `plan` → ... → `shipped` | (existing pipeline) | FO dispatch as today | FO | (existing commit format) |
+| `clarify`+`awaiting-clarify` | `epic` | Captain approves decomposition | Science Officer | `decompose: {slug} → [{child1}, {child2}, ...]` |
+| `epic` (all children shipped) | `shipped` | FO detects all children shipped | FO | `merge: {slug} — epic complete` |
+
+### Epic / Decomposition Lifecycle
+
+When `build-clarify` detects a `## Decomposition Recommendation` section (written by explore):
+
+1. **Science Officer presents decomposition FIRST** (before assumption batch):
+   - Shows suggested child entities with titles, scope, and dependencies
+   - Captain approves, modifies, or rejects the split
+
+2. **If approved**, Science Officer:
+   - Creates child entity files via `/build` (each gets its own `build-brainstorm` pass)
+   - Sets `parent: {original-slug}` in each child's frontmatter
+   - Updates original entity: `status: epic`, `children: [child1, child2, ...]`
+   - Commit: `decompose: {slug} → [child1, child2, ...]`
+   - Each child enters `draft`+`pending` independently
+
+3. **If rejected**, Science Officer:
+   - Removes `## Decomposition Recommendation` section
+   - Proceeds with normal clarify flow (single large entity)
+
+4. **Epic entity behavior**:
+   - `status: epic` — FO skips it (same as `manual: true`)
+   - Does NOT flow through pipeline stages
+   - Body preserves original Directive, Brainstorming Spec, and explore report as context
+   - FO periodically checks: when all children reach `shipped` → epic auto-completes
 
 ### Park & Resume
 
@@ -223,6 +250,8 @@ scale: {Small|Medium|Large}  # assessed by build-brainstorm
 project: {string}            # detected from workflow dir
 profile:                     # full|standard|express (assigned post-clarify)
 auto_advance:                # true if captain set "auto-execute after clarify"
+parent:                      # slug of parent epic (if this entity was decomposed from a larger one)
+children:                    # [slug1, slug2, ...] (if this entity is an epic/tracker)
 ---
 ```
 
@@ -238,6 +267,7 @@ auto_advance:                # true if captain set "auto-execute after clarify"
 | `## Assumptions` | build-explore | build-clarify confirms/corrects | Evidence-backed hypotheses with confidence levels |
 | `## Option Comparisons` | build-explore | build-clarify records selection | 2-3 option tables for gray areas without code precedent |
 | `## Canonical References` | build-clarify (grows during Q&A) | append-only | Paths to specs/ADRs/docs that captain references during clarify |
+| `## Decomposition Recommendation` | build-explore (if scope too large) | build-clarify resolves | Suggested child entity split with dependency order |
 | `## Stage Report: {name}` | ensign (per stage) | **append-only** | Audit trail — one per completed stage |
 
 ### Canonical Example (Entity 046)
@@ -370,6 +400,21 @@ Step 5: Intent & Scale Assessment
   - scale: Small (<5 files) | Medium (5-15 files) | Large (>15 files)
   If ambiguous → mark (needs clarification — deferred to explore)
 
+Step 5.5: Scope Check (Decomposition Signal)
+  Scan directive for large-scope signals:
+    - Signal words: "整個", "全部", "遷移", "migrate", "rewrite", "overhaul", "全面"
+    - Multiple distinct verbs targeting different subsystems
+    - Directive exceeds 3 sentences describing different areas
+    - Domain classification returned 3+ domains
+
+  If ≥2 signals detected:
+    Add to Captain Context Snapshot: `**Scope flag:** ⚠️ likely-decomposable`
+    This flag tells build-explore to prioritize decomposition analysis.
+
+  If <2 signals: no flag. Proceed normally.
+
+  This check is O(1) — pure text analysis, no codebase reads.
+
 Step 6: Entity Assembly & Commit
   Write entity file at {workflow_dir}/{slug}.md
   git add {slug}.md && git commit -m "seed: {slug} — {title}"
@@ -443,7 +488,36 @@ Step 2: Codebase Mapping
   - Count files → validate/revise scale assessment
   - Record findings under ## Stage Report: explore
 
-Step 3: Consume α Markers
+Step 3: Decomposition Analysis
+  Check Captain Context Snapshot for `⚠️ likely-decomposable` flag.
+  Also independently assess: did codebase mapping (Step 2) find >20 files
+  across 3+ layers?
+
+  If either condition is true:
+    Analyze whether the entity should be split. Consider:
+    - Are there natural boundaries (e.g., data layer vs UI vs sync)?
+    - Can sub-scopes be built and shipped independently?
+    - Are there clear dependency ordering between sub-scopes?
+
+    If decomposition is warranted, write ## Decomposition Recommendation:
+
+      ## Decomposition Recommendation
+
+      ⚠️ Scale exceeds recommended single-entity scope ({n} files, {n} domains).
+
+      Suggested split:
+      1. **{child-slug-1}** — {scope description} ({n} files)
+      2. **{child-slug-2}** — {scope description} ({n} files)
+      3. **{child-slug-3}** — {scope description} ({n} files)
+
+      Dependencies: {1 → 2 → 3 | all independent | ...}
+
+    If NOT warranted despite flag: note in Stage Report:
+      "Scope flag present but decomposition not recommended: {reason}"
+
+  If no flag AND <20 files: skip this step entirely.
+
+Step 3.5: Consume α Markers
   Scan Brainstorming Spec + Acceptance Criteria for (needs clarification — deferred
   to explore) markers. Each marker becomes a HIGH PRIORITY item for Step 4-6.
   These are the first things build-explore must attempt to resolve or convert
@@ -568,6 +642,49 @@ Fixtures directory: `spacebridge/skills/build-explore/forge/fixtures/`
 ### Core Flow
 
 ```
+Step 0: Decomposition Gate
+  Check entity body for ## Decomposition Recommendation section.
+
+  If present:
+    Present decomposition to captain BEFORE any other clarification:
+
+      "Explore found this entity's scope is large ({n} files, {n} domains).
+       Recommended split:
+
+       1. {child-slug-1} — {scope} ({n} files)
+       2. {child-slug-2} — {scope} ({n} files)
+       3. {child-slug-3} — {scope} ({n} files)
+
+       Dependencies: {ordering}
+
+       Options:
+       a) Accept split — I'll create child entities, this becomes an epic
+       b) Modify split — tell me what to change
+       c) Reject split — proceed as single entity"
+
+    Use AskUserQuestion with these 3 options.
+
+    If (a) Accept:
+      - For each child: invoke /build with child's title + scope as directive
+        (each gets its own build-brainstorm pass → draft entity)
+      - Update original entity frontmatter:
+          status: epic
+          children: [child-slug-1, child-slug-2, ...]
+      - Update each child's frontmatter: parent: {original-slug}
+      - Commit: decompose: {slug} → [child1, child2, ...]
+      - Report to captain: "Epic created. {n} child entities in draft."
+      - EXIT clarify — epic doesn't continue through pipeline.
+
+    If (b) Modify:
+      - Capture captain's modifications (freeform text)
+      - Adjust child list, re-present, loop until accepted or rejected
+
+    If (c) Reject:
+      - Remove ## Decomposition Recommendation section from entity body
+      - Proceed to Step 1 (normal clarify flow)
+
+  If not present: proceed to Step 1.
+
 Step 1: Load Entity State
   Read entity body. Count:
     - Unanswered Open Questions (no → Answer: annotation)
