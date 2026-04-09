@@ -1,14 +1,14 @@
 ---
 id: 042
 title: Dashboard — Entity Activity Feed + Chat Input
-status: pr-review
+status: shipped
 profile: standard
 source: 035 plan scope triage — deferred from dashboard-collaboration-ui
 started: 2026-04-09T03:30:00Z
-completed:
-verdict:
+completed: 2026-04-09T04:35:57Z
+verdict: PASSED
 score: 0.0
-worktree: .worktrees/spacedock-ensign-dashboard-activity-feed
+worktree:
 issue:
 pr: "#26"
 intent: feature
