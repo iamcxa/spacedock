@@ -1,7 +1,7 @@
 ---
 id: 045
 title: Dashboard Single-Server Unification (ADR-001) — Eliminate ctl.sh and Unify on :8420
-status: plan
+status: execute
 source: /build brainstorming (spec 2026-04-09-adr-001-single-server-8420-design.md)
 started: 2026-04-09T08:55:00Z
 completed:
