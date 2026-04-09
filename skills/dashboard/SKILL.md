@@ -4,23 +4,22 @@ description: >
   Use when user says 'dashboard', 'start dashboard', 'stop dashboard',
   'dashboard status', 'dashboard share', '看 dashboard', '開 dashboard',
   '關 dashboard', '分享 dashboard'. Manages the Spacedock workflow
-  dashboard daemon.
+  dashboard.
 user-invocable: true
 ---
 
-Manage the Spacedock workflow dashboard daemon via `ctl.sh`.
+Manage the Spacedock workflow dashboard via the MCP channel server on port 8420.
 
 ## Setup
 
 1. Detect project root: `git rev-parse --show-toplevel`
-2. Resolve ctl.sh path: `{project_root}/tools/dashboard/ctl.sh`
-3. Resolve state dir: `~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)`
+2. Resolve state dir: `~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)`
 
 ## MCP Setup Check
 
 Run this check **only on `/dashboard start`** (not on stop/status/logs/restart). It detects a missing or wrong `spacedock-dashboard` entry in `{project_root}/.mcp.json` and offers to fix it before starting the daemon.
 
-**Critical invariant:** This check is **best-effort and non-blocking**. If anything goes wrong (missing `channel.ts`, not a git repo, malformed JSON, user declines), log a warning and continue to `bash {ctl} start --root {project_root}`. The dashboard HTTP channel still works; only the MCP bidirectional path is degraded.
+**Critical invariant:** This check is **best-effort and non-blocking**. If anything goes wrong (missing `channel.ts`, not a git repo, malformed JSON, user declines), log a warning and skip. The dashboard requires the MCP channel to be active.
 
 ### Step A — Resolve paths
 
@@ -250,38 +249,28 @@ Wait for user to choose. Do not auto-start.
 
 Parse the user's intent from their message:
 
-- `/dashboard start` — start the dashboard daemon:
+- `/dashboard start` — The dashboard starts automatically when Claude Code activates the spacedock-dashboard MCP channel. If the channel entry is missing from `.mcp.json`, run the [MCP Setup Check](#mcp-setup-check) above, then restart Claude Code.
 
-  **First run the [MCP Setup Check](#mcp-setup-check)** (above) to detect/fix the `spacedock-dashboard` entry in `.mcp.json`. The check is best-effort and non-blocking — proceed to the start command regardless of outcome.
+- `/dashboard stop` — The dashboard stops when Claude Code exits (the channel server lifecycle is tied to the CC session). To force-stop, the user can quit and restart Claude Code.
 
+- `/dashboard status` — Check whether the channel server is active:
   ```bash
-  bash {ctl} start --root {project_root}
+  STATE_DIR=~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)
+  if [ -f "$STATE_DIR/channel_port" ]; then
+    PORT=$(cat "$STATE_DIR/channel_port" | tr -d '[:space:]')
+    curl -sf "http://127.0.0.1:$PORT/api/events" >/dev/null && echo "Dashboard running on :$PORT" || echo "Dashboard not responding"
+  else
+    echo "Dashboard not running (no channel_port state file)"
+  fi
   ```
 
-- `/dashboard stop` — stop the dashboard daemon:
+- `/dashboard logs` — show dashboard logs:
   ```bash
-  bash {ctl} stop --root {project_root}
+  STATE_DIR=~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)
+  cat "$STATE_DIR/dashboard.log" 2>/dev/null || echo "No log file found"
   ```
 
-- `/dashboard status` — show dashboard status:
-  ```bash
-  bash {ctl} status --root {project_root}
-  ```
-
-- `/dashboard status --all` — show all dashboard instances:
-  ```bash
-  bash {ctl} status --all
-  ```
-
-- `/dashboard logs` — show dashboard logs (timeout after 10 seconds if using --follow):
-  ```bash
-  bash {ctl} logs --root {project_root}
-  ```
-
-- `/dashboard restart` — restart the dashboard:
-  ```bash
-  bash {ctl} restart --root {project_root}
-  ```
+- `/dashboard restart` — To restart the dashboard, restart Claude Code (the channel server is tied to the CC session lifecycle).
 
 - `/dashboard share` — expose the full dashboard UI via an ngrok tunnel (see Share flow below)
 
@@ -293,19 +282,19 @@ When the user invokes `/dashboard share`, execute this flow.
 
 `/dashboard share` exposes the **full dashboard UI** via an `ngrok` tunnel. It does NOT create scoped share links or passwords — anyone with the URL can see and interact with everything in the dashboard exactly like the local user. Only share with trusted collaborators.
 
-**Critical port choice — always tunnel the channel port (8420), not the standalone server port (8421).** The channel server has a direct MCP stdio transport to the running Claude Code session, which means chat messages from the shared dashboard UI can actually reach the FO. The standalone server (8421) can only reach CC via a one-way `forwardToCtlServer()` WS bridge, which is a workaround — tunneling it means the remote user's messages may never arrive at the FO.
+**Port:** Always tunnel the channel port (8420). This is the only dashboard server — it has a direct MCP stdio transport to the running Claude Code session.
 
 If the user wants scoped, password-protected share links to specific entities, they should use the dashboard UI's "Share" panel inside the detail page instead.
 
 ### Step 1 — Ensure dashboard is running
 
 ```bash
-bash {ctl} status --root {project_root}
-```
-
-If neither server nor channel is running, start the dashboard first:
-```bash
-bash {ctl} start --root {project_root}
+STATE_DIR=~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)
+PORT=$(cat "$STATE_DIR/channel_port" 2>/dev/null | tr -d '[:space:]')
+if [ -z "$PORT" ] || ! curl -sf "http://127.0.0.1:$PORT/api/events" >/dev/null 2>&1; then
+  echo "[Share] Dashboard not running. The dashboard requires an active Claude Code session with the spacedock-dashboard MCP channel."
+  exit 1
+fi
 ```
 
 ### Step 2 — Check ngrok is installed
@@ -334,19 +323,13 @@ If user says `n`: stop the share flow. Print a hint: "安裝後重試 `/dashboar
 
 On macOS without homebrew, point user to `https://ngrok.com/download`.
 
-### Step 3 — Resolve dashboard port (prefer channel)
+### Step 3 — Resolve dashboard port
 
 ```bash
 STATE_DIR=~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)
-# PREFER channel_port (8420) — only the channel server has direct MCP stdio
-# transport to the running Claude Code session. The standalone server port
-# (8421) can only reach CC via the forwardToCtlServer() WS bridge, which is
-# a one-way workaround and will be removed by ADR-001.
-PORT=$(cat "$STATE_DIR/channel_port" 2>/dev/null || cat "$STATE_DIR/port" 2>/dev/null)
-PORT=$(echo "$PORT" | tr -d '[:space:]')
-
+PORT=$(cat "$STATE_DIR/channel_port" 2>/dev/null | tr -d '[:space:]')
 if [ -z "$PORT" ]; then
-  echo "[Share] 無法確認 dashboard port — 請先 /dashboard start"
+  echo "[Share] Cannot determine dashboard port — ensure Claude Code is running with the spacedock-dashboard channel"
   exit 1
 fi
 ```

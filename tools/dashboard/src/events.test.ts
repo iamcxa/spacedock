@@ -52,3 +52,60 @@ describe("EventBuffer.getByEntity", () => {
     expect(results[1].seq).toBeLessThan(results[2].seq);
   });
 });
+
+describe("EventBuffer.getChannelMessagesSince", () => {
+  let buf: EventBuffer;
+
+  beforeEach(() => {
+    buf = new EventBuffer(makeDb(), 100);
+  });
+
+  test("returns only channel_message events after given seq", () => {
+    buf.push({ type: "dispatch", entity: "alpha", stage: "build", agent: "fo", timestamp: "2026-01-01T00:00:00Z" });
+    const msg1 = buf.push({ type: "channel_message", entity: "alpha", stage: "", agent: "captain", timestamp: "2026-01-01T00:01:00Z", detail: "hello" });
+    buf.push({ type: "completion", entity: "alpha", stage: "build", agent: "fo", timestamp: "2026-01-01T00:02:00Z" });
+    buf.push({ type: "channel_message", entity: "beta", stage: "", agent: "captain", timestamp: "2026-01-01T00:03:00Z", detail: "world" });
+
+    const results = buf.getChannelMessagesSince(0);
+    expect(results).toHaveLength(2);
+    expect(results[0].event.type).toBe("channel_message");
+    expect(results[0].event.detail).toBe("hello");
+    expect(results[1].event.detail).toBe("world");
+  });
+
+  test("respects since_seq parameter", () => {
+    const msg1 = buf.push({ type: "channel_message", entity: "", stage: "", agent: "captain", timestamp: "2026-01-01T00:00:00Z", detail: "first" });
+    buf.push({ type: "channel_message", entity: "", stage: "", agent: "captain", timestamp: "2026-01-01T00:01:00Z", detail: "second" });
+
+    const results = buf.getChannelMessagesSince(msg1.seq);
+    expect(results).toHaveLength(1);
+    expect(results[0].event.detail).toBe("second");
+  });
+
+  test("filters by entity when provided", () => {
+    buf.push({ type: "channel_message", entity: "alpha", stage: "", agent: "captain", timestamp: "2026-01-01T00:00:00Z", detail: "for alpha" });
+    buf.push({ type: "channel_message", entity: "beta", stage: "", agent: "captain", timestamp: "2026-01-01T00:01:00Z", detail: "for beta" });
+    buf.push({ type: "channel_message", entity: "", stage: "", agent: "captain", timestamp: "2026-01-01T00:02:00Z", detail: "project-level" });
+
+    const results = buf.getChannelMessagesSince(0, "alpha");
+    expect(results).toHaveLength(1);
+    expect(results[0].event.detail).toBe("for alpha");
+  });
+
+  test("returns empty array when no channel_message events exist", () => {
+    buf.push({ type: "dispatch", entity: "alpha", stage: "build", agent: "fo", timestamp: "2026-01-01T00:00:00Z" });
+    buf.push({ type: "completion", entity: "alpha", stage: "build", agent: "fo", timestamp: "2026-01-01T00:01:00Z" });
+
+    const results = buf.getChannelMessagesSince(0);
+    expect(results).toHaveLength(0);
+  });
+
+  test("returns all channel_messages when entity is empty string", () => {
+    buf.push({ type: "channel_message", entity: "alpha", stage: "", agent: "captain", timestamp: "2026-01-01T00:00:00Z", detail: "a" });
+    buf.push({ type: "channel_message", entity: "beta", stage: "", agent: "captain", timestamp: "2026-01-01T00:01:00Z", detail: "b" });
+    buf.push({ type: "channel_message", entity: "", stage: "", agent: "captain", timestamp: "2026-01-01T00:02:00Z", detail: "c" });
+
+    const results = buf.getChannelMessagesSince(0, "");
+    expect(results).toHaveLength(3);
+  });
+});

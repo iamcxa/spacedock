@@ -1,6 +1,5 @@
 import { realpathSync, existsSync, appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve, sep, dirname } from "node:path";
-import { parseArgs } from "node:util";
 import { discoverWorkflows, aggregateWorkflow } from "./discovery";
 import { getEntityDetail, updateScore, updateTags, filterEntities } from "./api";
 import {
@@ -1244,41 +1243,3 @@ export function createServer(opts: ServerOptions) {
   return Object.assign(server, { db, eventBuffer, publishEvent, broadcastChannelStatus, shareRegistry, snapshotStore });
 }
 
-// CLI entry point -- only runs when executed directly
-if (import.meta.main) {
-  const { values } = parseArgs({
-    args: Bun.argv.slice(2),
-    options: {
-      port: { type: "string", default: "8420" },
-      host: { type: "string", default: "127.0.0.1" },
-      root: { type: "string" },
-      "log-file": { type: "string" },
-    },
-    strict: true,
-  });
-
-  let projectRoot = values.root ?? null;
-  if (!projectRoot) {
-    try {
-      const result = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"]);
-      projectRoot = result.stdout.toString().trim();
-    } catch {
-      projectRoot = process.cwd();
-    }
-  }
-  projectRoot = resolve(projectRoot);
-
-  const port = parseInt(values.port!, 10);
-  const staticDir = join(dirname(import.meta.dir), "static");
-  const logFile = values["log-file"] ?? undefined;
-
-  const hostname = values.host!;
-  const server = createServer({ port, hostname, projectRoot, staticDir, logFile });
-
-  const banner = `[${new Date().toISOString().slice(0, 19).replace("T", " ")}] Spacedock Dashboard started on http://${hostname}:${server.port}/ (root: ${projectRoot})`;
-  console.log(banner);
-  if (logFile) {
-    appendFileSync(logFile, banner + "\n");
-  }
-  console.log("Press Ctrl+C to stop.");
-}

@@ -293,7 +293,7 @@ describe("Channel State File", () => {
     mkdirSync(staticDir);
     writeFileSync(join(staticDir, "index.html"), "<html></html>");
 
-    // Compute state dir using same hash as ctl.sh
+    // Compute state dir using same hash as computeStateDir() in channel.ts
     const hash = Bun.spawnSync(["bash", "-c", `echo -n "${tmpDir}" | shasum | cut -c1-8`])
       .stdout.toString().trim();
     stateDir = join(homedir(), ".spacedock", "dashboard", hash);
