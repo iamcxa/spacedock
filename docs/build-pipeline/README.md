@@ -6,8 +6,8 @@ entity-label-plural: features
 id-style: sequential
 stages:
   profiles:
-    full:     [draft, brainstorm, explore, research, plan, execute, quality, seeding, e2e, docs, pr-draft, pr-review, shipped]
-    standard: [draft, brainstorm, explore, plan, execute, quality, pr-draft, pr-review, shipped]
+    full:     [draft, brainstorm, explore, clarify, research, plan, execute, quality, seeding, e2e, docs, pr-draft, pr-review, shipped]
+    standard: [draft, brainstorm, explore, clarify, plan, execute, quality, pr-draft, pr-review, shipped]
     express:  [draft, brainstorm, execute, quality, shipped]
   defaults:
     worktree: true
@@ -37,6 +37,22 @@ stages:
     - name: explore
       profiles: [full, standard]
       model: sonnet
+    - name: clarify
+      profiles: [full, standard]
+      worktree: false
+      manual: true
+      gate: true
+      skill: spacebridge:build-clarify
+      # Science Officer runs interactive AskUserQuestion loop with captain.
+      # Resolves: Open Questions, Assumptions, Option Comparisons from explore.
+      # Produces: confirmed context, canonical references, profile assignment.
+      # manual: true -- Science Officer invocation is captain-initiated,
+      # not auto-dispatched by FO.
+      # gate: true -- captain must approve context completeness before advancing.
+      #
+      # FALLBACK (no spacebridge installed):
+      # Captain reviews entity body manually, edits Open Questions/Assumptions
+      # directly, then advances status to plan via FO command.
     - name: research
       profiles: [full]
       agent: auto-researcher
