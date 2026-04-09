@@ -7,7 +7,7 @@ started: 2026-04-09
 completed: 2026-04-09
 verdict: APPROVED — 1 feedback round (5 warnings fixed: loadEntity dedup, body-mode auto-resolve, parseDiffHunks share, falsy guards, PR body)
 score: 0.8
-worktree: .worktrees/spacedock-ensign-dashboard-collaboration-ui
+worktree:
 issue:
 pr: 25
 intent: feature

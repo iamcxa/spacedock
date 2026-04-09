@@ -7,7 +7,7 @@ started: 2026-04-09
 completed: 2026-04-09
 verdict: APPROVED — 1 inline CSS fix (.notif-perm-granted rule)
 score: 0.85
-worktree: .worktrees/spacedock-ensign-dashboard-browser-notifications
+worktree:
 issue:
 pr: 24
 intent: feature

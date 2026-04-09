@@ -7,7 +7,7 @@ started: 2026-04-08
 completed: 2026-04-08
 verdict: PASSED with 2 review fixes applied
 score: 0.85
-worktree: .worktrees/spacedock-ensign-fo-dispatch-profile-routing
+worktree:
 issue:
 pr: "#22"
 intent: enhancement

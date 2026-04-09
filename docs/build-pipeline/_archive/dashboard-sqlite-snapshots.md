@@ -7,7 +7,7 @@ started: 2026-04-08
 completed: 2026-04-08
 verdict: APPROVED with non-blocking notes
 score: 0.9
-worktree: .worktrees/spacedock-ensign-dashboard-sqlite-snapshots
+worktree:
 issue:
 pr: 20
 intent: feature

@@ -7,7 +7,7 @@ started: 2026-04-08
 completed: 2026-04-09
 verdict: APPROVED — 1 feedback round (8 issues fixed: 3 critical + 5 warning)
 score: 0.85
-worktree: .worktrees/spacedock-ensign-dashboard-mcp-tool-expansion
+worktree:
 issue:
 pr: 23
 intent: feature
