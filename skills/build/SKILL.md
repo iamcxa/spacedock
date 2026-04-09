@@ -2,6 +2,7 @@
 name: build
 description: "Use when starting new feature or bugfix development through the build pipeline. Triggers on '/build', 'new feature', 'start building', or when user has a development idea to turn into code."
 user-invocable: true
+argument-hint: "[description | SC-123 | --project path]"
 ---
 
 # Build — Feature Development Launcher
