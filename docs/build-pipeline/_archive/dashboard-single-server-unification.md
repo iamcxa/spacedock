@@ -1,13 +1,13 @@
 ---
 id: 045
 title: Dashboard Single-Server Unification (ADR-001) — Eliminate ctl.sh and Unify on :8420
-status: pr-review
+status: shipped
 source: /build brainstorming (spec 2026-04-09-adr-001-single-server-8420-design.md)
 started: 2026-04-09T08:55:00Z
-completed:
-verdict:
+completed: 2026-04-09T14:02:07Z
+verdict: PASSED
 score:
-worktree: .worktrees/spacedock-ensign-dashboard-single-server-unification
+worktree:
 issue:
 pr: "#27"
 intent: feature
