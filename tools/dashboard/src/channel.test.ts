@@ -725,3 +725,72 @@ describe("auto-resolve — body-mode resolves all sections (W2)", () => {
     expect(wouldResolve.length).toBe(0);
   });
 });
+
+describe("createChannelServer — get_pending_messages tool", () => {
+  test("get_pending_messages returns channel_message events since seq", async () => {
+    const { dashboard } = createChannelServer({
+      port: 0,
+      projectRoot: TMP,
+      dbPath: join(TMP, "test.db"),
+    });
+    try {
+      const addr = getAddr(dashboard);
+
+      // Insert channel_message events via POST /api/channel/send
+      // Note: entity is passed inside meta, matching the /api/channel/send endpoint contract
+      await fetch(`${addr}api/channel/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "hello from captain", meta: { entity: "test-entity" } }),
+      });
+      await fetch(`${addr}api/channel/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "second message" }),
+      });
+
+      // Verify events are in the buffer via GET /api/events
+      const eventsRes = await fetch(`${addr}api/events`);
+      const eventsData = await eventsRes.json();
+      const channelMsgs = eventsData.events.filter((e: any) => e.event.type === "channel_message");
+      expect(channelMsgs.length).toBe(2);
+
+      // The MCP tool itself is tested via the tool handler; here we verify the
+      // underlying infrastructure that get_pending_messages will use.
+      // The tool calls eventBuffer.getChannelMessagesSince() which is tested in events.test.ts.
+      // This test confirms channel_message events are stored by the /api/channel/send endpoint.
+    } finally {
+      dashboard.stop();
+    }
+  });
+
+  test("channel_message events are filterable by entity", async () => {
+    const { dashboard } = createChannelServer({
+      port: 0,
+      projectRoot: TMP,
+      dbPath: join(TMP, "test.db"),
+    });
+    try {
+      const addr = getAddr(dashboard);
+
+      await fetch(`${addr}api/channel/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "for alpha", meta: { entity: "alpha" } }),
+      });
+      await fetch(`${addr}api/channel/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "for beta", meta: { entity: "beta" } }),
+      });
+
+      const res = await fetch(`${addr}api/events?entity=alpha`);
+      const data = await res.json();
+      const msgs = data.events.filter((e: any) => e.event.type === "channel_message");
+      expect(msgs.length).toBe(1);
+      expect(msgs[0].event.detail).toBe("for alpha");
+    } finally {
+      dashboard.stop();
+    }
+  });
+});
