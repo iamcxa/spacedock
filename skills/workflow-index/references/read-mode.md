@@ -1,18 +1,26 @@
 # workflow-index — read mode
 
-Read mode is idempotent and does not mutate state. It parses CONTRACTS.md, DECISIONS.md, or INDEX.md and returns structured results filtered by the caller's query.
+Read mode is idempotent and does not mutate state. It parses CONTRACTS.md or DECISIONS.md and returns structured results filtered by the caller's query.
 
 ## Inputs
 
 ```yaml
 mode: read
-target: contracts | decisions | index
+target: contracts | decisions
 query:
   file: {optional, relative path}
   entity: {optional, slug}
   include_superseded: {optional bool, default false}
   status_filter: {optional list, e.g. [in-flight, planned]}
 ```
+
+## Query Semantics
+
+- `file` and `entity` are optional filters and are not mutually exclusive.
+- If both are provided: return entries matching **both** (intersection).
+- If neither is provided: return all entries for the target.
+- `status_filter` applies to CONTRACTS only: keep rows whose status is in the provided list.
+- `include_superseded` applies to DECISIONS only: include superseded entries if `true`; default is `false`.
 
 ## Process
 
@@ -45,13 +53,22 @@ query:
 3. Apply same superseded filter as above.
 4. Return list.
 
-## Active Contracts Reference
+## Status Values by Target
 
-The active contracts section in CONTRACTS.md lists all in-flight and planned file contracts. When querying by entity, scan every file section and collect all rows for that entity slug.
+Status values differ between the two targets:
+
+| Target | Valid status values |
+|--------|---------------------|
+| CONTRACTS | `in-flight`, `planned`, `final`, `reverted` |
+| DECISIONS | `active`, `superseded` |
+
+Using a CONTRACTS status value (e.g. `final`) in a DECISIONS query (or vice versa) will return zero matches. Use `status_filter` only with the CONTRACTS target.
 
 ## Output Format
 
-Return structured YAML to the caller:
+Return structured YAML to the caller.
+
+CONTRACTS query result:
 
 ```yaml
 matches:
@@ -60,6 +77,21 @@ matches:
     intent: Filter logic moved to client-side
     status: final
     file: tools/dashboard/static/app.js
+count: 1
+```
+
+DECISIONS query result:
+
+```yaml
+# DECISIONS.md query result
+matches:
+  - id: D-046-1
+    title: Filter UI is client-side
+    source: entity 046, clarify stage, 2026-04-10
+    scope: tools/dashboard/static/app.js
+    rationale: Client-side filter keeps server load low
+    status: active
+    supersedes: none
 count: 1
 ```
 

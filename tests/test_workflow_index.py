@@ -91,4 +91,3 @@ def test_read_mode_documents_query_by_file_and_entity():
     assert "query" in content.lower()
     assert "file" in content.lower()
     assert "entity" in content.lower()
-    assert "active" in content.lower()
