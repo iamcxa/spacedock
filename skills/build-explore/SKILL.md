@@ -20,7 +20,14 @@ This skill is loaded by the ensign during the `explore` stage of the build pipel
 
 **NOT available:**
 - `AskUserQuestion` -- this skill is non-interactive. Write findings to the entity body; build-clarify handles captain interaction.
-- `Write` / `Edit` on the entity file -- the ensign wrapper applies updates. Return text output for the sections this skill owns.
+
+**Mode-dependent Write/Edit:**
+This skill can run in two modes:
+
+1. **Ensign-wrapper mode** (FO-dispatched): the ensign wrapper handles entity file writes. The skill returns text output for the sections it owns; the ensign applies them via its own Write/Edit calls. Prefer this mode when available.
+2. **SO-direct mode** (Science Officer invocation, no ensign): the skill writes directly to the entity file via `Write` and `Edit`. No wrapper translates between text output and file updates. Used when Science Officer runs explore as part of its context_status routing (see `agents/science-officer.md`).
+
+In both modes, the output format rules in `references/output-format.md` apply identically. SO-direct mode does NOT write `context_status` frontmatter transitions -- the Science Officer agent owns those per its Boot Sequence Step 2.5.
 
 ---
 

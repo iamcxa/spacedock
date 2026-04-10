@@ -57,6 +57,19 @@ captain and stop:
 
 ---
 
+## Pre-Step: Status Handoff Check
+
+This skill expects the entity to have `status: clarify` when it starts. Normally the ensign wrapper sets this before invocation. If you are running in SO-direct mode (Science Officer's context_status routing, no ensign wrapper), the entity may arrive with `status: draft`. Before Step 0:
+
+1. Read the entity frontmatter field `status`.
+2. If `status` is `clarify` -- proceed to Step 0 normally.
+3. If `status` is `draft` -- update frontmatter to `status: clarify` as your first action (Write/Edit on the entity frontmatter). The transition from draft to clarify is a skill-owned action in SO-direct mode.
+4. If `status` is anything else (e.g., `plan`, `execute`) -- STOP. Report to captain: "Entity `{slug}` is in `status: {value}`, which is past the clarify stage. Refusing to clarify an already-advanced entity."
+
+The `status` field and the `context_status` field serve different purposes: `status` tracks pipeline stage (draft / clarify / plan / execute / ...), `context_status` tracks clarify-phase progress (pending / awaiting-clarify / ready). Both must be correct for this skill to run safely. Note: this skill does not write `context_status` except at Step 5 (where it sets `context_status: ready` per existing behavior). The `awaiting-clarify` transition is owned by the Science Officer agent in SO-direct mode, NOT by this skill.
+
+---
+
 ## Step 0: Decomposition Gate
 
 Read `references/decomposition-gate.md` first. Then:
@@ -245,17 +258,20 @@ Then STOP. Do not commit. Do not loop back within this skill.
        Ready to hand off to First Officer.
 
 3. **Hybrid handoff check**: read the entity frontmatter `auto_advance` field.
-   - If `auto_advance: true` → proceed to Step 6 immediately
-   - Otherwise → present:
+   - If `auto_advance: true` (tight mode) -- proceed to Step 6 AND update `status: plan` in Step 6.
+   - If `auto_advance` is absent or `false` (loose mode, default) -- proceed to Step 6 AND commit the Stage Report + session changes, BUT do NOT update `status: plan`. The `status` field stays at `clarify` until the captain explicitly says "execute {slug}" (at which point First Officer owns the status transition in a separate flow).
+
+   After Step 6 commits in loose mode, present:
 
          Say "execute {slug}" when you're ready, or "hold {slug}" to park.
 
-     Then stop. The status transition happens in a separate invocation (FO or another
-     `/science {slug}` call) when the captain says "execute".
+   Then end the session. "End the session" here means "stop advancing the pipeline" -- Step 6 (write Stage Report + git commit) has already run. Do NOT interpret "stop" as "skip Step 6" -- that would leave the session's work uncommitted and is the Phase C smoke test bug this fix addresses.
 
 ---
 
 ## Step 6: Commit
+
+**Step 6 ALWAYS runs after Step 5 passes the sufficiency gate, regardless of handoff mode.** The distinction between loose and tight mode affects ONLY whether `status: plan` gets written to frontmatter. Writing the Stage Report and committing the session's entity body changes is not optional -- that's how the work is persisted to git.
 
 Read `references/output-format.md` (Stage Report section) to format the Stage Report
 correctly.
