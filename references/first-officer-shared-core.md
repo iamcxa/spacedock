@@ -206,6 +206,12 @@ When a worker completes:
 2. Review the `## Stage Report` section against the checklist. Every dispatched checklist item must be represented as DONE, SKIPPED, or FAILED.
 3. If checklist items are missing, send the worker back once to repair the report.
 3.5. Emit completion event with the checklist count summary as detail (skip if dashboard not running).
+3.6. Process pending knowledge captures (Phase E addition):
+   - Scan the entity file for a `## Pending Knowledge Captures` section containing `<capture>` elements.
+   - If the section exists and is non-empty, invoke the `knowledge-capture` skill via the Skill tool with `mode: apply`, `entity_slug: {current slug}`, `entity_path: {entity file path}`.
+   - Follow the skill's apply-mode instructions (see `skills/knowledge-capture/references/apply-mode.md`). AskUserQuestion calls inside the skill run in FO's `--agent` context where native UI works.
+   - If the section is absent or empty, proceed immediately to step 4.
+   - Rationale: stage ensigns cannot use AskUserQuestion themselves (they run as subagents). By staging D2 candidates in the entity body and having FO process them at completion time, we preserve the "captain-facing flows only happen in --agent context" invariant without adding a separate captain-gated stage.
 4. Check whether the completed stage is gated.
 
 The checklist review should produce an explicit count summary in the form:
