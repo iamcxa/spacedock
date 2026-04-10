@@ -65,3 +65,16 @@ def test_contracts_format_defines_section_structure():
     assert "Active Contracts" in content
     assert "Entity" in content
     assert "Status" in content
+
+
+def test_decisions_format_reference_exists():
+    ref = SKILL_DIR / "references" / "decisions-format.md"
+    assert ref.exists(), f"Expected {ref} to exist"
+
+
+def test_decisions_format_describes_supersede_mechanism():
+    ref = SKILL_DIR / "references" / "decisions-format.md"
+    content = ref.read_text(encoding="utf-8")
+    assert "Supersedes" in content
+    assert "append-only" in content.lower()
+    assert "D-" in content  # decision ID format marker
