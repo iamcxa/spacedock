@@ -37,17 +37,18 @@ Instructions for FO:
 1. List all entity files in `docs/build-pipeline/*.md`.
 2. For each entity, compare its current stage (from frontmatter `status` field) against the status recorded in CONTRACTS.md for that entity.
 3. If the entity has advanced (e.g., was `execute` in CONTRACTS, now `shipped` in frontmatter):
-   a. Invoke `workflow-index` skill:
+   a. Read the entity's most recent Stage Report to recover the list of files it touched. For each such file, invoke `workflow-index` skill once:
       ```yaml
       mode: write
       target: contracts
       operation: update-status
       entry:
         entity: {slug}
-        files: {files from entity's most recent Stage Report}
+        file: {single file path}        # singular; one skill call per file
         new_status: {final if shipped, in-flight otherwise}
       ```
-   b. If the new stage is `shipped` and the entity has been in shipped for > 30 days, run update-status with new_status=final and age-out logic (move to Recently Retired section).
+      Rationale: `update-status` in `skills/workflow-index/references/write-mode.md` locates the row by `(entity, file)` key, so multi-file updates must loop at the mod layer.
+   b. Recently Retired age-out is delegated to the skill. The mod simply calls `update-status` with `new_status: final`; the skill inspects the row's Last Updated date and, if older than 30 days, moves it to the Recently Retired section. See `skills/workflow-index/references/write-mode.md` Operation: update-status. **Known gap (tracked for Phase E Plan 1 follow-up):** write-mode currently has no explicit `shipped_date` input and must infer age from the row's Last Updated column. If that heuristic proves unreliable, extend the skill's input schema rather than duplicating the computation here.
 
 4. Scan DECISIONS.md for any decisions whose Related entities field references entities that have since shipped. If any, ensure the decision's Status reflects the latest state (no action needed unless explicit supersede was flagged).
 
