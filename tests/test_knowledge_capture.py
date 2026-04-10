@@ -46,3 +46,22 @@ def test_skill_content_mentions_D1_and_D2():
     content = SKILL_FILE.read_text(encoding="utf-8")
     assert "D1" in content
     assert "D2" in content
+
+
+def test_classifier_reference_exists():
+    ref = SKILL_DIR / "references" / "classifier.md"
+    assert ref.exists()
+
+
+def test_classifier_defines_all_severity_levels():
+    ref = SKILL_DIR / "references" / "classifier.md"
+    content = ref.read_text(encoding="utf-8")
+    for level in ["CRITICAL", "HIGH", "MEDIUM", "LOW", "NIT"]:
+        assert level in content, f"Expected severity {level} in classifier.md"
+
+
+def test_classifier_defines_all_root_types():
+    ref = SKILL_DIR / "references" / "classifier.md"
+    content = ref.read_text(encoding="utf-8")
+    for root in ["CODE", "DOC", "NEW", "PLAN"]:
+        assert root in content, f"Expected root {root} in classifier.md"
