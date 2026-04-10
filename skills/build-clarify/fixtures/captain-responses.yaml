@@ -1,0 +1,45 @@
+# Pre-recorded captain responses for build-clarify fixture regression test.
+# Forge intercepts AskUserQuestion calls and satisfies them with these responses
+# in order. Each entry corresponds to one Step in the skill.
+
+responses:
+  # Step 0: Decomposition Gate -- fixture has no ## Decomposition Recommendation, so
+  # this step is a no-op and no AskUserQuestion fires.
+
+  # Step 2: Assumption Batch Confirmation (batch mode, 1 assumption)
+  - step: 2
+    type: assumption_batch
+    response:
+      A-1:
+        action: confirm  # alternatives: correct, skip
+        note: ""
+
+  # Step 3: Option Selection (interactive, 1 option comparison)
+  - step: 3
+    type: option_select
+    question: "Configuration file location"
+    response:
+      option_label: "Repo root"  # verbatim from Option column
+      mode: interactive
+
+  # Step 4: Open Question Resolution (interactive, 1 question)
+  - step: 4
+    type: question_answer
+    question: "Q-1"
+    response:
+      answer: "Yes via hook file"  # picks option (a)
+      mode: interactive
+
+  # Step 5: Context Sufficiency Gate -- no AskUserQuestion fires.
+  # Step 6: Commit -- no AskUserQuestion fires.
+
+expected_final_state:
+  status: "clarify"        # loose mode, no auto_advance
+  context_status: "ready"
+  annotations:
+    - "A-1 must have → Confirmed:"
+    - "### Configuration file location must have → Selected: Repo root"
+    - "Q-1 must have → Answer: Yes via hook file"
+  stage_reports:
+    - name: "clarify"
+      checklist_items: 8  # all 8 metric lines present
