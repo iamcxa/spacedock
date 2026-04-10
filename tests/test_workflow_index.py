@@ -241,3 +241,32 @@ def test_read_decisions_includes_superseded_when_requested():
     all_ids = [r["id"] for r in results]
     assert "D-entity-a-1" in all_ids
     assert "D-entity-a-2" in all_ids
+
+
+MOD_FILE = REPO_ROOT / "mods" / "workflow-index-maintainer.md"
+
+
+def test_workflow_index_maintainer_mod_exists():
+    assert MOD_FILE.exists()
+
+
+def test_mod_has_frontmatter_with_name():
+    content = MOD_FILE.read_text(encoding="utf-8")
+    assert content.startswith("---\n")
+    fm_match = re.match(r"^---\n(.*?)\n---\n", content, re.DOTALL)
+    assert fm_match
+    fm = yaml.safe_load(fm_match.group(1))
+    assert fm.get("name") == "workflow-index-maintainer"
+
+
+def test_mod_defines_startup_and_idle_hooks():
+    content = MOD_FILE.read_text(encoding="utf-8")
+    assert "## Hook: startup" in content
+    assert "## Hook: idle" in content
+
+
+def test_mod_references_workflow_index_skill():
+    content = MOD_FILE.read_text(encoding="utf-8")
+    assert "workflow-index" in content
+    # Must tell FO to invoke the skill
+    assert "mode: write" in content or "write mode" in content
