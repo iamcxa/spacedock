@@ -183,19 +183,39 @@ The cleanup PR is NOT in the current 3-day scope. It happens after bridge reache
 | Domain core | fmodel (scoped) | CQRS for coordination domain; see 3.5 for scope |
 | Realtime | SSE | Simpler than WebSocket through tunnel; Next.js Route Handlers support streaming responses natively |
 | IPC | Unix socket | Daemon ↔ shim; macOS/Linux only (matches Spacedock platform support) |
-| Distribution | `bun build --compile` | Single standalone binary; Next.js requires `output: 'standalone'` + custom bundler step |
+| Distribution | Ship `.next/standalone/` directory + `spacebridge` wrapper CLI | Single-binary via `bun build --compile` was ruled out by the entity 049 spike (2026-04-10) — see §3.2 for the structural conflict. Distribution is a directory (server.js + node_modules + .next) plus a thin wrapper script/entry. More standard for Next.js self-hosting and more stable. |
 
-### 3.2 Bun + Next.js + `--compile` risk
+### 3.2 Bun + Next.js spike results (2026-04-10)
 
-This combination is not a well-trodden path. Known concerns:
+Entity 049 spike executed 2026-04-10 ahead of schedule. The combination was validated for **dev + build + run**, and ruled out for **single-binary compile**. Concrete findings:
 
-- Next.js on Bun runtime is supported from Next 15+ but has edge cases (certain webpack loaders, some SSR APIs).
-- `next build --output standalone` produces a Node-compatible bundle; wiring that into `bun build --compile` requires assembling assets and resolving the server entry manually.
-- Static asset handling differs between Next's built-in server and a compiled binary.
+**✅ Verified working:**
 
-**Mitigation**: Entity 049 is a pre-Phase F spike specifically to prove this combination works end-to-end with a hello-world-scale app (render a page, serve an SSE endpoint, compile to binary, execute binary, verify both work). If the spike fails, the design falls back to raw Bun.serve + a standalone React SPA bundle — a known-good path but a structurally different UI.
+| Area | Result |
+|---|---|
+| Next.js 16.2.2 App Router on Bun dev mode (`bun run --bun next dev`) | Ready in 374ms (Turbopack). Page renders, hot reload works. |
+| SSE endpoint via Route Handler (`ReadableStream` streamed Response) | Clients receive tick events at 1Hz via curl and browser. |
+| `@fraktalio/fmodel-ts@2.1.1` Decider (pure function `decide` + `evolve`) | Imports correctly, runs at render time, type inference works. Counter example: `IncrementCounter(5)` → `CounterIncremented(5)` → state `{count: 5}`. |
+| `bun run --bun next build` with `output: 'standalone'` | Produces `.next/standalone/server.js` (~7KB) + `node_modules/` + `.next/server/`. Static pages pre-rendered, API route marked as dynamic server-rendered. |
+| `bun run ./server.js` inside `.next/standalone/` | Ready in 0ms. Page renders, SSE streams, fmodel decider works. **This is the production run path.** |
 
-Entity 049 is **not** in the 3-day PR1 scope. It runs at the start of Phase F. PR1 does not depend on it.
+**❌ Ruled out: `bun build --compile` single-binary**
+
+`bun build --compile ./server.js` produces a 57MB binary successfully, but the binary fails at runtime with two distinct errors:
+
+1. `ENOENT: no such file or directory, chdir '/$bunfs/root/'` — Next.js standalone's bootstrap calls `process.chdir(__dirname)`. When Bun compiles, `__dirname` resolves to the virtual filesystem path `/$bunfs/root/`, which is NOT a real directory and cannot be the target of `chdir`.
+2. After patching the `chdir` call with a try/catch, the next error is `Cannot find package 'next' from '/$bunfs/root/spacebridge-spike'`. `bun build --compile` only bundles modules directly imported by the entry file; it does not walk sibling `node_modules/` directories. Next.js standalone relies on runtime file resolution into the adjacent `node_modules/`, which is structurally incompatible with single-binary compilation.
+
+**Root cause**: Next.js standalone is designed as "server.js + adjacent node_modules + runtime resolution". Bun's `--compile` is designed as "entry file + all transitive static imports bundled into one blob". These are fundamentally different file-layout assumptions.
+
+**New distribution path (verified)**: ship the `.next/standalone/` directory (server.js + node_modules + .next) as the distributable unit. A thin `spacebridge` CLI wrapper (bun script or shell script) dispatches to subcommands and invokes `bun run server.js` for `spacebridge start`. This is the standard Next.js self-hosting pattern — more stable, more maintained, and slightly larger on disk but negligibly different for end users (who install via plugin mechanism anyway).
+
+**Impact on other entities**:
+- Entity 049: **resolved** (see status in that file).
+- Entity 059: re-scoped from "bun compile single-binary" to "standalone directory distribution + wrapper CLI". Same entity slug retained; title and scope updated.
+- Dev workflow unchanged: `bun run --bun next dev` works natively with zero friction.
+
+**Fallback not needed**: the design doc originally prepared for "spike fails → raw Bun.serve + React SPA" as a structural backup. That fallback is NOT activated — Next.js still works end-to-end, only the final packaging step changed form.
 
 ### 3.3 Drizzle with Postgres forward-compatibility
 
@@ -715,6 +735,13 @@ Decisions taken during brainstorming, recorded for future review:
 - Bridge plugin scope is a natural expansion: the Next.js rewrite now lives inside a new plugin rather than in-place
 - Dual-purpose preservation: Phase F still dogfoods the new flow while building the product
 
+**D10: Why distribution is a directory, not a single binary (§3.1, §3.2)** *(added 2026-04-10 post-spike)*
+- Entity 049 spike proved `bun build --compile` has two structural conflicts with Next.js standalone output: virtual-fs `chdir` failure and no sibling `node_modules` bundling
+- Fallback to `.next/standalone/` as the ship unit is the standard Next.js self-hosting pattern — well-documented, well-supported, stable across Next.js versions
+- Single-binary was a nice-to-have for distribution ergonomics, not a hard requirement. The bridge plugin's install mechanism (Claude Code plugin installer) already handles "install a directory" naturally — there is no UX regression from not shipping a single file
+- Dev workflow is completely unaffected: `bun run --bun next dev` continues to work exactly as planned
+- This walks back one sentence in the original design doc but preserves the rest of the tech stack unchanged
+
 ---
 
 ## 10. Open Questions
@@ -751,10 +778,7 @@ Questions deferred out of the 3-day window. Each has a resolution trigger:
 - Team deployments may want "one daemon for the whole team, accessed via HTTPS"
 - **Resolution trigger**: first team deployment request or SaaS transition
 
-**OQ-7: Next.js + Bun + `--compile` feasibility**
-- Entity 049 spike addresses this
-- If spike fails, fallback is raw Bun.serve + React SPA bundle — a structural alternative
-- **Resolution trigger**: entity 049 spike outcome
+**OQ-7: ~~Next.js + Bun + `--compile` feasibility~~** **Resolved 2026-04-10** via entity 049 spike. Outcome: Next.js + Bun works end-to-end for dev/build/run (including SSE and fmodel-ts decider), but `bun build --compile` to single binary is structurally incompatible with Next.js standalone output. Distribution pivots to shipping `.next/standalone/` directory + thin wrapper CLI — a more standard Next.js self-hosting pattern. See §3.2 for full spike results and §9 D10 for the decision rationale.
 
 ---
 
