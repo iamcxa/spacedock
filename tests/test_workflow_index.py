@@ -119,3 +119,20 @@ def test_check_mode_documents_in_flight_and_warning_gates():
     assert "warning" in content.lower()
     # Must reference Dimension 7 from plan-checker
     assert "Dim" in content or "dimension 7" in content.lower() or "Dimension 7" in content
+
+
+FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "workflow-index-fixture"
+
+
+def test_workflow_index_fixture_directory_exists():
+    assert FIXTURE_DIR.exists() and FIXTURE_DIR.is_dir()
+
+
+def test_workflow_index_fixture_has_seed_artifacts():
+    for name in ["CONTRACTS.md", "DECISIONS.md", "INDEX.md"]:
+        assert (FIXTURE_DIR / "_index" / name).exists(), f"Missing {name}"
+
+
+def test_workflow_index_fixture_has_entities():
+    assert (FIXTURE_DIR / "entity-a.md").exists()
+    assert (FIXTURE_DIR / "entity-b.md").exists()
