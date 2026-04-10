@@ -65,3 +65,22 @@ def test_classifier_defines_all_root_types():
     content = ref.read_text(encoding="utf-8")
     for root in ["CODE", "DOC", "NEW", "PLAN"]:
         assert root in content, f"Expected root {root} in classifier.md"
+
+
+def test_gates_reference_exists():
+    ref = SKILL_DIR / "references" / "gates.md"
+    assert ref.exists()
+
+
+def test_gates_contains_three_question_test():
+    ref = SKILL_DIR / "references" / "gates.md"
+    content = ref.read_text(encoding="utf-8")
+    for q in ["Recurs", "Non-obvious", "Ruleable"]:
+        assert q in content, f"Expected '{q}' in gates.md"
+
+
+def test_gates_contains_severity_table():
+    ref = SKILL_DIR / "references" / "gates.md"
+    content = ref.read_text(encoding="utf-8")
+    assert "CRITICAL" in content
+    assert "candidate" in content.lower()
