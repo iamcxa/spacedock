@@ -91,3 +91,16 @@ def test_read_mode_documents_query_by_file_and_entity():
     assert "query" in content.lower()
     assert "file" in content.lower()
     assert "entity" in content.lower()
+
+
+def test_write_mode_reference_exists():
+    ref = SKILL_DIR / "references" / "write-mode.md"
+    assert ref.exists()
+
+
+def test_write_mode_documents_append_semantics():
+    ref = SKILL_DIR / "references" / "write-mode.md"
+    content = ref.read_text(encoding="utf-8")
+    assert "append" in content.lower()
+    assert "supersede" in content.lower() or "Supersedes" in content
+    assert "commit" in content.lower()
