@@ -77,7 +77,7 @@ Suggested options: (a) Persistent (SQLite) (b) Ephemeral (memory)
 ```
 
 Rules:
-- Append after Suggested options with ONE blank line separating them (markdown paragraph break). Earlier versions used "no blank line" which collapsed the Answer into the Suggested options paragraph in the dashboard UI -- fixed in Phase D (D.2).
+- Append after Suggested options with exactly one blank line separating them (markdown paragraph break). Earlier versions used "no blank line" which collapsed the Answer into the Suggested options paragraph in the dashboard UI -- fixed in Phase D (D.2).
 - If captain picked an AskUserQuestion option, quote the label verbatim.
 - If captain typed freeform, record the full response verbatim.
 - Include captain identifier, ISO date, `(interactive)` suffix.

@@ -85,7 +85,7 @@ Why it matters: Determines discoverability and consistency with existing docs.
 Suggested options: None -- captain input needed
 ```
 
-Each question includes Domain (one of the 5 GSD domains), Why it matters, and Suggested options (or "None -- captain input needed" when genuinely open). Each field MUST be separated from the next by a blank line so markdown renders them as distinct paragraphs. Single-newline separation collapses into a wall of text when rendered in the dashboard UI. This also applies to the `→ Answer:` annotation that build-clarify appends during Q resolution -- the answer line gets its own blank-line separation from `Suggested options:`.
+Each question includes Domain (one of the 5 GSD domains), Why it matters, and Suggested options (or "None -- captain input needed" when genuinely open). Each field -- the `Q-n:` header, `Domain:`, `Why it matters:`, `Suggested options:`, and any `→ Answer:` annotation appended later by build-clarify -- MUST be separated from the next by exactly one blank line so markdown renders them as distinct paragraphs. Single-newline separation collapses into a wall of text when rendered in the dashboard UI.
 
 ---
 
