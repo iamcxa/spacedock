@@ -1,0 +1,16 @@
+# Pre-recorded captain responses for knowledge-capture apply-mode tests.
+# Keyed by capture ID (as written in the entity body).
+
+responses:
+  kc-1:
+    action: apply
+    comment: null
+
+  kc-2:
+    action: reject
+    comment: "Too narrow; won't recur"
+
+  kc-3:
+    action: modify_target
+    new_target: lessons
+    secondary_confirmation: null

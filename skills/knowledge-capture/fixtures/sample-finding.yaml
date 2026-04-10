@@ -1,0 +1,30 @@
+# Sample findings for knowledge-capture capture-mode tests.
+# Each finding represents the kind of raw observation a review ensign
+# might pass into knowledge-capture.
+
+findings:
+  - id: f-001
+    summary: "Direct React state mutation in dashboard filter"
+    source_file: tools/dashboard/static/app.js
+    source_line: 244
+    detected_by: pr-review-toolkit:code-reviewer
+    evidence: |
+      // line 244-246: direct mutation
+      state.filterActive = newValue;
+      renderFilter();
+
+  - id: f-002
+    summary: "Trailing whitespace in config file"
+    source_file: config/app.json
+    source_line: 15
+    detected_by: pr-review-toolkit:code-simplifier
+    evidence: "trailing whitespace on line 15"
+
+  - id: f-003
+    summary: "Silent failure in WebSocket reconnection handler"
+    source_file: tools/dashboard/static/ws-client.js
+    source_line: 102
+    detected_by: pr-review-toolkit:silent-failure-hunter
+    evidence: |
+      // line 102: caught but not logged
+      try { this.reconnect(); } catch (e) {}

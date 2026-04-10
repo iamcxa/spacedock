@@ -130,3 +130,35 @@ def test_apply_mode_documents_askuserquestion_usage():
     assert "First Officer" in content or "FO" in content
     # Must document separate commit requirement
     assert "commit" in content.lower() and "separate" in content.lower()
+
+
+FIXTURES_DIR = SKILL_DIR / "fixtures"
+
+
+def test_fixtures_directory_exists():
+    assert FIXTURES_DIR.exists() and FIXTURES_DIR.is_dir()
+
+
+def test_sample_finding_fixture_parses():
+    sample = FIXTURES_DIR / "sample-finding.yaml"
+    assert sample.exists()
+    data = yaml.safe_load(sample.read_text(encoding="utf-8"))
+    assert isinstance(data, dict)
+    assert "findings" in data
+    assert len(data["findings"]) >= 2
+
+
+def test_captain_responses_fixture_parses():
+    resp = FIXTURES_DIR / "captain-responses.yaml"
+    assert resp.exists()
+    data = yaml.safe_load(resp.read_text(encoding="utf-8"))
+    assert isinstance(data, dict)
+    assert "responses" in data
+
+
+def test_entity_with_pending_fixture_has_pending_section():
+    entity = FIXTURES_DIR / "entity-with-pending.md"
+    assert entity.exists()
+    content = entity.read_text(encoding="utf-8")
+    assert "## Pending Knowledge Captures" in content
+    assert "<capture" in content
