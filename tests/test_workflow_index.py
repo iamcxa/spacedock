@@ -104,3 +104,18 @@ def test_write_mode_documents_append_semantics():
     assert "append" in content.lower()
     assert "supersede" in content.lower() or "Supersedes" in content
     assert "commit" in content.lower()
+
+
+def test_check_mode_reference_exists():
+    ref = SKILL_DIR / "references" / "check-mode.md"
+    assert ref.exists()
+
+
+def test_check_mode_documents_in_flight_and_warning_gates():
+    ref = SKILL_DIR / "references" / "check-mode.md"
+    content = ref.read_text(encoding="utf-8")
+    assert "in-flight" in content.lower()
+    assert "blocker" in content.lower()
+    assert "warning" in content.lower()
+    # Must reference Dimension 7 from plan-checker
+    assert "Dim" in content or "dimension 7" in content.lower() or "Dimension 7" in content
