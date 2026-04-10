@@ -35,7 +35,7 @@
 - `mods/workflow-index-maintainer.md` — mod with startup + idle hooks maintaining INDEX/CONTRACTS/DECISIONS
 - `tests/test_workflow_index.py` — pytest for workflow-index structural and behavior checks
 - `tests/test_knowledge_capture.py` — pytest for knowledge-capture structural and behavior checks
-- `tests/test_fo_pending_capture_step.py` — pytest verifying FO skill has the new step 6.5
+- `tests/test_fo_pending_capture_step.py` — pytest verifying `references/first-officer-shared-core.md` has the new step 3.6 (pending capture detection)
 - `tests/fixtures/workflow-index-fixture/README.md` — minimal workflow README for fixture
 - `tests/fixtures/workflow-index-fixture/_index/CONTRACTS.md` — seed contracts fixture
 - `tests/fixtures/workflow-index-fixture/_index/DECISIONS.md` — seed decisions fixture
@@ -50,7 +50,7 @@
 - `docs/build-pipeline/_index/INDEX.md` — initial production INDEX.md (empty shell)
 
 **Modify (existing files):**
-- `skills/first-officer/SKILL.md` — insert new step 6.5 (pending capture detection) into Dispatch Loop
+- `references/first-officer-shared-core.md` — insert new step 3.6 (pending capture detection) into "Completion and Gates" section, between existing steps 3.5 and 4. The `skills/first-officer/SKILL.md` file itself is a thin launcher (13 lines) that reads this reference; we don't need to modify the SKILL.md.
 
 ---
 
@@ -73,8 +73,8 @@
 | `mods/workflow-index-maintainer.md` | Startup + idle hook mod that scans entities for stage changes, invokes workflow-index write mode to update INDEX/CONTRACTS/DECISIONS. |
 | `tests/test_workflow_index.py` | Pytest: SKILL.md structural checks, reference file presence, fixture-based behavior tests for each mode. |
 | `tests/test_knowledge_capture.py` | Pytest: SKILL.md structural checks, classifier logic checks via fixture, capture-mode staging test, apply-mode replay test using captain-responses fixture. |
-| `tests/test_fo_pending_capture_step.py` | Pytest: grep FO skill for step 6.5 markers, verify invocation hook is present. |
-| `skills/first-officer/SKILL.md` | Existing operating contract; Plan 1 adds step 6.5 (pending capture detection) between existing steps 6 and 7. All other steps unchanged. |
+| `tests/test_fo_pending_capture_step.py` | Pytest: grep `references/first-officer-shared-core.md` for step 3.6 markers, verify invocation hook is present. |
+| `references/first-officer-shared-core.md` | Existing FO operating contract. Plan 1 adds step 3.6 (pending capture detection) between existing steps 3.5 and 4 in the "Completion and Gates" section. All other steps unchanged. |
 
 ---
 
@@ -2005,7 +2005,7 @@ Apply mode runs inside the First Officer's `--agent` context where native AskUse
 
 ## Caller
 
-**Only** the First Officer should invoke this mode. The First Officer detects pending captures in its Dispatch Loop step 6.5 (see `skills/first-officer/SKILL.md`) and calls knowledge-capture with `mode=apply` via the `Skill` tool.
+**Only** the First Officer should invoke this mode. The First Officer detects pending captures at step 3.6 of its "Completion and Gates" flow (see `references/first-officer-shared-core.md`) and calls knowledge-capture with `mode=apply` via the `Skill` tool.
 
 Do NOT call apply mode from:
 - Stage ensigns (they run as subagents without native AskUserQuestion)
@@ -2451,19 +2451,21 @@ git commit -m "feat(phase-e): workflow-index-maintainer mod (startup + idle hook
 
 ---
 
-### Task 19: Update spacedock:first-officer skill with step 6.5
+### Task 19: Update FO shared-core with pending capture detection step
+
+**Important plan correction (2026-04-11)**: Original Task 19 targeted `skills/first-officer/SKILL.md` with a "step 6.5" insertion. That was wrong — `skills/first-officer/SKILL.md` is a thin launcher (13 lines) that reads three reference files. The actual dispatch lifecycle lives in `references/first-officer-shared-core.md`, which has a "Completion and Gates" section with numbered steps 1, 2, 3, 3.5, 4 covering what FO does after a worker completes. The pending capture detection logically fits between step 3.5 (completion event emission) and step 4 (gate check) — call it **step 3.6**.
 
 **Files:**
-- Modify: `skills/first-officer/SKILL.md`
+- Modify: `references/first-officer-shared-core.md`
 - Test: `tests/test_fo_pending_capture_step.py`
 
-- [ ] **Step 1: Read current FO skill structure**
+- [ ] **Step 1: Inspect current shared-core structure**
 
 ```bash
-wc -l skills/first-officer/SKILL.md
+sed -n '201,225p' references/first-officer-shared-core.md
 ```
 
-Read `skills/first-officer/SKILL.md` to locate the Dispatch Loop section and identify where step 6 and step 7 currently live. Understand existing structure before modifying.
+Expected: see the "## Completion and Gates" section with steps 1, 2, 3, 3.5, 4 (gate check), then the unnumbered "If the stage is not gated" / "If the stage is gated" branches.
 
 - [ ] **Step 2: Write the failing test**
 
@@ -2474,7 +2476,7 @@ Create `tests/test_fo_pending_capture_step.py`:
 # /// script
 # requires-python = ">=3.10"
 # ///
-# ABOUTME: Verifies spacedock:first-officer skill includes step 6.5 pending capture detection.
+# ABOUTME: Verifies references/first-officer-shared-core.md includes pending capture detection step.
 # ABOUTME: This is the Phase E additive update that integrates knowledge-capture apply mode.
 
 from __future__ import annotations
@@ -2482,73 +2484,81 @@ from __future__ import annotations
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FO_SKILL = REPO_ROOT / "skills" / "first-officer" / "SKILL.md"
+FO_SHARED_CORE = REPO_ROOT / "references" / "first-officer-shared-core.md"
 
 
-def test_fo_skill_file_exists():
-    assert FO_SKILL.exists()
+def test_fo_shared_core_file_exists():
+    assert FO_SHARED_CORE.exists()
 
 
-def test_fo_skill_has_pending_capture_detection():
-    content = FO_SKILL.read_text(encoding="utf-8")
+def test_fo_shared_core_has_pending_capture_detection():
+    content = FO_SHARED_CORE.read_text(encoding="utf-8")
     # Phase E update markers
     assert "Pending Knowledge Captures" in content, (
-        "FO skill missing step 6.5: Pending Knowledge Captures detection"
+        "FO shared-core missing pending capture detection step"
     )
     assert "knowledge-capture" in content, (
-        "FO skill does not reference knowledge-capture skill"
+        "FO shared-core does not reference knowledge-capture skill"
     )
     assert "apply" in content.lower(), (
-        "FO skill step 6.5 does not invoke apply mode"
+        "FO shared-core does not invoke knowledge-capture apply mode"
     )
 
 
-def test_fo_skill_preserves_existing_structure():
-    """Ensure existing FO functionality is not accidentally removed."""
-    content = FO_SKILL.read_text(encoding="utf-8")
-    # Core FO behaviors that must still be present
-    assert "Dispatch" in content  # Dispatch Loop
-    # If build-clarify was referenced before, ensure it still is
-    # (this is a regression check — adjust based on current FO skill content)
+def test_fo_shared_core_preserves_existing_structure():
+    """Ensure existing FO shared-core functionality is not accidentally removed."""
+    content = FO_SHARED_CORE.read_text(encoding="utf-8")
+    # Core sections that must still be present
+    assert "## Startup" in content
+    assert "## Dispatch" in content
+    assert "## Completion and Gates" in content
+    assert "## Feedback Rejection Flow" in content
+    assert "## Merge and Cleanup" in content
+    assert "## Mod Hook Convention" in content
 ```
 
 - [ ] **Step 3: Run test to see it fail**
 
 Run: `uv run pytest tests/test_fo_pending_capture_step.py -v`
-Expected: FAIL on `test_fo_skill_has_pending_capture_detection`.
+Expected: FAIL on `test_fo_shared_core_has_pending_capture_detection` (the other two tests should already pass because the file and sections exist).
 
-- [ ] **Step 4: Add step 6.5 to FO skill**
+- [ ] **Step 4: Add step 3.6 to shared-core "Completion and Gates"**
 
-Read current `skills/first-officer/SKILL.md`. Find the Dispatch Loop section. Locate the point between "handle gate / captain approval" and "advance entity or handle feedback" (typically between step 6 and step 7 of the loop).
-
-Insert the following new section (use Edit with a unique old_string anchor that captures the transition point):
-
-```markdown
-
-### Step 6.5: Process pending knowledge captures (Phase E addition)
-
-After the stage ensign completes and before advancing the entity to the next stage, check whether the ensign staged any D2 knowledge capture candidates in the entity body.
-
-1. Read the entity file.
-2. Search for a `## Pending Knowledge Captures` section containing `<capture>` elements.
-3. If the section exists and is non-empty:
-   a. Invoke the `knowledge-capture` skill via the Skill tool with:
-      ```yaml
-      mode: apply
-      entity_slug: {current entity slug}
-      entity_path: {entity file path}
-      ```
-   b. Follow the skill's apply mode instructions (see `skills/knowledge-capture/references/apply-mode.md`).
-   c. AskUserQuestion calls inside the skill run in FO's `--agent` context where native UI works.
-4. If the section is absent or empty, skip this step and proceed to step 7.
-
-This step is additive and has no effect on entities whose ensigns did not stage pending captures (majority case).
-
-Rationale: stage ensigns cannot use AskUserQuestion themselves (they run as subagents). By staging D2 candidates in the entity body and having FO process them at stage transitions, we preserve the "captain-facing flows only happen in --agent context" invariant without adding a separate captain-gated stage.
+The "Completion and Gates" section currently reads (at the top):
 
 ```
+## Completion and Gates
 
-Use Edit with a specific anchor (locate the exact text that marks "end of step 6" and "start of step 7" in the current SKILL.md).
+When a worker completes:
+
+1. Read the entity file.
+2. Review the `## Stage Report` section against the checklist. Every dispatched checklist item must be represented as DONE, SKIPPED, or FAILED.
+3. If checklist items are missing, send the worker back once to repair the report.
+3.5. Emit completion event with the checklist count summary as detail (skip if dashboard not running).
+4. Check whether the completed stage is gated.
+```
+
+Use Edit with this exact `old_string` and `new_string`:
+
+**old_string**:
+```
+3.5. Emit completion event with the checklist count summary as detail (skip if dashboard not running).
+4. Check whether the completed stage is gated.
+```
+
+**new_string**:
+```
+3.5. Emit completion event with the checklist count summary as detail (skip if dashboard not running).
+3.6. Process pending knowledge captures (Phase E addition):
+   - Scan the entity file for a `## Pending Knowledge Captures` section containing `<capture>` elements.
+   - If the section exists and is non-empty, invoke the `knowledge-capture` skill via the Skill tool with `mode: apply`, `entity_slug: {current slug}`, `entity_path: {entity file path}`.
+   - Follow the skill's apply-mode instructions (see `skills/knowledge-capture/references/apply-mode.md`). AskUserQuestion calls inside the skill run in FO's `--agent` context where native UI works.
+   - If the section is absent or empty, proceed immediately to step 4.
+   - Rationale: stage ensigns cannot use AskUserQuestion themselves (they run as subagents). By staging D2 candidates in the entity body and having FO process them at completion time, we preserve the "captain-facing flows only happen in --agent context" invariant without adding a separate captain-gated stage.
+4. Check whether the completed stage is gated.
+```
+
+This is a minimal additive edit — it inserts exactly one new numbered step (3.6) and leaves all surrounding content untouched.
 
 - [ ] **Step 5: Run test to verify it passes**
 
@@ -2563,8 +2573,8 @@ Expected: All previously passing tests still pass (no regression).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add skills/first-officer/SKILL.md tests/test_fo_pending_capture_step.py
-git commit -m "feat(phase-e): FO skill step 6.5 — pending knowledge capture detection"
+git add references/first-officer-shared-core.md tests/test_fo_pending_capture_step.py
+git commit -m "feat(phase-e): FO shared-core step 3.6 — pending knowledge capture detection"
 ```
 
 ---
@@ -2632,7 +2642,7 @@ Create `docs/superpowers/plans/2026-04-11-phase-e-plan-1-foundation-stage-report
 - [x] 16. knowledge-capture apply-mode reference
 - [x] 17. knowledge-capture fixtures (findings, captain responses, pending entity)
 - [x] 18. workflow-index-maintainer mod (startup + idle hooks)
-- [x] 19. spacedock:first-officer skill update (step 6.5 pending capture detection)
+- [x] 19. FO shared-core step 3.6 (pending knowledge capture detection) in `references/first-officer-shared-core.md`
 - [x] 20. Full test suite + kc-plugin-forge audit + Stage Report
 
 ## Deliverables
@@ -2644,8 +2654,8 @@ Create `docs/superpowers/plans/2026-04-11-phase-e-plan-1-foundation-stage-report
 ### New mod
 - `mods/workflow-index-maintainer.md`
 
-### Updated skill
-- `skills/first-officer/SKILL.md` (additive step 6.5)
+### Updated reference
+- `references/first-officer-shared-core.md` (additive step 3.6 in "Completion and Gates")
 
 ### Initial production artifacts
 - `docs/build-pipeline/_index/CONTRACTS.md` (empty shell)
@@ -2676,7 +2686,7 @@ Record any deviations from the plan here:
 Phase E Plan 2 (Plan Stage: researcher agent + build-research + build-plan) is unblocked. Plan 2 can now depend on:
 - `workflow-index` skill for plan-checker Dimension 7 (Cross-Entity Coherence)
 - `knowledge-capture` skill for D2 findings staging from build-research and build-plan
-- FO step 6.5 for processing any D2 captures after plan stage completes
+- FO shared-core step 3.6 for processing any D2 captures after each stage completes
 
 Phase E Plan 1 complete.
 ```
@@ -2705,7 +2715,7 @@ Expected: clean working tree, recent commits matching the 20 tasks, HEAD on main
 - ✅ `spacebridge:workflow-index` (registered here as `spacedock:workflow-index` per namespace decision)
 - ✅ `mods/workflow-index-maintainer.md`
 - ✅ `spacebridge:knowledge-capture` (registered here as `spacedock:knowledge-capture`) with two-mode structure
-- ✅ `spacedock:first-officer` step 6.5 additive update
+- ✅ FO shared-core step 3.6 additive update (in `references/first-officer-shared-core.md`)
 - ✅ Initial `_index/` directory
 
 **2. Placeholder scan:** Each task has concrete file paths, concrete SKILL.md content, concrete Python test code, and concrete commit messages. No "TBD", no "add appropriate", no "similar to Task N". Fixture content is written out in full.
