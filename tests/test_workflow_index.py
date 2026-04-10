@@ -51,3 +51,17 @@ def test_skill_content_mentions_all_three_modes():
     content = SKILL_FILE.read_text(encoding="utf-8")
     for mode in ["read", "write", "check"]:
         assert mode in content.lower(), f"Expected mode '{mode}' mentioned in SKILL.md"
+
+
+def test_contracts_format_reference_exists():
+    ref = SKILL_DIR / "references" / "contracts-format.md"
+    assert ref.exists(), f"Expected {ref} to exist"
+
+
+def test_contracts_format_defines_section_structure():
+    ref = SKILL_DIR / "references" / "contracts-format.md"
+    content = ref.read_text(encoding="utf-8")
+    # Contract format must explain the per-file section structure
+    assert "Active Contracts" in content
+    assert "Entity" in content
+    assert "Status" in content
