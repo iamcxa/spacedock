@@ -136,3 +136,68 @@ def test_workflow_index_fixture_has_seed_artifacts():
 def test_workflow_index_fixture_has_entities():
     assert (FIXTURE_DIR / "entity-a.md").exists()
     assert (FIXTURE_DIR / "entity-b.md").exists()
+
+
+def parse_contracts_by_file(contracts_path: Path, file_query: str) -> list[dict]:
+    """Re-implements the read-mode 'query by file' logic in Python.
+
+    This is a spec-conformance check: the Python implementation mirrors what a
+    Claude ensign would do when executing the skill's read-mode reference.
+    """
+    content = contracts_path.read_text(encoding="utf-8")
+    # Find the section for the queried file
+    section_header = f"### {file_query}"
+    if section_header not in content:
+        return []
+
+    # Extract the section content up to the next ### or ##
+    start = content.index(section_header) + len(section_header)
+    rest = content[start:]
+    next_section_match = re.search(r"\n(##+ )", rest)
+    section_body = rest[: next_section_match.start()] if next_section_match else rest
+
+    # Parse the markdown table
+    lines = [line.strip() for line in section_body.strip().split("\n") if line.strip().startswith("|")]
+    if len(lines) < 3:
+        return []
+
+    # Skip header row and separator
+    rows = lines[2:]
+    results = []
+    for row in rows:
+        cells = [c.strip() for c in row.split("|")[1:-1]]
+        if len(cells) == 5:
+            # Post fix-forward schema: Entity | Stage | Intent | Status | Last Updated
+            results.append({
+                "entity": cells[0],
+                "stage": cells[1],
+                "intent": cells[2],
+                "status": cells[3],
+                "last_updated": cells[4],
+            })
+        elif len(cells) == 4:
+            # Legacy schema without Last Updated — treat as missing date
+            results.append({
+                "entity": cells[0],
+                "stage": cells[1],
+                "intent": cells[2],
+                "status": cells[3],
+                "last_updated": None,
+            })
+    return results
+
+
+def test_read_contracts_by_file_returns_expected_entries():
+    contracts = FIXTURE_DIR / "_index" / "CONTRACTS.md"
+    results = parse_contracts_by_file(contracts, "tools/fixture/a.ts")
+    assert len(results) == 2
+    assert results[0]["entity"] == "entity-a"
+    assert "final" in results[0]["status"]
+    assert results[1]["entity"] == "entity-b"
+    assert "in-flight" in results[1]["status"]
+
+
+def test_read_contracts_by_file_empty_for_unknown_file():
+    contracts = FIXTURE_DIR / "_index" / "CONTRACTS.md"
+    results = parse_contracts_by_file(contracts, "tools/fixture/nonexistent.ts")
+    assert results == []
