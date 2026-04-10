@@ -84,3 +84,15 @@ def test_gates_contains_severity_table():
     content = ref.read_text(encoding="utf-8")
     assert "CRITICAL" in content
     assert "candidate" in content.lower()
+
+
+def test_targets_reference_exists():
+    ref = SKILL_DIR / "references" / "targets.md"
+    assert ref.exists()
+
+
+def test_targets_defines_all_levels():
+    ref = SKILL_DIR / "references" / "targets.md"
+    content = ref.read_text(encoding="utf-8")
+    for level in ["plugin", "user-global", "project", "module", "lessons", "DECISIONS"]:
+        assert level in content, f"Expected level '{level}' in targets.md"
