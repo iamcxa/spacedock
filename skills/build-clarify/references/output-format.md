@@ -120,7 +120,7 @@ Written as the LAST new section at the end of Step 6 (Commit). Appended AFTER ex
 
 Rules:
 - All eight metric lines are mandatory -- use `0` or `not-applicable` rather than omitting.
-- Each line MUST use `- [x]` checklist format per parser contract (`tools/dashboard/src/frontmatter-io.ts:140`). Flat bullets are a drift bug.
+- Each line MUST use checklist format (`- [x]` for done, `- [ ]` for pending, `- [ ] SKIP: ...` or `- [ ] FAIL: ...` for partial stages) per parser contract (`tools/dashboard/src/frontmatter-io.ts:140`). Flat bullets (`- {metric}`) are a drift bug; the dashboard will render the Stage Report card as empty.
 - Must be the LAST `## Stage Report: {name}` section in the entity body.
 - Parsed by FO and status script -- keep field names exact.
 
