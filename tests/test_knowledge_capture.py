@@ -115,3 +115,18 @@ def test_capture_mode_describes_pending_captures_section():
     ref = SKILL_DIR / "references" / "capture-mode.md"
     content = ref.read_text(encoding="utf-8")
     assert "Pending Knowledge Captures" in content
+
+
+def test_apply_mode_reference_exists():
+    ref = SKILL_DIR / "references" / "apply-mode.md"
+    assert ref.exists()
+
+
+def test_apply_mode_documents_askuserquestion_usage():
+    ref = SKILL_DIR / "references" / "apply-mode.md"
+    content = ref.read_text(encoding="utf-8")
+    assert "AskUserQuestion" in content
+    # Must document that FO is the ONLY caller
+    assert "First Officer" in content or "FO" in content
+    # Must document separate commit requirement
+    assert "commit" in content.lower() and "separate" in content.lower()
