@@ -119,7 +119,7 @@ Written as the LAST new section at the end of Step 6 (Commit). Appended AFTER ex
 ```
 
 Rules:
-- All six metric lines are mandatory -- use `0` or `not-applicable` rather than omitting.
+- All eight metric lines are mandatory -- use `0` or `not-applicable` rather than omitting.
 - Must be the LAST `## Stage Report: {name}` section in the entity body.
 - Parsed by FO and status script -- keep field names exact.
 

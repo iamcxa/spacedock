@@ -691,7 +691,7 @@ correctly.
    ## Stage Report: clarify
 
    - Decomposition: {accepted|modified|rejected|not-applicable}
-   - Assumptions confirmed: {n} / {total} ({n} corrected)
+   - Assumptions confirmed: {n} / {total} ({n corrected})
    - Options selected: {n} / {total}
    - Questions answered: {n} / {total}
    - Canonical refs added: {n}
