@@ -54,15 +54,21 @@ stages:
       worktree: false
       manual: true
       gate: true
-      skill: spacebridge:build-clarify
-      # Science Officer runs interactive AskUserQuestion loop with captain.
+      skill: spacedock:build-clarify
+      # NAMESPACE NOTE: Spec §8 defines this skill as belonging to the spacebridge
+      # plugin. During Phase C it's hosted in spacedock (since spacebridge plugin
+      # doesn't exist yet). Will migrate to `spacebridge:build-clarify` in Phase D
+      # (plugin split).
+      #
+      # Science Officer (spacedock:science-officer agent) runs interactive
+      # AskUserQuestion loop with captain.
       # Resolves: Open Questions, Assumptions, Option Comparisons from explore.
       # Produces: confirmed context, canonical references, profile assignment.
       # manual: true -- Science Officer invocation is captain-initiated,
       # not auto-dispatched by FO.
       # gate: true -- captain must approve context completeness before advancing.
       #
-      # FALLBACK (no spacebridge installed):
+      # FALLBACK (skill not found):
       # Captain reviews entity body manually, edits Open Questions/Assumptions
       # directly, then advances status to plan via FO command.
     - name: research
