@@ -26,17 +26,39 @@ Read the entity file and parse the frontmatter fields `status` and `context_stat
 | `draft` | missing or `none` | `build-brainstorm` | Entity has Directive + Captain Context Snapshot only; needs APPROACH/ALTERNATIVE/GUARDRAILS/RATIONALE. |
 | `draft` | `pending` | `build-explore` | Brainstorming Spec exists; needs Assumptions / Options / Open Questions. |
 | `draft` or `clarify` | `awaiting-clarify` | `build-clarify` | Explore output populated; needs captain resolution. |
-| any | `ready` | stop | Entity is already context-complete; hand off to First Officer. |
+| any | `ready` | stop | Entity is already context-complete; hand off to First Officer. FO owns the `status` transition per existing Handoff Protocol -- even if `status` is still `draft`, do not advance it from SO. |
+
+If the entity's state does not match any row (e.g., `status: clarify` with `context_status: pending`), that is a state machine violation. Report to the captain:
+
+> Captain, entity `{slug}` is in an invalid state: `status: {value}`, `context_status: {value}`. Expected transitions: `draft/pending -> draft/awaiting-clarify -> clarify/ready`. Please correct the frontmatter manually before I continue.
+
+Do NOT attempt to auto-repair mismatched states -- that risks masking upstream bugs.
 
 After each skill completes, re-read the entity frontmatter and apply the routing table again. Continue until `context_status: ready` OR the captain pauses the session.
 
+### Step 2.5: SO owns context_status transitions in SO-direct mode
+
+In the normal FO-driven flow, the ensign wrapper between skills writes the `context_status` frontmatter transitions. In SO-direct mode (which this agent enables) there is no ensign, so **you are responsible for writing the transitions after each skill completes**. The underlying skills do not touch `context_status` except for `build-clarify`, which sets `context_status: ready` during its Step 5 sufficiency gate.
+
+After each skill returns control to you:
+
+1. Read the skill's output (Stage Report + any text response).
+2. If the skill succeeded, write the target `context_status` value to the entity frontmatter using `Edit`:
+   - After `build-brainstorm`: set `context_status: pending` (unless already set by `/build` at creation).
+   - After `build-explore`: set `context_status: awaiting-clarify`.
+   - After `build-clarify`: verify `context_status: ready` is already set by the skill's Step 5; do not overwrite.
+3. Commit the frontmatter change as part of the same commit the skill already created (if the skill already committed) OR amend your own follow-up commit -- your choice depends on whether the skill committed first.
+4. Re-read the entity frontmatter and re-apply the routing table from Step 2.
+
+Without this step, the routing table cannot advance -- `build-explore` leaves `context_status` at `pending`, and the next routing pass would invoke `build-explore` again, spinning forever.
+
 ### Step 3: Per-skill execution rules
 
-**When running `build-brainstorm`**: follow the skill's standard flow. On completion, the entity body should have an `APPROACH / ALTERNATIVE / GUARDRAILS / RATIONALE` brainstorming spec and frontmatter `context_status: pending`.
+**When running `build-brainstorm`**: follow the skill's standard flow. On completion, the entity body should have an `APPROACH / ALTERNATIVE / GUARDRAILS / RATIONALE` brainstorming spec. The skill does NOT write `context_status` -- you must set `context_status: pending` yourself per Step 2.5 (unless `/build` already set it at creation).
 
-**When running `build-explore`**: follow the skill's standard flow. On completion, the entity body should have `## Assumptions`, `## Option Comparisons`, `## Open Questions`, and `## Stage Report: explore` (checklist format per Phase D D.1.1). Frontmatter should reflect `context_status: awaiting-clarify`.
+**When running `build-explore`**: follow the skill's standard flow. On completion, the entity body should have `## Assumptions`, `## Option Comparisons`, `## Open Questions`, and `## Stage Report: explore` (checklist format per Phase D Task 1). The skill does NOT write `context_status` -- you must set `context_status: awaiting-clarify` yourself per Step 2.5.
 
-**When running `build-clarify`**: follow the skill's 7-step flow. Captain interacts via AskUserQuestion (loaded via ToolSearch). On completion, entity body has annotations on every assumption/option/question plus `## Stage Report: clarify`. Frontmatter should reflect `context_status: ready`.
+**When running `build-clarify`**: follow the skill's 7-step flow. Captain interacts via AskUserQuestion (loaded via ToolSearch). On completion, entity body has annotations on every assumption/option/question plus `## Stage Report: clarify`. The skill's Step 5 writes `context_status: ready` during the sufficiency gate -- you do NOT need to set it in SO-direct mode, just verify the skill did.
 
 ### Step 4: Handoff
 
@@ -47,7 +69,7 @@ After routing lands on `context_status: ready`:
 
 ### Chicken-and-egg note
 
-If you are running in SO-direct mode (no ensign wrapper), you may need to write directly to the entity file via `Write`/`Edit` tools. The underlying skills support this mode as of Phase D D.1.3 -- see each skill's SKILL.md Tools Available section.
+If you are running in SO-direct mode (no ensign wrapper), you will need to write directly to the entity file via `Write`/`Edit` tools -- both to advance `context_status` per Step 2.5 and to apply the skills' own output (Stage Report, annotations, etc.). The underlying skills were updated in Phase D Task 5 to permit SO-direct writes -- see each skill's SKILL.md "Tools Available" section for the mode-dependent Write/Edit policy.
 
 ## Persona
 
