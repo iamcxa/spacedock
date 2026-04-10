@@ -19,21 +19,23 @@ Evidence: tools/dashboard/src/server.ts:142 -- existing stage filter uses ?statu
 
 ## Annotation: Assumption Corrected
 
-If the captain corrects an assumption in the batch, replace the ✓ Confirmed line with ✗
-Corrected and add the captain's correction verbatim:
+If the captain corrects an assumption in the batch, append a SINGLE correction line below
+the Evidence line(s). The format combines metadata and the captain's correction verbatim:
 
 ```markdown
 A-3: Cross-instance sync uses HTTP POST bridge
 Confidence: Unclear
 Evidence: src/server.ts:88 -- forwardToCtlServer exists but untested for highlight payloads
-✗ Corrected: captain said "use WebSocket broadcast via existing channel, not HTTP"
-→ Corrected: captain, 2026-04-10 (batch)
+→ Corrected by captain, 2026-04-10 (batch): "use WebSocket broadcast via existing channel, not HTTP"
 ```
 
 Rules:
-- Use `→ Confirmed:` or `→ Corrected:` (single-arrow prefix) consistently.
-- Include captain identifier and ISO date (YYYY-MM-DD).
-- `(batch)` suffix marks Step 2 responses; Step 3/4 annotations use `(interactive)`.
+- Use `→ Confirmed:` or `→ Corrected by` (single-arrow prefix) consistently.
+- One line per assumption annotation -- never two.
+- Confirmed format: `→ Confirmed: captain, {ISO-date} ({mode})`
+- Corrected format: `→ Corrected by captain, {ISO-date} ({mode}): "{verbatim correction}"`
+- `({mode})` is `(batch)` for Step 2 responses, `(interactive)` for Step 3/4 annotations.
+- Include ISO date (YYYY-MM-DD).
 - Never delete the original Confidence or Evidence lines -- append only.
 
 ## Annotation: Option Selected
