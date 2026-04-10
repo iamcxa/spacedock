@@ -124,7 +124,7 @@ Present ALL unconfirmed assumptions in a single formatted block:
 - If "all correct" (or similar confirmation) → mark every assumption `→ Confirmed: captain, {ISO-date} (batch)`
 - If corrections given → parse per-assumption:
   - Confirmed ones get `→ Confirmed: captain, {ISO-date} (batch)`
-  - Corrected ones get `→ Corrected: captain said "{verbatim}"` plus `→ Corrected: captain, {ISO-date} (batch)`
+  - Corrected ones get `→ Corrected by captain, {ISO-date} (batch): "{verbatim captain correction}"` (single-line format — see references/output-format.md)
 
 Write all annotations to the entity body in place. Preserve the original A-n numbering,
 Confidence, and Evidence lines -- append annotations only.
