@@ -113,13 +113,21 @@ Written as the LAST new section at the end of Step 6 (Commit). Appended AFTER ex
 ## Stage Report: clarify
 
 - [x] Decomposition: {accepted|modified|rejected|not-applicable}
+  e.g., "not-applicable -- entity is Small scope, no children proposed"
 - [x] Assumptions confirmed: {n} / {total} ({n corrected})
+  e.g., "A-1, A-2, A-4 confirmed via batch; A-3 corrected captain cited src/foo.ts"
 - [x] Options selected: {n} / {total}
+  e.g., "O-1 Filter UI placement -> Second chip row per workflow card (recommended)"
 - [x] Questions answered: {n} / {total}
+  e.g., "Q-1 persisted via client-side filterState; Q-2 always-visible spec interpretation"
 - [x] Canonical refs added: {n}
+  e.g., "entity 009 app.js:244-246; ADR-001 single-server architecture"
 - [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected, all Qs answered
 - [x] Handoff mode: {loose|tight}
+  loose: captain must say "execute {slug}"; tight: auto_advance: true in frontmatter
 - [x] Clarify duration: {n} questions asked, session complete
+  e.g., "4 AskUserQuestion calls (1 batch + 1 option + 2 Qs)"
 ```
 
 Rules:
@@ -127,6 +135,8 @@ Rules:
 - Each line MUST use checklist format (`- [x]` for done, `- [ ]` for pending, `- [ ] SKIP: ...` or `- [ ] FAIL: ...` for partial stages) per parser contract (`tools/dashboard/src/frontmatter-io.ts:140`). Flat bullets (`- {metric}`) are a drift bug; the dashboard will render the Stage Report card as empty.
 - Must be the LAST `## Stage Report: {name}` section in the entity body.
 - Parsed by FO and status script -- keep field names exact.
+
+**Detail lines (optional, Tier 1 rendering):** Each checklist item MAY have a single detail line directly below it, indented with exactly 2 spaces. The dashboard parser reads this as the `detail` field of the Stage Report item and renders it under the metric in the UI card. The detail line must be a single line -- multi-line detail is Tier 2 work deferred to Phase F. For clarify, detail should capture the decision: which option was selected, which assumptions were corrected, which refs were cited. This turns the Stage Report into a one-glance decision audit trail.
 
 ## Frontmatter Updates
 
