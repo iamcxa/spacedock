@@ -282,14 +282,22 @@ correctly.
    ```markdown
    ## Stage Report: clarify
 
-   - Decomposition: {accepted|modified|rejected|not-applicable}
-   - Assumptions confirmed: {n} / {total} ({n corrected})
-   - Options selected: {n} / {total}
-   - Questions answered: {n} / {total}
-   - Canonical refs added: {n}
-   - Context status: ready
-   - Handoff mode: {loose|tight}
-   - Clarify duration: {n} questions asked, session complete
+   - [x] Decomposition: {accepted|modified|rejected|not-applicable}
+     e.g., "not-applicable -- entity is Small scope, no children proposed"
+   - [x] Assumptions confirmed: {n} / {total} ({n corrected})
+     e.g., "A-1, A-2, A-4 confirmed via batch; A-3 corrected captain cited src/foo.ts"
+   - [x] Options selected: {n} / {total}
+     e.g., "O-1 Filter UI placement -- Second chip row per workflow card (recommended)"
+   - [x] Questions answered: {n} / {total}
+     e.g., "Q-1 persisted via client-side filterState; Q-2 always-visible spec interpretation"
+   - [x] Canonical refs added: {n}
+     e.g., "entity 009 app.js:244-246; ADR-001 single-server architecture"
+   - [x] Context status: ready
+     e.g., "gate passed: all assumptions confirmed, all options selected, all Qs answered"
+   - [x] Handoff mode: {loose|tight}
+     e.g., "loose means captain must say 'execute {slug}'; tight means auto_advance: true in frontmatter"
+   - [x] Clarify duration: {n} questions asked, session complete
+     e.g., "4 AskUserQuestion calls (1 batch + 1 option + 2 Qs)"
    ```
 
 2. If the hybrid handoff mode is tight (`auto_advance: true`), update frontmatter:

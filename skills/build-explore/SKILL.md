@@ -158,15 +158,21 @@ Write `## Stage Report: explore` as the LAST section of the entity body with exa
 ```markdown
 ## Stage Report: explore
 
-- Files mapped: {count} across {layer list}
-- Assumptions formed: {count} (Confident: {n}, Likely: {n}, Unclear: {n})
-- Options surfaced: {count}
-- Questions generated: {count}
-- α markers resolved: {resolved} / {total}
-- Scale assessment: {confirmed | revised from X to Y}
+- [x] Files mapped: 14 across domain, contract, view, frontend
+  domain: 3 files (aggregate + command handler), contract: 2, view: 6, frontend: 3
+- [x] Assumptions formed: 6 (Confident: 4, Likely: 1, Unclear: 1)
+  A-1 through A-4 Confident via line-number evidence; A-5 Likely; A-6 Unclear (see Q-3)
+- [x] Options surfaced: 2
+  O-1 real-time update mechanism; O-2 entity storage format
+- [x] Questions generated: 3
+  Q-1 decomposition output shape; Q-2 naming convention; Q-3 frontend state strategy
+- [x] α markers resolved: 2 / 3
+  α-1 (protocol), α-2 (storage) resolved via codebase; α-3 (state) escalated to Q-3
+- [x] Scale assessment: revised from Small to Medium
+  initial Small was Brainstorming Spec estimate; 14-file breadth + 3 open questions push to Medium
 ```
 
-The FO and status script parse these fields. Keep the format exact.
+Six items, always in this order. Each item MUST use checklist format (`- [x]` for done, `- [ ]` for pending, `- [ ] SKIP: ...` or `- [ ] FAIL: ...` for partial stages) -- this is the parser contract defined at `tools/dashboard/src/frontmatter-io.ts:140`. Flat bullet format (`- {metric}`) is a drift bug; the dashboard will render the Stage Report card as empty. The FO and status script parse these fields. Keep field names exact. Detail lines (2-space indent, one line per metric) are optional but recommended -- see `references/output-format.md` for full field rules.
 
 ---
 
