@@ -503,7 +503,7 @@ The reference doc has the full branching logic -- do not improvise.
 
 Read the entity body. Count:
 - **Unresolved Open Questions**: `## Open Questions` entries without a `→ Answer:` annotation
-- **Unconfirmed Assumptions**: `## Assumptions` entries without a `→ Confirmed:` or `→ Corrected:` annotation
+- **Unconfirmed Assumptions**: `## Assumptions` entries without a `→ Confirmed:` or `→ Corrected by` annotation
 - **Unselected Option Comparisons**: `### {name}` subsections without a `→ Selected:` annotation below the table
 
 Record these counts internally for the Stage Report at Step 6.
@@ -616,10 +616,13 @@ they have lowest Q-numbers):
    - Append the path to a `## Canonical References` section in the entity body -- create
      the section if it does not exist, placing it AFTER `## Open Questions` and BEFORE
      `## Stage Report: explore`
-   - Format: `` `- `{relative-path}` -- {why captain cited it} (Q-{n})` ``
+   - Format: see `references/output-format.md` (Canonical References section) -- single source of truth for the entry format
    - Use the learned context to inform subsequent questions (e.g., if the captain cites an
      ADR, a later question about the same area can reference it: "ADR-001 says X -- does
      that apply here too?")
+
+The accumulator ALSO runs during Step 3 option selection -- if the captain's option choice
+or freeform response cites a file path or ADR, apply the same resolve-read-append flow.
 
 6. Append the Answer annotation to the entity body directly below the Suggested options.
 
@@ -630,13 +633,23 @@ they have lowest Q-numbers):
 Re-scan the entity body and verify:
 
 - [ ] Every `## Open Questions` entry has a `→ Answer:` annotation
-- [ ] Every `## Assumptions` entry has a `→ Confirmed:` or `→ Corrected:` annotation
+- [ ] Every `## Assumptions` entry has a `→ Confirmed:` or `→ Corrected by` annotation
 - [ ] Every `### {name}` subsection in `## Option Comparisons` has a `→ Selected:` annotation
 - [ ] `## Acceptance Criteria` exists with ≥2 criteria and no `α` markers remain
 - [ ] `## Canonical References` section exists (may be empty if captain cited no external docs -- that is OK)
 
 **If any check fails** → identify the gap and loop back to the relevant step (Step 2 for
 assumptions, Step 3 for options, Step 4 for questions). Do NOT advance to Step 6 with gaps.
+
+**Exception -- Acceptance Criteria defect**: if the `## Acceptance Criteria` check fails
+(fewer than 2 criteria, or α markers remain), this is an upstream defect -- build-clarify
+does NOT own this section. Notify the captain:
+
+> Entity `{slug}` has an Acceptance Criteria defect: {fewer than 2 criteria | α markers
+> remain}. This section is owned by build-brainstorm and build-explore. Re-run explore
+> (FO explore {slug}) or manually repair the section before resuming clarify.
+
+Then STOP. Do not commit. Do not loop back within this skill.
 
 **If all checks pass**:
 
