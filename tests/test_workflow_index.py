@@ -78,3 +78,17 @@ def test_decisions_format_describes_supersede_mechanism():
     assert "Supersedes" in content
     assert "append-only" in content.lower()
     assert "D-" in content  # decision ID format marker
+
+
+def test_read_mode_reference_exists():
+    ref = SKILL_DIR / "references" / "read-mode.md"
+    assert ref.exists()
+
+
+def test_read_mode_documents_query_by_file_and_entity():
+    ref = SKILL_DIR / "references" / "read-mode.md"
+    content = ref.read_text(encoding="utf-8")
+    assert "query" in content.lower()
+    assert "file" in content.lower()
+    assert "entity" in content.lower()
+    assert "active" in content.lower()
