@@ -64,7 +64,7 @@ This skill expects the entity to have `status: clarify` when it starts. Normally
 1. Read the entity frontmatter field `status`.
 2. If `status` is `clarify` -- proceed to Step 0 normally.
 3. If `status` is `draft` -- update frontmatter to `status: clarify` as your first action (Write/Edit on the entity frontmatter). The transition from draft to clarify is a skill-owned action in SO-direct mode.
-4. If `status` is anything else (e.g., `plan`, `execute`) -- STOP. Report to captain: "Entity `{slug}` is in `status: {value}`, which is past the clarify stage. Refusing to clarify an already-advanced entity."
+4. If `status` is anything else (e.g., `plan`, `execute`, or absent/empty) -- STOP. Report to captain: "Entity `{slug}` is in `status: {value}`. Expected `draft` or `clarify` to enter the clarify stage. If this entity already completed clarify, nothing to do -- hand off to First Officer. If the frontmatter is missing or malformed, repair the entity file manually before retrying."
 
 The `status` field and the `context_status` field serve different purposes: `status` tracks pipeline stage (draft / clarify / plan / execute / ...), `context_status` tracks clarify-phase progress (pending / awaiting-clarify / ready). Both must be correct for this skill to run safely. Note: this skill does not write `context_status` except at Step 5 (where it sets `context_status: ready` per existing behavior). The `awaiting-clarify` transition is owned by the Science Officer agent in SO-direct mode, NOT by this skill.
 
