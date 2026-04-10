@@ -112,15 +112,15 @@ Summary block written at the end of the explore stage output. The FO and status 
 ```markdown
 ## Stage Report: explore
 
-- Files mapped: 14 across domain, contract, view, frontend
-- Assumptions formed: 6 (Confident: 4, Likely: 1, Unclear: 1)
-- Options surfaced: 2
-- Questions generated: 3
-- α markers resolved: 2 / 3
-- Scale assessment: revised from Small to Medium
+- [x] Files mapped: 14 across domain, contract, view, frontend
+- [x] Assumptions formed: 6 (Confident: 4, Likely: 1, Unclear: 1)
+- [x] Options surfaced: 2
+- [x] Questions generated: 3
+- [x] α markers resolved: 2 / 3
+- [x] Scale assessment: revised from Small to Medium
 ```
 
-Six lines, always in this order. Field names must match exactly (the FO and status script parse these). Scale assessment uses one of: `confirmed` (no change from brainstorm's estimate) or `revised from X to Y` (where X and Y are `Small`, `Medium`, or `Large`).
+Six items, always in this order. Each item MUST use the `- [x]` checklist format -- this is the parser contract defined at `tools/dashboard/src/frontmatter-io.ts:140`. Flat bullet format (`- {metric}`) is a drift bug; the dashboard will render the Stage Report card as empty. Field names must match exactly (the FO and status script parse these). Scale assessment uses one of: `confirmed` (no change from brainstorm's estimate) or `revised from X to Y` (where X and Y are `Small`, `Medium`, or `Large`).
 
 ---
 

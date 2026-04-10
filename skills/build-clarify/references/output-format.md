@@ -108,18 +108,19 @@ Written as the LAST new section at the end of Step 6 (Commit). Appended AFTER ex
 ```markdown
 ## Stage Report: clarify
 
-- Decomposition: {accepted|modified|rejected|not-applicable}
-- Assumptions confirmed: {n} / {total} ({n corrected})
-- Options selected: {n} / {total}
-- Questions answered: {n} / {total}
-- Canonical refs added: {n}
-- Context status: ready
-- Handoff mode: {loose|tight}
-- Clarify duration: {n} questions asked, session complete
+- [x] Decomposition: {accepted|modified|rejected|not-applicable}
+- [x] Assumptions confirmed: {n} / {total} ({n corrected})
+- [x] Options selected: {n} / {total}
+- [x] Questions answered: {n} / {total}
+- [x] Canonical refs added: {n}
+- [x] Context status: ready
+- [x] Handoff mode: {loose|tight}
+- [x] Clarify duration: {n} questions asked, session complete
 ```
 
 Rules:
 - All eight metric lines are mandatory -- use `0` or `not-applicable` rather than omitting.
+- Each line MUST use `- [x]` checklist format per parser contract (`tools/dashboard/src/frontmatter-io.ts:140`). Flat bullets are a drift bug.
 - Must be the LAST `## Stage Report: {name}` section in the entity body.
 - Parsed by FO and status script -- keep field names exact.
 
