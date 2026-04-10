@@ -1,8 +1,8 @@
 ---
 id: 047
 title: Entity Body Rendering Hotfixes -- Stage Report Detail + Open Questions Format
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: /build
 created: 2026-04-10T14:45:00+08:00
 started:
@@ -71,6 +71,8 @@ Why it matters: Entity 047's APPROACH explicitly says "both scoped to skill refe
 
 Suggested options: (a) Expand entity 047 scope -- fix SKILL.md drift inside this entity (aligns with GUARDRAIL, stretches APPROACH), (b) Create D.1.5 loopback task -- new Phase D task, leave 047 scoped to reference docs only (preserves 047 boundary, records loopback explicitly), (c) Defer to Phase E review -- capture as Phase E finding, no Phase D action (slowest, risks drift persisting)
 
+→ Answer: (a) Expand entity 047 scope -- fix SKILL.md drift inside this entity (captain, 2026-04-10, interactive). Implication: entity 047's implementation work now includes editing skills/build-explore/SKILL.md:161 and skills/build-clarify/SKILL.md:286 to match the checklist + detail format; plan stage must update the APPROACH to add "Fix 3: update both SKILL.md Stage Report examples" and expand the "target files" list from 2 to 4.
+
 Q-2: Should the detail line content style be prescribed per metric in references/output-format.md, or left freeform to author judgment?
 
 Domain: Readable / Textual
@@ -79,27 +81,34 @@ Why it matters: Current references/output-format.md shows concrete detail exampl
 
 Suggested options: (a) Freeform -- author's judgment, no style rule (max flexibility, consistency risk), (b) Prescribed per metric -- reference doc specifies a style per metric like "Files mapped: list layer breakdown with counts; Assumptions formed: A-n IDs with confidence reasoning" (max consistency, reduces author flexibility), (c) Exemplar-based -- reference doc tags specific entity examples as "canonical pattern" and instructs authors to match the style of those examples (balances consistency and flexibility, but requires picking canonical exemplars)
 
+→ Answer: (c) Exemplar-based -- reference doc tags specific entity examples as canonical pattern and instructs authors to match that style (captain, 2026-04-10, interactive). Implication: references/output-format.md should add a brief "Canonical detail line exemplars" subsection naming specific entities (e.g., entity 008 dashboard-standalone-plugin or entity 047 itself once clarify lands) as the style references. This is a scope extension that MAY be rolled into 047's plan or deferred to a follow-up entity -- plan stage should decide based on scope budget; does NOT block 047 merging.
+
 ## Assumptions
 
 A-1: Dashboard parser extracts 2-space-indent detail lines from Stage Report items as `StageReportItem.detail`
 Confidence: Confident
 Evidence: tools/dashboard/src/frontmatter-io.ts:157-158 -- `if (j + 1 < lines.length && lines[j + 1].startsWith("  ")) { detail = lines[j + 1].trim() }` runs inside the checklist parser loop (line 140 regex `^- \[(x| )\] ((?:SKIP: |FAIL: )?)(.+)$`); tested in production by entity 008 which already uses the format
+→ Confirmed: captain, 2026-04-10 (batch)
 
 A-2: Dashboard frontend renders `StageReportItem.detail` under each checklist item in a `.item-detail` span
 Confidence: Confident
 Evidence: tools/dashboard/static/detail.js:119-124 -- `if (item.detail) { var detail = document.createElement('span'); detail.className = 'item-detail'; detail.textContent = item.detail; li.appendChild(detail); }` inside `renderStageReports()` at line 86
+→ Confirmed: captain, 2026-04-10 (batch)
 
 A-3: Tasks 1, 2, 3 successfully landed the checklist format + detail line spec + Open Questions blank-line rule in both `references/output-format.md` files
 Confidence: Confident
 Evidence: skills/build-explore/references/output-format.md:118-139 (checklist example + detail line paragraph), line 88 (Open Questions blank-line rule); skills/build-clarify/references/output-format.md:107-139 (clarify Stage Report checklist + detail line paragraph), line 80 (Answer blank-line rule from Task 2 D.2 hotfix)
+→ Confirmed: captain, 2026-04-10 (batch)
 
 A-4: Entity 008 (dashboard-standalone-plugin) already uses the checklist + detail format in production, predating Phase D Task 3
 Confidence: Confident
 Evidence: docs/build-pipeline/dashboard-standalone-plugin.md:253-268 -- Stage Report: explore with 6 `- [x]` checklist items each followed by a 2-space-indent detail line; served as the format exemplar Task 3 retrofitted into the reference doc spec
+→ Confirmed: captain, 2026-04-10 (batch)
 
 A-5: Stage Report rendering bypasses markdown soft-newline collapsing entirely because `renderBody()` splits the entity body at `## Stage Report:` before markdown renders the body section
 Confidence: Confident
 Evidence: tools/dashboard/static/detail.js:62-64 -- `var parts = bodyMarkdown.split(/^## Stage Report: /m); var bodyContent = parts[0].trim()` isolates Stage Report content for custom card rendering via `renderStageReports()`; detail text lives in a `.item-detail` span, never touched by markdown
+→ Confirmed: captain, 2026-04-10 (batch)
 
 ## Option Comparisons
 
@@ -112,6 +121,8 @@ The `skills/build-explore/SKILL.md` Step 7 (line 161) and `skills/build-clarify/
 | (a) Inline update -- rewrite SKILL.md Step 7 / Step 6 examples to match the full checklist + detail format | Preserves SKILL.md self-contained readability; aligns with existing duplicate pattern; matches MEMORY.md "Review-Driven Format Drift Detection" guidance which explicitly calls for mechanical grep enforcement of duplicate format defs | Drift can recur on future format changes without a verification-step grep comparison to catch it | Low | Recommended |
 | (b) Pointer replacement -- remove the inline example entirely, add "see `references/output-format.md` for exact format" | Eliminates drift mechanism at the source (single source of truth) | Executor must context-switch to a second file to see the format; SKILL.md loses self-contained step explanation | Low | Viable |
 | (c) Hybrid -- keep an abbreviated structural example in SKILL.md (showing checklist markers only, no detail line) plus an explicit pointer to references for the full spec | Captures intent at both levels while minimizing duplication | Still has a drift surface (abbreviated != full spec); may confuse readers about which is canonical | Medium | Not recommended |
+
+→ Selected: (a) Inline update -- rewrite SKILL.md Step 7 / Step 6 examples to match the full checklist + detail format (captain, 2026-04-10, interactive)
 
 ## Canonical References
 
@@ -131,3 +142,22 @@ The `skills/build-explore/SKILL.md` Step 7 (line 161) and `skills/build-clarify/
   Brainstorming Spec and Acceptance Criteria contain no `(needs clarification -- deferred to explore)` markers; /build produced a fully specified spec
 - [x] Scale assessment: confirmed
   Brainstorming Spec estimated Small; target files are 4 (2 reference docs already landed + 2 SKILL.md drift fixes if Q-1 resolves to option a); the 4 additional evidence files read (parser, frontend, 2 reference entities) are non-modifying verification reads; stays under the <5-file Small threshold
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  Entity 047 is Small scope with no Decomposition Recommendation section; build-explore correctly skipped Step 3 decomposition analysis
+- [x] Assumptions confirmed: 5 / 5 (0 corrected)
+  A-1 through A-5 all Confident-level with file:line evidence; captain confirmed entire batch "all correct" via single AskUserQuestion (recommended option)
+- [x] Options selected: 1 / 1
+  O-1 SKILL.md Stage Report format drift resolution -> (a) Inline update (recommended), rewrite SKILL.md Step 7 / Step 6 examples to match the full checklist + detail format
+- [x] Questions answered: 2 / 2 (0 deferred)
+  Q-1 drift fix scope -> (a) Expand 047 scope (fix SKILL.md inline in this entity); Q-2 detail line content style -> (c) Exemplar-based (reference doc tags canonical exemplars)
+- [x] Canonical refs added: 0
+  Captain's answers did not cite any new file paths, ADRs, or specs beyond what was already surfaced by build-explore; Canonical References section remains empty placeholder for this entity
+- [x] Context status: ready
+  Gate passed: all 5 assumptions confirmed, 1 option selected, 2 questions answered, Acceptance Criteria has 4 items (>=2) with no α markers remaining, Canonical References section exists
+- [x] Handoff mode: loose
+  `auto_advance:` field is empty in frontmatter; captain must explicitly say "execute 047" for First Officer to transition status: clarify -> plan
+- [x] Clarify duration: 4 captain interactions, session complete
+  1 plain-text assumption batch (rendered as 1 AskUserQuestion per captain's "use Claude UI" directive) + 1 option (O-1) + 2 questions (Q-1, Q-2); all via AskUserQuestion in Chinese; subagent AskUserQuestion bubbling WORKED on all 4 calls (Task 4 SO routing smoke test passed)
