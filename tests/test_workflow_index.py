@@ -201,3 +201,43 @@ def test_read_contracts_by_file_empty_for_unknown_file():
     contracts = FIXTURE_DIR / "_index" / "CONTRACTS.md"
     results = parse_contracts_by_file(contracts, "tools/fixture/nonexistent.ts")
     assert results == []
+
+
+def parse_decisions_filter_active(decisions_path: Path, include_superseded: bool = False) -> list[dict]:
+    """Re-implements 'query decisions' logic, default excludes superseded."""
+    content = decisions_path.read_text(encoding="utf-8")
+    # Split on ## D- headings
+    blocks = re.split(r"\n## (D-[\w\-]+): ", content)
+    results = []
+    # blocks[0] is preamble; then alternating (id, body)
+    for i in range(1, len(blocks), 2):
+        decision_id = blocks[i]
+        body = blocks[i + 1] if i + 1 < len(blocks) else ""
+        # Extract Status field
+        status_match = re.search(r"\*\*Status\*\*:\s*(.+?)(?:\n|$)", body)
+        status = status_match.group(1).strip() if status_match else ""
+        is_superseded = "superseded" in status
+        if not include_superseded and is_superseded:
+            continue
+        results.append({
+            "id": decision_id,
+            "status": status,
+            "is_superseded": is_superseded,
+        })
+    return results
+
+
+def test_read_decisions_excludes_superseded_by_default():
+    decisions = FIXTURE_DIR / "_index" / "DECISIONS.md"
+    results = parse_decisions_filter_active(decisions)
+    active_ids = [r["id"] for r in results]
+    assert "D-entity-a-1" in active_ids
+    assert "D-entity-a-2" not in active_ids  # superseded, excluded by default
+
+
+def test_read_decisions_includes_superseded_when_requested():
+    decisions = FIXTURE_DIR / "_index" / "DECISIONS.md"
+    results = parse_decisions_filter_active(decisions, include_superseded=True)
+    all_ids = [r["id"] for r in results]
+    assert "D-entity-a-1" in all_ids
+    assert "D-entity-a-2" in all_ids
