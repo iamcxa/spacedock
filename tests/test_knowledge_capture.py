@@ -96,3 +96,22 @@ def test_targets_defines_all_levels():
     content = ref.read_text(encoding="utf-8")
     for level in ["plugin", "user-global", "project", "module", "lessons", "DECISIONS"]:
         assert level in content, f"Expected level '{level}' in targets.md"
+
+
+def test_capture_mode_reference_exists():
+    ref = SKILL_DIR / "references" / "capture-mode.md"
+    assert ref.exists()
+
+
+def test_capture_mode_forbids_askuserquestion():
+    ref = SKILL_DIR / "references" / "capture-mode.md"
+    content = ref.read_text(encoding="utf-8")
+    # Must explicitly state no AskUserQuestion
+    assert "AskUserQuestion" in content
+    assert "not" in content.lower() or "never" in content.lower()
+
+
+def test_capture_mode_describes_pending_captures_section():
+    ref = SKILL_DIR / "references" / "capture-mode.md"
+    content = ref.read_text(encoding="utf-8")
+    assert "Pending Knowledge Captures" in content
