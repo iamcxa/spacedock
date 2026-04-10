@@ -1342,8 +1342,9 @@ Phase D is complete when ALL of the following hold:
 - [x] Task 4 (D.4) -- Science Officer agent loads all three context-building skills with context_status routing
 - [x] Task 5 (D.1.2, D.1.3, D.1.4) -- build-explore Write/Edit unblocked, build-clarify Step 5/6 clarified, build-clarify Pre-Step status handoff added
 - [x] Task 6 (VALIDATION) -- Entity 047 ran through expanded SO end-to-end with no workarounds; dashboard rendering verified; Dogfood Notes section appended (dogfood discovered SKILL.md format drift bug -- captain expanded 047 scope to fix inline per Q-1 answer; dashboard visual verification remains captain-owned)
-- [ ] Task 7 (D.6) -- `/science` slash command exists and delegates to science-officer agent
-- [ ] Task 8 (D.7) -- build-clarify forge fixtures exist (README + minimal entity + captain responses YAML)
+- [x] Task 7 (D.6) -- `/science` slash command exists at `skills/science/SKILL.md` using persona injection pattern (not subagent dispatch) to preserve AskUserQuestion access
+- [x] Task 8 (D.7) -- build-clarify forge fixtures exist at `skills/build-clarify/fixtures/` (README + minimal entity + captain responses YAML, all following Phase D format rules)
+- [x] Task 10 (047 Q-1) -- SKILL.md Stage Report format drift fixed at `skills/build-explore/SKILL.md:161` and `skills/build-clarify/SKILL.md:286`, matching reference docs character-for-character
 - [x] Task 9 (D.5) -- Plugin split decision anchored in entity 040 + roadmap spec Open Questions resolved (design-doc 2-plugin: spacedock engine + spacebridge [UI + coord + build studio]; ratified by Captain via AskUserQuestion)
 
 Final commit:
