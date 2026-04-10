@@ -211,3 +211,40 @@ SpaceDock 是 code name。CL 在 Opportunity 3 列了候選名：
 1. CLI entry point 要用什麼語言？Python (跟 engine 一致) 還是 shell (薄 wrapper)？
 2. Product name 要在什麼時間點決定？影響 plugin name、CLI command、repo name
 3. 008 的 plan 需要 review 嗎？還是直接進 execute？
+
+## Phase D Decision Anchor (2026-04-10)
+
+**Plugin split locked as 2-plugin (design-doc shape) by Captain via Phase D Task 9 (D.5)**.
+
+Authoritative design: `docs/superpowers/specs/2026-04-10-spacebridge-engine-bridge-split-design.md` §1.4 line 51.
+
+### Two plugins, two roles
+
+1. **`clkao/spacedock`** — engine upstream. Pipeline primitives (entities, workflows, stages), First Officer agent, execute/plan/seeding skills. Exposes `ChannelProvider` + `CoordinationClient` interfaces with in-process default implementations so headless installs keep working with zero behavior change.
+
+2. **`spacebridge`** — coordination plane + UI + build studio (all in ONE plugin):
+   - Dashboard UI (web, MCP channel, gate approval, share links)
+   - Coordinator daemon (fixed port 8420, multi-session, multi-repo)
+   - Build studio: `build-brainstorm` + `build-explore` + `build-clarify` skills + Science Officer agent
+   - Quality Officer hook (Phase E, as bridge mod hook not agent file per spec OQ-2)
+
+### Namespace migration
+
+- **Phase D**: namespace stays `spacedock:build-*`. No rename churn during Phase D -- the Science Officer skills loadout uses `spacedock:build-brainstorm` / `spacedock:build-explore` / `spacedock:build-clarify` as current.
+- **Phase F** (entity 055 / spacebridge bootstrapping): flip `spacedock:build-* -> spacebridge:build-*` as part of the spacebridge plugin bootstrap. References in `agents/science-officer.md`, `commands/science.md` (once it exists), `docs/build-pipeline/README.md`, and any entity body references get updated atomically.
+
+### Forward implications
+
+- Long-term distribution story (recce, carlvoe, and beyond): any project that installs `spacebridge` gets the build flow with zero spacedock engine coupling. Spacedock engine stays as the upstream pipeline primitive for projects that want the full workflow system; spacebridge ships the build flow standalone for projects that only want the Discuss phase.
+- Phase E role boundary formalization (SO/FO/QO) binds to plugin ownership: SO lives in spacebridge, FO stays in spacedock core, QO is a spacebridge bridge mod hook.
+- Entity 040 WP1 (dashboard plugin extraction) is still correct as a workstream, but its target plugin name is now `spacebridge`, NOT `spacedock-dashboard`. WP1 scope expands to include moving build studio skills + SO agent into the new plugin, not just the dashboard UI.
+- Entity 048 (multi-session daemon) is absorbed into the spacebridge design (per design doc §1.4 line 52). Its acceptance criteria are ported into design doc §51, §52, §56.
+
+### Relationship to existing Phase D tasks
+
+- **Task 4 (SO agent loadout)**: unchanged. SO loads `spacedock:build-*` prefix. Phase F will flip to `spacebridge:build-*` as part of the migration entity.
+- **Task 7 (`/science` slash command)**: unchanged. Lives in the plugin that owns science-officer agent -- currently spacedock, eventually spacebridge.
+- **Task 8 (build-clarify fixtures)**: unchanged. Fixtures stay with the skill during Phase F migration.
+
+Commit reference: (this commit -- Phase D Task 9 completion)
+Ratified via AskUserQuestion by Captain 2026-04-10 during Science Officer live-dispatched Task 9 execution (alongside Task 6 dogfood session).

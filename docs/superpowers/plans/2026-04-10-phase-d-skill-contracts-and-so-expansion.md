@@ -1336,15 +1336,15 @@ implications."
 
 Phase D is complete when ALL of the following hold:
 
-- [ ] Task 1 (D.1.1) -- Stage Report checklist format landed in both output-format.md files
-- [ ] Task 2 (D.2) -- Open Questions blank-line separation landed in build-explore output-format.md + build-clarify Answer rule updated
-- [ ] Task 3 (D.3) -- Stage Report Tier 1 detail lines documented in both output-format.md files
-- [ ] Task 4 (D.4) -- Science Officer agent loads all three context-building skills with context_status routing
-- [ ] Task 5 (D.1.2, D.1.3, D.1.4) -- build-explore Write/Edit unblocked, build-clarify Step 5/6 clarified, build-clarify Pre-Step status handoff added
-- [ ] Task 6 (VALIDATION) -- Entity 047 ran through expanded SO end-to-end with no workarounds; dashboard rendering verified; Dogfood Notes section appended
+- [x] Task 1 (D.1.1) -- Stage Report checklist format landed in both output-format.md files
+- [x] Task 2 (D.2) -- Open Questions blank-line separation landed in build-explore output-format.md + build-clarify Answer rule updated
+- [x] Task 3 (D.3) -- Stage Report Tier 1 detail lines documented in both output-format.md files
+- [x] Task 4 (D.4) -- Science Officer agent loads all three context-building skills with context_status routing
+- [x] Task 5 (D.1.2, D.1.3, D.1.4) -- build-explore Write/Edit unblocked, build-clarify Step 5/6 clarified, build-clarify Pre-Step status handoff added
+- [x] Task 6 (VALIDATION) -- Entity 047 ran through expanded SO end-to-end with no workarounds; dashboard rendering verified; Dogfood Notes section appended (dogfood discovered SKILL.md format drift bug -- captain expanded 047 scope to fix inline per Q-1 answer; dashboard visual verification remains captain-owned)
 - [ ] Task 7 (D.6) -- `/science` slash command exists and delegates to science-officer agent
 - [ ] Task 8 (D.7) -- build-clarify forge fixtures exist (README + minimal entity + captain responses YAML)
-- [ ] Task 9 (D.5) -- Plugin split decision anchored in entity 040 + roadmap spec Open Questions resolved
+- [x] Task 9 (D.5) -- Plugin split decision anchored in entity 040 + roadmap spec Open Questions resolved (design-doc 2-plugin: spacedock engine + spacebridge [UI + coord + build studio]; ratified by Captain via AskUserQuestion)
 
 Final commit:
 ```bash

@@ -111,8 +111,26 @@ This establishes the foundation for Phase E's "SO owns the Discuss phase" topolo
 
 Phase D does NOT re-scope the plugin split work -- entity 040 (spacedock-plugin-architecture-v2) already tracks that. Phase D's contribution:
 
-- Ensure the new spacedock-dashboard plugin boundary correctly exposes the APIs SO needs (entity body read/write, activity feed, comments)
-- Resolve the naming question: Phase C's handoff noted a migration target `spacedock:build-clarify -> spacebridge:build-clarify`. Phase D must either confirm this direction (3-plugin split: spacedock engine + spacedock-dashboard UI + spacebridge build studio) or revise it. Open question, not a decision.
+- Ensure the new plugin boundary correctly exposes the APIs SO needs (entity body read/write, activity feed, comments)
+- Resolve the naming question: Phase C's handoff noted a migration target `spacedock:build-clarify -> spacebridge:build-clarify`. **Resolved 2026-04-10 (see below).**
+
+##### D.5 Resolution (2026-04-10): 2-plugin split
+
+The plugin split is **two plugins, not three**:
+
+1. **`clkao/spacedock`** (engine, upstream) — entities, workflows, stages, pipeline primitives, First Officer agent, execute/plan/seeding skills. Exposes two public interfaces (`ChannelProvider` + `CoordinationClient`) with default in-process implementations so headless/no-bridge installs continue working with zero behavior change.
+
+2. **`spacebridge`** (user's plugin) — coordination plane + UI + build studio in one plugin. Includes: Science Officer agent, Quality Officer (mod-based v1, possible agent later), the full build-* skill suite (brainstorm / explore / clarify / quality / pr-review / ship) migrated from `spacedock:*` to `spacebridge:*` namespace, Next.js daemon (HTTP + SSE + UI), Drizzle ORM, L2 auto-fork daemon lifecycle, unix socket IPC with the engine's shim, tunnel-based multi-human collaboration for the pre-SaaS window.
+
+The third option that was considered and rejected — splitting UI out as a separate `spacedock-dashboard` plugin — was eliminated because the UI, coordination, and build studio all share the same "human interaction surface" identity. Splitting them adds coordination cost without clear benefit, and violates the role-interaction-density argument that places SO (which drives all three) in a single home.
+
+**Rationale**: see `docs/superpowers/specs/2026-04-10-spacebridge-engine-bridge-split-design.md` sections 1.4, 2.1, and 9 (Decision D3) for the full argument. That design doc is the authoritative source for the engine/bridge architecture; this roadmap references it but does not duplicate its contents.
+
+**Immediate implications for Phase D**:
+- Skill namespace migration (`spacedock:build-* → spacebridge:build-*`) is confirmed as a Phase F work item, not Phase D. Phase D keeps the current namespace.
+- The upstream PR for `ChannelProvider` interface extraction (PR1 in the spacebridge design) can run **in parallel with Phase D.1-D.4/D.6/D.7** because it is behavior-neutral and does not touch skill contracts or SO agent definitions.
+- `CoordinationClient` interface extraction (PR2) waits until Phase E completes its role boundary formalization — the role type is PR2's critical dependency.
+- Open Question 1 at the end of this document (plugin naming: 2 or 3 plugins) is now resolved and should be read as closed.
 
 #### D.6 -- `/science` thin wrapper + batch mode
 
@@ -276,7 +294,7 @@ This document is the tracking source **until Phase D completes**. At that point:
 
 ## Open Questions
 
-1. **Plugin naming**: confirm or revise `spacedock:build-* -> spacebridge:build-*` migration noted in Phase C handoff. Does the split produce 2 plugins (engine + UI) or 3 (engine + UI + build studio)?
-2. **Quality Officer role (Phase E)**: does 檢查 warrant a new persona, or is it a sub-mode of First Officer?
-3. **Plugin rename timing**: if plugin naming lands in Phase D (D.5), does that trigger entity-level renames or stay scoped to the new plugin?
+1. ~~**Plugin naming**: confirm or revise `spacedock:build-* -> spacebridge:build-*` migration noted in Phase C handoff. Does the split produce 2 plugins (engine + UI) or 3 (engine + UI + build studio)?~~ **Resolved 2026-04-10 via Phase D Task 9 (D.5)**: 2-plugin split -- `clkao/spacedock` engine upstream + `spacebridge` (coordination plane + UI + build studio in a single plugin). Build-* skills and Science Officer agent live in spacebridge. Namespace migration `spacedock:build-* -> spacebridge:build-*` is deferred to Phase F (spacebridge entity 055 bootstrap). Captain ratified via AskUserQuestion during Science Officer live Task 9 execution (alongside Task 6 dogfood validation). See `docs/build-pipeline/spacedock-plugin-architecture-v2.md §Phase D Decision Anchor` and the authoritative design doc `docs/superpowers/specs/2026-04-10-spacebridge-engine-bridge-split-design.md` §1.4 line 51.
+2. **Quality Officer role (Phase E)**: does 檢查 warrant a new persona, or is it a sub-mode of First Officer? **Interim position (2026-04-10)**: QO starts as a bridge mod hook (not an agent file) that can invoke subagents like `pr-review-toolkit`, `trailofbits`, and `e2e-flow`. Promotion to a persona is deferred to observed workload after Phase F ships. See spacebridge design doc §5.4 and OQ-4.
+3. **Plugin rename timing**: if plugin naming lands in Phase D (D.5), does that trigger entity-level renames or stay scoped to the new plugin? **Resolved 2026-04-10**: the skill namespace migration (`spacedock:build-* → spacebridge:build-*`) is a Phase F work item (spacebridge entity 055), not Phase D. Phase D keeps the current namespace to avoid churn.
 4. **Phase F start signal**: what marks Phase E as "done enough" to begin F? Propose: a single non-trivial entity (Small-to-Medium scale) ships via the full 討論→執行→檢查 flow without Captain intervention beyond the interactive Discuss phase.
