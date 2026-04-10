@@ -7,6 +7,7 @@ import {
 import { z } from "zod";
 import { createServer } from "./server";
 import type { AgentEvent } from "./types";
+import type { ChannelProvider } from "./channel-provider";
 
 const PermissionRequestNotificationSchema = z.object({
   method: z.literal("notifications/claude/channel/permission_request"),
@@ -54,6 +55,9 @@ interface ChannelServerOptions {
   dbPath?: string;
   /** Override permission request timeout (ms). Default 120_000. Used in tests. */
   permissionTimeoutMs?: number;
+  /** External ChannelProvider. When provided, createServer() is NOT called;
+   *  the channel layer uses this provider instead. */
+  provider?: ChannelProvider;
 }
 
 export function createChannelServer(opts: ChannelServerOptions) {
@@ -85,43 +89,47 @@ export function createChannelServer(opts: ChannelServerOptions) {
     timer: ReturnType<typeof setTimeout>;
   }>();
 
-  const dashboard = createServer({
+  // Build the onChannelMessage callback (used only for the in-process default path).
+  // When an external provider is injected, it handles inbound message routing itself.
+  const onChannelMessage = async (content: string, meta?: Record<string, string>) => {
+    try {
+      if (meta?.type === "permission_response" && meta?.request_id) {
+        const reqId = meta.request_id;
+        if (reqId.startsWith("tool:")) {
+          // Tool-level permission (application gate) — resolve waiting promise if still pending.
+          // If timed out already, the entry is gone; silently ignore the late response.
+          const pending = pendingPermissions.get(reqId);
+          if (pending) {
+            clearTimeout(pending.timer);
+            pendingPermissions.delete(reqId);
+            pending.resolve(content === "allow");
+          }
+          // else: timed out already — ignore, do NOT fall through to sendPermissionVerdict
+        } else {
+          // System-level permission (Claude Code tool approval)
+          const behavior = content === "allow" ? "allow" : "deny";
+          await sendPermissionVerdict(reqId, behavior as "allow" | "deny");
+        }
+      } else {
+        // Forward message to FO session via MCP channel notification
+        await mcp.notification({
+          method: "notifications/claude/channel",
+          params: { content, meta: meta ?? {} },
+        });
+      }
+    } catch {
+      // MCP transport not connected — message recorded in EventBuffer but not forwarded
+    }
+  };
+
+  const dashboard: ChannelProvider = opts.provider ?? createServer({
     port: opts.port,
     hostname: "127.0.0.1",
     projectRoot: opts.projectRoot,
     staticDir: opts.staticDir,
     logFile: opts.logFile,
     dbPath: opts.dbPath,
-    onChannelMessage: async (content, meta) => {
-      try {
-        if (meta?.type === "permission_response" && meta?.request_id) {
-          const reqId = meta.request_id;
-          if (reqId.startsWith("tool:")) {
-            // Tool-level permission (application gate) — resolve waiting promise if still pending.
-            // If timed out already, the entry is gone; silently ignore the late response.
-            const pending = pendingPermissions.get(reqId);
-            if (pending) {
-              clearTimeout(pending.timer);
-              pendingPermissions.delete(reqId);
-              pending.resolve(content === "allow");
-            }
-            // else: timed out already — ignore, do NOT fall through to sendPermissionVerdict
-          } else {
-            // System-level permission (Claude Code tool approval)
-            const behavior = content === "allow" ? "allow" : "deny";
-            await sendPermissionVerdict(reqId, behavior as "allow" | "deny");
-          }
-        } else {
-          // Forward message to FO session via MCP channel notification
-          await mcp.notification({
-            method: "notifications/claude/channel",
-            params: { content, meta: meta ?? {} },
-          });
-        }
-      } catch {
-        // MCP transport not connected — message recorded in EventBuffer but not forwarded
-      }
-    },
+    onChannelMessage,
   });
 
   async function requestPermissionAndWait(
