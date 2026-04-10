@@ -17,10 +17,10 @@ CONTRACTS.md tracks which entities have modified which files, their current pipe
 
 ### {file path relative to repo root}
 
-| Entity | Stage | Intent | Status |
-|--------|-------|--------|--------|
-| 046    | shipped | Filter logic moved to client-side | 🟢 final |
-| 052    | execute | WebSocket reconnection on idle    | 🟡 in-flight |
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| 046    | shipped | Filter logic moved to client-side | 🟢 final     | 2026-04-10 |
+| 052    | execute | WebSocket reconnection on idle    | 🟡 in-flight | 2026-04-11 |
 
 ### {another file path}
 ...
@@ -45,17 +45,25 @@ CONTRACTS.md tracks which entities have modified which files, their current pipe
 | 🔵 planned | Entity has a plan that will touch this file but execute hasn't started. |
 | 🔴 reverted | Entity was abandoned or its change was rolled back. Kept for audit. |
 
+## Rules for Last Updated Column
+
+The `Last Updated` column records the date the entity last advanced into a new stage that touched this file. Format: `YYYY-MM-DD`.
+
+- Written by `write` mode on `append` or `update-status` operations (always set to the current date).
+- Used by `check` mode to distinguish "recent" (within threshold_days) from "old" final contracts for warning classification.
+- Never edited manually — always update via workflow-index write mode.
+
 ## Rules for Reads
 
 When `read` mode queries by file path:
 1. Find the section matching the file path.
-2. Parse the table into a list of `{entity, stage, intent, status}` dicts.
+2. Parse the table into a list of `{entity, stage, intent, status, last_updated}` dicts.
 3. Return matches ordered by status priority: in-flight > planned > final > reverted.
 
 ## Rules for Writes
 
 When `write` mode appends a new entry:
 1. If the file path section doesn't exist, create it alphabetically.
-2. Within the section, append a new row to the table.
-3. Never modify existing rows unless the operation is explicitly updating an existing entry's status (e.g., in-flight → final when entity ships).
+2. Within the section, append a new row to the table with today's date in `Last Updated`.
+3. Never modify existing rows unless the operation is explicitly updating an existing entry's status (e.g., in-flight → final when entity ships) — when updating status, also refresh `Last Updated` to today.
 4. Preserve blank lines and section separators exactly.

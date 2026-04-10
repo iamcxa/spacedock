@@ -28,7 +28,7 @@ query:
 
 1. Read `docs/build-pipeline/_index/CONTRACTS.md`.
 2. Find the `### {file}` subsection matching `query.file`.
-3. Parse the table rows into `{entity, stage, intent, status}` dicts.
+3. Parse the table rows into `{entity, stage, intent, status, last_updated}` dicts. The `last_updated` field is a `YYYY-MM-DD` string from the `Last Updated` column (see `contracts-format.md`).
 4. If `status_filter` provided, keep only matching entries.
 5. Return results sorted by priority: in-flight > planned > final > reverted.
 
@@ -36,7 +36,7 @@ query:
 
 1. Scan all `### {file}` sections.
 2. For each section, find rows where `entity` column matches `query.entity`.
-3. Return a list of `{file, stage, intent, status}` entries for that entity.
+3. Return a list of `{file, stage, intent, status, last_updated}` entries for that entity.
 
 ### Query DECISIONS.md by file
 
@@ -76,6 +76,7 @@ matches:
     stage: shipped
     intent: Filter logic moved to client-side
     status: final
+    last_updated: 2026-04-10
     file: tools/dashboard/static/app.js
 count: 1
 ```

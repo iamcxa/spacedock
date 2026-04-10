@@ -1020,7 +1020,7 @@ stages:
 Minimal workflow with two entities used by `tests/test_workflow_index.py`. Not exercised by production FO.
 ```
 
-Write `tests/fixtures/workflow-index-fixture/_index/CONTRACTS.md`:
+Write `tests/fixtures/workflow-index-fixture/_index/CONTRACTS.md` (note: includes the `Last Updated` column added to the schema during the Task 3/5/7 fix-forward pass):
 
 ```markdown
 # Contracts Index
@@ -1031,16 +1031,16 @@ Fixture seed — mirrors structure of production CONTRACTS.md.
 
 ### tools/fixture/a.ts
 
-| Entity | Stage | Intent | Status |
-|--------|-------|--------|--------|
-| entity-a | shipped | Initial fixture entry | 🟢 final |
-| entity-b | execute | Modify fixture file | 🟡 in-flight |
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| entity-a | shipped | Initial fixture entry | 🟢 final     | 2026-04-01 |
+| entity-b | execute | Modify fixture file   | 🟡 in-flight | 2026-04-11 |
 
 ### tools/fixture/b.ts
 
-| Entity | Stage | Intent | Status |
-|--------|-------|--------|--------|
-| entity-a | shipped | Another shipped entry | 🟢 final |
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| entity-a | shipped | Another shipped entry | 🟢 final | 2026-04-01 |
 
 ## Recently Retired (last 30 days)
 
@@ -1174,12 +1174,23 @@ def parse_contracts_by_file(contracts_path: Path, file_query: str) -> list[dict]
     results = []
     for row in rows:
         cells = [c.strip() for c in row.split("|")[1:-1]]
-        if len(cells) == 4:
+        if len(cells) == 5:
+            # Post fix-forward schema: Entity | Stage | Intent | Status | Last Updated
             results.append({
                 "entity": cells[0],
                 "stage": cells[1],
                 "intent": cells[2],
                 "status": cells[3],
+                "last_updated": cells[4],
+            })
+        elif len(cells) == 4:
+            # Legacy schema without Last Updated — treat as missing date
+            results.append({
+                "entity": cells[0],
+                "stage": cells[1],
+                "intent": cells[2],
+                "status": cells[3],
+                "last_updated": None,
             })
     return results
 
