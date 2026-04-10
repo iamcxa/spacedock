@@ -66,14 +66,18 @@ After Step 4 (Open Question Resolution), append an answer line below the Suggest
 
 ```markdown
 Q-2: Should highlights persist across sessions or be ephemeral?
+
 Domain: User-facing Visual -- State handling
+
 Why it matters: Affects API response shape and UI complexity
+
 Suggested options: (a) Persistent (SQLite) (b) Ephemeral (memory)
+
 → Answer: Persistent via SQLite (captain, 2026-04-10, interactive)
 ```
 
 Rules:
-- Append after Suggested options, no blank line.
+- Append after Suggested options with ONE blank line separating them (markdown paragraph break). Earlier versions used "no blank line" which collapsed the Answer into the Suggested options paragraph in the dashboard UI -- fixed in Phase D (D.2).
 - If captain picked an AskUserQuestion option, quote the label verbatim.
 - If captain typed freeform, record the full response verbatim.
 - Include captain identifier, ISO date, `(interactive)` suffix.

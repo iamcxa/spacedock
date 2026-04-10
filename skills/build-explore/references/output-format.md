@@ -69,17 +69,23 @@ Track C items from the hybrid classification.
 ## Open Questions
 
 Q-1: Should the explore stage produce a decomposition recommendation, or only flag when decomposition seems needed?
+
 Domain: Runnable/Invokable
+
 Why it matters: If explore recommends specific child entities, it needs to generate slugs and dependency graphs. If it only flags, that work moves to a later stage.
+
 Suggested options: (a) Full decomposition with child slugs, (b) Flag-only with annotation, (c) Conditional based on gray area count
 
 Q-2: What naming convention should new reference docs follow?
+
 Domain: Readable/Textual
+
 Why it matters: Determines discoverability and consistency with existing docs.
+
 Suggested options: None -- captain input needed
 ```
 
-Each question includes Domain (one of the 5 GSD domains), Why it matters, and Suggested options (or "None -- captain input needed" when genuinely open).
+Each question includes Domain (one of the 5 GSD domains), Why it matters, and Suggested options (or "None -- captain input needed" when genuinely open). Each field MUST be separated from the next by a blank line so markdown renders them as distinct paragraphs. Single-newline separation collapses into a wall of text when rendered in the dashboard UI. This also applies to the `→ Answer:` annotation that build-clarify appends during Q resolution -- the answer line gets its own blank-line separation from `Suggested options:`.
 
 ---
 
