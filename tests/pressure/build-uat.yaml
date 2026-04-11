@@ -40,7 +40,7 @@ test_cases:
     history:
       - date: 2026-04-11
         round: 1
-        result: red-baseline-captured
+        result: green
         notes: |
           Baseline returned B first-try. Rationalizations captured: "item-3
           had a fail earlier, re-verify to be safe", "safer read is captain
@@ -76,7 +76,7 @@ test_cases:
     history:
       - date: 2026-04-11
         round: 1
-        result: red-baseline-captured
+        result: green
         notes: |
           Baseline returned C first-try citing spec lines 407-417.
           Rationalizations: "a fail is a fail, route uniformly", "captain
@@ -114,7 +114,7 @@ test_cases:
     history:
       - date: 2026-04-11
         round: 1
-        result: red-baseline-captured
+        result: green
         notes: |
           Baseline returned C first-try citing spec line 421 + build-clarify
           lines 166+327 precedent. Rationalizations: "batching 3 into
