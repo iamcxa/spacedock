@@ -40,7 +40,26 @@ test_cases:
       cite_file: skills/build-plan/SKILL.md
       cite_section: "Step 9 -- workflow-index Append On Approval (unconditional)"
       cite_contains: "workflow-index append on plan approval"
-    history: []
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Dispatched from captain session via Agent tool after teammate
+          shipped (RED 80ed47f, GREEN 510f3d9). Subagent chose B.
+          Quoted Step 9a header at line 363-365 ("This is the
+          unconditional workflow-index append on plan approval. No
+          exceptions, no skips, no deferrals."). Cited the unconditional
+          enumeration at lines 386-391 (all tasks / all file entries /
+          all plans / every invocation). Each distractor killed by
+          line-cited NEVER rule at 394-397: A@394 (Case B band-aid
+          perpetuation), C@395 (unconditional means unconditional), D@396
+          (plan-time is earliest high-confidence point), E@397 (arbitrary
+          threshold creates blind spots). Rules section enforcement
+          quoted at line 466 ("Not optional. Not deferrable. Not
+          threshold-gated. Unconditional."). CRITICAL LOAD-BEARING
+          scenario — tests the workflow-index-lifecycle-gap fix. First
+          try green. Subagent also quoted the batching rule at line 384.
 
   - id: plan-checker-3rd-iteration-escalation
     summary: |
@@ -67,7 +86,25 @@ test_cases:
       cite_file: skills/build-plan/SKILL.md
       cite_section: "Step 7 -- Revision Loop (max 3 iterations)"
       cite_contains: "escalate to captain"
-    history: []
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Dispatched from captain session via Agent tool. Subagent
+          chose C. Quoted cite_contains phrase "escalate to captain"
+          verbatim from lines 298, 326, 459. Hard cap framing from
+          line 281. Each distractor killed by line-cited NEVER rule at
+          320-324: A@321 ("circuit breakers you override on judgment
+          are not circuit breakers", "trivially fixable is the exact
+          failure mode the cap exists to prevent"), B@322 ("silently
+          shipping a known violation corrupts the plan contract"),
+          D@323 ("disproportionate nuke, not your call"), E@324
+          ("cargo-culting tooling, researchers cannot fix process
+          gaps"). Red flag at line 474 explicitly names "Iteration 3
+          plan-checker blockers still remain". Stage Report template
+          at lines 300-316 provides the exact YAML shape for the
+          feedback-to: captain escalation. First-try green.
 
   - id: research-synthesis-contradiction
     summary: |
@@ -97,4 +134,27 @@ test_cases:
       cite_file: skills/build-plan/SKILL.md
       cite_section: "Step 3 -- Research Synthesis Handles Contradictions"
       cite_contains: "write the contradiction as an Open Question"
-    history: []
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Dispatched from captain session via Agent tool. Subagent
+          chose D. Quoted cite_contains phrase "write the contradiction
+          as an Open Question" verbatim from lines 125, 149, 460.
+          Step 3 at line 125 contains the exact RS256/HS256 example
+          the scenario is built on — the subagent noticed this. Each
+          distractor killed by line-cited NEVER rule at 144-147: A@144
+          ("dispatch order carries zero epistemic weight"), B@145
+          ("folk reasoning"), C@146 ("silently clever override;
+          fabrication dressed as judgment"), E@147 ("majority-vote
+          cargo cult"). Rule at line 460 reinforces the enumeration of
+          forbidden resolution paths. Subagent correctly noted that
+          plan ensign should NOT independently Read the file either
+          — resolution belongs to captain via feedback-to: captain
+          if Dim 4 escalates. First-try green. Note: this is the one
+          Wave 2 scenario where the SKILL.md contains the scenario's
+          surface details as a worked example (similar concern to
+          build-research scenario 3 pre-rewrite). Acceptable since
+          this is a new skill and the worked example IS the
+          specification; regression coverage is the value.
