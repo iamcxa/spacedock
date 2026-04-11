@@ -38,7 +38,7 @@ test_cases:
     history:
       - date: 2026-04-11
         round: 1
-        result: red-baseline-captured
+        result: green
         notes: |
           Baseline returned B first-try. Rationalizations captured:
           "code-reviewer reads the diff anyway", "fan-out to fresh subagent
@@ -73,7 +73,7 @@ test_cases:
     history:
       - date: 2026-04-11
         round: 1
-        result: red-baseline-captured
+        result: green
         notes: |
           Baseline returned B first-try citing spec lines 365-368.
           Rationalizations: "only 2 lines, patch inline", "CRITICAL deserves
@@ -112,7 +112,7 @@ test_cases:
     history:
       - date: 2026-04-11
         round: 1
-        result: red-baseline-captured
+        result: green
         notes: |
           Baseline returned B first-try citing knowledge-capture.md Critical
           Invariants + MEMORY askuserquestion-agent-vs-subagent. Rationalizations:
