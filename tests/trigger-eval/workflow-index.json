@@ -1,0 +1,82 @@
+[
+  {
+    "query": "as FO starting up today, i see INDEX.md mtime is 3 days old and entity 058.md was just touched an hour ago — need to refresh the workflow index before i start dispatching today's queue of drafts",
+    "should_trigger": true
+  },
+  {
+    "query": "Entity 049 is advancing from execute to review. It touched 5 files during execute and i need to flip all 5 CONTRACTS rows from in-flight to final. What's the right operation to use?",
+    "should_trigger": true
+  },
+  {
+    "query": "plan-checker Dim 7 just flagged a possible cross-entity conflict on tools/dashboard/src/ws-client.ts — need to look up who else is in-flight on that file and whether it's a blocker or warning",
+    "should_trigger": true
+  },
+  {
+    "query": "captain just approved in clarify stage that we're going client-side for the new filter UI. Need to write this to DECISIONS.md as a new decision entry scoped to tools/dashboard/static/app.js, source entity 068",
+    "should_trigger": true
+  },
+  {
+    "query": "quality ensign for entity 052 just finished the review checklist, need to record its file touches in the workflow index. Status should still be in-flight since it's heading to uat next",
+    "should_trigger": true
+  },
+  {
+    "query": "i need to check if D-046-1 (the client-side filter decision from entity 046's clarify stage) is still active or whether it was superseded by any newer decision in DECISIONS.md",
+    "should_trigger": true
+  },
+  {
+    "query": "my plan for entity 071 proposes changes to tools/dashboard/src/channel-provider.ts — scan the coherence index for recent shipped entries on that file so i know what the last entity did before we started",
+    "should_trigger": true
+  },
+  {
+    "query": "how do i query workflow-index read mode to get all contract entries for entity 046 across every file it touched during its pipeline run?",
+    "should_trigger": true
+  },
+  {
+    "query": "idle hook tick — need to rebuild INDEX.md from current entity frontmatter states. There are 47 entities in docs/build-pipeline/ right now",
+    "should_trigger": true
+  },
+  {
+    "query": "entity 072 got reverted after code review rejection — need to mark its in-flight CONTRACTS rows as reverted so plan-checker doesn't see phantom conflicts",
+    "should_trigger": true
+  },
+  {
+    "query": "check which React components in the spacedock dashboard use useEffect without a dependency array — looks like a perf bug causing re-render loops in activity-feed",
+    "should_trigger": false
+  },
+  {
+    "query": "Rebuild the dashboard Bun bundle for production after fixing the ws-client timeout: `bun run build --target bun`. Check if the bundle size regressed",
+    "should_trigger": false
+  },
+  {
+    "query": "The entity 052 worktree has merge conflicts with main on tools/dashboard/src/ws-client.ts — how do i resolve them manually without losing the exponential backoff changes from execute",
+    "should_trigger": false
+  },
+  {
+    "query": "Write a CONTRIBUTING.md section explaining how our build-pipeline stages work for new contributors — specifically the difference between pending and ready context_status",
+    "should_trigger": false
+  },
+  {
+    "query": "i need to find all git commits mentioning 'WebSocket reconnect' in the last 2 weeks on main for the sprint retro — want to count how many entities touched that area",
+    "should_trigger": false
+  },
+  {
+    "query": "Summarize entity 046's Stage Report into 3 sentences for the weekly eng update — focus on what was shipped and what was deferred",
+    "should_trigger": false
+  },
+  {
+    "query": "Set up a new stage definition in docs/build-pipeline/_mods/ — what's the YAML schema for adding a new stage called 'security-review' between quality and review?",
+    "should_trigger": false
+  },
+  {
+    "query": "spacedock dashboard is stuck showing '17 days' for an entity that shipped today — check the channel websocket code in tools/dashboard/static/ws-client.js and see why it's not broadcasting the update event",
+    "should_trigger": false
+  },
+  {
+    "query": "how do i add a new archive destination for docs/build-pipeline/_archive/ when we hit 200 shipped entities? the single dir is getting unwieldy",
+    "should_trigger": false
+  },
+  {
+    "query": "trace through the plan-checker logic in skills/build-plan — i want to understand how Dim 7 actually consumes the workflow-index check output and what it does with the issue list",
+    "should_trigger": false
+  }
+]

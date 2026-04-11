@@ -1,6 +1,6 @@
 ---
 name: workflow-index
-description: Read, write, and check the workflow-level index artifacts (CONTRACTS.md, DECISIONS.md, INDEX.md) that track cross-entity coherence. Three modes — read (query by file or entity), write (append entries after entity stage changes), check (plan-checker Dim 7 cross-entity coherence validation). Used by build-plan's plan-checker, stage ensigns that need to look up prior decisions, and the workflow-index-maintainer mod.
+description: Use whenever the user mentions CONTRACTS.md, DECISIONS.md, INDEX.md, cross-entity coherence, workflow-level index, plan-checker Dimension 7, or needs to look up which entity is in-flight, planned, or recently shipped on a specific file path under tools/dashboard/ or anywhere in the spacedock build-pipeline. Make sure to use this skill when an entity advances stages and its file touches need recording in CONTRACTS, when a captain decision in clarify needs persisting as a D-{slug}-{n} entry in DECISIONS.md, when INDEX.md is stale and needs rebuilding (FO startup or idle hooks), when a plan-checker is running Dimension 7 cross-entity coherence validation on a proposed plan's files_modified list, or when looking up prior decisions for a specific file. Trigger phrases include 'rebuild INDEX', 'update CONTRACTS', 'append contract', 'capture decision', 'D-046-1', 'workflow index', 'cross-entity coherence', 'in-flight on', 'recently shipped on', 'plan-checker Dim 7'. Three modes (read/write/check) — see SKILL.md body for routing.
 allowed-tools:
   - Read
   - Write
