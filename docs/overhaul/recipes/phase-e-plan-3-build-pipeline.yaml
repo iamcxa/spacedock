@@ -1,0 +1,382 @@
+---
+target: docs/build-pipeline/README.md
+description: |
+  Phase 3 of Phase E Plan 2: restructure the build pipeline from the Phase D
+  tail (14 stages including research/seeding/e2e/docs/pr-draft/pr-review) into
+  the Phase E 10-stage shape (draft->brainstorm->explore->clarify->plan->
+  execute->quality->review->uat->shipped), wire in the new Phase E Plan 2
+  stage skills (spacedock:build-plan / execute / quality / review / uat), flip
+  execute from opus to sonnet per spec line 223, and eliminate the profiles
+  block entirely (single-path pipeline, no full/standard/express branching).
+author: Kent (captain) + Claude (main agent)
+date: 2026-04-11
+spacedock_version: 0.9.0
+
+# This recipe is the first reference artifact for the overhaul skill. The
+# transformation was applied MANUALLY during Phase 3 (there was no working
+# overhaul implementation at authoring time); the recipe records the intent
+# so Phase E+1 can validate a real overhaul implementation by replaying this
+# recipe against a pre-edit snapshot and diffing against the manual result.
+#
+# NOT all operations below map to primitives that exist in recipe-format.md --
+# several stages-section edits (yaml block field removal, table row updates,
+# schema enum edits) use primitives that Phase E+1 will need to add. Those
+# operations are marked with `manual_edit: true` and a `notes` field.
+
+operations:
+  # ============================================================
+  # Stage 1: Frontmatter field flips on surviving stages
+  # ============================================================
+
+  - op: set-stage-field
+    stage: execute
+    field: model
+    value: sonnet
+    reason: |
+      Spec line 223: execute orchestrator is sonnet, not opus. Phase E's
+      per-task model dispatch (haiku/sonnet/opus per task hint) means the
+      orchestrator only needs sonnet reasoning for wave graph building and
+      skill selection. Opus budget moved to plan.
+
+  - op: set-stage-field
+    stage: plan
+    field: skill
+    value: spacedock:build-plan
+    reason: |
+      Wire in the Phase E Plan 2 Wave 2 skill. Plan orchestrator dispatches
+      parallel research subagents internally and runs plan-checker loop.
+
+  - op: set-stage-field
+    stage: execute
+    field: skill
+    value: spacedock:build-execute
+    reason: |
+      Wire in the Phase E Plan 2 Wave 3 skill. Execute orchestrator builds
+      wave graph from PLAN and dispatches task-executor agents per task.
+
+  - op: set-stage-field
+    stage: quality
+    field: skill
+    value: spacedock:build-quality
+    reason: |
+      Wire in the Phase E Plan 2 Wave 2 skill. Mechanical full-project checks
+      (bun test / lint / tsc --noEmit / bun build).
+
+  # ============================================================
+  # Stage 2: Remove profile fields from surviving stages
+  # ============================================================
+
+  - op: remove-stage-field
+    stage: explore
+    field: profiles
+    reason: Profiles concept retired -- single-path pipeline
+
+  - op: remove-stage-field
+    stage: clarify
+    field: profiles
+    reason: Profiles concept retired -- single-path pipeline
+
+  - op: remove-stage-field
+    stage: plan
+    field: profiles
+    reason: Profiles concept retired -- single-path pipeline
+
+  # ============================================================
+  # Stage 3: Delete the top-level profiles block
+  # ============================================================
+
+  - op: remove-frontmatter-path
+    path: stages.profiles
+    reason: |
+      Captain decision (Phase 3 planning session, 2026-04-11): Phase E's
+      10-stage full pipeline absorbs all profile use cases. plan-checker
+      greenlights trivial plans cheaply; execute wave graph degenerates to
+      1-wave-1-task for small work; per-task model dispatch solves cost
+      scaling; UAT accepts CLI items for 30-second verification. Express
+      profile's value (skip plan for speed) is no longer distinct.
+
+      Engine still supports profiles -- this is a workflow decision ("this
+      pipeline doesn't use them"), not a schema change. Future workflows
+      can reintroduce profiles at their README level.
+
+  # ============================================================
+  # Stage 4: Remove retired stages (with body subsection side-effects)
+  # ============================================================
+
+  - op: remove-stage
+    name: research
+    reason: |
+      Spec line 98: research merged into plan orchestrator. Plan dispatches
+      parallel research subagents internally via the researcher agent; the
+      research step is no longer a separate deliverable stage.
+
+  - op: remove-stage
+    name: seeding
+    reason: |
+      Spec line 102: seeding removed. Will be mod-triggered when UAT needs
+      it (deferred to Phase E+1 per Phase E scope out-of-scope list).
+
+  - op: remove-stage
+    name: docs
+    reason: |
+      Spec line 104: docs removed as a stage. Doc-sync is a hook concern, not
+      a stage (deferred to Phase E+1).
+
+  - op: remove-stage
+    name: pr-draft
+    reason: |
+      Spec line 107: pr-draft + pr-review merged into shipped mod. Git
+      operations belong in mod layer per Phase E architectural principle
+      (merge hook drafts PR, idle hook polls PR state).
+
+  - op: remove-stage
+    name: pr-review
+    reason: |
+      Spec line 107: same as pr-draft. The diff-level code review function
+      is NOT retired -- it becomes the new `review` stage (spec line 105).
+      Only the PR review loop (self-review + captain approve + gh pr ready)
+      moves to the shipped mod.
+
+  - op: remove-stage
+    name: e2e
+    reason: |
+      Spec line 103: e2e merged into uat. E2E is a verification modality,
+      not a stage. The new `uat` stage orchestrates e2e-pipeline skills
+      alongside CLI/API/interactive items with skip/resume support.
+
+  # ============================================================
+  # Stage 5: Add new stages (review, uat) with full body content
+  # ============================================================
+
+  - op: add-stage
+    name: review
+    after: quality
+    fields:
+      model: sonnet
+      feedback-to: execute
+      skill: spacedock:build-review
+      comment: |
+        Judgment-based diff-level code review.
+        Pre-scan (CLAUDE.md / stale refs / import graph / plan consistency) runs
+        inline before parallel dispatch of pr-review-toolkit + trailofbits agents.
+        Invokes knowledge-capture in capture mode for D1/D2 staging.
+        CRITICAL/HIGH CODE findings -> feedback-to: execute.
+        PLAN advisory findings raise replan flag (captain decides).
+
+        NAMESPACE NOTE: Migration to `spacebridge:build-review` is Phase F work (entity 055).
+    body_content: |
+      ### `review`
+
+      Judgment-based diff-level code review. Scope is `git diff {execute_base}..HEAD` — only what this execute iteration changed. Combines a mechanical pre-scan (inline, no dispatch) with parallel dispatches of pr-review-toolkit and trailofbits review agents.
+
+      - **Inputs:** Feature branch, execute base commit SHA, context lake
+      - **Outputs:**
+        - **Pre-scan** (inline): CLAUDE.md compliance walk, stale references grep, dependency chain check, plan consistency (diff matches PLAN's `files_modified`)
+        - **Parallel dispatches**: `pr-review-toolkit:code-reviewer`, `silent-failure-hunter`, `comment-analyzer`, `pr-test-analyzer`, `type-design-analyzer`, `code-simplifier`, plus trailofbits `differential-review` / `sharp-edges` / `variant-analysis` (if installed)
+        - Findings classified: severity (CRITICAL/HIGH/MEDIUM/LOW/NIT) × root (CODE/DOC/NEW/PLAN)
+        - `spacedock:knowledge-capture` invoked in `capture` mode: D1 patterns auto-appended to plugin learned-patterns.md, D2 candidates staged to entity body `## Pending Knowledge Captures`
+        - `## Stage Report: review` — classified findings table
+      - **Verdict routing:**
+        - No CRITICAL/HIGH CODE findings → advance to uat
+        - Any CRITICAL/HIGH CODE finding → `feedback-to: execute`
+        - Any PLAN finding → raise replan flag in Stage Report (advisory — captain decides whether to reset status to plan)
+      - **Good:** Pre-scan catches mechanical issues before paying for subagent dispatch; consistent classification; D2 candidates staged (not applied) so FO handles captain interaction
+      - **Bad:** Skipping pre-scan, treating NIT findings as blockers, silently applying D2 candidates without FO handoff, dispatching review agents on the entire branch instead of `execute_base..HEAD` diff
+    model_dispatch_row: "| review | sonnet | Classifies and synthesizes parallel review agent outputs into a verdict |"
+    reason: Spec §Stage Definitions / Review (lines 317-373)
+
+  - op: add-stage
+    name: uat
+    after: review
+    fields:
+      model: sonnet
+      gate: true
+      feedback-to: execute
+      skill: spacedock:build-uat
+      comment: |
+        Automated e2e + captain sign-off.
+        Orchestrates e2e-pipeline skills (e2e-map / e2e-flow / e2e-test) for
+        browser items; CLI/API items run directly; interactive items via
+        AskUserQuestion one-at-a-time.
+        Supports skip/resume via /spacedock:uat-resume slash command.
+        Infra fails auto-route to execute; assertion fails routed through captain review.
+
+        NAMESPACE NOTE: Migration to `spacebridge:build-uat` is Phase F work (entity 055).
+    body_content: |
+      ### `uat`
+
+      User-observable behavior verification with automated e2e + captain sign-off. This is an approval gate. Supports skip/resume via the `/spacedock:uat-resume {slug}` captain slash command.
+
+      - **Inputs:** `## UAT Spec` from plan stage (items classified browser/cli/api/interactive), feature branch (quality + review passed)
+      - **Outputs:**
+        - **Browser items**: `Skill: "e2e-pipeline:e2e-map"` coverage check + `e2e-flow` generation + `e2e-test` execution; artifacts (screenshots, video, trace)
+        - **CLI items**: declared command execution with stdout/stderr/exit code capture
+        - **API items**: declared curl/gh command execution with response/status code capture
+        - **Interactive items**: captain AskUserQuestion one-at-a-time (not batched) — loaded via ToolSearch at runtime
+        - `## UAT Results` — per-item table: item / status (pass/fail/skipped) / evidence refs / notes / re-attempt
+        - If any items skipped with captain ack: entity frontmatter `uat_pending_count=N` set for future `/spacedock:uat-resume`
+      - **Failure classification:**
+        - **Infra fail** (browser crash, URL 404, command not found, environment error) → `feedback-to: execute` without captain interaction (clear execute bug)
+        - **Assertion fail with evidence** (screenshot shows wrong value, curl returns wrong body) → include in captain review; captain decides retry / override / feedback
+      - **Good:** Automated items run first (no captain cost for obvious failures); evidence attached to every item; skip reasons captured verbatim; failure classification drives routing
+      - **Bad:** Asking captain to retry infra failures, batching AskUserQuestion calls, unclassified failures, skipping items without captain ack
+    model_dispatch_row: "| uat | sonnet | Orchestrates e2e-pipeline + captain AskUserQuestion flow |"
+    reason: Spec §Stage Definitions / UAT (lines 375-442)
+
+  # ============================================================
+  # Stage 6: Replace body subsections for redesigned surviving stages
+  # ============================================================
+
+  - op: replace-body-subsection
+    heading: plan
+    new_content: |
+      ### `plan`
+
+      Transform clarified entity context into an execution-proof plan. The plan orchestrator (opus) dispatches parallel research subagents internally (each loading `spacedock:build-research` via the researcher agent), synthesizes findings, writes the PLAN with UAT Spec and Validation Map, self-reviews, and runs a plan-checker subagent through up to 3 revision iterations before advancing.
+
+      This is a **conditional approval gate** — the first officer escalates to the captain only when the plan involves architectural decisions (schema changes, cross-domain impact, new public APIs, new infrastructure dependencies). Small/routine plans auto-advance.
+
+      (Full content in README -- this recipe records intent only)
+    reason: Spec §Stage Definitions / Plan (lines 114-215) -- new orchestration model
+
+  - op: replace-body-subsection
+    heading: execute
+    new_content: |
+      ### `execute`
+
+      Implement the plan via wave-based parallel task dispatch. The execute orchestrator (sonnet) builds a wave graph from `## PLAN`, dispatches task subagents through `spacedock:task-executor` agent with per-task model hints, collects changes, and commits serially per task.
+
+      (Full content in README -- this recipe records intent only)
+    reason: Spec §Stage Definitions / Execute (lines 217-292) -- wave-parallel redesign
+
+  - op: replace-body-subsection
+    heading: quality
+    new_content: |
+      ### `quality`
+
+      Project-wide mechanical verification — "does the whole project still work?" **Not a gate** — auto-advances when all checks pass.
+
+      (Full content in README -- this recipe records intent only. Old quality subsection had ~150 lines of coverage/security/migration/contract logic; new quality is 4 commands + evidence.)
+    reason: |
+      Spec §Stage Definitions / Quality (lines 294-315) -- simplified to pure
+      mechanical checks. Coverage delta, security analysis, API contract
+      compatibility, migration safety, license compliance all removed from
+      quality. Security moved to review stage. Coverage becomes workflow
+      config. Migration safety becomes a plan-stage concern.
+
+  - op: replace-body-subsection
+    heading: shipped
+    new_content: |
+      ### `shipped`
+
+      Terminal stage. Mod-driven: `mods/pr-review-loop.md` (Phase E+1) handles PR lifecycle via merge and idle hooks.
+
+      (Full content in README -- this recipe records intent only)
+    reason: Spec §Stage Definitions / Shipped (lines 444-456) -- mod-driven terminal
+
+  # ============================================================
+  # Stage 7: Free-form body edits (future primitives needed)
+  # ============================================================
+
+  - op: manual_edit
+    notes: |
+      Update intro paragraph (anchor: "A development pipeline that takes a
+      brainstormed idea"): change "14 stages" framing to "10 stages", update
+      stage list phrasing to match new pipeline shape. Future primitive:
+      update-prose-block with paragraph boundary detection.
+
+  - op: manual_edit
+    notes: |
+      Replace Model Dispatch table (anchor: "| Stage | Model | Rationale |"):
+      drop rows for research/seeding/e2e/docs/pr-draft/pr-review, add rows
+      for review/uat, flip execute row from opus to sonnet, add brainstorm
+      row (previously missing despite brainstorm having model: sonnet).
+      Future primitive: replace-table-block (find table by header row, swap
+      full table including header, rows, and trailing blank line).
+
+  - op: manual_edit
+    notes: |
+      Replace entire Prerequisites section. Tables restructured for 10-stage
+      pipeline: kc-pr-flow row removed entirely (pr-draft and pr-review no
+      longer exist -- moved to shipped mod); pr-review-toolkit now cites
+      review stage; trailofbits cites review; context7 cites plan (via
+      researcher); e2e-pipeline cites uat; expo-accessibility cites uat;
+      agent-browser cites uat. Verification code block updated with new
+      skill lookup examples. Future primitive: replace-section (like
+      replace-body-subsection but for H2 headings).
+
+  - op: manual_edit
+    notes: |
+      Schema yaml code block (inside "## Schema" section): remove `profile:`
+      field from example frontmatter. Add `uat_pending_count:` field (new in
+      Phase E). Future primitive: update-yaml-block (find code block by
+      language tag + position, surgically edit fields).
+
+  - op: manual_edit
+    notes: |
+      Field Reference table (inside "### Field Reference" H3): remove the
+      `| profile | ... |` row; update the `| status | ... |` row enum values
+      to match new states[]. Add `| uat_pending_count | ... |` row. Future
+      primitive: update-table-row (find table + row by first column match,
+      update specific cells).
+
+  - op: manual_edit
+    notes: |
+      Feature Template yaml code block (inside "## Feature Template" section,
+      this is a large embedded example of a feature file): remove `profile:`
+      field from the yaml frontmatter example, add `uat_pending_count:`.
+      Future primitive: same as update-yaml-block above.
+
+validation:
+  expected_stage_count: 10
+  expected_profile_count: 0
+  expected_stage_names:
+    - draft
+    - brainstorm
+    - explore
+    - clarify
+    - plan
+    - execute
+    - quality
+    - review
+    - uat
+    - shipped
+  required_skill_refs:
+    - spacedock:build-explore    # Phase D shipped, preserved
+    - spacedock:build-clarify    # Phase D shipped, preserved
+    - spacedock:build-plan       # Wave 2 shipped, wired in Phase 3
+    - spacedock:build-execute    # Wave 3 shipped, wired in Phase 3
+    - spacedock:build-quality    # Wave 2 shipped, wired in Phase 3
+    - spacedock:build-review     # Wave 3 shipped, wired in Phase 3
+    - spacedock:build-uat        # Wave 3 shipped, wired in Phase 3
+
+notes: |
+  This recipe is the first reference artifact under docs/overhaul/recipes/.
+  It was authored AFTER the manual edit was applied to docs/build-pipeline/
+  README.md, as a record of what was done and as test input for the future
+  overhaul skill implementation (Phase E+1).
+
+  Validation strategy for Phase E+1 overhaul implementation:
+    1. Check out commit {PRE_EDIT_SHA} -- the state before Phase 3 manual edit
+    2. Replay this recipe via `overhaul <README path> <recipe path>` (future)
+    3. Diff result against commit {POST_EDIT_SHA} (Phase 3 commit)
+    4. Byte-equal match -> overhaul implementation is correct
+    5. Non-match -> either recipe is under-specified or overhaul has bugs
+
+  Open design questions deferred to Phase E+1 overhaul implementation:
+    - How does replace-body-subsection handle subsections with nested tables?
+      (The old quality subsection had many nested tables; replace-body-subsection
+      needs to detect the H3 boundary correctly.)
+    - Should cross-reference updates (Model Dispatch row, Schema enum) be
+      automatic side-effects of remove-stage / rename-stage / add-stage, or
+      explicit ops in the recipe? Current recipe format says automatic,
+      but this recipe lists them as manual_edit ops because the side-effect
+      machinery doesn't exist yet.
+    - How does the recipe format express "remove yaml field from embedded
+      code block"? The Feature Template section is a code block containing
+      sample feature frontmatter -- editing it requires reaching into the
+      code block and editing yaml inside. Not a primitive yet.
+
+  None of these unknowns block Phase 3 shipping (manual edit is complete) or
+  Phase 4 dogfood (pipeline is now wired with Phase E skills). They only
+  block overhaul Phase E+1 implementation, which is a separate work item.
