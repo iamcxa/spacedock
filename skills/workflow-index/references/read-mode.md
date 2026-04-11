@@ -28,14 +28,14 @@ query:
 
 1. Read `docs/build-pipeline/_index/CONTRACTS.md`.
 2. Find the `### {file}` subsection matching `query.file`.
-3. Parse the table rows into `{entity, stage, intent, status, last_updated}` dicts. The `last_updated` field is a `YYYY-MM-DD` string from the `Last Updated` column (see `contracts-format.md`).
+3. Parse the table rows into `{entity, stage, intent, status, last_updated}` dicts. The `last_updated` field is a `YYYY-MM-DD` string from the `Last Updated` column (see `contracts-format.md`). **Legacy rows**: if a row has fewer cells than the table header (pre-`Last Updated`-column data), set `last_updated: null` in the dict and still include the row. Never drop rows with missing columns; never raise errors. Downstream consumers (check-mode) handle `last_updated: null` explicitly per `check-mode.md` Error Handling ("treat the row as 'old final'").
 4. If `status_filter` provided, keep only matching entries.
 5. Return results sorted by priority: in-flight > planned > final > reverted.
 
 ### Query CONTRACTS.md by entity
 
 1. Scan all `### {file}` sections.
-2. For each section, find rows where `entity` column matches `query.entity`.
+2. For each section, find rows where `entity` column matches `query.entity`. Apply the same legacy-row handling as "Query by file" step 3: rows with missing cells parse to `last_updated: null` and are still returned.
 3. Return a list of `{file, stage, intent, status, last_updated}` entries for that entity.
 
 ### Query DECISIONS.md by file

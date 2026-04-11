@@ -42,5 +42,5 @@ These formats are the contract between workflow-index (writer) and callers (read
 
 - **Never rewrite unrelated sections** — Edit the minimal region required by the operation. Use Edit with specific `old_string` / `new_string` matches, not wholesale Write.
 - **Decisions are append-only** — Never delete a decision entry. Use supersede mechanism (set Status to 🔴 superseded, reference new decision in Supersedes field).
-- **Commits are separate** — Workflow-index writes get their own commit (`chore(index): update CONTRACTS for entity-046`), never bundled with code changes.
+- **Commits are separate from code changes** — Workflow-index writes always get their own commit with a `chore(index):` or `docs(decisions):` prefix, never bundled with feature code. Commit granularity is **one commit per write operation invocation** — `update-status` → one commit per file, `update-status-bulk` → one commit per entity transition. See `references/write-mode.md` for per-operation commit templates.
 - **Idempotent reads** — `read` mode never mutates state. Safe to call repeatedly.

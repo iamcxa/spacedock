@@ -7,7 +7,7 @@ Write mode appends new entries to CONTRACTS.md, DECISIONS.md, or rebuilds INDEX.
 ```yaml
 mode: write
 target: contracts | decisions | index
-operation: append | update-status | supersede | rebuild
+operation: append | update-status | update-status-bulk | supersede | rebuild
 entry:
   # Fields vary by target, see below
 ```
@@ -38,7 +38,7 @@ Process:
 
 ## Operation: update-status in CONTRACTS.md
 
-Used when an entity advances to shipped or the contract retires.
+Used when a **single-file** contract advances or retires. For multi-file shipping transitions that affect several contract rows for the same entity, use `update-status-bulk` instead — it produces one atomic commit per entity transition instead of N commits per file.
 
 Input:
 ```yaml
@@ -54,6 +54,42 @@ Process:
 3. Edit just the Status cell with minimal old_string/new_string replacement.
 4. If new_status is `final` and entity has been shipped > 30 days, move row to Recently Retired section.
 5. Commit: `chore(index): mark contract for {entity}+{file} as {new_status}`
+
+## Operation: update-status-bulk in CONTRACTS.md
+
+Used when a single entity transition affects multiple contract rows at once — the typical case for an entity shipping or being reverted after touching several files during execute.
+
+Input:
+```yaml
+entry:
+  entity: 049
+  files:
+    - tools/dashboard/static/app.js
+    - tools/dashboard/static/ws-client.js
+    - tools/dashboard/src/ws-client.ts
+    - tools/dashboard/src/channel-provider.ts
+    - tools/dashboard/static/activity-feed.js
+  new_status: final  # or reverted
+```
+
+Process:
+1. Read CONTRACTS.md once.
+2. For each file in `entry.files`:
+   a. Locate the row matching `entity + file`.
+   b. Edit just the Status cell with minimal old_string/new_string replacement (per-file Edit calls — multiple Edits within a single bulk operation is expected and correct; each still satisfies the minimal-edits rule).
+   c. If `new_status` is `final` and the entity has been shipped > 30 days, move that row to the Recently Retired section (same age-out logic as single `update-status`).
+3. **Atomicity**: if any Edit fails mid-loop, abort the whole operation and leave CONTRACTS.md as-is. Do NOT commit partial edits. The caller should retry after resolving the failure.
+4. Commit ONCE at the end: `chore(index): advance entity-{slug} contracts to {new_status} ({N} files)`, where `{N}` is the count of files processed.
+
+**When to use**:
+- Entity shipping events that flip multiple contract rows from `in-flight` → `final`.
+- Entity abandonment that flips multiple rows to `reverted`.
+- Any multi-file stage transition driven by a single event (e.g., `workflow-index-maintainer` idle-hook sweep).
+
+**When NOT to use**:
+- Single-file updates — use the regular `update-status` operation.
+- Cross-entity batch updates — each entity must be its own bulk call (commit scope is per-entity-transition, never mixed).
+- Mixed `new_status` across files — all files in one call must transition to the same status.
 
 ## Operation: append to DECISIONS.md
 
@@ -114,7 +150,9 @@ Process:
 
 ## Rules
 
-- **Minimal edits** — Use Edit with unique old_string/new_string matches. Never use Write to rewrite a whole file (except INDEX.md rebuild which is generated).
-- **Separate commits** — Each write operation is its own commit. Never bundle with feature code.
+- **Minimal edits** — Use Edit with unique old_string/new_string matches. Never use Write to rewrite a whole file (except INDEX.md rebuild which is generated). "Minimal edits" applies per row, not per operation — `update-status-bulk` doing N per-row Edits within one operation is compliant.
+- **Separate commits, never bundled with code** — Workflow-index writes always live in their own commit with a `chore(index):` or `docs(decisions):` prefix. Never bundle with feature code.
+- **Commit granularity is per operation, not per file** — One invocation of a write operation produces exactly one commit. `update-status` (single-file) → one commit per file. `update-status-bulk` → one commit per entity transition covering all its files. `append` to CONTRACTS → one commit per entity stage entry covering all files in that stage. Pick the operation whose granularity matches the real-world event.
 - **Idempotency for rebuild** — Running rebuild twice in a row should produce identical INDEX.md content.
 - **Atomicity for supersede** — Both the new decision append AND the old decision status update must happen in the same commit.
+- **Atomicity for bulk** — `update-status-bulk` is all-or-nothing. Partial edits must not be committed.
