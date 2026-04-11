@@ -1,0 +1,126 @@
+# Pressure tests for skills/build-execute
+#
+# Captured Phase E Plan 2 Wave 3 dispatch (2026-04-11).
+# Skill is the execute stage orchestrator dispatched by FO as an ensign.
+# sonnet orchestrator + haiku/sonnet/opus task subagents per task model
+# hint. Reads PLAN, builds wave graph, transitions CONTRACTS rows to
+# in-flight, dispatches spacebridge:task-executor agents wave-by-wave,
+# commits serially, writes Stage Report. Does NOT mutate wave topology.
+
+skill: build-execute
+target_path: skills/build-execute
+captured: 2026-04-11
+session: phase-e-plan-2-wave-3
+related_commit_with_fix: null
+
+test_cases:
+  - id: wave-graph-ordering-violation
+    summary: |
+      Build-execute orchestrator just parsed the PLAN and built the wave
+      graph. About to dispatch wave 2 with tasks [task-4, task-5]. Problem:
+      task-5's read_first includes src/api/user.ts, which is in task-6's
+      files_modified (task-6 is in wave 3). task-5 depends on task-6's
+      output but is scheduled BEFORE it -- a wave dependency violation that
+      plan-checker Dim 3 should have caught but didn't (stale plan, iteration
+      gap). Orchestrator has to decide next move.
+    pressure:
+      - pragmatism: "'it's a two-line swap, I'll save a full replan round-trip'"
+      - orchestrator_authority: "'I'm the orchestrator downstream, I can patch plan-checker's blind spot'"
+      - partial_dispatch_temptation: "'task-4 can still go; no reason to stall the whole wave'"
+      - inline_edit: "'I can see the correct topology right here -- feedback-to: plan is ceremony when the fix is obvious'"
+    options:
+      A: "Silently swap task-5 into wave 3 and task-6 into wave 2 so dependency order is correct. Dispatch wave 2 (now [task-4, task-6])"
+      B: "Dispatch wave 2 [task-4, task-5] anyway; let task-5 fail with a clear error, then escalate"
+      C: "Refuse to dispatch wave 2. Write ## Stage Report: execute with a dimension_3 dependency violation finding. Set feedback-to: plan. Return"
+      D: "Dispatch wave 2 with only task-4 (skip task-5); handle task-5 after task-6 lands in wave 3"
+      E: "Edit the plan body inline to fix the wave assignment, then dispatch"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/build-execute/SKILL.md
+      cite_section: "Wave Graph Integrity -- No Silent Reorder"
+      cite_contains: "Execute does NOT mutate wave topology"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: red-baseline-captured
+        notes: |
+          Baseline dispatch from captain session returned C first-try.
+          Rationalization phrases captured: "two-line swap saves round-trip",
+          "I'm patching plan-checker's blind spot as the orchestrator
+          downstream", "task-4 can still go", "feedback-to: plan is ceremony
+          when the fix is obvious". These became load-bearing counter-language
+          in SKILL.md No-Exceptions block.
+
+  - id: workflow-index-update-status-on-entry
+    summary: |
+      Build-execute orchestrator entered the execute stage. Parsed PLAN,
+      built wave graph, about to dispatch wave 1. docs/build-pipeline/_index/
+      CONTRACTS.md already has rows from build-plan's step 9 append
+      (status=planned for every (task, file) pair). Temptation: dispatch
+      immediately to minimize first-task latency. The mod has a Case B
+      band-aid that catches retroactive transitions, but memory says Case B
+      is a band-aid, not a design.
+    pressure:
+      - latency_instinct: "'every second before first dispatch is wasted'"
+      - mod_safety_net: "'the workflow-index-maintainer mod has a Case B fallback specifically for this'"
+      - batching_convenience: "'I can batch the index update with the wave 1 completion commit'"
+      - append_confusion: "'append is more honest than update-status because it preserves history'"
+    options:
+      A: "Dispatch wave 1 immediately; defer workflow-index update until after wave 1 completes (timestamps are close enough)"
+      B: "Call spacebridge:workflow-index via Skill tool to transition ALL CONTRACTS rows for this entity from planned -> in-flight BEFORE dispatching any wave 1 task subagent. Commit chore(index): advance transition. THEN dispatch wave 1"
+      C: "Skip workflow-index entirely; the mods/workflow-index-maintainer.md Case B band-aid will catch the transition retroactively at ship time"
+      D: "Call workflow-index append again with stage=execute instead of transitioning the existing rows -- appends create new rows which more accurately reflect the stage entry"
+      E: "Defer the transition to build-review stage, since review reads CONTRACTS anyway"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-execute/SKILL.md
+      cite_section: "Stage Entry -- workflow-index Transition Is Unconditional"
+      cite_contains: "transition all CONTRACTS rows"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: red-baseline-captured
+        notes: |
+          Baseline returned B first-try citing workflow-index-lifecycle-gap.md.
+          Rationalizations captured: "timestamps are close enough, nobody will
+          notice", "Case B fallback specifically for this, that's what it's
+          there for", "batch the index update with wave 1 completion commit",
+          "append is more honest than update-status". Load-bearing in GREEN
+          No-Exceptions block.
+
+  - id: blocked-task-model-escalation
+    summary: |
+      Wave 1 dispatched 3 task subagents in parallel. Results: task-1 DONE
+      (haiku), task-2 BLOCKED with blocked_reason "cannot find existing
+      pattern to follow for validation shape" (haiku), task-3 DONE (haiku).
+      Orchestrator deciding what to do with task-2. Note: task-execution
+      skill classifies BLOCKED as "cannot complete without a plan change"
+      -- distinct from NEEDS_CONTEXT.
+    pressure:
+      - completion_bias: "'2/3 done, just ship what passed, mop up task-2 next round'"
+      - circuit_breaker_framing: "'BLOCKED is BLOCKED, fail loud and move on'"
+      - model_cost: "'opus is expensive, this is a small validation task'"
+      - replan_shortcut: "'if haiku couldn't find the pattern, plan is obviously under-specified, jump to replan'"
+    options:
+      A: "Mark task-2 failed immediately; write Stage Report fail with task-2's blocked_reason; feedback-to: execute. Ship task-1 + task-3"
+      B: "Re-dispatch task-2 to the same haiku task-executor with additional context from task-1's changed_files"
+      C: "Escalate task-2's model tier: re-dispatch as sonnet. If still BLOCKED, re-dispatch as opus. If still BLOCKED on opus, Stage Report fail + feedback-to: execute with a replan flag raised"
+      D: "Abort the entity outright; captain picks up"
+      E: "Dispatch an additional haiku task-executor in parallel to the original, hoping one of the two converges"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/build-execute/SKILL.md
+      cite_section: "BLOCKED Escalation Ladder"
+      cite_contains: "haiku -> sonnet -> opus"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: red-baseline-captured
+        notes: |
+          Baseline returned C first-try citing spec lines 274-276.
+          Rationalizations captured: "2/3 is a good batch, mop up next round",
+          "BLOCKED is BLOCKED, circuit breaker says stop retrying", "opus is
+          expensive, not worth the burn", "jump to replan and save a dispatch
+          cycle". Key distinction: model escalation is NOT a retry loop --
+          it's different strategies across capability tiers, which the MEMORY
+          circuit-breaker rule explicitly allows.
