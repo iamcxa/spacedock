@@ -1,7 +1,8 @@
 ---
 name: uat-resume
 description: "Use when captain runs /spacebridge:uat-resume {slug} to re-run pending UAT items on an already-shipped entity. Thin wrapper that dispatches build-uat in skip-only mode after validating preconditions and detecting spec drift -- not a separate execution path."
-model: sonnet
+user-invocable: true
+argument-hint: "[entity-slug]"
 ---
 
 # UAT-Resume -- Thin Wrapper Over Build-UAT
@@ -22,7 +23,7 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` line 4
 - `Read` -- open the target entity file to validate preconditions and read `## UAT Spec` + `## UAT Results` for drift detection
 - `Grep` / `Glob` -- locate the entity file if only the slug is given
 - `Bash` -- ISO timestamp capture for the dispatch record; `git rev-parse --short HEAD` for the resume dispatch record
-- `Skill` -- dispatch `spacebridge:build-uat` (or `skills/build-uat/` via flat path, depending on how the captain's slash command is wired at invocation time)
+- `Skill` -- dispatch `build-uat` via its flat `skills/build-uat/` path. Namespace migration to `spacebridge:build-uat` is Phase F per the namespace note above; until then the flat path is canonical.
 - `AskUserQuestion` -- ONLY for the spec-drift escalation path. Load via `ToolSearch(query: "select:AskUserQuestion", max_results: 1)` before the first call, matching the `skills/build-clarify/SKILL.md` line 28-30 precedent.
 
 **NOT available (by policy):**
@@ -143,4 +144,15 @@ Every return path produces one of:
 
 The wrapper does NOT write a stage report. The wrapper does NOT commit. The wrapper does NOT touch the entity file. All entity-facing side effects flow through build-uat.
 
-**Use `--` (double dash)** everywhere. Never the em dash. Matches the rest of the build skill family.
+---
+
+## Rules
+
+- **NEVER write to the entity body.** No `## Stage Report: uat-resume`, no `## UAT Results` rows, no frontmatter `uat_pending_count` mutation. Every entity-facing side effect flows through `build-uat`. Creating a second writer is how resume semantics silently corrupt.
+- **NEVER dispatch any skill other than `build-uat`.** You are a leaf wrapper over a single downstream skill. No `workflow-index`, no `knowledge-capture`, no `e2e-pipeline`. If build-uat needs to invoke those, it invokes them from its own context.
+- **NEVER filter, re-map, or re-index `## UAT Spec` before dispatch.** Scope selection lives in `build-uat` step 1's skip-only branch. Passing a filtered copy creates a second source of truth that must stay in sync with `## UAT Results` or silently corrupts resume semantics on any divergence.
+- **NEVER short-circuit the Precondition Check on `uat_pending_count > 0`**, even when the captain "obviously just wants it to run". The check is 2 reads and a comparison; skipping it means trusting frontmatter state the wrapper did not verify.
+- **NEVER skip the Spec Drift Guard** citing "thin wrapper means thin wrapper, drift is build-uat's problem". Drift detection is input validation, not execution. The wrapper is the only place with both the recorded skipped-item identities AND the current `## UAT Spec`.
+- **NEVER reinterpret build-uat's verdict.** Return whatever build-uat returned: DONE, NEEDS_CONTEXT, or BLOCKED. The wrapper never originates a blocked verdict and never upgrades or downgrades a downstream verdict.
+- **NEVER call `AskUserQuestion` outside the Spec Drift Guard escalation path.** The wrapper is user-invoked via slash command; the captain expects dispatch or refusal, not a confirmation loop. AskUserQuestion is reserved for the drift-report return path.
+- **Use `--` (double dash)** everywhere. Never `—` (em dash). Matches the rest of the build skill family.
