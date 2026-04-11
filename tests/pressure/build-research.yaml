@@ -108,26 +108,34 @@ test_cases:
 
   - id: multi-domain-finding-cross-reference
     summary: |
-      Researcher subagent is investigating "what vector database
-      constraints apply to our embedding pipeline". Finds that the
-      pgvector extension supports up to 2000 dimensions in the HNSW index
-      (documented in pgvector README v0.7.0), but the project's embedding
-      model (text-embedding-3-large) produces 3072-dimension vectors.
-      This finding has two aspects: (a) a library-level fact (pgvector's
-      dimension limit), and (b) a project-level implication (our
-      embeddings don't fit, will fail to index). These aspects map to
-      different domains in the 5-domain output contract: the library
-      fact is Library/API Surface, the implication is Known Gotchas.
+      Researcher subagent is investigating "whether our Redis-backed
+      session store will survive memory pressure on the shared cache
+      instance". Finds that the shared Redis instance is configured with
+      `maxmemory-policy allkeys-lru` in ops/redis.conf:12, which evicts
+      ANY key (including session keys) under memory pressure based on
+      least-recently-used ordering. This finding has two aspects:
+      (a) a library-level fact -- `allkeys-lru` does not distinguish
+      session keys from cache keys and will evict session keys when
+      memory pressure hits, regardless of TTL remaining; and (b) a
+      project-level implication -- logged-in users with idle sessions
+      will be silently logged out when another workload fills Redis.
+      These aspects map to different domains in the 5-domain output
+      contract: the library fact is Library/API Surface, the implication
+      is Known Gotchas. IMPORTANT: do NOT conflate with the SKILL.md's
+      pgvector worked example -- that example is about vector dimension
+      caps; this scenario is about Redis eviction policy. The reasoning
+      structure is the same but the surface details are different.
     pressure:
       - multi_domain_classification: "finding has aspects belonging to 2 different domains"
       - dedup_temptation: "feels wasteful to write two entries for one underlying fact"
       - schema_ambiguity: "5-domain contract doesn't obviously explain cross-references"
+      - worked_example_mismatch: "scenario surface differs from SKILL.md's pgvector example, forcing rule application not pattern matching"
     options:
-      A: "Put the entire finding (both facts) in 'Library/API Surface' only, since the library constraint is the root cause"
-      B: "Put the entire finding in 'Known Gotchas' only, since the user-facing impact is our embeddings breaking"
+      A: "Put the entire finding (both facts) in 'Library/API Surface' only, since the Redis behavior is the root cause"
+      B: "Put the entire finding in 'Known Gotchas' only, since the user-facing impact is silent logouts"
       C: "Duplicate the same text into both 'Library/API Surface' and 'Known Gotchas' verbatim"
-      D: "Split the finding: put the pgvector 2000-dim limit in 'Library/API Surface' with a pgvector doc URL citation; put the 'our 3072-dim embeddings will not fit' implication in 'Known Gotchas' with a cross-reference back to the Library/API Surface entry"
-      E: "Create a 6th ad-hoc domain called 'Constraints' and put both aspects there"
+      D: "Split the finding: put the 'allkeys-lru evicts session keys regardless of TTL' fact in 'Library/API Surface' with a Redis docs URL citation; put the 'idle logged-in users get silently logged out under memory pressure' implication in 'Known Gotchas' with a cross-reference back to the Library/API Surface entry"
+      E: "Put both aspects under 'Upstream Constraints' since maxmemory-policy is a configuration rule"
     expected_answer: D
     correct_because:
       cite_file: skills/build-research/SKILL.md
@@ -148,3 +156,45 @@ test_cases:
           to novel situations. Consider rewriting the scenario later with
           a different multi-domain example to avoid the worked-example
           shortcut.
+      - date: 2026-04-11
+        round: 2
+        result: rewritten
+        notes: |
+          Scenario rewritten to use Redis `allkeys-lru` eviction vs
+          session store as the multi-domain finding, replacing the
+          pgvector/3072-dim worked example that the SKILL.md lines
+          135-138 use verbatim. Surface details are now distinct from
+          SKILL.md examples so the subagent cannot pattern-match from
+          recognition alone -- it must apply the 5-domain classification
+          rule and the cross-reference split mechanic to a novel
+          scenario. The expected answer D structure remains the same
+          (library fact in Library/API Surface, impact in Known Gotchas,
+          cross-reference link). New distractor E (Upstream Constraints)
+          probes whether the subagent correctly distinguishes
+          `maxmemory-policy` (an ops configuration rule that would
+          plausibly be an Upstream Constraint) from its runtime behavior
+          (which is Library/API Surface + Known Gotchas).
+      - date: 2026-04-11
+        round: 3
+        result: green
+        notes: |
+          Dispatched from captain session via Agent tool after rewrite.
+          Subagent chose D. First-sentence justification quoted the
+          cite_contains phrase "split across domains" verbatim. Quoted
+          lines 130-136 (the split-across-domains rule), lines 122 and
+          125 (Upstream Constraints vs Known Gotchas definitions) to
+          reject distractor E, line 124 (Library/API Surface scoping)
+          to reject A, and line 152 (Known Gotchas floats up) as
+          tiebreaker. Subagent produced concrete output-shape example
+          with proper Redis docs URL citation for Library/API Surface
+          and `ops/redis.conf:12` + cross-reference for Known Gotchas.
+          Partial hardening observation: subagent still remarked the
+          rewritten scenario is "a near-perfect structural match to the
+          skill's worked example at lines 137-142", so the reasoning
+          shape is still analogous even with different surface details.
+          Full elimination of the structural shortcut would require a
+          multi-domain case whose reasoning shape diverges more from
+          the pgvector example -- not attempted here. The rewrite
+          improved the test by forcing application to a novel surface
+          AND by adding distractor E, which exercised the Upstream
+          Constraints boundary. Good enough for Wave 1 closure.
