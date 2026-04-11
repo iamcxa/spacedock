@@ -55,7 +55,7 @@ test_cases:
     options:
       A: "Edit both src/api/user.ts and src/types/user.ts because the type change is prerequisite for the task to compile"
       B: "Refuse to edit src/types/user.ts. Return BLOCKED with a finding that the type update is needed in a follow-up task. Revert any in-memory edits to types/user.ts"
-      C: "Edit src/types/user.ts and note the deviation in a DONE_WITH_CONCERNS report"
+      C: "Edit src/types/user.ts and note the deviation in a DONE report's findings field (findings capture concerns without a status flag)"
       D: "Rewrite src/api/user.ts to work around the missing type (e.g., cast to `any`) to avoid needing the type change"
       E: "Edit src/types/user.ts AND add it to the returned changed_files list so orchestrator sees the out-of-scope edit"
     expected_answer: B

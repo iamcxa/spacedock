@@ -1,6 +1,6 @@
 ---
 name: task-execution
-description: "Per-task execution subroutine for build-execute. Loaded by the spacebridge:task-executor agent when build-execute dispatches one task from the plan. Defines: load skills from prompt, read_first files, execute action, verify acceptance_criteria, return changed_files with DONE/DONE_WITH_CONCERNS/NEEDS_CONTEXT/BLOCKED status. Does NOT commit."
+description: "Per-task execution subroutine for build-execute. Loaded by the spacebridge:task-executor agent when build-execute dispatches one task from the plan. Defines: load skills from prompt, read_first files, execute action, verify acceptance_criteria, return changed_files with DONE/NEEDS_CONTEXT/BLOCKED status. Does NOT commit."
 ---
 
 # Task-Execution -- Per-Task Execution Subroutine
@@ -70,7 +70,7 @@ If the action is internally contradictory (e.g. "add field X to src/types/user.t
 
 Run every command in `task.acceptance_criteria` in the order listed. Capture stdout, stderr, and exit code for each.
 
-A task is only `DONE` when **every** acceptance_criteria command passes (exit 0 for commands, observable state matches for conditions). If any command fails, the task is not DONE -- it is either `BLOCKED` (cannot proceed without replan) or `DONE_WITH_CONCERNS` (functionally correct but the criterion is defective, e.g. an unrelated pre-existing test failure you can prove is unrelated). Err toward `BLOCKED` when uncertain.
+A task is only `DONE` when **every** acceptance_criteria command passes (exit 0 for commands, observable state matches for conditions). If any command fails, the task is `BLOCKED` -- you cannot proceed without a plan change. Err toward `BLOCKED` when uncertain. If a pre-existing failure is genuinely unrelated to your edits and the task is otherwise complete, classify `DONE` and surface the failure via a `pre_existing_failure` finding in the returned report -- findings are the channel for concerns, status is only a terminal classification.
 
 ---
 
@@ -105,7 +105,7 @@ All of these mean: run the command exactly as `task.acceptance_criteria` specifi
 **No exceptions:**
 - **NEVER edit files outside files_modified**, even for a mechanically trivial 1-line change that would unblock compilation. A 1-line change today is a 20-line cascade tomorrow; triviality is the rationalization that normalizes scope creep.
 - Not for "the 1-line type change in src/types/user.ts is mechanically trivial" -- 1-line change today is a 20-line cascade tomorrow. Triviality is the rationalization that normalizes scope creep.
-- Not for "returning DONE_WITH_CONCERNS with a note about the adjacent edit" -- a contract violation with a guilty conscience is still a contract violation; the note does not undo the edit.
+- Not for "returning DONE with a finding about the adjacent edit" -- findings capture concerns without a status flag, but a contract violation with a guilty conscience is still a contract violation; the finding does not undo the edit.
 - Not for "casting to `any` so I can avoid touching the adjacent file" -- never degrade code quality to preserve a scope fiction. That is worse than being blocked.
 - Not for "adding the out-of-scope file to the returned changed_files list so the orchestrator sees it" -- changed_files is a report, not a license. Surfacing the edit does not erase the unauthorized mutation.
 - Not for "the orchestrator is waiting, returning BLOCKED feels like failing" -- BLOCKED is the correct answer when the writable boundary doesn't cover the work. Returning BLOCKED surfaces a real plan gap that plan ensign must fix in the next iteration; returning DONE with an out-of-scope edit hides it.
@@ -141,12 +141,11 @@ All of these mean: run the command exactly as `task.acceptance_criteria` specifi
 
 After verification, classify the task into exactly one status:
 
-- **DONE** -- all acceptance_criteria commands passed, all edits are inside files_modified, no concerns worth surfacing.
-- **DONE_WITH_CONCERNS** -- all acceptance_criteria passed and all edits are inside files_modified, but at least one concern (e.g. a pre-existing test that fails for reasons the task did not introduce, a defect in the criterion wording, an unused import the linter flagged) is worth surfacing to plan ensign. Concerns do NOT block the commit -- orchestrator still commits, but the finding propagates.
-- **NEEDS_CONTEXT** -- you cannot classify DONE/BLOCKED without one specific piece of information the dispatch prompt did not include. Must name the exact information required. NEEDS_CONTEXT is not a generic "I'm unsure" -- it is "I need this specific fact to proceed."
+- **DONE** -- all acceptance_criteria commands passed and all edits are inside files_modified. Concerns (pre-existing failures proven unrelated, linter nits, skill suggestions, scope observations) are surfaced via the `findings` channel in the returned report, NOT via a separate status flag. A DONE task can have findings; findings do not block the commit.
+- **NEEDS_CONTEXT** -- you cannot classify DONE or BLOCKED without one specific piece of information the dispatch prompt did not include. Must name the exact information required. NEEDS_CONTEXT is not a generic "I'm unsure" -- it is "I need this specific fact to proceed."
 - **BLOCKED** -- the task cannot complete without a plan change. Use for: missing read_first file, scope_gap outside files_modified, contradictory action, acceptance_criteria that cannot pass on the current worktree, malformed task input. Orchestrator will escalate the model tier (haiku -> sonnet -> opus) and re-dispatch, or raise replan.
 
-**NEVER invent a new status value.** The enum is exactly those four. A status of "DONE_PARTIAL", "BLOCKED_MINOR", "DONE_SKIPPED_TEST" is invalid and will crash the orchestrator's state machine.
+**NEVER invent a new status value.** The enum is exactly those three. A status of "DONE_WITH_CONCERNS", "DONE_PARTIAL", "BLOCKED_MINOR", "DONE_SKIPPED_TEST" is invalid and will crash the orchestrator's state machine. Findings carry nuance; status carries terminal classification.
 
 ---
 
@@ -158,17 +157,17 @@ Walk every file you actually mutated in this dispatch. For each, record:
 - **action** -- `created` | `modified` | `deleted`
 - **summary** -- one sentence describing the change
 
-Cross-check the list against `task.files_modified`. If the cross-check finds a path in changed_files that is NOT in files_modified, you have a scope violation -- revert that file and return BLOCKED per the Scope Discipline section. If a path in files_modified is NOT in changed_files, that is fine (not every listed file must be touched) -- note it under concerns if it's surprising.
+Cross-check the list against `task.files_modified`. If the cross-check finds a path in changed_files that is NOT in files_modified, you have a scope violation -- revert that file and return BLOCKED per the Scope Discipline section. If a path in files_modified is NOT in changed_files, that is fine (not every listed file must be touched) -- log a `scope_observation` finding if it's surprising.
 
 ---
 
 ## Step 6: Draft Findings
 
-Findings are how you communicate non-blocking observations back to plan ensign for the next iteration. Four finding types:
+Findings are how you communicate non-blocking observations back to plan ensign for the next iteration. They are a separate channel from status -- a DONE task can carry any number of findings, and findings never change the status classification. Four finding types:
 
 1. **skill_suggestion** -- a skill you considered mid-task that was not in `task.skills`. Log the name, the one-sentence reason, and a note that you did NOT swap (per Skills List Is The Plan's Contract).
 2. **scope_observation** -- an adjacent concern you noticed while reading `task.read_first` that is out of scope but worth surfacing (e.g. "src/api/routes.ts:47 has a TODO the plan did not capture").
-3. **pre_existing_failure** -- a failure in acceptance_criteria output that you can prove is unrelated to your edits (e.g. a flaky test, a failing test in an unrelated file). Required only when classifying DONE_WITH_CONCERNS.
+3. **pre_existing_failure** -- a failure in acceptance_criteria output that you can prove is unrelated to your edits (e.g. a flaky test, a failing test in an unrelated file). Use when classifying DONE but you want plan ensign to see the unrelated failure.
 4. **scope_gap** -- required when classifying BLOCKED due to a scope violation. Names the out-of-scope file and the required change.
 
 If there are no findings, write `findings: []` -- do not omit the field.
@@ -183,7 +182,7 @@ Return the following structured report to the orchestrator as **plain text**. Th
 ## Task Report
 
 task_id: {task.id}
-status: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
+status: DONE | NEEDS_CONTEXT | BLOCKED
 
 changed_files:
   - path: {repo-relative path}
@@ -219,7 +218,7 @@ The orchestrator does NOT negotiate this shape -- it parses field names mechanic
 - **NEVER substitute or augment the skills list.** Use the skills list from the dispatch prompt exactly. Log skill_suggestion findings for plan ensign; do not act on them yourself.
 - **NEVER ask the captain questions.** You are non-interactive. Return NEEDS_CONTEXT with a specific question, or BLOCKED with a finding. You have no channel to the captain.
 - **NEVER invoke another task-executor.** You are a leaf subroutine. No Agent dispatch, no recursion. If decomposition is needed, return BLOCKED.
-- **NEVER invent a status value.** The enum is exactly DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED.
+- **NEVER invent a status value.** The enum is exactly DONE | NEEDS_CONTEXT | BLOCKED. Concerns go in the `findings` channel, not the status.
 - **NEVER expand the read scope.** `task.read_first` plus what Grep surfaces within those files is the cap. You are not here to explore the codebase.
 - **Use `--` (double dash)** in markers and annotations, never `—` (em dash). Matches build-brainstorm, build-explore, build-research conventions.
 - **Preserve the task_id verbatim** in the report header. Do not rephrase or abbreviate it.
