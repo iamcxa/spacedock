@@ -47,7 +47,24 @@ test_cases:
       cite_file: skills/build-research/SKILL.md
       cite_section: "Scope Discipline -- Read-Only Enforcement"
       cite_contains: "NEVER edit during research"
-    history: []
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: deferred-dispatch-unavailable
+        notes: |
+          Pilot (Wave 1) attempted live verification dispatch per plan.
+          The Agent tool (subagent_type=general-purpose) was NOT surfaced
+          in the PILOT teammate's environment — only TeamCreate/SendMessage
+          were available, which is a different coordination pattern than
+          the manual pressure-test dispatch template in tests/pressure/README.md
+          assumes. Per OAuth-only constraint, did NOT shell out to claude -p
+          or use Anthropic SDK. Round-1 live dispatch deferred to a session
+          that has the Agent tool surfaced. Structural validation still
+          holds: SKILL.md contains the exact cite_contains phrase at
+          line 79, the section heading exists, and the read-only rule is
+          stated in prose + reinforced with a Red Flags list and a
+          "No exceptions" block that enumerates every rationalization
+          pathway in the scenario's options (A, C, D, E).
 
   - id: citation-required-for-every-finding
     summary: |
