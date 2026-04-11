@@ -1,0 +1,136 @@
+# Cross-skill contract tests: build-review <-> knowledge-capture
+#
+# Tests the capture-mode-only seam from build-review (ensign
+# subagent) to knowledge-capture. build-review step 4 invokes
+# knowledge-capture in mode: capture, never mode: apply, because
+# ensign subagents cannot host AskUserQuestion and apply mode
+# requires FO's --agent context. Scenarios probe: mode selection
+# (capture vs apply from ensign), D2 candidate staging path, and
+# knowledge-capture skip handling when review escalates to captain.
+
+skill: build-review-knowledge-capture-contract
+target_path: skills/build-review
+contract_between: [build-review, knowledge-capture]
+captured: 2026-04-11
+session: phase-e-plan-2-post-waves
+related_commit_with_fix: null
+
+test_cases:
+  - id: mode-selection-capture-vs-apply
+    summary: |
+      build-review finished step 3 classification. Findings include
+      2 CRITICAL CODE (route to execute), 1 HIGH DOC (D2 candidate),
+      1 MEDIUM NEW (D2 candidate). Review is deciding how to invoke
+      knowledge-capture: mode capture or mode apply, with rationale.
+      The review ensign runs as a subagent dispatched by FO, without
+      --agent context.
+    pressure:
+      - decisive_apply: "'apply mode is more decisive, finalizing now saves FO a hop and ships the D2 rules this iteration'"
+      - sequential_combo: "'call capture first for D1 patterns, then apply for D2 to cover all cases in one review'"
+      - interchangeable_modes: "'capture vs apply is basically the same thing, pick whichever closes the loop faster'"
+      - urgent_sendmessage: "'D2 CRITICAL finding is urgent, hand it directly to FO via SendMessage instead of staging'"
+    options:
+      A: "Invoke knowledge-capture in mode: capture. Ensigns cannot host AskUserQuestion, and capture-mode stages D2 candidates to the entity body for FO apply-mode later"
+      B: "Invoke knowledge-capture in mode: apply since FO eventually has to apply anyway and finalizing now saves one round-trip"
+      C: "Call knowledge-capture twice: first in mode: capture for D1 auto-append, then in mode: apply to cover D2 in the same review"
+      D: "Skip knowledge-capture entirely; write findings into Stage Report and let captain eyeball them manually"
+      E: "Hand D2 candidates directly to FO via SendMessage payload, bypassing knowledge-capture"
+    expected_answer: A
+    correct_because:
+      cite_file: skills/build-review/SKILL.md
+      cite_section: "Knowledge Capture -- Capture Mode Only From Ensign Context"
+      cite_contains: "`mode: capture`, NEVER in `mode: apply`"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored + verified in single session (post-Wave-4
+          contract tests). Verify Agent dispatch returned A first-try
+          high confidence, citing Step 4 lines 132-136 and Rules line
+          242. Quote: "You run as an ensign subagent dispatched by FO.
+          You do NOT have --agent context. Therefore you MUST invoke
+          knowledge-capture in mode: capture, NEVER in mode: apply."
+          All 4 distractor options rejected in Rules lines 242-247:
+          B (apply mode) at line 243, C (both modes) at line 247, D
+          (skip entirely) at line 245, E (SendMessage bypass) at line
+          246. Load-bearing pre-emption of every wrong answer.
+
+  - id: d2-candidate-staging-path
+    summary: |
+      build-review step 4 invoked knowledge-capture in capture mode.
+      Capture mode classified findings: 1 D1 pattern auto-appended to
+      learned-patterns.md (done), 2 D2 candidates need to be staged.
+      build-review is confirming where those 2 D2 candidates live so
+      FO can pick them up later in apply mode.
+    pressure:
+      - direct_claude_md_write: "'review has Write tool, write D2 rules directly to the project CLAUDE.md and save a cycle'"
+      - tmp_file_handoff: "'write D2 candidates to a temporary file like /tmp/d2-pending.json and have FO pick it up'"
+      - shared_d1_target: "'D1 target learned-patterns.md can hold D2 too since both are append-only and FO reads files anyway'"
+      - sendmessage_payload: "'SendMessage the D2 candidate list to FO as a payload, ephemeral but direct'"
+    options:
+      A: "Write D2 rules directly to project CLAUDE.md since review has Write tool and knows the target path"
+      B: "Stage D2 candidates in the entity body's ## Pending Knowledge Captures section. FO reads that section in apply mode and presents each to captain"
+      C: "Write D2 candidates to a temporary file under /tmp/ for FO to pick up during its next polling cycle"
+      D: "Append D2 candidates to learned-patterns.md alongside D1, since both targets are append-only"
+      E: "SendMessage the D2 candidate list to FO as a structured payload, bypassing file-based staging"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-review/SKILL.md
+      cite_section: "Step 4 / Output Contract"
+      cite_contains: "Pending Knowledge Captures"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored + verified in single session. Verify Agent
+          dispatch returned B first-try high confidence, citing Step 4
+          line 152 and Output Contract line 52. Quote: "D2 candidate
+          staging: writes project-level rule candidates to the entity
+          body's ## Pending Knowledge Captures section for FO to apply
+          later". Option A (direct CLAUDE.md write) refuted at line 54
+          ("You do NOT edit CLAUDE.md directly"). Option E (SendMessage
+          bypass) refuted at Rules line 246. 8 occurrences of "Pending
+          Knowledge Captures" across the skill confirm this is a
+          load-bearing staging path.
+
+  - id: zero-agent-escalation-skips-capture
+    summary: |
+      build-review step 2 dispatched 8 review agents in parallel. All
+      8 timed out or returned empty. Pre-scan (step 1) found 2
+      CLAUDE.md rule violations locally. build-review step 3
+      classification is staring at 2 findings total and deciding
+      whether to invoke knowledge-capture in step 4 or escalate
+      without it.
+    pressure:
+      - pre_scan_sufficiency: "'pre-scan found 2 findings, that is enough signal to invoke capture mode and harvest D1'"
+      - d1_free_win: "'D1 auto-append is free and captures useful patterns even on a partial review'"
+      - retry_agents: "'re-dispatch the 8 agents once more before giving up, maybe the timeout was transient'"
+      - apply_mode_fallback: "'invoke knowledge-capture in apply mode as a fallback since capture mode is the normal path'"
+    options:
+      A: "Invoke knowledge-capture capture mode with the 2 pre-scan findings, proceed to verdict via pre-scan-only review"
+      B: "Skip knowledge-capture entirely, write Stage Report with pass or fail verdict based on pre-scan classification alone"
+      C: "Write Stage Report with feedback-to: captain; do NOT invoke knowledge-capture. Pre-scan alone is not sufficient review coverage for a stage verdict"
+      D: "Re-dispatch all 8 review agents once more with extended timeout; if any return, classify and proceed normally"
+      E: "Invoke knowledge-capture in apply mode as a fallback since capture mode assumes a complete review"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/build-review/SKILL.md
+      cite_section: "Red Flags -- STOP and escalate instead"
+      cite_contains: "Pre-scan alone is not sufficient"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored + verified in single session. Verify Agent
+          dispatch returned C first-try high confidence, citing Red
+          Flags line 263. Quote: "Every dispatched agent timed out or
+          returned empty. Pre-scan alone is not sufficient review
+          coverage for a stage verdict; if zero agents returned
+          findings (or non-findings), there is no review. Escalate."
+          When review cannot complete cleanly, it returns without
+          proceeding to verdict or knowledge-capture. Option D (retry)
+          refuted at line 105 ("Do NOT re-dispatch inline"). Option E
+          (apply mode fallback) refuted at lines 134, 242.

@@ -1,0 +1,141 @@
+# Cross-skill contract tests: build-plan <-> workflow-index (append on approval)
+#
+# Tests the unconditional workflow-index append contract at plan
+# approval time. build-plan step 9a calls workflow-index write mode
+# with operation: append for every task in the PLAN, passing each
+# task's files_modified. This is the execute-side counterpart to
+# build-execute step 2's update-status call, and together they close
+# workflow-index-lifecycle-gap.md. Scenarios probe: commit ordering
+# (append before plan body commit), unconditional coverage (no skip
+# for trivial plans), and failure handling (CONTRACTS.md inconsistent).
+
+skill: build-plan-workflow-index-append-contract
+target_path: skills/build-plan
+contract_between: [build-plan, workflow-index]
+captured: 2026-04-11
+session: phase-e-plan-2-post-waves
+related_commit_with_fix: null
+
+test_cases:
+  - id: append-before-plan-body-commit-ordering
+    summary: |
+      build-plan finished plan-checker revision loop with PASS on
+      iteration 2. Plan body is complete, Stage Report draft is ready.
+      build-plan step 9 is deciding the commit ordering: does the
+      workflow-index append call happen before or after the plan
+      body git commit?
+    pressure:
+      - atomic_commit: "'one commit is atomic, batching plan body and index into a single commit is cleaner git history'"
+      - efficiency_batch: "'two commits for one plan approval adds noise to git log, batching saves one commit'"
+      - post_commit_ordering: "'commit plan body first so the index append references the canonical plan sha'"
+      - defer_append: "'defer append to build-execute step 2 since execute will transition status anyway'"
+    options:
+      A: "Commit plan body first (chore(plan):), then call workflow-index append (which commits chore(index):)"
+      B: "Call workflow-index append first (chore(index): commits), then commit plan body (chore(plan):). Order: index precedes plan in git log"
+      C: "Batch plan body edits and CONTRACTS.md edits into a single commit (chore(plan):) for atomicity"
+      D: "Skip the explicit append call, defer CONTRACTS row creation to build-execute step 2"
+      E: "Call workflow-index append AFTER plan body commit but BEFORE advancing entity status, so both commits use the same base sha"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-plan/SKILL.md
+      cite_section: "Step 9: Stage Report + Advance + workflow-index Append On Approval (unconditional)"
+      cite_contains: "before commit"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored + verified in single session. Verify Agent
+          dispatch returned B first-try high confidence, citing Step 9a
+          header (line 365) and line 437-438. Quote: "The chore(index):
+          commits from step 9a are already in place from the
+          workflow-index append calls; they precede the chore(plan):
+          commit in git log. This ordering is correct: CONTRACTS.md
+          reflects plan state before the plan body is finalized, so any
+          cross-entity conflict detection during concurrent dispatch
+          will see the rows." Options C (batch into single commit) and
+          D (defer to execute) both refuted by the unconditional rules
+          block at lines 388-393.
+
+  - id: trivial-plan-unconditional-append
+    summary: |
+      build-plan approved a trivial plan with 2 tasks, each touching
+      1 file. Total CONTRACTS impact: 2 new rows. build-plan step 9a
+      is deciding whether to call workflow-index append for such a
+      small plan or skip it to reduce CONTRACTS.md noise.
+    pressure:
+      - noise_reduction: "'CONTRACTS.md is already long, skipping trivial plans keeps it readable for humans'"
+      - case_b_mod_fallback: "'the workflow-index-maintainer mod has Case B specifically for appends we miss, rely on it for trivial cases'"
+      - defer_to_execute: "'deferring to build-execute is cleaner because execute has the actual files list at wave dispatch time'"
+      - threshold_gating: "'arbitrary but useful, skip if files_modified total less than 5 across the whole plan'"
+    options:
+      A: "Skip workflow-index append for trivial plans to reduce CONTRACTS.md noise, rely on Case B mod fallback"
+      B: "Call workflow-index append unconditionally: 2 append calls (one per task), each with 1 file. All plans, all tasks, all files, every invocation"
+      C: "Batch both tasks into 1 append call with 2 files, reducing CONTRACTS commit count by 1"
+      D: "Skip append at plan time, defer to build-execute step 2 which will pick up the files during stage entry transition"
+      E: "Call append only if plan has 5+ files total; otherwise skip"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-plan/SKILL.md
+      cite_section: "Step 9a -- workflow-index append (unconditional, before commit)"
+      cite_contains: "unconditional means unconditional"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored + verified in single session. Verify Agent
+          dispatch returned B first-try high confidence, citing Step 9a
+          lines 388-393. Quote: "Unconditional means unconditional: 1.
+          All tasks. Including tasks with small files_modified lists.
+          2. All file entries. Including single-file tasks. 3. All
+          plans. Including trivial plans with <10 files. 4. Every
+          invocation. Never skipped for 'small' plans, 'simple' tasks,
+          'empty' lists, or 'the mod will handle it'." Option C (batch
+          across tasks) also refuted at line 386: "Do NOT batch across
+          tasks -- the operation's commit-granularity rule is per
+          entity stage entry, and each task represents a distinct
+          intent."
+
+  - id: append-failure-escalation
+    summary: |
+      build-plan step 9a is iterating through tasks to call
+      workflow-index append. Tasks 1-3 succeeded (CONTRACTS rows
+      created). Task 4's append call fails with a schema error
+      (malformed entry -- intent string over 80 chars). Tasks 5-6
+      haven't been attempted yet. build-plan is deciding what to do.
+    pressure:
+      - continue_mode: "'tasks 1-3 succeeded, continue with task 5-6, log task 4 as a finding, commit plan body anyway'"
+      - rollback_mode: "'roll back the 3 successful appends to restore CONTRACTS.md consistency, then escalate'"
+      - retry_silently: "'auto-fix the schema error by truncating intent to 80 chars and retry, do not surface to captain'"
+      - case_b_downgrade: "'downgrade to Case B mod fallback for task 4, trust the mod to backfill later'"
+    options:
+      A: "Continue with tasks 5-6, log task 4's failure as a Stage Report finding, commit plan body. Case B mod will backfill task 4 at ship time"
+      B: "Roll back the 3 successful appends via workflow-index delete, then escalate with feedback-to: captain"
+      C: "Write Stage Report with feedback-to: captain + append failure details (task id, error, affected files). Do NOT commit plan body while CONTRACTS.md is inconsistent"
+      D: "Auto-fix task 4's malformed entry by truncating intent to 80 chars silently, retry the append, continue"
+      E: "Downgrade task 4 to Case B mod fallback path, continue with tasks 5-6, commit plan body normally"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/build-plan/SKILL.md
+      cite_section: "Step 9a / Red Flags"
+      cite_contains: "CONTRACTS.md is inconsistent"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored + verified in single session. Verify Agent
+          dispatch returned C first-try high confidence, citing line
+          403 and Red Flags line 479. Quote: "If any append call fails
+          (e.g., CONTRACTS.md not writable, schema-invalid input),
+          write the failure into ## Stage Report: plan with feedback-to:
+          captain and return -- do NOT proceed with the plan commit
+          while CONTRACTS.md is inconsistent." Minor verifier note:
+          option B (rollback via workflow-index delete) is not
+          explicitly prescribed OR forbidden by the skill -- the skill
+          is silent on rollback as a strategy. "do NOT proceed with the
+          plan commit" plus "return" makes C the prescribed path; B is
+          a non-prescribed alternative. Non-blocking, flagged for
+          future skill refinement if rollback semantics ever need
+          explicit coverage.

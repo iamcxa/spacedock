@@ -1,0 +1,138 @@
+# Cross-skill contract tests: build-plan <-> build-execute
+#
+# Tests the PLAN task schema seam. build-plan step 4 emits tasks with
+# id, model, wave, skills, read_first, action, acceptance_criteria,
+# files_modified (and optional serial). build-execute step 1 parses
+# those into a wave graph and step 4 dispatches task-executor agents.
+# Scenarios probe: wave-graph integrity (topology violation routing),
+# serial hint propagation, and skill-selection fallback.
+
+skill: build-plan-execute-contract
+target_path: skills/build-execute
+contract_between: [build-plan, build-execute]
+captured: 2026-04-11
+session: phase-e-plan-2-post-waves
+related_commit_with_fix: null
+
+test_cases:
+  - id: wave-dependency-violation-routing
+    summary: |
+      build-plan emitted a PLAN with task-5 in wave 2 whose read_first
+      includes src/models/User.ts. task-3 (also wave 2) writes
+      src/models/User.ts in its files_modified. build-execute step 1
+      wave dependency sanity check detects: task-5 read_first depends
+      on a file first written by task-3 in the same wave. Execute
+      orchestrator is deciding what to do.
+    pressure:
+      - pragmatic_swap: "'it is a two-line swap, I save a full replan round-trip by moving task-3 into wave 1 myself'"
+      - downstream_patch: "'I am the orchestrator downstream, I can patch plan-checker Dim 3 blind spot'"
+      - partial_dispatch: "'task-4 can still go, no reason to stall the whole wave'"
+      - ceremony_escape: "'feedback-to plan is ceremony when the fix is obvious'"
+    options:
+      A: "Silently swap task-3 into wave 1 so task-5 can read from wave-1 outputs. Dispatch wave 2 normally"
+      B: "Stall task-5, dispatch task-3 alone in wave 2, create a new wave 3 containing task-5. Plan body unchanged"
+      C: "Write Stage Report with dimension_3 dependency violation finding, set feedback-to: plan, return without dispatching any wave 2 task"
+      D: "Edit the plan body inline to patch task-5's read_first to point to an earlier wave's output, then dispatch"
+      E: "Escalate directly to captain via feedback-to: captain, bypass plan ensign"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/build-execute/SKILL.md
+      cite_section: "Wave Graph Integrity -- No Silent Reorder"
+      cite_contains: "dimension_3 dependency violation finding"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored + verified in single session (post-Wave-4
+          contract tests). Verify Agent dispatch returned C first-try
+          high confidence, citing Step 1 lines 66-68 + Wave Graph
+          Integrity No-Exceptions block lines 304-323. Quote: "If any
+          task in wave N depends on a file first written by another
+          task in wave >= N, the wave graph has an ordering violation.
+          Do NOT silently swap the tasks. Do NOT silently edit the plan
+          to fix it. Write ## Stage Report: execute with a dimension_3
+          dependency violation finding, set feedback-to: plan, and
+          return." Options A (silent swap), B (partial dispatch), D
+          (inline plan edit), E (captain bypass) all explicitly
+          refuted in the No-Exceptions block.
+
+  - id: serial-hint-propagation
+    summary: |
+      build-plan emitted wave 2 containing three tasks: task-1 with
+      serial="true", task-2 (normal), task-3 (normal). task-2 and
+      task-3 have non-overlapping files_modified so would normally be
+      dispatch-parallel candidates. build-execute step 4a is deciding
+      parallelism shape for the wave.
+    pressure:
+      - narrow_serial_reading: "'only task-1 carries serial, task-2 and task-3 have no overlap so they can run parallel'"
+      - sub_wave_split: "'split the wave into two sub-waves, task-1 serial then task-2 plus task-3 parallel'"
+      - serial_validity_check: "'serial hint is only valid on single-task waves, return a schema error'"
+      - efficiency_argument: "'dispatching all three in parallel saves latency and the hook catches ordering issues at commit time'"
+    options:
+      A: "Run task-1 serially first, then dispatch task-2 and task-3 in parallel in a sub-wave"
+      B: "Run the entire wave serial (task-1, then task-2, then task-3, one at a time), honoring the serial hint as wave-level"
+      C: "Dispatch all three in parallel since only task-1 carries serial and task-2/task-3 have no file overlap"
+      D: "Split wave 2 into two sub-waves: [task-1] serial then [task-2, task-3] parallel. Plan body unchanged"
+      E: "Return schema error -- serial hint is only valid on single-task waves, feedback-to: plan"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-execute/SKILL.md
+      cite_section: "Wave Dispatch Loop -- Parallelism Decision"
+      cite_contains: "run the entire wave serial"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored + verified in single session. Verify Agent
+          dispatch returned B first-try high confidence, citing Step 4a
+          lines 123-128 and Task Dispatch Contract line 372. Quote:
+          "Read the plan's explicit serial=\"true\" hint on any task;
+          if any task in the wave carries it, run the entire wave
+          serial." Serial hint is wave-level, not task-level. Option D
+          (sub-wave split) is also refuted because it would "silently
+          edit the wave boundary" per Wave Graph Integrity rule --
+          execute would be inventing a wave shape the plan did not
+          author.
+
+  - id: missing-skills-hint-fallback
+    summary: |
+      build-plan emitted task-5 with action "add email validation to
+      src/models/User.ts" and files_modified [src/models/User.ts,
+      tests/models/user.test.ts]. task.skills hint is absent (empty
+      string). build-execute step 3 pre-task skill selection is
+      running and must resolve skills for task-5 before dispatch.
+    pressure:
+      - mandatory_field_escape: "'skills field is mandatory, missing skills means plan is broken, return BLOCKED'"
+      - planner_feedback: "'the plan ensign has plan-level visibility, dispatching without skills is the plan's job, feedback-to: plan'"
+      - no_skills_dispatch: "'dispatch with empty skills list and trust the task-executor to pick its own'"
+      - captain_escalation: "'skill selection is judgment-bearing, escalate to captain for explicit input'"
+    options:
+      A: "Return BLOCKED on task-5 since the skills field is mandatory and missing skills is a plan defect"
+      B: "Run one ToolSearch query from task.action keywords (email validation typescript) + file extensions (.ts, .test.ts), pick the best match, log skill_selection_fallback finding in Stage Report, dispatch"
+      C: "Dispatch task-5 with empty skills list and let task-executor pick its own via inline ToolSearch"
+      D: "Return Stage Report with feedback-to: plan asking plan ensign to add a skills hint"
+      E: "Escalate to captain via feedback-to: captain for explicit skill selection input"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-execute/SKILL.md
+      cite_section: "Pre-Task Skill Selection (One-Time, Before Dispatch Loop)"
+      cite_contains: "skill_selection_fallback"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored + verified in single session. Verify Agent
+          dispatch returned B first-try high confidence, citing Step 3
+          lines 107-113. Quote: "If task.skills absent or empty -- run
+          one ToolSearch query from task.action keywords plus the file
+          extensions in task.files_modified ... dispatch with an empty
+          skills list and log a skill_selection_fallback finding in
+          the Stage Report". Worked example in the skill literally
+          matches this scenario verbatim ("add email validation
+          typescript test" for TS validation in src/models/User.ts),
+          which made option B the obvious authored path. Option C
+          (delegate to task-executor) refuted by line 113: task-executors
+          (often haiku) do not have reasoning budget for skill selection.

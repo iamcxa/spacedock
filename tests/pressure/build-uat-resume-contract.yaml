@@ -1,0 +1,134 @@
+# Cross-skill contract tests: build-uat <-> uat-resume
+#
+# Tests the skip-only mode handoff from uat-resume (thin wrapper)
+# into build-uat. uat-resume dispatches build-uat with Mode: skip-only
+# via the 5-field Dispatch Shape; build-uat's step 1 skip-only branch
+# owns scope selection and result writing. Scenarios probe: the wire
+# format of the dispatch, delegation of scope selection, and the
+# prior-rows-preserved invariant that protects resume idempotency.
+
+skill: build-uat-resume-contract
+target_path: skills/uat-resume
+contract_between: [uat-resume, build-uat]
+captured: 2026-04-11
+session: phase-e-plan-2-post-waves
+related_commit_with_fix: null
+
+test_cases:
+  - id: dispatch-wire-format
+    summary: |
+      uat-resume has passed Precondition Check and Spec Drift Guard
+      cleanly for entity 047-example (uat_pending_count: 1, no drift).
+      It is constructing the dispatch to build-uat. The wrapper must
+      decide what inputs to pass and how.
+    pressure:
+      - minimal_slug_only: "'the slug uniquely identifies the entity, build-uat can derive everything else, pass slug only'"
+      - items_list_override: "'pass slug plus Mode plus an explicit items_to_rerun list so build-uat does not have to parse UAT Results'"
+      - filtered_entity_copy: "'build a filtered copy of entity frontmatter containing only the skipped items, pass that in for perfect isolation'"
+      - captain_acked_items: "'pass slug plus Mode plus the captain-acked items list so build-uat has pre-approved scope'"
+    options:
+      A: "Pass entity slug only; build-uat derives everything else from the workflow directory"
+      B: "Pass 5 fields per build-uat Inputs From Orchestrator (lines 37-47): entity slug, entity file path, workflow directory, Mode=skip-only, execute base SHA. No items override, no filtered input, the original unmodified entity file"
+      C: "Pass entity slug + Mode + an explicit items_to_rerun list extracted from UAT Results in the wrapper"
+      D: "Pass entity slug + Mode + a filtered copy of entity frontmatter containing only the skipped items so build-uat sees reduced input"
+      E: "Pass entity slug + Mode + a captain-acked items list pre-approved via AskUserQuestion in the wrapper before dispatch"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/uat-resume/SKILL.md
+      cite_section: "Delegation Contract -- Dispatch Shape"
+      cite_contains: "original, unmodified entity file"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored + verified in single session. Verify Agent
+          dispatch returned B first-try high confidence, citing Dispatch
+          Shape lines 114-122 and No-Exceptions block lines 129-132.
+          Quote: "Pass the dispatch inputs in the prompt per
+          skills/build-uat/SKILL.md Inputs From Orchestrator (lines
+          37-47): 1. Entity slug ... 5. Execute base SHA ... That is
+          the entire dispatch contract." Options C, D, E each directly
+          refuted in the No Exceptions block by name. Wire format
+          resolved via Wave 4 discovery: Mode field at build-uat line
+          44 (normal | skip-only).
+
+  - id: scope-selection-ownership
+    summary: |
+      build-uat receives a dispatch from uat-resume with Mode:
+      skip-only and the 5-field input set. Entity has 6 items in
+      ## UAT Results; item-5 has status: skipped, items 1-4 and 6
+      have status: pass. Who is responsible for reading UAT Results
+      and selecting which items to re-run -- the wrapper or build-uat?
+    pressure:
+      - wrapper_already_knows: "'the wrapper already parsed UAT Results during Precondition Check, passing the scope is free'"
+      - dual_source_of_truth: "'the wrapper is a single checkpoint for scope, having build-uat re-parse is redundant work'"
+      - handshake_via_args: "'having the wrapper pass the list via args is the most explicit handshake'"
+      - preserve_invariant: "'build-uat owns UAT Results, the wrapper should stay out of parsing it'"
+    options:
+      A: "The wrapper parses UAT Results and passes an explicit items list to build-uat; build-uat runs whatever is in the list"
+      B: "build-uat's own Step 1 skip-only branch reads UAT Results, filters to rows with status: skipped, builds items_to_rerun. The wrapper does not parse UAT Results for scope"
+      C: "Captain manually specifies items in the slash command invocation; neither wrapper nor build-uat parses UAT Results"
+      D: "FO reads entity frontmatter uat_pending_list and passes that to the wrapper which passes it forward"
+      E: "A shared helper skill owns selection, invoked from both wrapper and build-uat for consistency"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/uat-resume/SKILL.md
+      cite_section: "Delegation Contract"
+      cite_contains: "build-uat's own skip-only handler reads `## UAT Results`"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored + verified in single session. Verify Agent
+          dispatch returned B first-try high confidence, citing lines
+          108-109, 111, 123. Quote: "The wrapper delegates scope
+          selection to build-uat ... build-uat's own skip-only handler
+          reads ## UAT Results, filters to skipped rows, and re-runs
+          exactly those items." Line 111 reinforces single source of
+          truth: "The single source of truth for which items need
+          re-running is the entity's ## UAT Results section". Option A
+          (wrapper parses) is the first No-Exceptions rejection at
+          line 129.
+
+  - id: prior-rows-preservation-invariant
+    summary: |
+      build-uat is running in skip-only mode for entity 047. Item-5
+      (previously skipped with captain reason "no staging db") now
+      passes the re-run. Items 1-4 and 6 are prior-pass rows already
+      in ## UAT Results and were NOT re-run. build-uat is writing the
+      result row for item-5 and must not corrupt the earlier rows.
+    pressure:
+      - full_rewrite: "'rewriting the whole UAT Results table in re-run format is cleaner than appending a single row'"
+      - overwrite_row: "'item-5 has a prior row with status: skipped, overwrite it with status: pass in place for idempotency'"
+      - archive_and_append: "'move item-5 prior row to an archive section then append the new row, keeping history'"
+      - rewrite_round_format: "'rewrite all rows in round-aware format so future resume runs can track generations'"
+    options:
+      A: "Delete all existing rows, write fresh rows for every item including the items that were not re-run"
+      B: "Preserve all existing rows untouched; append a new row for item-5 with round: 2 and the new status: pass. Prior rows are preserved untouched per build-uat Rules (Skip-Only Mode)"
+      C: "Overwrite item-5's existing row with the new result in place; leave items 1-4 and 6 alone"
+      D: "Move item-5's prior row to an archive section inside UAT Results, then append the new row for item-5"
+      E: "Rewrite all 6 rows in round-aware format so later resume runs can track generations"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/uat-resume/SKILL.md
+      cite_section: "Delegation Contract / Dispatch Shape"
+      cite_contains: "prior rows are preserved untouched"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored + verified in single session. Verify Agent
+          dispatch returned B first-try high confidence, citing line
+          123 and Precondition Check No-Exceptions line 67. Quote: "Per
+          skills/build-uat/SKILL.md Rules (Skip-Only Mode), prior rows
+          are preserved untouched" plus "Overwriting prior-pass rows
+          also invalidates captain's earlier sign-offs" (line 67).
+          Minor verifier note: exact row-write mechanics (append-new
+          vs in-place-overwrite for the re-run row itself) are
+          delegated to build-uat Rules (Skip-Only Mode) block and not
+          fully specified in uat-resume SKILL.md alone. Append-only
+          reading is stronger but depends on cross-reading build-uat;
+          flagged for future spec refinement. Non-blocking.
