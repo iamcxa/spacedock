@@ -22,8 +22,8 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
 - `Grep` / `Glob` -- locate related artifacts during topic extraction and Context Compliance checks
 - `Write` / `Edit` -- write plan sections into the entity body and the final `## Stage Report: plan`
 - `Bash` -- `git` commands (branch, sha, commit), `workflow-index` CLI invocations if applicable
-- `Agent` -- dispatch `spacebridge:researcher` (step 2) and `general-purpose` plan-checker (step 6). You run in the **main orchestrator context** (opus), so Agent dispatch is available to you.
-- `Skill` -- invoke `spacebridge:workflow-index` (step 9) and `spacebridge:knowledge-capture` (step 8, optional)
+- `Agent` -- dispatch `spacedock:researcher` (step 2) and `general-purpose` plan-checker (step 6). You run in the **main orchestrator context** (opus), so Agent dispatch is available to you.
+- `Skill` -- invoke `spacedock:workflow-index` (step 9) and `spacedock:knowledge-capture` (step 8, optional)
 
 **NOT available:**
 - `AskUserQuestion` -- you run as an ensign subagent dispatched by FO. FO owns captain interaction. If escalation is needed at step 7, write `feedback-to: captain` in the Stage Report and return; FO routes to captain.
@@ -89,7 +89,7 @@ For every topic from step 1, dispatch a researcher in parallel:
 
 ```
 Agent(
-  subagent_type="spacebridge:researcher",
+  subagent_type="spacedock:researcher",
   model="sonnet",
   prompt="""
   ## Topic
@@ -161,7 +161,7 @@ Write three sections into the entity body:
 Task list using the PLAN task schema from spec lines 182-214:
 
 ```markdown
-<task id="task-1" model="haiku" wave="1" skills="spacebridge:validation-patterns">
+<task id="task-1" model="haiku" wave="1" skills="spacedock:validation-patterns">
   <read_first>
     - src/models/User.ts
     - tests/models/user.test.ts
@@ -211,7 +211,7 @@ Testable items in four categories:
 - [ ] `GET /api/entities?status=execute` returns only execute-stage entities
 
 ### Interactive
-- [ ] Captain can resolve a plan-checker escalation via `/spacebridge:uat-resume`
+- [ ] Captain can resolve a plan-checker escalation via `/spacedock:uat-resume`
 ```
 
 Categories may be empty (write `None` under the header) but all four headers must be present so downstream UAT stage can iterate deterministically.
@@ -264,7 +264,7 @@ Wait for the dispatched subagent to return. Parse its YAML output into a list of
 
 **Plan-checker is stateless.** Each dispatch gets a fresh context. The checker does not remember previous iterations, and you do not tell it what iteration you are on. This is deliberate -- each check is an independent judgment.
 
-**Known architectural unknown -- Skill tool in dispatched subagent context.** The plan-checker prompt assumes the `Skill` tool is available in the dispatched `general-purpose` subagent so Dim 7 can call `spacebridge:workflow-index` read mode. Per `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md`, subagents have restricted tool surfaces and we have no positive evidence that `Skill` is available there. If the assumption proves false in practice, the graceful-degradation stub in `references/plan-checker-prompt.md` (Dim 7 section) emits a Dim 7 warning instead of silently skipping -- captain resolves out-of-band or restructures build-plan to pre-compute CONTRACTS conflict data and inject it into the prompt. Flagged during Wave 2 CQR.
+**Known architectural unknown -- Skill tool in dispatched subagent context.** The plan-checker prompt assumes the `Skill` tool is available in the dispatched `general-purpose` subagent so Dim 7 can call `spacedock:workflow-index` read mode. Per `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md`, subagents have restricted tool surfaces and we have no positive evidence that `Skill` is available there. If the assumption proves false in practice, the graceful-degradation stub in `references/plan-checker-prompt.md` (Dim 7 section) emits a Dim 7 warning instead of silently skipping -- captain resolves out-of-band or restructures build-plan to pre-compute CONTRACTS conflict data and inject it into the prompt. Flagged during Wave 2 CQR.
 
 **Plan-checker dimensions** (for reference; full detail lives in `references/plan-checker-prompt.md`):
 
@@ -339,7 +339,7 @@ Only **escalate to captain** on iteration 3 fail.
 **How to invoke.** Use the `Skill` tool (inline, same context -- you are the caller):
 
 ```
-Skill("spacebridge:knowledge-capture", args={
+Skill("spacedock:knowledge-capture", args={
   mode: "capture",
   findings: [...list of RawFinding objects...],
   source_stage: "plan",
@@ -369,7 +369,7 @@ This is the load-bearing step. Three sub-operations in strict order:
 For every task in the `## PLAN` section, for every file in that task's `files_modified`, invoke the workflow-index skill via the `Skill` tool:
 
 ```
-Skill("spacebridge:workflow-index", args={
+Skill("spacedock:workflow-index", args={
   mode: "write",
   target: "contracts",
   operation: "append",

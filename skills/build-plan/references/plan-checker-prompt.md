@@ -91,7 +91,7 @@ If any task references `<automated>MISSING</automated>` in its `acceptance_crite
 
 ### 7. Cross-Entity Coherence
 
-Call `spacebridge:workflow-index` read mode (via Skill tool) with the plan's complete `files_modified` list. For each file:
+Call `spacedock:workflow-index` read mode (via Skill tool) with the plan's complete `files_modified` list. For each file:
 
 - If CONTRACTS.md has an entry with status `in-flight` under a different entity -- **blocker** (cross-entity conflict; two entities cannot execute on the same file simultaneously).
 - If CONTRACTS.md has a `final` entry from a different entity within the last 7 days -- **warning** (recent change; plan author should have read it but may not have).

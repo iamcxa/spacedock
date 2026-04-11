@@ -23,7 +23,7 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
 - `Grep` / `Glob` -- pre-scan's stale-reference pass and CLAUDE.md rule walk
 - `Write` / `Edit` -- only to append `## Stage Report: review` and `## Pending Knowledge Captures` to the entity body
 - `Agent` -- dispatch the 8 external review agents in parallel during Step 2. You run in the **main orchestrator context** (sonnet) so Agent dispatch is available to you.
-- `Skill` -- invoke `spacebridge:knowledge-capture` in Step 4 (mode: capture)
+- `Skill` -- invoke `spacedock:knowledge-capture` in Step 4 (mode: capture)
 
 **NOT available (by policy, even though the tools may technically be loaded):**
 - `AskUserQuestion` -- you run as an ensign subagent dispatched by FO. FO owns captain interaction. If escalation is genuinely needed, write `feedback-to: captain` in the Stage Report and return; FO routes to captain.
@@ -138,7 +138,7 @@ Apply mode requires FO's `--agent` context because it calls `AskUserQuestion` na
 Invoke via the `Skill` tool in your own context:
 
 ```
-Skill("spacebridge:knowledge-capture", args={
+Skill("spacedock:knowledge-capture", args={
   mode: "capture",
   findings: [...RawFinding list built from Step 3 classification...],
   source_stage: "review",

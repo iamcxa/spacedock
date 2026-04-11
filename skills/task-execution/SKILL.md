@@ -1,17 +1,17 @@
 ---
 name: task-execution
-description: "Per-task execution subroutine for build-execute. Loaded by the spacebridge:task-executor agent when build-execute dispatches one task from the plan. Defines: load skills from prompt, read_first files, execute action, verify acceptance_criteria, return changed_files with DONE/NEEDS_CONTEXT/BLOCKED status. Does NOT commit."
+description: "Per-task execution subroutine for build-execute. Loaded by the spacedock:task-executor agent when build-execute dispatches one task from the plan. Defines: load skills from prompt, read_first files, execute action, verify acceptance_criteria, return changed_files with DONE/NEEDS_CONTEXT/BLOCKED status. Does NOT commit."
 ---
 
 # Task-Execution -- Per-Task Execution Subroutine
 
-**Namespace note.** This skill lives at `skills/task-execution/`; namespace migration to `spacebridge:task-execution` is Phase F work (entity 055). When `build-execute` dispatches the `spacebridge:task-executor` agent, the agent loads this skill via its flat `skills/task-execution/` path plus any additional skills named in the dispatch prompt's `skills` field.
+**Namespace note.** This skill lives at `skills/task-execution/`; namespace migration to `spacebridge:task-execution` is Phase F work (entity 055). When `build-execute` dispatches the `spacedock:task-executor` agent, the agent loads this skill via its flat `skills/task-execution/` path plus any additional skills named in the dispatch prompt's `skills` field.
 
-You are a leaf subroutine invoked by `build-execute` through the `spacebridge:task-executor` agent. You receive one plan task in the dispatch prompt and implement it against the current worktree. You do NOT commit -- you return a `changed_files` list and a status code that the orchestrator collects, then commits serially after the wave closes.
+You are a leaf subroutine invoked by `build-execute` through the `spacedock:task-executor` agent. You receive one plan task in the dispatch prompt and implement it against the current worktree. You do NOT commit -- you return a `changed_files` list and a status code that the orchestrator collects, then commits serially after the wave closes.
 
 **Seven steps, in strict order. No interaction with the captain at any point.**
 
-See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 217-290 (Execute stage orchestration), line 477 (skill matrix row), and line 497 (spacebridge:task-executor agent definition) for the plan-stage contract this skill implements.
+See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 217-290 (Execute stage orchestration), line 477 (skill matrix row), and line 497 (spacedock:task-executor agent definition) for the plan-stage contract this skill implements.
 
 ---
 

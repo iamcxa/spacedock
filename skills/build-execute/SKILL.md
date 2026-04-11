@@ -1,17 +1,17 @@
 ---
 name: build-execute
-description: "Execute stage orchestrator dispatched by FO. Sonnet orchestrator + haiku/sonnet/opus task subagents per task model hint. Pre-task skill selection, wave-parallel task dispatch via spacebridge:task-executor agent, serial commits per task, unconditional workflow-index status transition on stage entry."
+description: "Execute stage orchestrator dispatched by FO. Sonnet orchestrator + haiku/sonnet/opus task subagents per task model hint. Pre-task skill selection, wave-parallel task dispatch via spacedock:task-executor agent, serial commits per task, unconditional workflow-index status transition on stage entry."
 ---
 
 # Build-Execute -- Wave-Parallel Task Dispatch Orchestrator
 
 **Namespace note.** This skill lives at `skills/build-execute/`; namespace migration to `spacebridge:build-execute` is Phase F work (entity 055). When FO dispatches the execute stage, the ensign loads this skill via its flat `skills/build-execute/` path.
 
-You are the execute-stage orchestrator invoked by First Officer through the execute ensign. You read a planned entity, transition its CONTRACTS rows to in-flight, build the wave graph, dispatch `spacebridge:task-executor` agents wave-by-wave with per-task model hints, collect their reports, commit serially after each wave, and finally write a `## Stage Report: execute` section back to the entity body. You are the execute-side counterpart to `build-plan`'s plan-approval workflow-index append.
+You are the execute-stage orchestrator invoked by First Officer through the execute ensign. You read a planned entity, transition its CONTRACTS rows to in-flight, build the wave graph, dispatch `spacedock:task-executor` agents wave-by-wave with per-task model hints, collect their reports, commit serially after each wave, and finally write a `## Stage Report: execute` section back to the entity body. You are the execute-side counterpart to `build-plan`'s plan-approval workflow-index append.
 
 **Nine steps, in strict order. Never skip, never reorder, never combine.**
 
-See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 217-290 for the execute stage orchestration diagram (your contract), line 467 for the skill matrix row, lines 274-276 for the BLOCKED escalation ladder, and line 497 for the `spacebridge:task-executor` agent definition.
+See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 217-290 for the execute stage orchestration diagram (your contract), line 467 for the skill matrix row, lines 274-276 for the BLOCKED escalation ladder, and line 497 for the `spacedock:task-executor` agent definition.
 
 ---
 
@@ -22,13 +22,13 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
 - `Grep` / `Glob` -- locate referenced files during pre-task skill selection if a task lacks a `skills` hint
 - `Write` / `Edit` -- append the `## Stage Report: execute` section to the entity body and update the `## Validation Map` status column per task
 - `Bash` -- `git status`, `git diff`, `git rev-parse`, `git add`, `git commit` for serial per-task commits; `bun` for pre-task ToolSearch fallback if needed
-- `Agent` -- dispatch `spacebridge:task-executor` agents, one per wave task, with per-task model hint. You run in the **ensign orchestrator context** (sonnet), so Agent dispatch is available to you.
-- `Skill` -- invoke `spacebridge:workflow-index` (step 2, mandatory stage-entry transition) and `spacebridge:knowledge-capture` (step 8, optional)
+- `Agent` -- dispatch `spacedock:task-executor` agents, one per wave task, with per-task model hint. You run in the **ensign orchestrator context** (sonnet), so Agent dispatch is available to you.
+- `Skill` -- invoke `spacedock:workflow-index` (step 2, mandatory stage-entry transition) and `spacedock:knowledge-capture` (step 8, optional)
 
 **NOT available:**
 - `AskUserQuestion` -- you run as an ensign subagent dispatched by FO. FO owns captain interaction. If escalation is needed at step 7 or 8, write `feedback-to: {execute|plan|captain}` in the Stage Report and return; FO routes.
 
-**Important dispatch constraint.** You are the orchestrator in your own ensign context -- you CAN dispatch `spacebridge:task-executor` agents via the `Agent` tool. The task-executors you dispatch, however, run as nested subagents and **cannot themselves dispatch further Agent calls**. See `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md`. Design every task dispatch to be leaf-complete -- the task-executor must have everything it needs in its prompt, and it will never fan out to more subagents. If a task genuinely needs decomposition, that is a plan defect -- the task-executor returns `BLOCKED` and you escalate per step 7.
+**Important dispatch constraint.** You are the orchestrator in your own ensign context -- you CAN dispatch `spacedock:task-executor` agents via the `Agent` tool. The task-executors you dispatch, however, run as nested subagents and **cannot themselves dispatch further Agent calls**. See `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md`. Design every task dispatch to be leaf-complete -- the task-executor must have everything it needs in its prompt, and it will never fan out to more subagents. If a task genuinely needs decomposition, that is a plan defect -- the task-executor returns `BLOCKED` and you escalate per step 7.
 
 ---
 
@@ -80,7 +80,7 @@ First, build the deduped file list from step 1's parsed wave graph: union every 
 Then invoke the workflow-index skill via the `Skill` tool using the `update-status-bulk` operation (the per-entity multi-file transition API documented in `skills/workflow-index/references/write-mode.md` lines 60-94):
 
 ```
-Skill("spacebridge:workflow-index", args={
+Skill("spacedock:workflow-index", args={
   mode: "write",
   target: "contracts",
   operation: "update-status-bulk",
@@ -138,7 +138,7 @@ For each task in the wave (or one at a time for serial waves):
 
 ```
 Agent(
-  subagent_type="spacebridge:task-executor",
+  subagent_type="spacedock:task-executor",
   model=task.model,
   prompt="""
   ## Task
@@ -250,7 +250,7 @@ Classify deviations per the spec's GSD-style taxonomy (line 284): bug-fix / crit
 **Conditional step.** Only run step 8 if a task-executor surfaced a `scope_observation`, `pre_existing_failure`, or `skill_suggestion` finding that generalizes beyond this entity. Invoke:
 
 ```
-Skill("spacebridge:knowledge-capture", args={
+Skill("spacedock:knowledge-capture", args={
   mode: "capture",
   findings: [...list of RawFinding objects from step 7...],
   source_stage: "execute",
@@ -329,7 +329,7 @@ All of these mean: refuse to dispatch, write Stage Report with dimension_3 depen
 
 ### Stage Entry -- workflow-index Transition Is Unconditional
 
-**Before dispatching any wave 1 task subagent, you MUST call `spacebridge:workflow-index` via the Skill tool to transition all CONTRACTS rows for this entity from `planned` to `in-flight`.** This call is unconditional. It happens on every execute stage entry, for every entity, regardless of wave size, task count, or perceived latency cost.
+**Before dispatching any wave 1 task subagent, you MUST call `spacedock:workflow-index` via the Skill tool to transition all CONTRACTS rows for this entity from `planned` to `in-flight`.** This call is unconditional. It happens on every execute stage entry, for every entity, regardless of wave size, task count, or perceived latency cost.
 
 **No exceptions. Never on any of these rationales:**
 - **"Every second before first dispatch is wasted"** -- latency instinct applied to a 500ms Skill call is penny-wise pound-foolish. The transition commit is the only mechanism that keeps plan-checker Dim 7 cross-entity coherence accurate at stage-transition granularity. Skipping it to save milliseconds degrades a full pipeline stage of conflict detection lead time.
@@ -344,7 +344,7 @@ All of these mean: refuse to dispatch, write Stage Report with dimension_3 depen
 - "Batch the index update with wave 1 completion commit..."
 - "Append is more honest than update-status-bulk because it preserves history..."
 
-All of these mean: call `Skill("spacebridge:workflow-index", {mode: write, operation: update-status-bulk, entry: {entity, files, new_status: "in-flight"}})` NOW, wait for the `chore(index):` commit to land, THEN dispatch wave 1.
+All of these mean: call `Skill("spacedock:workflow-index", {mode: write, operation: update-status-bulk, entry: {entity, files, new_status: "in-flight"}})` NOW, wait for the `chore(index):` commit to land, THEN dispatch wave 1.
 
 **Why this rule exists:** workflow-index stage-transition granularity is how cross-entity coherence detection (plan-checker Dim 7) gets lead time on in-flight conflicts. If every row is eventually-consistent at ship-time (the Case B failure mode), two concurrent execute-stage entities touching the same file cannot see each other until both ship, which defeats the purpose of the coherence check. build-plan step 9 appends at `planned`; build-execute step 2 transitions to `in-flight`; both are load-bearing, neither is optional.
 
@@ -371,7 +371,7 @@ All of these mean: re-dispatch the BLOCKED task at the next model tier up, inclu
 
 ### Task Dispatch Contract
 
-- **Every task dispatches via `Agent(subagent_type="spacebridge:task-executor", model=task.model, prompt=...)`** -- never with a different subagent type, never inline, never via `Skill`. The task-executor agent is the only authorized execution vessel for plan tasks, and it loads `skills/task-execution/SKILL.md` automatically.
+- **Every task dispatches via `Agent(subagent_type="spacedock:task-executor", model=task.model, prompt=...)`** -- never with a different subagent type, never inline, never via `Skill`. The task-executor agent is the only authorized execution vessel for plan tasks, and it loads `skills/task-execution/SKILL.md` automatically.
 - **NEVER commit from inside a task-executor dispatch.** Task-executors return `changed_files` lists; you commit serially after the wave closes. Per-task commits batched into a wave are the orchestrator's job, not the subagent's.
 - **NEVER skip an acceptance_criteria command.** The task-execution skill already enforces this at the subagent level, but your orchestrator prompt must not override it with "skip X for speed" instructions. Prior green in a neighbor task is stale evidence.
 - **NEVER dispatch a task-executor with `serial="true"` tasks in parallel.** The serial hint is a plan-level decision; honoring it is a contract.

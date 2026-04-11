@@ -1,7 +1,7 @@
 # Pressure tests for skills/uat-resume
 #
 # Captured Phase E Plan 2 Wave 4 dispatch (2026-04-11).
-# Skill is a user-invoked slash command (/spacebridge:uat-resume {slug})
+# Skill is a user-invoked slash command (/spacedock:uat-resume {slug})
 # that wraps build-uat in skip-only mode to re-run pending UAT items for
 # an already-shipped entity. Thin wrapper discipline per spec line 490:
 # not a separate execution path. sonnet.
@@ -15,7 +15,7 @@ related_commit_with_fix: null
 test_cases:
   - id: scope-selection-delegation
     summary: |
-      Captain runs /spacebridge:uat-resume 047-example. Entity already
+      Captain runs /spacedock:uat-resume 047-example. Entity already
       shipped. ## UAT Results has 6 items: items 1, 2, 4, 6 pass; item 3
       was fail then execute loop then pass; item 5 skipped with captain
       reason "no staging db available, defer". Frontmatter
@@ -56,7 +56,7 @@ test_cases:
 
   - id: zero-pending-no-op
     summary: |
-      Captain runs /spacebridge:uat-resume 052-fully-acked. Entity shipped
+      Captain runs /spacedock:uat-resume 052-fully-acked. Entity shipped
       last week. Frontmatter uat_pending_count: 0. ## UAT Results shows
       all items pass with no skipped rows. Captain's invocation appears
       to be a stale mental model or a wrong slug. uat-resume wrapper is
@@ -104,7 +104,7 @@ test_cases:
       through 9 renumbered down to 5 through 8, and a new item 9 was
       added. ## UAT Results still shows the old text "5. Run device cert
       flow (SKIPPED)" and "7. Verify pairing handshake (SKIPPED)". Captain
-      runs /spacebridge:uat-resume 048-legacy-thing assuming nothing
+      runs /spacedock:uat-resume 048-legacy-thing assuming nothing
       changed. uat-resume wrapper is checking preconditions before
       dispatching.
     pressure:

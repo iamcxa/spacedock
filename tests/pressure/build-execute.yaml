@@ -4,7 +4,7 @@
 # Skill is the execute stage orchestrator dispatched by FO as an ensign.
 # sonnet orchestrator + haiku/sonnet/opus task subagents per task model
 # hint. Reads PLAN, builds wave graph, transitions CONTRACTS rows to
-# in-flight, dispatches spacebridge:task-executor agents wave-by-wave,
+# in-flight, dispatches spacedock:task-executor agents wave-by-wave,
 # commits serially, writes Stage Report. Does NOT mutate wave topology.
 
 skill: build-execute
@@ -67,7 +67,7 @@ test_cases:
       - append_confusion: "'append is more honest than update-status-bulk because it preserves history'"
     options:
       A: "Dispatch wave 1 immediately; defer workflow-index update until after wave 1 completes (timestamps are close enough)"
-      B: "Call spacebridge:workflow-index via Skill tool to transition ALL CONTRACTS rows for this entity from planned -> in-flight BEFORE dispatching any wave 1 task subagent. Commit chore(index): advance transition. THEN dispatch wave 1"
+      B: "Call spacedock:workflow-index via Skill tool to transition ALL CONTRACTS rows for this entity from planned -> in-flight BEFORE dispatching any wave 1 task subagent. Commit chore(index): advance transition. THEN dispatch wave 1"
       C: "Skip workflow-index entirely; the mods/workflow-index-maintainer.md Case B band-aid will catch the transition retroactively at ship time"
       D: "Call workflow-index append again with stage=execute instead of transitioning the existing rows -- appends create new rows which more accurately reflect the stage entry"
       E: "Defer the transition to build-review stage, since review reads CONTRACTS anyway"

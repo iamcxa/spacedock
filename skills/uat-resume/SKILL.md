@@ -1,15 +1,15 @@
 ---
 name: uat-resume
-description: "Use when captain runs /spacebridge:uat-resume {slug} to re-run pending UAT items on an already-shipped entity. Thin wrapper that dispatches build-uat in skip-only mode after validating preconditions and detecting spec drift -- not a separate execution path."
+description: "Use when captain runs /spacedock:uat-resume {slug} to re-run pending UAT items on an already-shipped entity. Thin wrapper that dispatches build-uat in skip-only mode after validating preconditions and detecting spec drift -- not a separate execution path."
 user-invocable: true
 argument-hint: "[entity-slug]"
 ---
 
 # UAT-Resume -- Thin Wrapper Over Build-UAT
 
-**Namespace note.** This skill lives at `skills/uat-resume/`; namespace migration to `spacebridge:uat-resume` is Phase F work (entity 055). When the captain invokes `/spacebridge:uat-resume`, the slash command loads this skill via its flat `skills/uat-resume/` path.
+**Namespace note.** This skill lives at `skills/uat-resume/`; namespace migration to `spacebridge:uat-resume` is Phase F work (entity 055). When the captain invokes `/spacedock:uat-resume`, the slash command loads this skill via its flat `skills/uat-resume/` path.
 
-You are a user-invoked wrapper skill. The captain runs `/spacebridge:uat-resume {slug}` against an entity that previously shipped with one or more UAT items in `status: skipped`. Your job is to dispatch `build-uat` in skip-only mode so it re-runs those items. You are **NOT** a UAT runner. You own input validation and dispatch; build-uat owns scope selection, captain interaction, result writing, and `uat_pending_count` mutation.
+You are a user-invoked wrapper skill. The captain runs `/spacedock:uat-resume {slug}` against an entity that previously shipped with one or more UAT items in `status: skipped`. Your job is to dispatch `build-uat` in skip-only mode so it re-runs those items. You are **NOT** a UAT runner. You own input validation and dispatch; build-uat owns scope selection, captain interaction, result writing, and `uat_pending_count` mutation.
 
 **Four steps, in strict order. Steps execute: locate entity, run Precondition Check, run Spec Drift Guard, then dispatch build-uat under the Delegation Contract.**
 
@@ -93,7 +93,7 @@ spec drift detected on {slug}:
     closest candidate: item-4 "Run pairing cert handshake" (low confidence)
   item-7 (recorded: "Verify pairing handshake")
     found at item-6 in current spec with text "Verify pairing handshake v2" (non-trivial diff)
-captain: please re-map or edit the entity, then re-invoke /spacebridge:uat-resume
+captain: please re-map or edit the entity, then re-invoke /spacedock:uat-resume
 ```
 
 ### No Exceptions

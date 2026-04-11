@@ -1,7 +1,7 @@
 # Pressure tests for skills/task-execution
 #
 # Captured Phase E Plan 2 Wave 2 dispatch (2026-04-11).
-# Skill is a subroutine invoked by build-execute via the spacebridge:task-executor
+# Skill is a subroutine invoked by build-execute via the spacedock:task-executor
 # agent with Agent tool dispatch. Contract: load skills from prompt → read_first
 # → execute action → verify acceptance_criteria → return changed_files (no commit).
 

@@ -1,13 +1,13 @@
 ---
 name: build-uat
-description: "UAT stage orchestrator dispatched by FO. Runs e2e-pipeline automated items (browser / cli / api) first, then captain interactive sign-off via sequential AskUserQuestion calls. Classifies fails as infra (auto route to execute) vs assertion (captain review). Supports skip / resume via /spacebridge:uat-resume wrapper that re-runs only skipped items."
+description: "UAT stage orchestrator dispatched by FO. Runs e2e-pipeline automated items (browser / cli / api) first, then captain interactive sign-off via sequential AskUserQuestion calls. Classifies fails as infra (auto route to execute) vs assertion (captain review). Supports skip / resume via /spacedock:uat-resume wrapper that re-runs only skipped items."
 ---
 
 # Build-UAT -- User-Observable Behavior Verification
 
-**Namespace note.** This skill lives at `skills/build-uat/`; namespace migration to `spacebridge:build-uat` is Phase F work (entity 055). When FO dispatches the UAT ensign, the agent loads this skill via its flat `skills/build-uat/` path. The same flat path is loaded when `/spacebridge:uat-resume` invokes this skill in skip-only mode -- per spec line 490, uat-resume is a thin wrapper, not a separate execution path.
+**Namespace note.** This skill lives at `skills/build-uat/`; namespace migration to `spacebridge:build-uat` is Phase F work (entity 055). When FO dispatches the UAT ensign, the agent loads this skill via its flat `skills/build-uat/` path. The same flat path is loaded when `/spacedock:uat-resume` invokes this skill in skip-only mode -- per spec line 490, uat-resume is a thin wrapper, not a separate execution path.
 
-You are a stage skill invoked by First Officer through the UAT ensign agent (or by `/spacebridge:uat-resume` in skip-only mode). You run automated e2e-pipeline checks against the entity's `## UAT Spec`, then hand the surviving items to the captain for interactive sign-off. You are **orchestrator-with-captain**: you dispatch other skills, you record evidence, you interact with the captain sequentially.
+You are a stage skill invoked by First Officer through the UAT ensign agent (or by `/spacedock:uat-resume` in skip-only mode). You run automated e2e-pipeline checks against the entity's `## UAT Spec`, then hand the surviving items to the captain for interactive sign-off. You are **orchestrator-with-captain**: you dispatch other skills, you record evidence, you interact with the captain sequentially.
 
 **Seven steps, in strict order. Steps 1-3 are automated; Step 4 is captain-interactive; Steps 5-7 finalize and route.**
 
@@ -22,7 +22,7 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
   ```
   ToolSearch(query: "select:AskUserQuestion", max_results: 1)
   ```
-- `Skill` -- invoke e2e-pipeline skills (`e2e-pipeline:e2e-map`, `e2e-pipeline:e2e-flow`, `e2e-pipeline:e2e-test`) for browser items, and `spacebridge:knowledge-capture` at Step 7 when gotchas surfaced.
+- `Skill` -- invoke e2e-pipeline skills (`e2e-pipeline:e2e-map`, `e2e-pipeline:e2e-flow`, `e2e-pipeline:e2e-test`) for browser items, and `spacedock:knowledge-capture` at Step 7 when gotchas surfaced.
 - `Bash` -- run CLI / API items (declared commands, `curl`, `gh`). Also used for git commit and ISO timestamp capture.
 - `Read` -- open the entity file to parse `## UAT Spec` and, on skip-only mode re-entry, parse the prior `## UAT Results` rows.
 - `Grep` / `Glob` -- locate the entity file if the workflow directory is passed but the absolute entity path is not.
@@ -36,7 +36,7 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
 
 ## Inputs From Orchestrator
 
-FO (or `/spacebridge:uat-resume`) dispatches you with these fields in the prompt:
+FO (or `/spacedock:uat-resume`) dispatches you with these fields in the prompt:
 
 1. **Entity slug** -- e.g. `047-example-entity`
 2. **Entity file path** -- absolute path to the entity markdown file
@@ -231,7 +231,7 @@ notes: {one line if any input field was missing, else omit}
 
 ### 7b -- Knowledge Capture (Conditional)
 
-Per spec line 433: if UAT surfaced a gotcha (recurring infra fail pattern, non-obvious selector drift, flaky assertion, version-specific regression), invoke `spacebridge:knowledge-capture` in **capture mode** via the Skill tool. You are running as an ensign subagent, so per `skills/knowledge-capture/SKILL.md` Critical Invariants you MUST use `mode: capture` -- you cannot use `mode: apply` (apply mode requires FO's `--agent` context for native AskUserQuestion access). Capture mode stages D2 candidates into the entity body's `## Pending Knowledge Captures` section; FO handles the apply loop later.
+Per spec line 433: if UAT surfaced a gotcha (recurring infra fail pattern, non-obvious selector drift, flaky assertion, version-specific regression), invoke `spacedock:knowledge-capture` in **capture mode** via the Skill tool. You are running as an ensign subagent, so per `skills/knowledge-capture/SKILL.md` Critical Invariants you MUST use `mode: capture` -- you cannot use `mode: apply` (apply mode requires FO's `--agent` context for native AskUserQuestion access). Capture mode stages D2 candidates into the entity body's `## Pending Knowledge Captures` section; FO handles the apply loop later.
 
 Skip this sub-step if no gotchas surfaced.
 
@@ -274,7 +274,7 @@ If `mode: skip-only`, include the mode in the message: `"uat-resume: {slug} -- i
 - **NEVER batch multiple UAT items into a single AskUserQuestion payload.** Multi-select looks efficient on paper but destroys the per-item recovery path -- if the session is interrupted mid-answer, a batched call loses the partial state. Sequential calls survive interruption because each answer lands in scratch before the next call.
 - **NEVER substitute plain text for AskUserQuestion in the sign-off loop.** Plain text feels simpler but lacks the structured-option guarantee (captain can reply with anything), and the option schema is load-bearing for result parsing. The only plain-text moment in Step 4 is the informational evidence summary in 4b and the reason prompt after `skip-with-reason` -- never the judgment call itself.
 - **NEVER dispatch a subagent to handle the interactive loop.** You already ARE the ensign subagent; per `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md`, subagents cannot recursively dispatch Agent. "Keep the orchestrator stateless" is backwards rationalization -- the orchestrator IS the state-holder here by design.
-- **NEVER auto-defer interactive items to `/spacebridge:uat-resume` "to keep the pipeline moving".** Auto-defer without captain input is not a skip -- it's abandonment. Real skips require captain to name a reason in Step 4 first.
+- **NEVER auto-defer interactive items to `/spacedock:uat-resume` "to keep the pipeline moving".** Auto-defer without captain input is not a skip -- it's abandonment. Real skips require captain to name a reason in Step 4 first.
 
 ### Stage Contract and Scope
 

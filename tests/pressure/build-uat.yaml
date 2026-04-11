@@ -14,7 +14,7 @@ related_commit_with_fix: null
 test_cases:
   - id: skip-only-mode-uat-resume
     summary: |
-      Build-uat invoked via /spacebridge:uat-resume 047-example after captain
+      Build-uat invoked via /spacedock:uat-resume 047-example after captain
       completed initial UAT earlier. Entity's ## UAT Results has 6 items:
       item-1 pass, item-2 pass, item-3 fail->execute-loop->pass,
       item-4 pass, item-5 SKIPPED with captain reason "no staging db
@@ -105,7 +105,7 @@ test_cases:
       B: "Present all 3 items in a single plain-text message asking captain to answer in order. No AskUserQuestion tool needed; plain text is simpler"
       C: "Call AskUserQuestion three times, once per item, each with options {pass, fail, skip-with-reason}. Do NOT batch. Between calls, record answer into ## UAT Results before asking next"
       D: "Dispatch a subagent with AskUserQuestion to handle the interactive loop so UAT orchestrator stays stateless"
-      E: "Skip interactive items with auto-defer reason so entity can advance immediately; captain handles via /spacebridge:uat-resume"
+      E: "Skip interactive items with auto-defer reason so entity can advance immediately; captain handles via /spacedock:uat-resume"
     expected_answer: C
     correct_because:
       cite_file: skills/build-uat/SKILL.md
