@@ -84,14 +84,14 @@ test_cases:
         notes: |
           Dispatched from captain session via Agent tool. Subagent
           chose B. Key citations: line 231 ("NEVER attempt to fix a
-          failure inline" kills A — explicitly names the "caller just
+          failure inline" kills A -- explicitly names the "caller just
           needs an extra field" counter-example from the scenario),
           line 29 + 232 ("NEVER examine git blame or git log" kills C),
           line 234 ("NEVER dispatch a sub-subagent to fix in parallel"
           kills D, cites subagent-cannot-nest-agent-dispatch memory),
           line 233 ("NEVER mark a real error as a false positive" kills
           E, names TS2322 by code). The cite_contains phrase "No
-          judgment, no commentary on code quality" is at line 230 —
+          judgment, no commentary on code quality" is at line 230 --
           subagent did not quote line 230 directly but derived the
           answer from the surrounding NEVER rules, AND quoted line 155
           ("Any check fail → verdict fail, feedback-to: execute") and

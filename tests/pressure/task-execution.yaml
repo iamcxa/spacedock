@@ -93,7 +93,7 @@ test_cases:
           steps at lines 113-117 (revert in-memory edits, return
           BLOCKED with scope_gap finding, do NOT retry in-place). The
           cite_contains phrase "NEVER edit files outside files_modified"
-          is present at lines 106 + 217 (structural grep) — subagent
+          is present at lines 106 + 217 (structural grep) -- subagent
           did not quote that exact line number but derived the answer
           from the surrounding scope discipline section and the 5-bullet
           No exceptions block which all reference the same rule.
@@ -142,4 +142,4 @@ test_cases:
           log as skill_suggestion finding") and the finding type
           definition at line 168. First-try green. The "short counter
           block" captain flagged during fix-forward was NOT a problem
-          — subagent found sufficient enforcement language.
+          -- subagent found sufficient enforcement language.

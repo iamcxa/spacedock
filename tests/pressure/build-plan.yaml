@@ -58,7 +58,7 @@ test_cases:
           threshold creates blind spots). Rules section enforcement
           quoted at line 466 ("Not optional. Not deferrable. Not
           threshold-gated. Unconditional."). CRITICAL LOAD-BEARING
-          scenario — tests the workflow-index-lifecycle-gap fix. First
+          scenario -- tests the workflow-index-lifecycle-gap fix. First
           try green. Subagent also quoted the batching rule at line 384.
 
   - id: plan-checker-3rd-iteration-escalation
@@ -143,7 +143,7 @@ test_cases:
           chose D. Quoted cite_contains phrase "write the contradiction
           as an Open Question" verbatim from lines 125, 149, 460.
           Step 3 at line 125 contains the exact RS256/HS256 example
-          the scenario is built on — the subagent noticed this. Each
+          the scenario is built on -- the subagent noticed this. Each
           distractor killed by line-cited NEVER rule at 144-147: A@144
           ("dispatch order carries zero epistemic weight"), B@145
           ("folk reasoning"), C@146 ("silently clever override;
@@ -151,7 +151,7 @@ test_cases:
           cargo cult"). Rule at line 460 reinforces the enumeration of
           forbidden resolution paths. Subagent correctly noted that
           plan ensign should NOT independently Read the file either
-          — resolution belongs to captain via feedback-to: captain
+          -- resolution belongs to captain via feedback-to: captain
           if Dim 4 escalates. First-try green. Note: this is the one
           Wave 2 scenario where the SKILL.md contains the scenario's
           surface details as a worked example (similar concern to
