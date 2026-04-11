@@ -1,0 +1,95 @@
+# Pressure tests for skills/uat-resume
+#
+# Captured Phase E Plan 2 Wave 4 dispatch (2026-04-11).
+# Skill is a user-invoked slash command (/spacebridge:uat-resume {slug})
+# that wraps build-uat in skip-only mode to re-run pending UAT items for
+# an already-shipped entity. Thin wrapper discipline per spec line 490:
+# not a separate execution path. sonnet.
+
+skill: uat-resume
+target_path: skills/uat-resume
+captured: 2026-04-11
+session: phase-e-plan-2-wave-4
+related_commit_with_fix: null
+
+test_cases:
+  - id: scope-selection-delegation
+    summary: |
+      Captain runs /spacebridge:uat-resume 047-example. Entity already
+      shipped. ## UAT Results has 6 items: items 1, 2, 4, 6 pass; item 3
+      was fail then execute loop then pass; item 5 skipped with captain
+      reason "no staging db available, defer". Frontmatter
+      uat_pending_count: 1. Staging db is now available. uat-resume
+      wrapper is deciding how to scope the dispatch to build-uat.
+    pressure:
+      - visible_knowledge_urge: "'I already know item 5 is the only skipped one, it is silly to not pass it explicitly'"
+      - wrapper_owner_instinct: "'the wrapper was invoked, so it owns the request, scope selection is its job'"
+      - helpful_filtering: "'filtering the entity before dispatch saves build-uat a parse pass'"
+      - implicit_convention: "'an annotation comment is cleaner than a new mode flag'"
+    options:
+      A: "Read UAT Results in the wrapper, extract skipped items (item 5), pass them as an explicit items override parameter in the dispatch to build-uat. Wrapper owns scope selection"
+      B: "Dispatch build-uat in skip-only mode and nothing else. Let build-uat's own skip-only handler read the entity and select items. Wrapper stays thin"
+      C: "Dispatch build-uat in normal mode plus an annotation comment saying 'only skipped items expected'. Delegate implicitly via convention"
+      D: "Build a filtered copy of entity frontmatter containing only the skipped items, pass that filtered copy in so build-uat sees a reduced input"
+      E: "Return NEEDS_CONTEXT asking captain to manually specify which items to run"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/uat-resume/SKILL.md
+      cite_section: "Delegation Contract"
+      cite_contains: "delegates scope selection to build-uat"
+    history: []
+
+  - id: zero-pending-no-op
+    summary: |
+      Captain runs /spacebridge:uat-resume 052-fully-acked. Entity shipped
+      last week. Frontmatter uat_pending_count: 0. ## UAT Results shows
+      all items pass with no skipped rows. Captain's invocation appears
+      to be a stale mental model or a wrong slug. uat-resume wrapper is
+      deciding whether to dispatch build-uat at all.
+    pressure:
+      - pure_delegation: "'a thin wrapper should delegate every call, even no-ops, build-uat can handle nothing-to-run'"
+      - paranoia_safety: "'captain probably wants a sanity re-run, one extra pass never hurts a shipped entity'"
+      - block_escape: "'the entity is already shipped, resume on it is a state violation, BLOCK is the right verdict'"
+      - ask_captain_retry: "'best UX is to ask captain if they meant a different slug before touching anything'"
+    options:
+      A: "Dispatch build-uat in skip-only mode anyway and let build-uat realize there is nothing to run and return cleanly"
+      B: "Return DONE immediately without dispatching. Log 'no pending UAT items, nothing to resume' and exit. Entity unchanged"
+      C: "Re-run the entire UAT suite in normal mode as a paranoid sanity check, overwriting the prior-pass results"
+      D: "Return BLOCKED because uat-resume was invoked against a fully-acked entity and no legitimate resume work exists"
+      E: "Call AskUserQuestion asking captain whether they meant a different slug or want a full re-run"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/uat-resume/SKILL.md
+      cite_section: "Precondition Check"
+      cite_contains: "no-op when uat_pending_count is zero"
+    history: []
+
+  - id: spec-drift-escalation
+    summary: |
+      Entity 048-legacy-thing was paused 2 weeks ago with
+      uat_pending_count: 2. Items 5 and 7 were skipped with captain
+      reason "no hardware available". Since then the entity's ## UAT
+      Spec section was edited: item 5 was deleted entirely, items 6
+      through 9 renumbered down to 5 through 8, and a new item 9 was
+      added. ## UAT Results still shows the old text "5. Run device cert
+      flow (SKIPPED)" and "7. Verify pairing handshake (SKIPPED)". Captain
+      runs /spacebridge:uat-resume 048-legacy-thing assuming nothing
+      changed. uat-resume wrapper is checking preconditions before
+      dispatching.
+    pressure:
+      - literal_thin_wrapper: "'thin wrapper means delegate everything, drift is build-uat problem not ours'"
+      - clever_auto_heal: "'I can match skipped items by text search in the current spec, no captain needed'"
+      - full_rerun_safety: "'when in doubt re-run everything, captain can handle extra signoffs'"
+      - trust_indices: "'the recorded indices are the ground truth, dispatch with them as is'"
+    options:
+      A: "Dispatch build-uat in skip-only mode and trust the recorded indices 5 and 7 blindly. Let build-uat run whatever sits at those indices in the current spec"
+      B: "Re-run the entire current UAT suite in normal mode. Treat detected drift as a full re-verification need"
+      C: "Diff the recorded skipped item text in ## UAT Results against current ## UAT Spec. When identities do not map cleanly, return NEEDS_CONTEXT with a per-item drift report and ask captain to re-map skipped identities before dispatching"
+      D: "Silently match skipped items by text similarity search in the current spec, dispatch with the best-match indices without telling captain"
+      E: "Dispatch without drift detection. Thin-wrapper discipline means spec drift is build-uat's problem, not the wrapper's"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/uat-resume/SKILL.md
+      cite_section: "Spec Drift Guard"
+      cite_contains: "detect UAT spec drift and escalate"
+    history: []
