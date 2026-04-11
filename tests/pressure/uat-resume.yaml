@@ -22,10 +22,10 @@ test_cases:
       uat_pending_count: 1. Staging db is now available. uat-resume
       wrapper is deciding how to scope the dispatch to build-uat.
     pressure:
-      - visible_knowledge_urge: "'I already know item 5 is the only skipped one, it is silly to not pass it explicitly'"
-      - wrapper_owner_instinct: "'the wrapper was invoked, so it owns the request, scope selection is its job'"
+      - explicit_is_auditable: "'explicit is better than implicit, passing the item list makes the dispatch auditable and testable in isolation'"
+      - build_uat_stays_unaware: "'build-uat stays completely unaware of skip-resume semantics, a pure preprocessing step gives perfect isolation'"
+      - captain_knows_best: "'captain knows best which skips are actually ready to re-run now, explicit confirmation prevents wasted ensign cycles'"
       - helpful_filtering: "'filtering the entity before dispatch saves build-uat a parse pass'"
-      - implicit_convention: "'an annotation comment is cleaner than a new mode flag'"
     options:
       A: "Read UAT Results in the wrapper, extract skipped items (item 5), pass them as an explicit items override parameter in the dispatch to build-uat. Wrapper owns scope selection"
       B: "Dispatch build-uat in skip-only mode and nothing else. Let build-uat's own skip-only handler read the entity and select items. Wrapper stays thin"
@@ -47,10 +47,10 @@ test_cases:
       to be a stale mental model or a wrong slug. uat-resume wrapper is
       deciding whether to dispatch build-uat at all.
     pressure:
-      - pure_delegation: "'a thin wrapper should delegate every call, even no-ops, build-uat can handle nothing-to-run'"
-      - paranoia_safety: "'captain probably wants a sanity re-run, one extra pass never hurts a shipped entity'"
+      - maximally_thin: "'delegating the empty-set check to build-uat keeps uat-resume maximally thin'"
+      - paranoid_reverify: "'entities shipped last week may have bit-rotted against a moved main, a paranoid re-verification is a free safety net'"
+      - clarifying_question: "'captain invocation is ambiguous between wrong slug and wanted a re-run anyway, a single clarifying question prevents both failure modes'"
       - block_escape: "'the entity is already shipped, resume on it is a state violation, BLOCK is the right verdict'"
-      - ask_captain_retry: "'best UX is to ask captain if they meant a different slug before touching anything'"
     options:
       A: "Dispatch build-uat in skip-only mode anyway and let build-uat realize there is nothing to run and return cleanly"
       B: "Return DONE immediately without dispatching. Log 'no pending UAT items, nothing to resume' and exit. Entity unchanged"
@@ -77,10 +77,10 @@ test_cases:
       changed. uat-resume wrapper is checking preconditions before
       dispatching.
     pressure:
-      - literal_thin_wrapper: "'thin wrapper means delegate everything, drift is build-uat problem not ours'"
-      - clever_auto_heal: "'I can match skipped items by text search in the current spec, no captain needed'"
-      - full_rerun_safety: "'when in doubt re-run everything, captain can handle extra signoffs'"
-      - trust_indices: "'the recorded indices are the ground truth, dispatch with them as is'"
+      - trust_recorded_indices: "'the recorded indices are the captain prior decision, honoring them literally is the most faithful execution of original skip intent'"
+      - full_rerun_safety: "'drift detected anywhere means the verification baseline changed, the only safe answer is a full re-run, partial resume on shifted spec is worse than redundancy'"
+      - text_similarity_auto_heal: "'text similarity is how humans would re-locate the items anyway, surfacing a drift dialog for every minor edit creates friction'"
+      - literal_thin_wrapper: "'thin wrapper means thin wrapper, drift detection is exactly the kind of scope creep that violates the locked spec constraint'"
     options:
       A: "Dispatch build-uat in skip-only mode and trust the recorded indices 5 and 7 blindly. Let build-uat run whatever sits at those indices in the current spec"
       B: "Re-run the entire current UAT suite in normal mode. Treat detected drift as a full re-verification need"
