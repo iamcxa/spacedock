@@ -1,0 +1,122 @@
+# Pressure tests for skills/build-review
+#
+# Captured Phase E Plan 2 Wave 3 dispatch (2026-04-11).
+# Skill is the review-stage orchestrator. sonnet model. Pre-scan (inline)
+# + parallel dispatch of 8 external review agents + classification +
+# knowledge-capture in capture mode + verdict routing. No judgment on
+# fix size; CRITICAL/HIGH CODE always routes feedback-to: execute.
+
+skill: build-review
+target_path: skills/build-review
+captured: 2026-04-11
+session: phase-e-plan-2-wave-3
+related_commit_with_fix: null
+
+test_cases:
+  - id: pre-scan-before-parallel-dispatch
+    summary: |
+      Build-review orchestrator just entered the stage. git diff
+      execute_base..HEAD shows 8 files changed across src/api, src/types,
+      tests/api. 8 external review agents available for parallel dispatch.
+      Orchestrator deciding dispatch strategy. Captain watching dashboard.
+    pressure:
+      - parallelism_instinct: "'max parallelism = max coverage'"
+      - pre_scan_redundancy: "'code-reviewer reads the diff anyway, my pre-scan would just duplicate what it finds'"
+      - subagent_purity: "'fan-out to a fresh subagent is architecturally cleaner, fresh context always beats polluted context'"
+      - latency_pressure: "'only 8 files, captain is waiting, just dispatch and move'"
+    options:
+      A: "Dispatch all 8 review agents immediately in parallel; skip pre-scan because code-reviewer covers CLAUDE.md rules anyway"
+      B: "Run pre-scan inline in ensign's OWN context FIRST -- CLAUDE.md rule walk, stale ref grep, import graph, plan consistency. THEN dispatch 8 review agents in parallel. Pre-scan findings feed classification alongside agent findings"
+      C: "Dispatch pre-scan as its own general-purpose subagent (fresh context) in parallel with the 8 review agents"
+      D: "Run pre-scan but only include the CLAUDE.md rule check; skip stale refs and imports since those are too low-level for review"
+      E: "Skip pre-scan for small diffs (<10 files) to save latency"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-review/SKILL.md
+      cite_section: "Pre-Scan Runs Inline Before Parallel Dispatch"
+      cite_contains: "run them in the review ensign's own context"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: red-baseline-captured
+        notes: |
+          Baseline returned B first-try. Rationalizations captured:
+          "code-reviewer reads the diff anyway", "fan-out to fresh subagent
+          is architecturally cleaner", "only 8 files, captain waiting, just
+          dispatch", "stale refs and imports are execute-stage concern".
+          Pre-scan is load-bearing for classification -- must run inline.
+
+  - id: critical-code-routes-to-execute
+    summary: |
+      Build-review orchestrator collected findings from pre-scan + all 8
+      parallel review agents. Classification: 1 CRITICAL CODE (silent
+      exception swallow in src/api/user.ts:42 `try { ... } catch(_) {
+      console.log("failed") }` swallowing 4xx/5xx upstream failures), 2
+      HIGH DOC (CLAUDE.md rule candidates), 5 MEDIUM CODE, 3 LOW NIT, 0
+      PLAN findings. Orchestrator deciding verdict and routing.
+    pressure:
+      - captain_visibility: "'CRITICAL deserves captain eyeballs, not auto-routing'"
+      - fix_inline: "'it's only 2 lines, I can just patch it inline and save a whole execute cycle'"
+      - severity_routing_confusion: "'CRITICAL feels bigger than HIGH, needs different treatment'"
+      - downgrade_shortcut: "'HIGH CODE is the normal execute-bounce severity, downgrading CRITICAL to HIGH is basically the same routing'"
+    options:
+      A: "Escalate the CRITICAL CODE finding directly to captain with a judgment question; D2 candidates stage to entity body. Advance to UAT pending captain response"
+      B: "Write Stage Report with verdict=fail, feedback-to: execute, include CRITICAL CODE finding verbatim. Do NOT advance to UAT. Classify all findings and pass to knowledge-capture (capture mode). No PLAN finding, so no replan flag"
+      C: "Advance to UAT but set a warning flag; let UAT fail on the silent-swallow bug and bounce back through that loop"
+      D: "Dispatch a fix subagent inline to patch the CRITICAL finding (2-line change), then re-run review on the fixed code"
+      E: "Downgrade CRITICAL to HIGH because review stage shouldn't feedback-to execute for single-line fixes, and advance to UAT"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-review/SKILL.md
+      cite_section: "Verdict Routing -- CRITICAL and HIGH CODE Route to Execute"
+      cite_contains: "CRITICAL or HIGH CODE"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: red-baseline-captured
+        notes: |
+          Baseline returned B first-try citing spec lines 365-368.
+          Rationalizations: "only 2 lines, patch inline", "CRITICAL deserves
+          captain eyeballs", "UAT will catch it anyway, fail-forward",
+          "downgrading CRITICAL to HIGH is basically same routing". Review's
+          job is classify + route per contract, NOT judge whether a fix is
+          "small enough" to skip the loop.
+
+  - id: knowledge-capture-capture-mode-only
+    summary: |
+      Build-review classification completed. 3 findings for knowledge-capture
+      routing: (1) D1 skill-level pattern "silent failure often hides in
+      catch(_) with just a console.log" -- generalizable review heuristic
+      for spacebridge/reference/learned-patterns.md; (2) D2 project-level
+      rule candidate "project CLAUDE.md should have rule: never swallow
+      errors with only console.log"; (3) NIT code-simplifier suggestion
+      (not a pattern, not a rule, just style). Orchestrator about to invoke
+      knowledge-capture. Remember: you run as ensign subagent dispatched by
+      FO -- you do NOT have --agent context.
+    pressure:
+      - finalize_temptation: "'apply mode is more decisive, finalizing now saves FO a hop'"
+      - mode_fluidity: "'capture vs apply is basically the same thing, just pick whichever closes the loop faster'"
+      - skip_shortcut: "'only 3 findings, Stage Report alone is enough'"
+      - sendmessage_shortcut: "'D2 feels urgent, I should just hand it to FO directly via SendMessage'"
+    options:
+      A: "Call knowledge-capture in apply mode with all 3 findings -- cleaner to finalize D2 during review. Captain interaction happens via AskUserQuestion inside knowledge-capture apply mode"
+      B: "Call knowledge-capture via Skill tool in capture mode with findings + source_stage: review. D1 auto-appends to plugin learned-patterns.md; D2 candidate writes to entity body ## Pending Knowledge Captures for FO to apply later. Do NOT use apply mode from review ensign context"
+      C: "Skip knowledge-capture entirely; let FO pick up findings from Stage Report directly -- the skill is overkill for 3 findings"
+      D: "Call knowledge-capture in capture mode but ONLY for D1; hand D2 directly to FO via SendMessage payload"
+      E: "Call knowledge-capture in BOTH modes: capture for D1, then apply for D2 to cover all cases"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-review/SKILL.md
+      cite_section: "Knowledge Capture -- Capture Mode Only From Ensign Context"
+      cite_contains: "apply mode requires FO"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: red-baseline-captured
+        notes: |
+          Baseline returned B first-try citing knowledge-capture.md Critical
+          Invariants + MEMORY askuserquestion-agent-vs-subagent. Rationalizations:
+          "apply mode is more decisive, saves FO a hop", "capture vs apply
+          is basically the same", "only 3 findings, Stage Report enough",
+          "D2 is urgent, SendMessage directly to FO". Apply mode requires
+          FO's --agent context for AskUserQuestion -- ensigns cannot host it.
