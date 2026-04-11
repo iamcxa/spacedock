@@ -75,21 +75,26 @@ See the "Wave Graph Integrity -- No Silent Reorder" No-Exceptions block below fo
 
 **Before dispatching any wave 1 task subagent, you MUST transition all CONTRACTS rows for this entity from `planned` to `in-flight`.** This is the execute-side counterpart to `build-plan` step 9's unconditional append. It closes the Case B band-aid in `mods/workflow-index-maintainer.md` and restores stage-transition granularity to the cross-entity coherence detector.
 
-Invoke the workflow-index skill via the `Skill` tool:
+First, build the deduped file list from step 1's parsed wave graph: union every `task.files_modified` across every wave into one flat list, removing duplicates. Step 1 already parsed `## PLAN` into the in-memory task list, so this is a local operation -- you do not re-read the entity file.
+
+Then invoke the workflow-index skill via the `Skill` tool using the `update-status-bulk` operation (the per-entity multi-file transition API documented in `skills/workflow-index/references/write-mode.md` lines 60-94):
 
 ```
 Skill("spacebridge:workflow-index", args={
   mode: "write",
   target: "contracts",
-  operation: "update-status",
-  filter: { entity: "{current entity slug}" },
-  new_status: "in-flight"
+  operation: "update-status-bulk",
+  entry: {
+    entity: "{current entity slug}",
+    files: [{deduped file list from step 1}],
+    new_status: "in-flight"
+  }
 })
 ```
 
-The operation iterates every CONTRACTS row where `entity == {slug}` and flips `status` from `planned` to `in-flight`. If the skill returns a row count of zero, it means `build-plan` step 9 failed to append -- write `## Stage Report: execute` with `feedback-to: plan` and return. Do NOT attempt to repair the gap by calling `append` yourself; an execute-time append loses plan-time intent and masks the upstream failure.
+The operation locates every CONTRACTS row matching `(entity, file)` for this entity's file list and flips `status` from `planned` to `in-flight`, committing atomically at the end per write-mode.md line 84. If the skill returns a row count less than the number of files passed, it means `build-plan` step 9 failed to append one or more files -- write `## Stage Report: execute` with `feedback-to: plan` and return. Do NOT attempt to repair the gap by calling `append` yourself; an execute-time append loses plan-time intent and masks the upstream failure.
 
-The workflow-index skill commits the transition as `chore(index): advance {slug} contracts to in-flight` automatically. Verify the commit landed via `git log --oneline -1 -- docs/build-pipeline/_index/CONTRACTS.md` before proceeding.
+The workflow-index skill commits the transition as `chore(index): advance entity-{slug} contracts to in-flight ({N} files)` automatically (per write-mode.md line 84). Verify the commit landed via `git log --oneline -1 -- docs/build-pipeline/_index/CONTRACTS.md` before proceeding.
 
 **Only after the transition commit lands do you proceed to step 3.** Wave 1 dispatch is blocked on this step.
 
@@ -330,16 +335,16 @@ All of these mean: refuse to dispatch, write Stage Report with dimension_3 depen
 - **"Every second before first dispatch is wasted"** -- latency instinct applied to a 500ms Skill call is penny-wise pound-foolish. The transition commit is the only mechanism that keeps plan-checker Dim 7 cross-entity coherence accurate at stage-transition granularity. Skipping it to save milliseconds degrades a full pipeline stage of conflict detection lead time.
 - **"The workflow-index-maintainer mod has a Case B fallback specifically for this"** -- Case B is a band-aid, not a design. Per `~/.claude/projects/-Users-kent-Project-spacedock/memory/workflow-index-lifecycle-gap.md`, Case B was an interim fallback added in Phase E Plan 1 quality补洞 (2026-04-11). The proper path, which Phase E Plan 3 explicitly mandates, is build-execute calling the transition at stage entry. Relying on Case B perpetuates the ship-time granularity bug and turns every execute stage into a silent CONTRACTS drift event.
 - **"I can batch the index update with the wave 1 completion commit"** -- batching means the transition lands AFTER wave 1 already ran. For a concurrent plan ensign starting a sibling entity in that window, CONTRACTS says this entity is still `planned` when it is actively mutating files. Stage-transition granularity is exactly the property Case B loses; batching recreates the same loss.
-- **"append is more honest than update-status because it preserves history"** -- appends create new rows instead of transitioning existing ones. The existing rows from build-plan step 9 already declare the (entity, task, file) tuples; appending a second set from execute creates duplicate rows that plan-checker Dim 7 then has to reconcile. `update-status` is the correct operation because the plan-time rows are authoritative and need a status flip, not a rewrite.
+- **"append is more honest than update-status-bulk because it preserves history"** -- appends create new rows instead of transitioning existing ones. The existing rows from build-plan step 9 already declare the (entity, task, file) tuples; appending a second set from execute creates duplicate rows that plan-checker Dim 7 then has to reconcile. `update-status-bulk` is the correct operation because the plan-time rows are authoritative and need a status flip, not a rewrite, and the bulk variant produces a single atomic commit per entity transition rather than N per-file commits.
 - **"Defer the transition to build-review stage, since review reads CONTRACTS anyway"** -- review reading CONTRACTS does not create CONTRACTS rows. Deferring means wave dispatch happens while CONTRACTS still says `planned`, and the whole in-flight detection window is lost. This is the exact gap the memory mandate closes.
 
-**Red flags -- STOP and call workflow-index update-status first:**
+**Red flags -- STOP and call workflow-index update-status-bulk first:**
 - "Timestamps are close enough, nobody will notice..."
 - "Case B fallback is specifically for this, that's what it's there for..."
 - "Batch the index update with wave 1 completion commit..."
-- "Append is more honest than update-status because it preserves history..."
+- "Append is more honest than update-status-bulk because it preserves history..."
 
-All of these mean: call `Skill("spacebridge:workflow-index", {mode: write, operation: update-status, ...})` NOW, wait for the `chore(index):` commit to land, THEN dispatch wave 1.
+All of these mean: call `Skill("spacebridge:workflow-index", {mode: write, operation: update-status-bulk, entry: {entity, files, new_status: "in-flight"}})` NOW, wait for the `chore(index):` commit to land, THEN dispatch wave 1.
 
 **Why this rule exists:** workflow-index stage-transition granularity is how cross-entity coherence detection (plan-checker Dim 7) gets lead time on in-flight conflicts. If every row is eventually-consistent at ship-time (the Case B failure mode), two concurrent execute-stage entities touching the same file cannot see each other until both ship, which defeats the purpose of the coherence check. build-plan step 9 appends at `planned`; build-execute step 2 transitions to `in-flight`; both are load-bearing, neither is optional.
 

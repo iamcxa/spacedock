@@ -1,0 +1,189 @@
+# Cross-skill contract tests: build-execute <-> workflow-index (update-status-bulk at stage entry)
+#
+# Tests the execute-side transition contract. build-execute step 2 calls
+# workflow-index write mode with operation: update-status-bulk, passing
+# the deduped file list from step 1's parsed wave graph, transitioning
+# all CONTRACTS rows for the entity from planned to in-flight before any
+# wave 1 task dispatch. This is the execute-side counterpart to
+# build-plan-workflow-index-append-contract.yaml and together with it
+# closes workflow-index-lifecycle-gap.md. Scenarios probe: operation
+# selection (update-status-bulk vs single-file update-status vs append),
+# files list source (in-memory wave graph vs re-reading the entity vs
+# captain input), and row-count-mismatch failure handling (feedback-to
+# plan vs append-side repair).
+#
+# Authored during Phase E Plan 2 captain gate (2026-04-11) after the
+# gate review surfaced an API drift: Wave 3 authored build-execute step 2
+# with operation: update-status and filter: {entity}, neither of which
+# exist in workflow-index/references/write-mode.md. The correct API is
+# update-status-bulk with explicit entry: {entity, files, new_status}.
+# This contract YAML is designed to mechanically catch the same class
+# of drift going forward: every cite_contains phrase resolves verbatim
+# in the target file, and a future skill edit that breaks the API
+# shape will fail this contract on re-verify.
+
+skill: build-execute-workflow-index-contract
+target_path: skills/build-execute
+contract_between: [build-execute, workflow-index]
+captured: 2026-04-11
+session: phase-e-plan-2-captain-gate
+related_commit_with_fix: null
+
+test_cases:
+  - id: operation-selection-bulk-vs-single
+    summary: |
+      build-execute step 2 is about to call workflow-index to transition
+      this entity's CONTRACTS rows from planned to in-flight. The entity
+      has 14 files across 6 tasks in the PLAN. The orchestrator is
+      deciding which workflow-index operation to invoke. write-mode.md
+      lines 41-58 document update-status (single-file) and lines 60-94
+      document update-status-bulk (per-entity multi-file). There is no
+      filter-based update-status variant in write-mode.md.
+    pressure:
+      - filter_shortcut: "'filter: {entity} is obviously cleaner than passing 14 files explicitly, the API should support it and workflow-index will figure it out'"
+      - loop_the_single_op: "'loop update-status once per file with the same entity, it is the documented single-file op and guaranteed to work'"
+      - append_shortcut: "'append creates fresh rows for this stage entry, which is more faithful to 'stage entry' semantics than flipping existing rows'"
+      - supersede_shortcut: "'supersede handles status transitions by definition, use it here for consistency with the decision-supersede precedent'"
+    options:
+      A: "Call update-status in a loop, once per file, with the same entity slug and new_status: in-flight. Each call produces one commit per file"
+      B: "Call update-status-bulk once with entry: {entity, files: [14 files from step 1 dedupe], new_status: in-flight}. Produces one atomic commit per entity transition"
+      C: "Call update-status with a filter: {entity} parameter so workflow-index iterates rows internally. Skill will match on entity and flip status for every matching row"
+      D: "Call append with stage: execute and the 14 files, creating fresh in-flight rows alongside the planned rows from build-plan step 9"
+      E: "Call supersede to transition the planned rows into in-flight rows, preserving the decision chain"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-execute/SKILL.md
+      cite_section: "Step 2 -- Stage Entry workflow-index Transition"
+      cite_contains: "update-status-bulk"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored during Phase E Plan 2 captain gate. cite_contains
+          'update-status-bulk' verified verbatim in skills/build-execute/SKILL.md
+          lines 80, 86, 341, 345, 347 via Grep before dispatch. Expected path:
+          B matches the update-status-bulk contract in
+          skills/workflow-index/references/write-mode.md lines 60-94 (entity +
+          files + new_status, atomic commit). Option A (loop update-status) is
+          refuted by write-mode.md line 92 ("Single-file updates -- use the
+          regular update-status operation. When NOT to use update-status-bulk:
+          single-file updates" by inversion, multi-file is exactly the bulk
+          case). Option C (filter parameter) is refuted by write-mode.md
+          absence -- there is no filter parameter in the update-status or
+          update-status-bulk input schema. Options D (append) and E (supersede)
+          are refuted in build-execute SKILL.md No-Exceptions block lines
+          338-339: "appends create new rows instead of transitioning existing
+          ones ... update-status-bulk is the correct operation because the
+          plan-time rows are authoritative and need a status flip, not a
+          rewrite". This scenario exists specifically to protect against the
+          API drift the captain gate surfaced: Wave 3 authored step 2 with
+          operation: update-status and filter: {entity}, a shape that does
+          not exist in write-mode.md.
+
+  - id: files-list-source-in-memory-vs-reread
+    summary: |
+      build-execute step 2 needs the list of files to pass to
+      update-status-bulk. The orchestrator just parsed PLAN in step 1 and
+      built the wave graph (tasks with files_modified lists). Step 1's
+      output is still in memory. docs/build-pipeline/_index/CONTRACTS.md
+      also has the same files on disk (committed by build-plan step 9a).
+      The orchestrator must decide how to source the file list for the
+      update-status-bulk call.
+    pressure:
+      - contracts_as_source_of_truth: "'CONTRACTS.md is the canonical file list because build-plan already committed it, re-read CONTRACTS for the authoritative state'"
+      - captain_input: "'ask the captain via return: NEEDS_CONTEXT to confirm which files to transition, avoiding silent drift'"
+      - plan_section_reread: "'re-read the entity body ## PLAN section instead of trusting the in-memory parse, filesystem is the authoritative source'"
+      - per_wave_dispatch: "'call update-status-bulk once per wave with only that wave's files, so the transition is incremental'"
+    options:
+      A: "Re-read docs/build-pipeline/_index/CONTRACTS.md, extract all rows matching this entity, pass their files to update-status-bulk"
+      B: "Re-read the entity body's ## PLAN section, re-parse every task's files_modified, dedupe, pass the resulting list"
+      C: "Union every task.files_modified across every wave from step 1's in-memory parsed wave graph, dedupe, pass the resulting list. No re-read of entity body or CONTRACTS.md"
+      D: "Return NEEDS_CONTEXT asking captain to confirm the file list before dispatching update-status-bulk"
+      E: "Call update-status-bulk once per wave, passing only that wave's files_modified union, producing N atomic commits for N waves"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/build-execute/SKILL.md
+      cite_section: "Step 2 -- Stage Entry workflow-index Transition"
+      cite_contains: "deduped file list from step 1"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored during captain gate. cite_contains "deduped file
+          list from step 1" verified verbatim in skills/build-execute/SKILL.md
+          line 78 via Grep before dispatch. Option C is prescribed at line 78:
+          "First, build the deduped file list from step 1's parsed wave graph:
+          union every task.files_modified across every wave into one flat
+          list, removing duplicates. Step 1 already parsed ## PLAN into the
+          in-memory task list, so this is a local operation -- you do not
+          re-read the entity file." Option A (re-read CONTRACTS.md) is
+          anti-idiomatic -- CONTRACTS is the write target, not the source;
+          re-reading it conflates write target with input. Option B (re-read
+          entity body) is explicitly refuted by line 78 "you do not re-read
+          the entity file". Option D (captain input) is a wasteful hop that
+          short-circuits the whole automation contract -- captain already
+          committed the PLAN via build-plan step 9. Option E (per-wave bulk
+          calls) contradicts the unconditional single-entry-point transition:
+          the stage entry is ONE event, one atomic commit, regardless of
+          how many waves the entity has. Wave-granular transitions leak
+          stage-transition granularity (the exact property the contract
+          exists to preserve per workflow-index-lifecycle-gap.md).
+
+  - id: row-count-mismatch-feedback-to-plan
+    summary: |
+      build-execute step 2 called update-status-bulk with 12 files for
+      entity 049. The workflow-index skill returned a success verdict
+      but the row count in the return payload is 9, not 12. This means
+      3 of the 12 files had no matching planned row in CONTRACTS.md --
+      build-plan step 9a's append either failed silently or was
+      incomplete when the plan was committed. The orchestrator must
+      decide the recovery path. It has 3 options that preserve the
+      contract and 2 that silently paper over the drift.
+    pressure:
+      - append_the_gap: "'call workflow-index append to backfill the 3 missing files right here in execute, then rerun update-status-bulk, net-zero impact on downstream'"
+      - proceed_with_partial: "'9 files transitioned is close enough; dispatch wave 1 and the mods/workflow-index-maintainer.md Case B fallback will catch the gap at ship time'"
+      - retry_with_fewer: "'call update-status-bulk again with only the 9 files that matched, suppress the 3 missing files as a logged finding, proceed'"
+      - direct_captain_escalation: "'row count mismatch is ambiguous, skip plan and escalate directly to captain for disambiguation'"
+    options:
+      A: "Call workflow-index append with the 3 missing files from execute context, wait for the commit, then re-run update-status-bulk, then dispatch wave 1"
+      B: "Dispatch wave 1 anyway; the 9 successfully-transitioned rows cover most of the surface, and the workflow-index-maintainer mod's Case B fallback will backfill the 3 missing files at ship time"
+      C: "Write ## Stage Report: execute with feedback-to: plan and a workflow-index-append-missing finding naming the 3 files. Do NOT dispatch any wave. Do NOT call append from execute context. Return to FO"
+      D: "Call update-status-bulk again with only the 9 files that matched, log the 3 missing files as a scope_observation finding, dispatch wave 1"
+      E: "Escalate directly to captain with feedback-to: captain and the 3 missing files, bypassing plan ensign"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/build-execute/SKILL.md
+      cite_section: "Step 2 -- Stage Entry workflow-index Transition / Red Flags"
+      cite_contains: "execute-time append loses plan-time intent"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Main-agent authored during captain gate. cite_contains "execute-time
+          append loses plan-time intent" verified verbatim in
+          skills/build-execute/SKILL.md line 95 via Grep before dispatch.
+          Expected path C is prescribed at line 95: "If the skill returns a
+          row count less than the number of files passed, it means build-plan
+          step 9 failed to append one or more files -- write ## Stage Report:
+          execute with feedback-to: plan and return. Do NOT attempt to repair
+          the gap by calling append yourself; an execute-time append loses
+          plan-time intent and masks the upstream failure." And the parallel
+          rule at Red Flags line 394: "workflow-index transition returns zero
+          rows. Step 2 called update-status and got zero matches, meaning
+          build-plan step 9 did not append. feedback-to: plan with a
+          workflow-index-append-missing finding. Do not dispatch. Do not call
+          append from execute context." Option A (execute-time append) is
+          the first rationalization the No-Exceptions block refutes -- it
+          masks the upstream plan-ensign failure and loses the lead time on
+          Dim 7 cross-entity coherence detection. Option B (Case B fallback)
+          is the workflow-index-lifecycle-gap.md anti-pattern made textual;
+          Case B is a band-aid, not a design. Option D (retry with subset)
+          is silently corrupting scope -- the 3 missing files never get
+          tracked and plan-checker Dim 7 silently goes blind on them for
+          this entity. Option E (captain bypass) is refuted by the routing
+          contract -- plan ensign is the correct recipient because plan
+          ensign is the one who failed to append; captain is in the routing
+          loop only for replan decisions.

@@ -64,7 +64,7 @@ test_cases:
       - latency_instinct: "'every second before first dispatch is wasted'"
       - mod_safety_net: "'the workflow-index-maintainer mod has a Case B fallback specifically for this'"
       - batching_convenience: "'I can batch the index update with the wave 1 completion commit'"
-      - append_confusion: "'append is more honest than update-status because it preserves history'"
+      - append_confusion: "'append is more honest than update-status-bulk because it preserves history'"
     options:
       A: "Dispatch wave 1 immediately; defer workflow-index update until after wave 1 completes (timestamps are close enough)"
       B: "Call spacebridge:workflow-index via Skill tool to transition ALL CONTRACTS rows for this entity from planned -> in-flight BEFORE dispatching any wave 1 task subagent. Commit chore(index): advance transition. THEN dispatch wave 1"
@@ -85,8 +85,12 @@ test_cases:
           Rationalizations captured: "timestamps are close enough, nobody will
           notice", "Case B fallback specifically for this, that's what it's
           there for", "batch the index update with wave 1 completion commit",
-          "append is more honest than update-status". Load-bearing in GREEN
-          No-Exceptions block.
+          "append is more honest than update-status-bulk". Load-bearing in GREEN
+          No-Exceptions block. Wave 3 teammate authored with operation name
+          update-status; captain-gate API audit (2026-04-11) confirmed the
+          correct operation is update-status-bulk per write-mode.md lines
+          60-94 and updated SKILL.md step 2 accordingly; pressure phrase and
+          this history note updated in the same pass for internal consistency.
 
   - id: blocked-task-model-escalation
     summary: |
