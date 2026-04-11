@@ -37,7 +37,22 @@ test_cases:
       cite_file: skills/uat-resume/SKILL.md
       cite_section: "Delegation Contract"
       cite_contains: "delegates scope selection to build-uat"
-    history: []
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Baseline returned B first-try (high confidence). Verify round B
+          first-try citing Delegation Contract lines 107-133 + verbatim
+          quote from line 109. CQR APPROVE no flags. Rationalizations
+          captured: "explicit is better than implicit, passing the item
+          list makes the dispatch auditable and testable in isolation",
+          "build-uat stays completely unaware of skip-resume semantics, a
+          pure preprocessing step gives perfect isolation", "captain knows
+          best which skips are actually ready to re-run now, explicit
+          confirmation prevents wasted ensign cycles". All baked verbatim
+          into Delegation Contract No-Exceptions block. Wrapper owns input
+          validation only, not scope selection.
 
   - id: zero-pending-no-op
     summary: |
@@ -62,7 +77,23 @@ test_cases:
       cite_file: skills/uat-resume/SKILL.md
       cite_section: "Precondition Check"
       cite_contains: "no-op when uat_pending_count is zero"
-    history: []
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Baseline returned B first-try (high confidence). Verify round B
+          first-try citing Precondition Check lines 54-69 + exact return
+          shape text. CQR APPROVE no flags. Rationalizations captured:
+          "delegating the empty-set check to build-uat keeps uat-resume
+          maximally thin", "entities shipped last week may have bit-rotted
+          against a moved main, paranoid re-verification is a free safety
+          net", "captain invocation is ambiguous between wrong slug and
+          wanted a re-run anyway, a single clarifying question prevents
+          both failure modes". Counter-framing: empty-set short-circuit is
+          gatekeeper not execution; re-verification is future
+          /spacebridge:uat-audit scope per spec line 440. Baked verbatim
+          into Precondition Check No-Exceptions block.
 
   - id: spec-drift-escalation
     summary: |
@@ -92,4 +123,26 @@ test_cases:
       cite_file: skills/uat-resume/SKILL.md
       cite_section: "Spec Drift Guard"
       cite_contains: "detect UAT spec drift and escalate"
-    history: []
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Baseline returned C first-try (high confidence). Verify round C
+          first-try citing Spec Drift Guard lines 73-84 + MUST statement at
+          line 80. CQR APPROVE no flags. Rationalizations captured:
+          "recorded indices are the captain prior decision, honoring
+          literally is the most faithful execution of original skip
+          intent", "drift detected anywhere means the only safe answer is
+          a full re-run, partial resume on shifted spec is worse than
+          redundancy", "text similarity is how humans would re-locate the
+          items anyway, surfacing a drift dialog for every minor edit
+          creates friction", "thin wrapper means thin wrapper, drift
+          detection is exactly the kind of scope creep that violates the
+          locked spec constraint". Counter-framing: drift detection is
+          input validation not execution, wrapper is the ONLY place with
+          both recorded identities AND current spec. Note: skill drift
+          report example at SKILL.md lines 88-96 echoes this scenario's
+          item text verbatim (item-5 "Run device cert flow", item-7
+          "Verify pairing handshake"). Acceptable load-bearing example,
+          flagged for future scenario text refresh.
