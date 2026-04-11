@@ -211,7 +211,7 @@ Testable items in four categories:
 - [ ] `GET /api/entities?status=execute` returns only execute-stage entities
 
 ### Interactive
-- [ ] Captain can resolve a plan-checker escalation via `/spacedock:uat-resume`
+- [ ] Captain can resolve a plan-checker escalation via `/spacebridge:uat-resume`
 ```
 
 Categories may be empty (write `None` under the header) but all four headers must be present so downstream UAT stage can iterate deterministically.
