@@ -97,6 +97,17 @@ Call `spacebridge:workflow-index` read mode (via Skill tool) with the plan's com
 - If CONTRACTS.md has a `final` entry from a different entity within the last 7 days -- **warning** (recent change; plan author should have read it but may not have).
 - If CONTRACTS.md has no entries for a file -- pass (new territory).
 
+**Graceful degradation.** If the Skill tool is unavailable in this dispatched context (you get an "unknown tool" error or cannot invoke Skill at all), do NOT silently skip Dim 7. Emit this YAML issue instead:
+
+```yaml
+  - dimension: cross_entity_coherence
+    severity: warning
+    description: "Skill tool unavailable in dispatched plan-checker context; Dim 7 not evaluated at check time"
+    fix_hint: "Captain: verify Dim 7 out-of-band via `workflow-index read` from main session, or restructure build-plan to pre-compute CONTRACTS conflict data and inject into plan-checker prompt"
+```
+
+The plan ensign will then surface this warning to captain via the revision loop and decide whether to proceed or restructure. Do NOT resolve Dim 7 by guessing or by reading CONTRACTS.md directly via `Read` -- the whole point of the Skill tool path is that workflow-index understands the CONTRACTS schema; a raw Read is not a substitute.
+
 ## Output Format
 
 Return exactly this YAML, nothing else. No prose, no summary, no explanation. If there are no issues, return `issues: []` and nothing else.

@@ -1,6 +1,6 @@
 ---
 name: build-plan
-description: "Opus plan-stage orchestrator dispatched by FO. Transforms a clarified entity (Brainstorm Spec + Explore Output + Clarify Output) into an execution-proof plan via parallel research dispatch, inline self-review, sonnet plan-checker revision loop, optional knowledge capture, and unconditional workflow-index append on approval. Nine internal steps in strict order."
+description: "Opus plan-stage orchestrator dispatched by FO on clarified entities. Produces research-backed PLAN, UAT Spec, Validation Map, and unconditional CONTRACTS.md append at plan approval. Loaded by the plan ensign via FO dispatch path."
 ---
 
 # Build-Plan -- Plan-Stage Orchestrator
@@ -263,6 +263,8 @@ Agent(
 Wait for the dispatched subagent to return. Parse its YAML output into a list of issues. Each issue has `dimension`, `task` (optional), `severity` (`blocker` | `warning`), `description`, `fix_hint`.
 
 **Plan-checker is stateless.** Each dispatch gets a fresh context. The checker does not remember previous iterations, and you do not tell it what iteration you are on. This is deliberate -- each check is an independent judgment.
+
+**Known architectural unknown -- Skill tool in dispatched subagent context.** The plan-checker prompt assumes the `Skill` tool is available in the dispatched `general-purpose` subagent so Dim 7 can call `spacebridge:workflow-index` read mode. Per `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md`, subagents have restricted tool surfaces and we have no positive evidence that `Skill` is available there. If the assumption proves false in practice, the graceful-degradation stub in `references/plan-checker-prompt.md` (Dim 7 section) emits a Dim 7 warning instead of silently skipping -- captain resolves out-of-band or restructures build-plan to pre-compute CONTRACTS conflict data and inject it into the prompt. Flagged during Wave 2 CQR.
 
 **Plan-checker dimensions** (for reference; full detail lives in `references/plan-checker-prompt.md`):
 
