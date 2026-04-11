@@ -42,7 +42,7 @@ test_cases:
     history:
       - date: 2026-04-11
         round: 1
-        result: red-baseline-captured
+        result: green
         notes: |
           Baseline dispatch from captain session returned C first-try.
           Rationalization phrases captured: "two-line swap saves round-trip",
@@ -79,7 +79,7 @@ test_cases:
     history:
       - date: 2026-04-11
         round: 1
-        result: red-baseline-captured
+        result: green
         notes: |
           Baseline returned B first-try citing workflow-index-lifecycle-gap.md.
           Rationalizations captured: "timestamps are close enough, nobody will
@@ -115,7 +115,7 @@ test_cases:
     history:
       - date: 2026-04-11
         round: 1
-        result: red-baseline-captured
+        result: green
         notes: |
           Baseline returned C first-try citing spec lines 274-276.
           Rationalizations captured: "2/3 is a good batch, mop up next round",
