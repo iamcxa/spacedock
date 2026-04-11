@@ -5,10 +5,6 @@ entity-label: feature
 entity-label-plural: features
 id-style: sequential
 stages:
-  profiles:
-    full:     [draft, brainstorm, explore, clarify, research, plan, execute, quality, seeding, e2e, docs, pr-draft, pr-review, shipped]
-    standard: [draft, brainstorm, explore, clarify, plan, execute, quality, pr-draft, pr-review, shipped]
-    express:  [draft, brainstorm, execute, quality, shipped]
   defaults:
     worktree: true
     concurrency: 2
@@ -21,49 +17,41 @@ stages:
       manual: true
       # Captain captures entity here. Edit body, refine spec, capture intent.
       # FO does NOT auto-dispatch draft entities (manual: true).
-      # Captain advances status: draft → brainstorm when ready to begin work.
+      # Captain advances status: draft -> brainstorm when ready to begin work.
       # Use draft for: feature ideas, bug captures, design notes, anything
       # not yet ready for active pipeline work.
     - name: brainstorm
       model: sonnet
       worktree: false
       gate: true
-      # FO-inline triage: executability assessment → profile recommendation.
-      # Express (5/5 + small): FO posts recommendation, captain confirms.
-      # Standard/Full (≤4/5): FO asks captain A/B/C path:
+      # FO-inline triage: executability assessment + approach pathing.
+      # (Profile concept retired in Phase E -- all work follows single 10-stage path.)
+      # FO asks captain A/B/C path:
       #   A) Interactive brainstorm (superpowers:brainstorming)
       #   B) Ensign analysis (dispatch to worktree, posts to dashboard)
       #   C) Captain provides approach directly
     - name: explore
-      profiles: [full, standard]
       model: sonnet
       skill: spacedock:build-explore
       # Ensign loads build-explore skill for codebase mapping + question generation.
       # Hybrid classification: assumptions (Track A), options (Track B), questions (Track C).
       # Writes to entity body: ## Assumptions, ## Option Comparisons, ## Open Questions.
       #
-      # NAMESPACE NOTE: Spec §7 defines this skill as belonging to the spacebridge
-      # plugin. During Phase B it's hosted in spacedock (since spacebridge plugin
-      # doesn't exist yet). Will migrate to `spacebridge:build-explore` in Phase D
-      # (plugin split).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-explore` is Phase F work (entity 055).
       #
       # FALLBACK (skill not found):
       # Ensign uses inline explore definition below (basic file mapping, no question generation).
     - name: clarify
-      profiles: [full, standard]
       worktree: false
       manual: true
       gate: true
       skill: spacedock:build-clarify
-      # NAMESPACE NOTE: Spec §8 defines this skill as belonging to the spacebridge
-      # plugin. During Phase C it's hosted in spacedock (since spacebridge plugin
-      # doesn't exist yet). Will migrate to `spacebridge:build-clarify` in Phase D
-      # (plugin split).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-clarify` is Phase F work (entity 055).
       #
       # Science Officer (spacedock:science-officer agent) runs interactive
       # AskUserQuestion loop with captain.
       # Resolves: Open Questions, Assumptions, Option Comparisons from explore.
-      # Produces: confirmed context, canonical references, profile assignment.
+      # Produces: confirmed context, canonical references.
       # manual: true -- Science Officer invocation is captain-initiated,
       # not auto-dispatched by FO.
       # gate: true -- captain must approve context completeness before advancing.
@@ -71,67 +59,87 @@ stages:
       # FALLBACK (skill not found):
       # Captain reviews entity body manually, edits Open Questions/Assumptions
       # directly, then advances status to plan via FO command.
-    - name: research
-      profiles: [full]
-      agent: auto-researcher
-      model: opus
     - name: plan
-      profiles: [full, standard]
       gate: true
       model: opus
+      skill: spacedock:build-plan
+      # Plan orchestrator (opus) dispatches parallel research subagents internally
+      # (each loads spacedock:build-research via spacedock:researcher agent).
+      # Writes ## Research Findings / ## PLAN / ## UAT Spec / ## Validation Map.
+      # Runs self-review + plan-checker subagent through up to 3 revision iterations.
+      # Calls workflow-index append unconditionally at plan approval.
+      #
       # CONDITIONAL gate: only when plan involves schema change, cross-domain,
       # new public API, or new infra dependency. Otherwise auto-advance.
       # Architecture review by captain before execute begins.
+      #
+      # NAMESPACE NOTE: Migration to `spacebridge:build-plan` is Phase F work (entity 055).
     - name: execute
-      model: opus
+      model: sonnet
+      skill: spacedock:build-execute
+      # Execute orchestrator (sonnet) builds wave graph from PLAN and dispatches
+      # task subagents via spacedock:task-executor agent with per-task model hint
+      # (haiku for mechanical, sonnet for integration, opus only on BLOCKED escalation).
+      # Wave-parallel within each wave (when files_modified don't overlap),
+      # serial across waves. Pre-commit hook fires per task commit.
+      # Calls workflow-index update-status (planned -> in-flight) at stage entry.
+      #
+      # NAMESPACE NOTE: Migration to `spacebridge:build-execute` is Phase F work (entity 055).
     - name: quality
       feedback-to: execute
       model: haiku
-      # NOT a gate. Auto-advances when all checks pass.
-      # Escalates to captain ONLY for: security findings, breaking API,
-      # destructive migration, or 3 failed feedback rounds.
-    - name: seeding
-      profiles: [full]
+      skill: spacedock:build-quality
+      # NOT a gate. Auto-advances when all mechanical checks pass.
+      # Pure project-wide verification: bun test, bun lint, tsc --noEmit, bun build.
+      # No judgment, no commentary. Evidence-backed Stage Report.
+      # Any fail -> feedback-to: execute (max 3 rounds, then escalate to captain).
+      #
+      # NAMESPACE NOTE: Migration to `spacebridge:build-quality` is Phase F work (entity 055).
+    - name: review
       model: sonnet
-      # CONDITIONAL: only when e2e needs test data not yet present
-      # FO checks explore results for seed requirements
-    - name: e2e
-      profiles: [full]
-      gate: true
+      feedback-to: execute
+      skill: spacedock:build-review
+      # Judgment-based diff-level code review.
+      # Pre-scan (CLAUDE.md / stale refs / import graph / plan consistency) runs
+      # inline before parallel dispatch of pr-review-toolkit + trailofbits agents.
+      # Invokes knowledge-capture in capture mode for D1/D2 staging.
+      # CRITICAL/HIGH CODE findings -> feedback-to: execute.
+      # PLAN advisory findings raise replan flag (captain decides).
+      #
+      # NAMESPACE NOTE: Migration to `spacebridge:build-review` is Phase F work (entity 055).
+    - name: uat
       model: sonnet
-      # Conditional feedback routing (FO decides based on failure reason):
-      #   seed data insufficient → feedback-to: seeding
-      #   code bug → feedback-to: execute
-      #   infra failure → escalate to captain
-    - name: docs
-      profiles: [full]
-      model: sonnet
-      # CONDITIONAL: only when feature adds/changes public API, CLI, config,
-      # or has breaking changes requiring migration guide
-    - name: pr-draft
-      profiles: [full, standard]
-      model: sonnet
-    - name: pr-review
-      profiles: [full, standard]
       gate: true
       feedback-to: execute
-      model: opus
+      skill: spacedock:build-uat
+      # Automated e2e + captain sign-off.
+      # Orchestrates e2e-pipeline skills (e2e-map / e2e-flow / e2e-test) for
+      # browser items; CLI/API items run directly; interactive items via
+      # AskUserQuestion one-at-a-time.
+      # Supports skip/resume via /spacedock:uat-resume slash command.
+      # Infra fails auto-route to execute; assertion fails routed through captain review.
+      #
+      # NAMESPACE NOTE: Migration to `spacebridge:build-uat` is Phase F work (entity 055).
     - name: shipped
       terminal: true
       worktree: false
+      # Terminal stage. Mod-driven: mods/pr-review-loop.md (Phase E+1) handles
+      # gh pr create on merge hook and PR state polling on idle hook.
+      # If mod not installed, captain manually creates PR from the completed
+      # feature branch.
 ---
 
-# Idea to PR — Generalized Development Pipeline
+# Idea to PR -- Generalized Development Pipeline
 
-A development pipeline that takes a brainstormed idea through codebase exploration, technical research, planning, implementation, quality gates, E2E testing, and PR creation. Designed for use across projects: Spacedock, Carlove, Recce, and others.
+A 10-stage development pipeline that takes a brainstormed idea through codebase exploration, clarification, planning with integrated multi-source research, wave-parallel implementation, mechanical quality gates, judgment-based code review, automated-plus-interactive UAT, and mod-driven PR lifecycle. Designed for use across projects: Spacedock, Carlove, Recce, and others.
 
-Features enter this workflow with a completed brainstorming spec (produced by `/build` skill's interactive Phase I). The spec contains the approach, alternatives considered, guardrails, and acceptance criteria. From here, the pipeline is fully autonomous — the first officer dispatches ensigns through each stage, only escalating to the captain at quality and pr-review gates when issues arise.
+Features enter this workflow with a completed brainstorming spec (produced by `/build` skill's interactive Phase I). The spec contains the approach, alternatives considered, guardrails, and acceptance criteria. From here, the pipeline is fully autonomous — the first officer dispatches ensigns through each stage, only escalating to the captain at conditional gates (plan architecture review, review CRITICAL/HIGH findings, UAT sign-off) when issues arise.
 
 ## Context Lake Protocol
 
 See [CONTEXT-LAKE-PROTOCOL.md](./_docs/CONTEXT-LAKE-PROTOCOL.md) for the full specification of how ensigns use the context lake MCP tools (`store_insight`, `search_insights`, `invalidate_stale`) for cross-stage knowledge transfer.
 
-**Quick summary:** Explore stores file-level insights (`source: read`), research/execute overwrite with verified knowledge (`source: manual`). Every ensign searches `file_path` exact match (freshness 30 days) before starting work. Content uses 5 lightweight tags: `[purpose]`, `[pattern]`, `[gotcha]`, `[correction]`, `[decision]`.
+**Quick summary:** Explore stores file-level insights (`source: read`), plan/execute overwrite with verified knowledge (`source: manual`). Every ensign searches `file_path` exact match (freshness 30 days) before starting work. Content uses 5 lightweight tags: `[purpose]`, `[pattern]`, `[gotcha]`, `[correction]`, `[decision]`.
 
 ## Model Dispatch
 
@@ -139,16 +147,13 @@ Each stage specifies a `model:` property in the frontmatter. The first officer r
 
 | Stage | Model | Rationale |
 |-------|-------|-----------|
+| brainstorm | sonnet | FO-inline triage + approach pathing |
 | explore | sonnet | Codebase search and classification — no deep reasoning needed |
-| research | **opus** | Multi-source cross-reference synthesis requires high reasoning |
-| plan | **opus** | Architecture decisions determine downstream quality |
-| execute | **opus** | Code quality is the core deliverable |
-| quality | haiku | Running CLI commands and parsing output |
-| seeding | sonnet | Writing seed data following existing patterns |
-| e2e | sonnet | Skill invocations + result reporting |
-| docs | sonnet | Documentation writing |
-| pr-draft | sonnet | PR content generation (kc-pr-create does the heavy lifting) |
-| pr-review | **opus** | Finding bugs in code review requires high reasoning |
+| plan | **opus** | Orchestrates parallel research, writes PLAN/UAT Spec/Validation Map, runs plan-checker loop; architecture decisions determine downstream quality |
+| execute | sonnet | Orchestrator only — dispatches per-task subagents with `model:` hint (haiku/sonnet/opus per task) for cost-optimized implementation |
+| quality | haiku | Parsing CLI output (bun test / lint / tsc / build); no reasoning |
+| review | sonnet | Classifies and synthesizes parallel review agent outputs into a verdict |
+| uat | sonnet | Orchestrates e2e-pipeline + captain AskUserQuestion flow |
 
 **FO dispatch rule:** When dispatching an agent for a stage, if the stage has a `model` property in the README frontmatter, include `model="{stage.model}"` in the Agent() call. Example:
 
@@ -161,6 +166,8 @@ Agent(
 )
 ```
 
+For stage skills loaded via `skill:` property, the ensign invokes the skill through the Skill tool after dispatch; the ensign subagent itself runs at the stage's declared model.
+
 ## Prerequisites
 
 ### Required — core pipeline cannot function without these
@@ -169,35 +176,35 @@ Agent(
 |--------|---------|---------|
 | **superpowers** | `/plugin marketplace add superpowers` | explore (systematic-debugging), plan (writing-plans), execute (executing-plans) |
 
-### Required for full pipeline — PR and E2E stages
+### Required for full pipeline — review and UAT stages
 
 | Plugin | Install | Used by | Without it |
 |--------|---------|---------|------------|
-| **kc-pr-flow** | `/plugin add local ~/.claude/plugins/local/kc-pr-flow` | pr-draft (kc-pr-create), pr-review (kc-pr-announce) | Ensign follows PR steps manually — push, `gh pr create`, annotate. Functional but less structured. |
-| **e2e-pipeline** | `/plugin add local ~/.claude/plugins/local/e2e-pipeline` | e2e (e2e-map, e2e-flow, e2e-test) | E2E stage skipped entirely with warning. |
-| **pr-review-toolkit** | Bundled with superpowers | pr-review (code-reviewer, comment-analyzer) | Ensign runs lightweight main-context pre-scan only. |
+| **pr-review-toolkit** | Bundled with superpowers | review (code-reviewer, silent-failure-hunter, comment-analyzer, pr-test-analyzer, type-design-analyzer, code-simplifier) | Review stage falls back to inline pre-scan only (CLAUDE.md compliance, stale refs, import graph, plan consistency) |
+| **e2e-pipeline** | `/plugin add local ~/.claude/plugins/local/e2e-pipeline` | uat (e2e-map, e2e-flow, e2e-test) | UAT browser items skipped with warning; CLI/API/interactive items still run |
 
 ### Optional — enhance quality but not required
 
 | Plugin | Install | Used by | Without it |
 |--------|---------|---------|------------|
-| **trailofbits/skills** | `/plugin marketplace add trailofbits/skills` | quality (static-analysis, insecure-defaults, supply-chain-risk-auditor, fp-check, sharp-edges, mutation-testing, variant-analysis), pr-review (differential-review) | Security scans skipped with `SKIP:` in stage report. Core quality checks (type-check, tests, lint, build) still run. |
-| **context7** MCP server | `.mcp.json` configuration | research (Context7 subagent for library doc verification) | Research relies on Explorer (codebase) + Web Search only. Two-source instead of three-source verification. |
+| **trailofbits/skills** | `/plugin marketplace add trailofbits/skills` | review (differential-review, sharp-edges, variant-analysis) | Security-aware review dispatches skipped with `SKIP:` in Stage Report |
+| **context7** MCP server | `.mcp.json` configuration | plan (via researcher agent for library doc verification) | Research falls back to Explorer (codebase) + Web Search only (two-source instead of three-source) |
 
 ### Project-specific — only needed for certain target projects
 
 | Plugin/Skill | Used by | When needed |
 |--------------|---------|-------------|
-| **expo-accessibility** | e2e (accessibility audit) | Expo/React Native projects only |
-| **agent-browser** | e2e (browser automation) | Projects with web UI |
+| **expo-accessibility** | uat (accessibility audit) | Expo/React Native projects only |
+| **agent-browser** | uat (browser automation) | Projects with web UI |
 
 ### Verification
 
 FO can verify prerequisites at startup by checking skill availability:
 ```
-Skill: "superpowers:writing-plans"  → if not found, STOP: "superpowers plugin required"
-Skill: "kc-pr-flow:kc-pr-create"   → if not found, WARN: "kc-pr-flow not installed, PR stages will use manual fallback"
-Skill: "static-analysis"           → if not found, NOTE: "trailofbits/skills not installed, security scans disabled"
+Skill: "superpowers:writing-plans"         → if not found, STOP: "superpowers plugin required"
+Skill: "pr-review-toolkit:code-reviewer"   → if not found, WARN: "review stage will run pre-scan only"
+Skill: "e2e-pipeline:e2e-test"             → if not found, WARN: "uat browser items will be skipped"
+Skill: "static-analysis"                   → if not found, NOTE: "trailofbits/skills not installed, security-aware review disabled"
 ```
 
 ## File Naming
@@ -226,8 +233,8 @@ pr:
 intent: feature
 scale: Medium
 project:
-profile:
 auto_advance:
+uat_pending_count:
 parent:
 children:
 ---
@@ -239,7 +246,7 @@ children:
 |-------|------|-------------|
 | `id` | string | Unique identifier, format determined by id-style in README frontmatter |
 | `title` | string | Human-readable feature name |
-| `status` | enum | One of: draft, brainstorm, explore, clarify, research, plan, execute, quality, seeding, e2e, docs, pr-draft, pr-review, shipped, epic |
+| `status` | enum | One of: draft, brainstorm, explore, clarify, plan, execute, quality, review, uat, shipped, epic |
 | `context_status` | enum | `pending`, `exploring`, `awaiting-clarify`, `ready`. Orthogonal to `status`. Tracks context maturity during draft/explore/clarify phases. |
 | `source` | string | Where this feature came from (e.g., `/build`, `commission seed`) |
 | `created` | ISO 8601 | Entity creation timestamp (set by `/build`) |
@@ -253,8 +260,8 @@ children:
 | `intent` | enum | `feature` or `bugfix` -- determines whether explore includes root cause diagnosis |
 | `scale` | enum | `Small` (<5 files, TDD-direct), `Medium` (5-15 files, formal plan), or `Large` (>15 files, decomposition candidate) |
 | `project` | string | Target project name (e.g., "spacedock", "carlove", "recce") |
-| `profile` | enum | `full`, `standard`, or `express`. Assigned after clarify; determines which stages run. |
 | `auto_advance` | bool | If true, Science Officer advances status from clarify to plan without waiting for captain approval. |
+| `uat_pending_count` | integer | Count of UAT items skipped with captain ack during uat stage. If non-zero, entity shipped with pending verification; `/spacedock:uat-resume {slug}` re-runs pending items. |
 | `parent` | string | Slug of parent epic (if this entity was decomposed from a larger one). |
 | `children` | list | `[slug1, slug2, ...]` (if this entity is an epic/tracker with child entities). |
 
@@ -270,40 +277,25 @@ The first stage after a feature enters the pipeline. An ensign performs deep cod
   - Context lake insights stored for each relevant file discovered
   - Scale confirmation or revision based on actual file count
   - If `intent: bugfix`: root cause diagnosis via `Skill: "superpowers:systematic-debugging"`
-  - Coverage infrastructure discovery (for quality stage):
-    - Coverage command: detect `test:coverage` script, vitest/jest/pytest/go coverage config
-    - Comparison script: look for `coverage-summary.*`, `coverage-report.*` in `.github/scripts/` or `scripts/`
-    - Coverage format: Istanbul JSON (`coverage-final.json`), LCOV (`lcov.info`), or JSON summary
-    - Baseline strategy: check if CI caches baseline (e.g., `actions/cache`), if baseline file is committed, or if none exists
-    - Record findings in entity body under `## Coverage Infrastructure`
-- **Good:** Every file has a one-line purpose note, insights cached to lake, scale validated against grep count, coverage infra documented
+- **Good:** Every file has a one-line purpose note, insights cached to lake, scale validated against grep count
 - **Bad:** File list without layer grouping, no store_insight calls, "obviously Small" without grep
-
-### `research`
-
-Verify the brainstorming spec's technical assumptions before planning. The auto-researcher agent dispatches 3 parallel subagents for multi-source verification.
-
-- **Inputs:** Entity body (brainstorming spec + explore results), context lake insights
-- **Outputs:**
-  - Technical claims extracted from spec and explore results
-  - Per-claim verification from Explorer (codebase), Context7 (library docs), and Web Search (community/version)
-  - Cross-referenced synthesis with confidence levels (HIGH/MEDIUM/NONE)
-  - Corrections for any incorrect assumptions, with cited sources
-  - Verified patterns and corrections cached to context lake
-- **Good:** Every claim has multi-source evidence, corrections cite specific documentation, insights stored for plan stage
-- **Bad:** "Looks correct" without verification, skipping claims because "I know this API"
 
 ### `plan`
 
-Produce an implementation plan informed by verified technical knowledge from the research stage. This is a **conditional approval gate** — the first officer escalates to the captain only when the plan involves architectural decisions (schema changes, cross-domain impact, new public APIs, new infrastructure dependencies). Small/routine plans auto-advance.
+Transform clarified entity context into an execution-proof plan. The plan orchestrator (opus) dispatches parallel research subagents internally (each loading `spacedock:build-research` via the researcher agent), synthesizes findings, writes the PLAN with UAT Spec and Validation Map, self-reviews, and runs a plan-checker subagent through up to 3 revision iterations before advancing.
 
-- **Inputs:** Entity body (spec + explore + research report), context lake (verified patterns)
+This is a **conditional approval gate** — the first officer escalates to the captain only when the plan involves architectural decisions (schema changes, cross-domain impact, new public APIs, new infrastructure dependencies). Small/routine plans auto-advance.
+
+- **Inputs:** Entity body (brainstorming spec, explore results, clarify outputs), context lake (verified patterns)
 - **Outputs:**
-  - For Medium scale: formal plan document via `Skill: "superpowers:writing-plans"` saved to `docs/superpowers/specs/`
-  - For Small scale: lightweight TDD checklist in entity body (test files, assertions, implementation files, quality gate commands)
-  - Plan incorporates research corrections — no unverified assumptions
-- **Good:** Plan has concrete file paths, test-first ordering, references research-verified patterns, quality gate steps included
-- **Bad:** Vague plan ("update the router"), ignores research corrections, no test mentions
+  - `## Research Findings` — five domain sections with citations (Upstream Constraints, Existing Patterns, Library/API Surface, Known Gotchas, Reference Examples)
+  - `## PLAN` — task list with per-task attributes (model, wave, skills hint, read_first, action, acceptance_criteria, files_modified)
+  - `## UAT Spec` — testable items classified by type (browser/cli/api/interactive)
+  - `## Validation Map` — requirement → task → command → status table
+  - `## Stage Report: plan` — plan-checker verdict attached
+  - `workflow-index append` called unconditionally at plan approval (closes the workflow-index-lifecycle-gap class)
+- **Good:** Every AC in entity body maps to ≥1 task; every task has read_first/action/acceptance_criteria/files_modified/wave; plan-checker pass within ≤3 iterations
+- **Bad:** Placeholder text ("TBD", "add appropriate", "similar to Task N"); tasks without acceptance_criteria; plan-checker escalation on 3rd iteration without captain hand-off
 
 **FO conditional gate — architecture review triggers:**
 
@@ -319,323 +311,85 @@ FO detects signals by scanning the plan for keywords: `migration`, `schema`, `sa
 
 ### `execute`
 
-Implement the plan using Superpowers executing-plans skill with parallel worker subagents.
+Implement the plan via wave-based parallel task dispatch. The execute orchestrator (sonnet) builds a wave graph from `## PLAN`, dispatches task subagents through `spacedock:task-executor` agent with per-task model hints, collects changes, and commits serially per task.
 
-- **Inputs:** Plan document or TDD checklist, context lake (verified patterns + implementation insights)
+- **Inputs:** `## PLAN` from plan stage, context lake (verified patterns + implementation insights)
 - **Outputs:**
-  - Implementation commits on the feature branch
-  - TDD discipline: tests written before implementation code
-  - Commit format: `{type}(scope): {description}` per logical change
-  - Implementation decisions cached to context lake
-- **Good:** TDD test-first, atomic commits, parallel dispatch where independent, research-verified patterns used
-- **Bad:** No tests, single giant commit, ignoring research corrections, sequential when parallelizable
+  - Implementation commits on the feature branch, one per task
+  - Wave graph honored: Wave 0 (test infra if declared) → Wave 1 (independent tasks) → Wave 2 (depends on Wave 1) → ...
+  - Per-task model dispatch: haiku for mechanical tasks, sonnet for integration, opus escalation on BLOCKED
+  - Pre-commit hook fires per task commit (`bun lint --fix` + `tsc --incremental`)
+  - `## Stage Report: execute` — per-task commit SHAs, deviations, BLOCKED escalations
+  - `workflow-index update-status` transitions entries from planned → in-flight at stage entry
+- **Good:** Parallel dispatch where independent, serial commits with conventional messages, plan honored (no scope creep), task subagents return `changed_files` without committing themselves
+- **Bad:** Single giant commit, ignoring plan's serial/parallel hints, task subagent committing, scope creep beyond `files_modified`
 
 ### `quality`
 
-Run quality gate checks, security analysis, and engineering standards verification. **Not a gate** — auto-advances when all checks pass. Escalates to captain only for exceptional situations (security findings, breaking API changes, destructive migrations, or 3 failed feedback rounds).
+Project-wide mechanical verification — "does the whole project still work?" **Not a gate** — auto-advances when all checks pass. Escalates to captain only on 3 consecutive execute feedback rounds.
 
 - **Inputs:** Feature branch with implementation commits
 - **Outputs:**
-  - **Compilation & Tests:**
-    - Type-check result (pass/fail with details)
-    - Test results (pass/fail with counts)
-    - Build result (pass/fail, frontend changes only)
-    - Lint result (pass/fail, if configured)
-  - **Code Coverage Delta** (uses `## Coverage Infrastructure` from explore stage):
-    - If explore found no coverage tool: `[ ] SKIP: No coverage infrastructure detected`
-    - **Step 1 — Feature branch coverage:**
-      ```bash
-      # Use the command explore discovered (examples):
-      pnpm test:coverage                    # Node/vitest/jest
-      pytest --cov --cov-report=json        # Python
-      go test -coverprofile=coverage.out ./...  # Go
-      deno test --coverage=cov_dir && deno coverage cov_dir --lcov > lcov.info  # Deno
-      ```
-      Collect artifacts: `coverage-final.json`, `lcov.info`, or equivalent.
-    - **Step 2 — Baseline from main** (try in order, use first that works):
-      1. **Comparison script** — if explore found one (e.g., `.github/scripts/coverage-summary.mjs`), it likely accepts `--baseline` and handles acquisition internally. Use it directly in Step 3.
-      2. **Git artifact** — `git show main:coverage-baseline.json > /tmp/cov-baseline.json`. Works if CI commits or caches the baseline file on the main branch.
-      3. **Temporary worktree** — create a disposable worktree on main, run the same coverage command, collect baseline:
-         ```bash
-         git worktree add /tmp/cov-main main
-         cd /tmp/cov-main && <same coverage command>
-         cp coverage-final.json /tmp/cov-baseline.json
-         cd - && git worktree remove /tmp/cov-main
-         ```
-      4. **No baseline** — report absolute coverage only, skip delta comparison. Note in report: `baseline unavailable — showing absolute coverage only`.
-    - **Step 3 — Compare:**
-      - If project has comparison script: run it with both reports (e.g., `node .github/scripts/coverage-summary.mjs ./artifacts --baseline /tmp/cov-baseline.json --threshold 60`)
-      - Otherwise: parse both JSON reports, compute per-group delta:
-        ```
-        Group            main    feature   delta
-        domains/         84.2%   85.0%     +0.8%  ✅
-        packages/        71.3%   69.1%     -2.2%  ⚠️
-        overall          78.4%   78.1%     -0.3%  ✅ (within tolerance)
-        ```
-      - Tolerance: -2% (configurable via project threshold). Decrease within tolerance = pass.
-    - **Step 4 — Changed-file coverage** (always, even without baseline):
-      ```bash
-      git diff --name-only $(git merge-base HEAD main)...HEAD -- '*.ts' '*.tsx' '*.py' '*.go'
-      ```
-      Cross-reference with coverage report. Flag:
-      - New source files with 0% coverage
-      - Changed files with coverage below project threshold (default 60%)
-    - **Report format:**
-      ```
-      Coverage: 78.4% → 78.1% (-0.3%) ✅ within tolerance
-      Changed files: 8 files, 1 flagged
+  - `bun test` full suite result (not targeted)
+  - `bun lint` full project result
+  - `tsc --noEmit` full project result
+  - `bun build` result
+  - Coverage threshold (if workflow config defines one)
+  - `## Stage Report: quality` — per-check result with actual command output snippets
+- **Rules:** Evidence-backed (actual command output quoted in Stage Report), binary pass/fail per check, zero commentary on code quality, any fail → `feedback-to: execute` with failing output
+- **Good:** Evidence quoted verbatim; binary verdicts; full-project scope (not targeted)
+- **Bad:** Aggregate "tests pass" without output, judgment on code quality, partial run, targeting only changed files
 
-      | File | Coverage | Status |
-      |------|----------|--------|
-      | src/domain/new-feature.ts | 92% | ✅ |
-      | src/router/handler.ts | 0% | ⚠️ new — no tests |
-      ```
-  - **Security Analysis** (optional — requires `trailofbits/skills` marketplace plugin):
-    - If installed:
-      - `Skill: "static-analysis"` — CodeQL + Semgrep vulnerability scan on changed files
-      - `Skill: "insecure-defaults"` — scan for hardcoded secrets, risky configs, dangerous defaults
-      - `Skill: "supply-chain-risk-auditor"` — dependency vulnerability assessment (only when deps changed)
-      - `Skill: "sharp-edges"` — flag dangerous API usage patterns, error-prone configs, footgun designs
-      - `Skill: "mutation-testing"` — verify test quality by mutating code and checking if tests catch it (coverage alone is insufficient)
-      - `Skill: "variant-analysis"` — after finding one vulnerability, search for similar patterns across the codebase
-      - `Skill: "fp-check"` — verify security findings are not false positives before failing the gate (run LAST, after all other scans)
-    - If not installed: skip with stage report entry:
-      `[ ] SKIP: Security scans — trailofbits/skills not installed. Run /plugin marketplace add trailofbits/skills to enable.`
-  - **API Contract Compatibility** (conditional: when contract/schema files changed):
-    - **Step 1 — Identify contract changes:**
-      ```bash
-      git diff --name-only $(git merge-base HEAD main)...HEAD \
-        | grep -E '\.(contract|schemas)\.(ts|json|yaml)$|openapi|swagger|graphql'
-      ```
-      If no matches: skip this section entirely.
-    - **Step 2 — Classify changes:**
-      For each changed contract file, diff against main and classify:
-      ```bash
-      git diff $(git merge-base HEAD main)...HEAD -- {contract_file}
-      ```
-      | Change Type | Classification | Examples |
-      |-------------|---------------|----------|
-      | Removed field/endpoint | **BREAKING** | deleted property, removed route |
-      | Changed type | **BREAKING** | `string` → `number`, `optional` → `required` |
-      | Narrowed enum | **BREAKING** | removed enum value consumers may use |
-      | Added required field | **BREAKING** | new required property on request/response |
-      | Added optional field | non-breaking | new optional property |
-      | Added endpoint | non-breaking | new route |
-      | Added enum value | non-breaking | expanded enum |
-      | Docs/description only | non-breaking | comment changes |
-    - **Step 3 — Report:**
-      ```
-      Contract changes: 3 files, 1 breaking
+### `review`
 
-      | File | Change | Classification |
-      |------|--------|---------------|
-      | booking.contract.ts | removed `legacyId` field | BREAKING |
-      | booking.contract.ts | added optional `notes` | non-breaking |
-      | service.schemas.ts | added enum value `premium` | non-breaking |
-      ```
-    - Breaking change detected → escalate to captain (not auto-fail — may be intentional)
-  - **Migration Safety** (conditional: when migration files present in diff):
-    - **Step 1 — Identify migrations:**
-      ```bash
-      git diff --name-only $(git merge-base HEAD main)...HEAD \
-        | grep -iE 'migration|\.sql$'
-      ```
-      If no matches: skip this section entirely.
-    - **Step 2 — Scan for destructive operations:**
-      For each migration file, grep for dangerous patterns:
-      ```bash
-      grep -inE 'DROP\s+(TABLE|COLUMN|INDEX|CONSTRAINT|FUNCTION)|DELETE\s+FROM|TRUNCATE|ALTER\s+.*TYPE' {migration_file}
-      ```
-      Classify each match:
-      | Pattern | Risk | Action |
-      |---------|------|--------|
-      | `DROP TABLE` | **destructive** — data loss | Escalate to captain |
-      | `DROP COLUMN` | **destructive** — data loss | Escalate to captain |
-      | `ALTER ... TYPE` | **risky** — may fail on existing data | Flag in report |
-      | `DELETE FROM` | **destructive** — data loss | Escalate to captain |
-      | `TRUNCATE` | **destructive** — data loss | Escalate to captain |
-      | `DROP INDEX` | reversible | Note in report |
-      | `DROP FUNCTION` | reversible (if recreated) | Check if function is recreated in same migration |
-      | `ADD COLUMN ... NOT NULL` (no DEFAULT) | **risky** — fails on existing rows | Flag in report |
-    - **Step 3 — Check reversibility:**
-      - Does the migration have a corresponding `down` migration or rollback?
-      - For Drizzle/Knex: check if rollback is generated
-      - For raw SQL: check if a paired `_down.sql` exists
-    - **Step 4 — Verify no broken references:**
-      If columns/tables are dropped, grep codebase for references:
-      ```bash
-      # For each dropped column/table name
-      grep -rl "{dropped_name}" domains/ apps/ packages/ --include="*.ts" | head -20
-      ```
-      References found → flag as potential runtime breakage.
-    - **Step 5 — Report:**
-      ```
-      Migrations: 2 files, 1 destructive operation
+Judgment-based diff-level code review. Scope is `git diff {execute_base}..HEAD` — only what this execute iteration changed. Combines a mechanical pre-scan (inline, no dispatch) with parallel dispatches of pr-review-toolkit and trailofbits review agents.
 
-      | File | Operation | Risk | References |
-      |------|-----------|------|------------|
-      | 0042_drop_legacy.sql | DROP COLUMN legacy_id | destructive | 3 files still reference |
-      | 0043_add_notes.sql | ADD COLUMN notes TEXT | safe | — |
-      ```
-    - Destructive operations → escalate to captain
-    - Broken references → feedback-to: execute (fix references before migration)
-  - **License Compliance** (conditional: when lockfile/deps changed):
-    - New dependencies checked for license compatibility
-    - Flag: GPL/AGPL in MIT-licensed project, unknown licenses, no license
-  - **Advance decision:**
-    - All checks pass + zero confirmed security findings → **auto-advance** (no captain approval needed)
-    - Compilation/test failures → feedback-to: execute (max 3 rounds, then escalate)
-    - Coverage delta beyond tolerance (default -2%) or new files with 0% coverage → feedback-to: execute (add tests for flagged files)
-    - Confirmed security findings → **escalate to captain** with severity assessment
-    - Breaking API change → **escalate to captain** (intentional or not?)
-    - Data-destructive migration → **escalate to captain**
-- **Good:** All checks ran for affected scope, security scans completed, false positives filtered out, coverage maintained, breaking changes flagged
-- **Bad:** Only partial checks, skipping security scans, ignoring coverage drop, treating all findings as blockers without fp-check
-
-### `seeding`
-
-Prepare test data required for E2E testing. **CONDITIONAL: only when E2E needs seed data not yet present** (e.g., new entity types, specific workflow states, or test user scenarios). Also dispatched via feedback when e2e fails due to insufficient test data.
-
-- **Inputs:** Entity body (plan + acceptance criteria), explore results (seed requirements), e2e failure report (if feedback from e2e)
+- **Inputs:** Feature branch, execute base commit SHA, context lake
 - **Outputs:**
-  - Seed data scripts or builders for required test scenarios
-  - Test users, entities, or workflow states needed by E2E flows
-  - Seed validation (data actually exists in test environment after seeding)
-  - If project has seed infrastructure: integrate with existing seed pattern (e.g., Snaplet Seed, fixtures)
-- **Good:** Seed data matches E2E flow requirements exactly, uses project's existing seed patterns, validates data exists after creation
-- **Bad:** Generic/random data that doesn't match test scenarios, bypassing project seed conventions, no validation
+  - **Pre-scan** (inline): CLAUDE.md compliance walk, stale references grep, dependency chain check, plan consistency (diff matches PLAN's `files_modified`)
+  - **Parallel dispatches**: `pr-review-toolkit:code-reviewer`, `silent-failure-hunter`, `comment-analyzer`, `pr-test-analyzer`, `type-design-analyzer`, `code-simplifier`, plus trailofbits `differential-review` / `sharp-edges` / `variant-analysis` (if installed)
+  - Findings classified: severity (CRITICAL/HIGH/MEDIUM/LOW/NIT) × root (CODE/DOC/NEW/PLAN)
+  - `spacedock:knowledge-capture` invoked in `capture` mode: D1 patterns auto-appended to plugin learned-patterns.md, D2 candidates staged to entity body `## Pending Knowledge Captures`
+  - `## Stage Report: review` — classified findings table
+- **Verdict routing:**
+  - No CRITICAL/HIGH CODE findings → advance to uat
+  - Any CRITICAL/HIGH CODE finding → `feedback-to: execute`
+  - Any PLAN finding → raise replan flag in Stage Report (advisory — captain decides whether to reset status to plan)
+- **Good:** Pre-scan catches mechanical issues before paying for subagent dispatch; consistent classification; D2 candidates staged (not applied) so FO handles captain interaction
+- **Bad:** Skipping pre-scan, treating NIT findings as blockers, silently applying D2 candidates without FO handoff, dispatching review agents on the entire branch instead of `execute_base..HEAD` diff
 
-**FO conditional dispatch:** Check explore results for seed requirements (new entity types mentioned in acceptance criteria, specific states needed for testing). If no seed requirements detected AND no feedback from e2e → skip to e2e.
+### `uat`
 
-### `e2e`
+User-observable behavior verification with automated e2e + captain sign-off. This is an approval gate. Supports skip/resume via the `/spacedock:uat-resume {slug}` captain slash command.
 
-Browser E2E testing for features with UI changes. This is an approval gate with conditional failure routing. Skipped for backend-only changes (first officer checks explore results for UI file paths).
-
-- **Inputs:** Feature branch (quality gate passed), seeded test data (if seeding ran), context lake, E2E mappings
+- **Inputs:** `## UAT Spec` from plan stage (items classified browser/cli/api/interactive), feature branch (quality + review passed)
 - **Outputs:**
-  - Updated UI mappings if new pages added (via `Skill: "e2e-map"` — requires `e2e-pipeline` plugin)
-  - Generated E2E flow from plan acceptance criteria (via `Skill: "e2e-flow"`)
-  - Test execution results with artifacts (via `Skill: "e2e-test"`)
-  - If `e2e-pipeline` not installed: entire e2e stage skipped with `SKIP: e2e-pipeline plugin not installed`
-  - **Accessibility audit** (conditional: UI changes with user-facing components):
-    - WCAG 2.1 AA compliance check on changed components
-    - Screen reader attributes (`aria-label`, `role`, `accessibilityLabel`)
-    - Keyboard navigation for interactive elements
-    - Color contrast verification
-    - `Skill: "expo-accessibility"` for Expo/React Native components
-  - **Failure classification** (if test fails):
-    - `SEED_INSUFFICIENT` — test data missing or incomplete (e.g., "no orders found", empty list)
-    - `CODE_BUG` — selector mismatch, logic error, wrong API response
-    - `INFRA_FAILURE` — browser crash, LLM API timeout, network error, environment issue
-- **Good:** Flow generated from plan criteria, mapping updated for new pages, failure classified with evidence
-- **Bad:** Skipped because "no mapping exists" (create the mapping), hardcoded flow not from plan, unclassified failure
-
-**FO gate — conditional routing based on failure classification:**
-
-| Classification | Action |
-|----------------|--------|
-| PASS | Auto-advance to pr-ship |
-| `SEED_INSUFFICIENT` | Feedback-to: seeding (prepare missing data, then re-run e2e) |
-| `CODE_BUG` | Feedback-to: execute (fix code, re-run quality → seeding? → e2e) |
-| `INFRA_FAILURE` | Escalate to captain: retry / skip e2e / abort |
-| Unclassified after 2 rounds | Escalate to captain |
-
-### `docs`
-
-Update documentation to reflect the implemented changes. **CONDITIONAL: only when the feature adds or changes public API, CLI commands, configuration, or has breaking changes requiring a migration guide.** Skipped for internal refactors, test-only changes, and cosmetic UI updates.
-
-- **Inputs:** Feature branch (post-e2e), plan document, entity context (breaking changes from quality report)
-- **Outputs:**
-  - **API documentation** (conditional: new/changed endpoints):
-    - OpenAPI/Swagger spec updated, or inline API doc comments updated
-    - Request/response examples reflect new behavior
-  - **CHANGELOG entry** (conditional: feat/fix types):
-    - Entry follows Keep a Changelog format or project convention
-    - Breaking changes highlighted with `BREAKING CHANGE:` prefix
-    - Links to relevant issue/PR
-  - **Migration guide** (conditional: breaking changes detected in quality):
-    - Step-by-step upgrade instructions for consumers
-    - Before/after code examples
-    - Deprecation timeline if gradual migration
-  - **README/CLAUDE.md updates** (conditional: new patterns, commands, or configuration):
-    - New commands or configuration options documented
-    - Architecture docs updated if structural changes
-  - **Observability notes** (conditional: new endpoints/handlers):
-    - Logging: new handlers have `createLogger()` calls
-    - Sentry: breadcrumbs for critical paths
-    - Metrics: counters/gauges for new business operations
-- **Good:** Docs match implemented behavior exactly, changelog entry present for user-facing changes, migration guide for breaking changes, observability in place
-- **Bad:** Docs describe planned behavior (not actual), missing changelog for feat/fix, no migration guide for breaking change, new endpoint with no logging
-
-**FO conditional dispatch:** Check quality report for breaking API changes, explore results for new endpoints/commands, entity intent for feat/fix type. If none of these → skip to pr-draft.
-
-### `pr-draft`
-
-Create a draft PR with annotations. Ensign invokes `Skill: "kc-pr-flow:kc-pr-create"` with `--draft-only --no-announce` flags to execute Part A (Steps 1-9) of the PR lifecycle.
-
-- **Inputs:** Feature branch (all checks passed), entity context (issue_id, E2E results, quality report)
-- **Outputs:**
-  - Draft PR on GitHub with conventional commit title and structured body
-  - Self-review annotations posted as PR review comments (if >100 lines changed)
-  - Linear issue commented with PR link (if `issue` field set)
-  - PR_NUMBER and PR_URL captured in entity body (FO writes to frontmatter)
-- **PR Size Check:**
-  - Diff <500 lines → normal
-  - Diff 500-1000 lines → note in entity: "Consider splitting for easier review"
-  - Diff >1000 lines → escalate to captain: "PR is {N} lines. Split or proceed?"
-- **Good:** Title follows conventional commits (<70 chars), body uses project PR template if present, annotations explain design decisions ("why" not "what"), E2E results and quality report included in body
-- **Bad:** Title >70 chars, ignoring project PR template, annotations on self-explanatory code, missing test evidence in body, >1000 line PR without captain acknowledgment
-
-**Skill invocation:** `Skill: "kc-pr-flow:kc-pr-create" --draft-only --no-announce`
-- Step 1.5 (E2E suggestion): auto-skip — already handled by e2e stage
-- Steps 4, 7 (interactive confirmations): auto-approve in pipeline context — the gate comes after pr-review, not before push
-
-**Fallback (if kc-pr-flow not installed):** Ensign follows PR steps manually:
-1. Generate title: `{type}({scope}): {description}` from entity context
-2. Generate body: Summary + Test plan + quality report
-3. `git push -u origin $(git branch --show-current)`
-4. `gh pr create --draft --title "..." --body "..." --assignee @me`
-5. Capture PR_NUMBER/PR_URL from output
-
-### `pr-review`
-
-Self-review loop followed by captain approval gate. Follows kc-pr-create Part B (Steps 10-12) and Part C (Step 13). Captain reviews the PR and self-review results before the PR is marked ready.
-
-- **Inputs:** Draft PR (PR_NUMBER from entity), feature branch
-- **Outputs:**
-  - **Before gate (ensign does autonomously):**
-    - **Security diff review** (optional — requires `trailofbits/skills`): `Skill: "differential-review"` — security-focused analysis on PR diff. If not installed: skip with `SKIP:` note.
-    - **Self-review agents** dispatched in parallel (requires `pr-review-toolkit`, bundled with superpowers): `code-reviewer` (code quality, bugs) + `comment-analyzer` (comment accuracy). If unavailable: run lightweight main-context pre-scan only (CLAUDE.md compliance, stale refs, unused imports).
-    - All findings classified: CODE/SUGGESTION → fixed, DOC/advisory → noted
-    - Fixes committed and pushed (max 3 rounds)
-    - Review summary written to entity body
-  - **After captain approve (ensign continues):**
-    - `gh pr ready {PR_NUMBER}` — PR marked ready for human review
-    - CI gate (if configured): poll checks up to 5 min
-    - Announce: detect demo artifacts → `Skill: "kc-pr-flow:kc-pr-announce"` (if artifacts found)
-  - **On captain reject:**
-    - Findings sent to execute stage via feedback-to
-- **Good:** All CODE/SUGGESTION findings fixed before gate, review summary is clear and concise, PR marked ready only after captain approval, CI passes
-- **Bad:** Infinite loop on NIT findings, marking ready without gate approval, blocking on advisory-only items
-
-**Gate presentation format:**
-```
-Gate review: {entity title} — pr-review
-
-  PR: #{PR_NUMBER} (draft) — {PR_URL}
-  Title: {PR title}
-
-  Self-review: {N} rounds
-    Fixed: {N} items ({breakdown by severity})
-    Advisory: {N} items (noted, not blocking)
-    Result: {APPROVE | remaining issues}
-
-  Assessment: {Recommend approve | Recommend reject: {reason}}
-```
+  - **Browser items**: `Skill: "e2e-pipeline:e2e-map"` coverage check + `e2e-flow` generation + `e2e-test` execution; artifacts (screenshots, video, trace)
+  - **CLI items**: declared command execution with stdout/stderr/exit code capture
+  - **API items**: declared curl/gh command execution with response/status code capture
+  - **Interactive items**: captain AskUserQuestion one-at-a-time (not batched) — loaded via ToolSearch at runtime
+  - `## UAT Results` — per-item table: item / status (pass/fail/skipped) / evidence refs / notes / re-attempt
+  - If any items skipped with captain ack: entity frontmatter `uat_pending_count=N` set for future `/spacedock:uat-resume`
+- **Failure classification:**
+  - **Infra fail** (browser crash, URL 404, command not found, environment error) → `feedback-to: execute` without captain interaction (clear execute bug)
+  - **Assertion fail with evidence** (screenshot shows wrong value, curl returns wrong body) → include in captain review; captain decides retry / override / feedback
+- **Good:** Automated items run first (no captain cost for obvious failures); evidence attached to every item; skip reasons captured verbatim; failure classification drives routing
+- **Bad:** Asking captain to retry infra failures, batching AskUserQuestion calls, unclassified failures, skipping items without captain ack
 
 ### `shipped`
 
-Terminal stage. The feature's PR has been merged or is ready for merge. The entity is archived.
+Terminal stage. Mod-driven: `mods/pr-review-loop.md` (Phase E+1) handles PR lifecycle via merge and idle hooks.
+
+- **Merge hook:** Draft PR summary from entity body (Stage Reports, UAT Results), ask captain approval, `git push origin {branch}` + `gh pr create`, set entity `pr: #{number}`. Engine skips default local merge.
+- **Idle hook:** Poll `gh pr view {number} --json state,reviews,mergeable`:
+  - MERGED → advance and archive
+  - CHANGES_REQUESTED or CI fail → reset entity `status: execute`, clear `pr:`, log context in entity body
+  - APPROVED + mergeable → merge and archive
+  - OPEN + pending → no action
+- **Startup hook:** Same PR-state checks as idle (defense in depth on session start)
+- **Fallback** (mod not installed): Captain manually creates PR from the completed feature branch
+
+The detailed shipped design (PR body template, PR agent review dispatch, human-review gate, merge strategy, post-merge cleanup) is deferred to Phase E+1. This README documents the mod contract; the mod itself ships separately.
 
 ## Workflow State
 
@@ -687,8 +441,8 @@ pr:
 intent: feature
 scale: Medium
 project:
-profile:
 auto_advance:
+uat_pending_count:
 parent:
 children:
 ---
