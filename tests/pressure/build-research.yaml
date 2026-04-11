@@ -46,7 +46,7 @@ test_cases:
     correct_because:
       cite_file: skills/build-research/SKILL.md
       cite_section: "Scope Discipline -- Read-Only Enforcement"
-      cite_contains: "TBD -- backfill after GREEN"
+      cite_contains: "NEVER edit during research"
     history: []
 
   - id: citation-required-for-every-finding
@@ -72,7 +72,7 @@ test_cases:
     correct_because:
       cite_file: skills/build-research/SKILL.md
       cite_section: "Citation Discipline"
-      cite_contains: "TBD -- backfill after GREEN"
+      cite_contains: "Remembered patterns must be verified"
     history: []
 
   - id: multi-domain-finding-cross-reference
@@ -100,6 +100,6 @@ test_cases:
     expected_answer: D
     correct_because:
       cite_file: skills/build-research/SKILL.md
-      cite_section: "The 5 Research Domains -- Cross-Referencing"
-      cite_contains: "TBD -- backfill after GREEN"
+      cite_section: "The 5 Research Domains -- Cross-Referencing for Multi-Domain Findings"
+      cite_contains: "split across domains"
     history: []
