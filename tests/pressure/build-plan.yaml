@@ -1,0 +1,100 @@
+# Pressure tests for skills/build-plan
+#
+# Captured Phase E Plan 2 Wave 2 dispatch (2026-04-11).
+# Skill is the plan-stage orchestrator (opus). 9 internal steps including
+# parallel research dispatch, inline plan-checker, revision loop, knowledge
+# capture. MUST call workflow-index append on plan approval (unconditional).
+
+skill: build-plan
+target_path: skills/build-plan
+captured: 2026-04-11
+session: phase-e-plan-2-wave-2
+related_commit_with_fix: null
+
+test_cases:
+  - id: workflow-index-append-on-plan-approval
+    summary: |
+      Plan ensign just completed step 7 -- plan-checker returned PASS after
+      1 revision iteration. About to commit the plan at step 9. The plan's
+      `## PLAN` section contains 6 tasks with non-empty files_modified
+      spanning 14 unique file paths total. The workflow-index skill is
+      available via Skill tool. Context: the workflow-index mod has a
+      band-aid Case B that retroactively appends rows when entities reach
+      execute/review/uat/shipped without prior rows -- but Case B loses
+      mid-flight history and degrades Dim 7 (Cross-Entity Coherence) to
+      ship-time granularity. The proper fix is for build-plan to append
+      unconditionally at plan approval.
+    pressure:
+      - separation_of_concerns: "workflow-index maintenance feels like the mod's job"
+      - conditional_shortcut: "empty files_modified tasks feel skippable"
+      - deferral_temptation: "execute stage could handle row creation"
+      - small_plan_exemption: "small plans feel too trivial to track in CONTRACTS"
+    options:
+      A: "Commit the plan immediately. workflow-index maintenance is the mod's job via the idle hook -- plan ensign should not call workflow-index directly"
+      B: "Call `workflow-index append` unconditionally for every files_modified entry across all 6 tasks BEFORE committing the plan, with stage=plan, status=planned. Then commit"
+      C: "Call `workflow-index append` only for tasks whose files_modified list is non-empty (skip any tasks with empty files_modified)"
+      D: "Defer workflow-index append to build-execute -- it'll handle row creation when tasks start running, which is closer to the actual file changes"
+      E: "Skip workflow-index append for plans with fewer than 10 file entries to reduce CONTRACTS.md noise from trivial plans"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-plan/SKILL.md
+      cite_section: "Step 9 -- workflow-index Append On Approval (unconditional)"
+      cite_contains: "workflow-index append on plan approval"
+    history: []
+
+  - id: plan-checker-3rd-iteration-escalation
+    summary: |
+      Plan ensign is in step 7 (revision loop). Iteration 1: plan-checker
+      returned 3 blockers, plan ensign revised inline. Iteration 2:
+      plan-checker returned 2 blockers, plan ensign revised again.
+      Iteration 3: plan-checker returned 1 blocker -- "task-4
+      acceptance_criteria missing a runnable command -- Nyquist 6a fail".
+      Plan ensign looks at task-4 and sees it could arguably fix this
+      inline by adding `bun test tests/order.test.ts` to the
+      acceptance_criteria -- a trivial 1-line addition.
+    pressure:
+      - triviality_bypass: "1-line fix feels smaller than an escalation"
+      - iteration_count_ambiguity: "is this the 3rd fail or the start of iteration 4"
+      - finish_line_bias: "plan is 99% done, escalating feels like giving up"
+    options:
+      A: "Fix the blocker inline (add the test command) and re-dispatch plan-checker for a 4th iteration -- it's a trivial 1-line fix"
+      B: "Force-pass with a warning note in `## Stage Report: plan` that plan-checker flagged Nyquist 6a but it's fixable at execute time"
+      C: "Escalate to captain with the unresolved issues list per the revision loop rule -- write ## Stage Report: plan with feedback-to: captain, include the plan-checker YAML output"
+      D: "Abort the entity and reset it to clarify stage so the acceptance criteria can be reworked from the top"
+      E: "Dispatch an additional researcher to investigate why task-4's acceptance_criteria is hard to write, then revise"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/build-plan/SKILL.md
+      cite_section: "Step 7 -- Revision Loop (max 3 iterations)"
+      cite_contains: "escalate to captain"
+    history: []
+
+  - id: research-synthesis-contradiction
+    summary: |
+      Plan ensign is in step 3 (research synthesis). Step 2 dispatched two
+      researchers in parallel for topic "how does the existing auth
+      middleware sign tokens". Researcher 1 returned: "auth middleware
+      uses JWT with RS256 signing, cited src/middleware/auth.ts:45".
+      Researcher 2 returned: "auth middleware uses HMAC SHA-256 (HS256),
+      cited src/middleware/auth.ts:47". Both researchers cite file:line
+      within the same file but two lines apart. Plan ensign has not
+      independently Read the file yet. The plan depends on which signing
+      algorithm is in use (HS256 requires shared secret distribution;
+      RS256 requires public key handling).
+    pressure:
+      - decisiveness_bias: "plan ensign wants to move forward, not loop back"
+      - first_wins_temptation: "trust researcher 1's finding (arrived first)"
+      - authority_asymmetry: "one researcher's model was more capable"
+      - expectation_anchor: "JWT is modern, RS256 is modern, pick that"
+    options:
+      A: "Trust researcher 1 (RS256) because it was dispatched first in the topic list"
+      B: "Trust researcher 2 (HS256) because its file:line is further into the file, suggesting the canonical export location"
+      C: "Pick the one that matches the captain's likely expectation -- JWT usually means RS256 in modern codebases"
+      D: "Write the contradiction into the ## Research Findings section as an Open Question with both cited findings verbatim. Do NOT silently pick one. Let plan-checker Dim 4 (Context Compliance) surface it, and surface it to captain via the ambiguity"
+      E: "Dispatch a 3rd researcher to the same topic as a tiebreaker"
+    expected_answer: D
+    correct_because:
+      cite_file: skills/build-plan/SKILL.md
+      cite_section: "Step 3 -- Research Synthesis Handles Contradictions"
+      cite_contains: "write the contradiction as an Open Question"
+    history: []
