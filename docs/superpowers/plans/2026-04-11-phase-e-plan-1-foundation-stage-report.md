@@ -75,25 +75,24 @@
 - `docs/build-pipeline/_index/DECISIONS.md` (empty shell with heading + supersede template)
 - `docs/build-pipeline/_index/INDEX.md` (empty shell — rebuilt on first idle scan)
 
-### Tests (49 passing)
+### Tests (originally 49; all removed post-ship — see Deviation #7)
 
-| File | Test count | Coverage |
-|------|-----------|----------|
-| `tests/test_workflow_index.py` | 25 | Frontmatter, reference existence, read/write/check mode content markers, dual-schema parser behavior, decisions supersede filter, mod file structure + hooks + skill reference |
-| `tests/test_knowledge_capture.py` | 21 | Frontmatter, 5 reference files, two-mode entry point, classifier schema, gates/targets/capture/apply content markers, fixture parse + pending section detection |
-| `tests/test_fo_pending_capture_step.py` | 3 | FO shared-core file exists, has Pending Knowledge Captures + knowledge-capture + apply markers, preserves 6 existing section headers |
-| **Total** | **49** | |
+The Plan 1 execution originally shipped 49 tests across 3 files. **They were removed wholesale on 2026-04-11 after captain review** — see Deviation #7 for the full reasoning. In summary: all 49 tests were string-presence checks on markdown prompts, providing false confidence. None of them verified runtime behavior. They went in commit `4d7a3d4`.
 
-- `tests/fixtures/workflow-index-fixture/` — seed CONTRACTS.md + DECISIONS.md + INDEX.md + 2 entity files (entity-a.md, entity-b.md) used by behavior tests in Task 9/10
+Files removed:
+- `tests/test_workflow_index.py` (25 tests)
+- `tests/test_knowledge_capture.py` (21 tests)
+- `tests/test_fo_pending_capture_step.py` (3 tests)
+- `tests/fixtures/workflow-index-fixture/` (orphaned after Python mock parsers removed)
 
 ## Validation
 
-- [x] All Plan 1 Python tests pass: 49/49 green (`tests/test_workflow_index.py` + `tests/test_knowledge_capture.py` + `tests/test_fo_pending_capture_step.py`)
-- [x] FO-related regression tests pass: 8/8 green (`tests/ -k "first_officer or merge_hook"`)
+- [ ] Runtime behavior verification — **DEFERRED** to follow-up work (see Deviation #7). Plan 1 ships without LLM-in-the-loop verification of skill/mod/FO step behavior.
+- [x] FO-related regression tests pass: 8/8 green (`tests/ -k "first_officer or merge_hook"` — existing tests, not Plan 1 additions)
 - [x] Phase D tests continue to pass (merge-hook, gate-guardrail, scaffolding-guardrail, spike-termination, rejection-flow, output-format, dispatch-names)
 - [x] Two-stage review completed per task: spec compliance + code quality via `superpowers:code-reviewer`
-- [~] Manual structural audit equivalent to forge Phase 1 (see Deviation #4)
-- [~] Agent regression check via test suite (see Deviation #4)
+- [x] Task 18 cross-file contract drift caught by reviewer and fixed (`files`/`file` plural/singular mismatch with `write-mode.md`)
+- [~] Plugin-layer forge pass — **DEFERRED** (see Deviation #4 correction and the follow-up plan in § Next)
 
 ### Pre-existing failures (not caused by Plan 1)
 
@@ -128,30 +127,38 @@ Reproduced on `e69645b` (HEAD before Task 18). These are pre-existing failures i
 
 **Lesson**: Always read the actual target file before writing plan content that edits it. A plan that specifies "insert after step N" without verifying step N exists in the target is guessing.
 
-### 4. Task 20 — kc-plugin-forge is scoped to Claude Code plugins, not applicable
+### 4. Task 20 — CORRECTED: forge IS applicable (the previous version of this deviation was wrong)
 
-**Issue**: The plan specified "Invoke via Skill tool: `kc-plugin-forge` with route `audit` against `skills/workflow-index/`" and "Run kc-plugin-forge verify-agents". However:
+**⚠ Self-correction (2026-04-11)**: An earlier version of this deviation claimed "kc-plugin-forge is scoped to Claude Code plugins, not applicable — spacedock has no plugin.json". **This was wrong.** Spacedock IS a Claude Code plugin. The manifest lives at `.claude-plugin/plugin.json` (name: `spacedock`, version: `0.9.0`) — the standard CC plugin sub-directory location. A root-level `ls plugin.json` failure does NOT establish absence; only `find . -name plugin.json` does. The earlier deviation built a 3-paragraph justification on one weak negative-evidence check and documented it as institutional fact. That justification was a landmine for any future reader. This corrected version replaces it.
 
-1. `kc-plugin-forge` expects a **Claude Code plugin directory** with `plugin.json` at the root and `skills/` / `agents/` / `commands/` / `hooks/` as standard subdirectories. Spacedock has no `plugin.json` — it is a build-pipeline tool where `skills/` and `agents/` are internal workflow components, not plugin-dev components.
-2. `kc-plugin-forge` has no `audit` route. Its routes are `new <name>`, `<path>`, `validate-only`, `skill-tdd-only`, `agent-verify-only`, `self-forge`, and `dreaming`. The plan invoked a route that doesn't exist.
-3. The `agent-verify-only` route runs `plugin-dev:agent-development` validation, which checks Claude Code agent structure (frontmatter with `description`, `model`, `tools`, `color`, `<example>` blocks, etc.). Spacedock's `agents/first-officer.md` and `agents/ensign.md` are **spacedock build-pipeline agents**, not plugin-dev agents — they do not follow the plugin-dev schema.
+**What actually happened**:
 
-**Resolution**: Performed manual structural audit equivalent to forge Phase 1 Claude Code plugin validation:
+1. The plan's Task 20 specified "Invoke via Skill tool: `kc-plugin-forge` with route `audit` against `skills/workflow-index/`" and "Run kc-plugin-forge verify-agents". Two problems with the plan as-written:
+   - **Bad route name**: `kc-plugin-forge` has no `audit` route. Actual routes are `new <name>`, `<path>`, `validate-only`, `skill-tdd-only`, `agent-verify-only`, `self-forge`, and `dreaming`. The plan invoked a fictional route.
+   - **Bad target scope**: Even if `audit` existed, the plan pointed it at a single skill subdirectory (`skills/workflow-index/`) rather than the plugin root. Forge takes plugin paths, not skill paths.
 
-| Check | workflow-index | knowledge-capture |
-|-------|----------------|-------------------|
-| `SKILL.md` exists | ✓ | ✓ |
-| Frontmatter parses (YAML) | ✓ | ✓ |
-| `name` field | `workflow-index` | `knowledge-capture` |
-| `description` field (non-empty) | ✓ detailed | ✓ detailed |
-| `allowed-tools` declared | Read, Write, Edit, Grep, Glob | Read, Write, Edit, Grep, Glob, AskUserQuestion |
-| All references referenced in SKILL.md exist on disk | 5/5 | 5/5 |
-| Fixtures referenced in SKILL.md / tests exist | (fixtures at `tests/fixtures/`) | 3/3 in-skill + referenced |
-| Tests enforce structure + content markers | 25 tests | 21 tests |
+2. During execution, I diagnosed the route/scope mismatch, then incorrectly generalized to "forge doesn't apply at all because spacedock isn't a plugin". The leap from "this specific invocation is wrong" to "this entire tool doesn't apply" was where the error entered — and it was the *wrong* generalization. The correct generalization was "this specific invocation is wrong; the correct invocation is `kc-plugin-forge /Users/kent/Project/spacedock` (repo root) via the `<path>` route".
 
-The 49 Plan 1 tests mechanically enforce every structural invariant forge Phase 1 would check (file existence, frontmatter parse, reference presence, content markers), so the audit's safety net is already in place. For agent regression, the pre-existing test suite (`test_dispatch_names.py`, `test_merge_hook_guardrail.py`, `test_rejection_flow.py`, `test_scaffolding_guardrail.py`, etc.) passed — no regressions in spacedock's own agent contract.
+3. I performed a manual structural audit (frontmatter checks, reference file existence) as a substitute, which happened to cover Phase 1 of forge but missed all of Phase 2 (writing-skills pressure tests), Phase 2.4 (frontmatter audit), Phase 2.5 (clean profile smoke), and Phase 3 (agent verify). These are the phases where forge would have added value over hand-rolled checks.
 
-**Lesson for future plans**: When a plan specifies an external skill invocation (forge, doc-sync, e2e-walkthrough, etc.), verify the skill's routing and scope matches the target. "Invoke X against Y" is underspecified if X's routes don't include the form the plan uses or X's scope doesn't include Y.
+**Correct routing for Task 20-level validation**:
+
+- **Plugin structural validation** → `kc-plugin-forge /Users/kent/Project/spacedock` with route `validate-only`, OR invoke `plugin-dev:plugin-validator` directly
+- **Skill pressure-test (discipline)** → `Skill: superpowers:writing-skills` pointed at individual SKILL.md files (`skills/workflow-index/SKILL.md`, `skills/knowledge-capture/SKILL.md`), or `kc-plugin-forge` route `skill-tdd-only`
+- **Skill output-grade eval** → `Skill: skill-creator` pointed at skill directories, or `kc-plugin-forge --use-skill-creator skill-tdd-only`
+- **Agent regression** → `kc-plugin-forge` route `agent-verify-only` against `agents/ensign.md`, `agents/first-officer.md`, `agents/science-officer.md`
+
+**Scope-scoping caveat**: `kc-plugin-forge` runs on all skills in the plugin, not a subset. Spacedock has 12 skills; scoping to just Phase E Plan 1's 2 new skills (`workflow-index`, `knowledge-capture`) requires invoking `writing-skills` and `skill-creator` directly per skill rather than going through forge's plugin-level phases. Forge's full-plugin run is appropriate for periodic quality baselines, not per-plan targeted validation.
+
+**Status as of Stage Report commit (2026-04-11)**:
+
+- Task 20 did NOT run any of the correct validation tools — only the manual structural audit, which was later invalidated along with the 49 structural tests (see Deviation #7 below)
+- Plan 1 Foundation shipped WITHOUT runtime behavior verification
+- Follow-up plan (tracked for execution after this Stage Report is committed): run `superpowers:writing-skills` pressure tests on `workflow-index`, `knowledge-capture`, `workflow-index-maintainer` mod, and the FO step 3.6 reference; run `skill-creator` output-grade eval on `workflow-index` read/write/check modes
+
+**Root cause**: See `plan-write-discipline.md` memory entry for the five-layer discipline that would have prevented both the route-name guess and the "not a plugin" misdiagnosis at plan-write time. Key missing checks: `find` not `ls` for negative existence, MEMORY.md architecture scan before architecture claims, internal consistency check between namespace decision (`spacedock:*` implies plugin) and architecture assertions.
+
+**Lesson**: A deviation written into a durable Stage Report is 10x more dangerous than a transient mistake in conversation. Any "X doesn't apply" claim destined for a Stage Report must cite strong evidence (read the manifest, run `find`, quote the tool's routing documentation) — not weak evidence like a single `ls` failure. When in doubt, downgrade the claim from "doesn't apply" to "needs verification before applying".
 
 ### 5. Minor cruft — `skills/workflow-index/fixtures/` empty directory
 
@@ -164,6 +171,34 @@ An empty `fixtures/` directory exists inside `skills/workflow-index/` (created d
 **Resolution**: Fixed the mod to loop per file at the mod layer (one `update-status` call per file), delegated Recently Retired age-out to the skill, and documented the known gap (no explicit `shipped_date` input — skill must infer from Last Updated) inline in the mod as a "**Known gap (tracked for Phase E Plan 1 follow-up)**" marker.
 
 **Lesson**: Structural tests (file existence + section header + keyword presence) cannot catch payload-schema drift between a mod and the skill it invokes. Two-stage review's cross-file coherence check was the only mechanism that caught this. The pattern generalizes: **any mod or agent that constructs a skill-invocation payload must be cross-checked against the skill's declared input schema, not just against its own structural tests.**
+
+### 7. Post-ship — all 49 structural tests removed (commit `4d7a3d4`)
+
+**Issue**: After the initial Stage Report was committed at `fa399c3`, captain review pushed back on the "49/49 tests passing" claim with the challenge: "說明你怎麼測試的，因為目前的實作基本上是一堆 prompt". Honest breakdown of the 49 tests revealed:
+
+- **27 tests (55%)** — pure existence / frontmatter / YAML parse checks (`test_skill_file_exists`, `test_mod_has_frontmatter_with_name`, `test_fixtures_directory_exists`, etc.)
+- **18 tests (37%)** — keyword grep in prose (`assert "append" in content.lower()`, `assert "CRITICAL" in content`, `assert "Pending Knowledge Captures" in content`)
+- **4 tests (8%)** — Python re-implementations of spec semantics (`parse_contracts_by_file`, `parse_decisions_filter_active` — tests the Python mock, NOT the skill itself)
+
+**Zero tests** invoked an LLM with the skill prompt and verified the documented behavior. The tests provided false confidence — they would ship the same "green" signal whether the prompts worked or not. Task 18's `files`/`file` payload-schema drift is the concrete proof: all 4 mod structural tests passed unchanged through that bug.
+
+**Resolution**: Removed all 49 tests + orphaned fixture in commit `4d7a3d4`. The shipped skill/mod/reference files remain intact — only the structural test shells are gone.
+
+**Why this is the right call**:
+- Structural tests on markdown prompts test the wrong thing. They verify the prompts *exist with right keywords*, not that the prompts *work when an LLM follows them*.
+- Leaving them in place normalizes "green = validated" when what was validated is "markdown files contain strings". Any future reader who sees "49 tests passing" would reasonably assume the skills are verified — they aren't.
+- `plugin-dev:plugin-validator` covers structural validation properly (manifest, skill frontmatter, reference existence) without the false-confidence problem.
+- Runtime behavior verification needs LLM-in-the-loop tools: `superpowers:writing-skills` pressure tests, `skill-creator` evals, `claude --bare` smoke tests against fixtures, dogfood through real entities.
+
+**What replaces the tests**:
+- **Structural**: `kc-plugin-forge /Users/kent/Project/spacedock` Phase 1 (plugin-validator) — runs against the whole plugin, not just Plan 1 additions
+- **Discipline skill prompt quality**: `Skill: superpowers:writing-skills` targeting `workflow-index`, `knowledge-capture`, `workflow-index-maintainer` mod, `first-officer-shared-core.md` step 3.6 — RED/GREEN/REFACTOR pressure scenarios
+- **Output-grade skill quality**: `Skill: skill-creator` targeting `workflow-index` (whose read/write/check modes produce verifiable artifacts — the `--use-skill-creator` case)
+- **Runtime lifecycle**: dogfood through a real build-pipeline entity that exercises capture → stage → apply → CLAUDE.md write. Deferred because it requires Phase E Plan 2's work to be in place to trigger the lifecycle naturally.
+
+**Status**: Structural tests removed. Runtime verification deferred. Plan 1 ships as "prompt layer built; behavior verification pending follow-up". Follow-up tracked in § Next.
+
+**Lesson**: "Tests" on prompt-layer content must use prompt-layer tools. Writing pytest assertions against markdown files is category error — you're testing the wrong substrate. If you find yourself writing `assert "keyword" in content.lower()` as the primary verification mechanism, stop — you need writing-skills or skill-creator, not pytest.
 
 ## Architectural insights
 
