@@ -1,0 +1,157 @@
+# Pressure tests for mods/workflow-index-maintainer.md
+#
+# Captured during Phase E Plan 1 quality 补洞 Task 3 (2026-04-11).
+# All 3 scenarios revealed real holes; fix-forward commit 0d7d2e1 added
+# Error Handling section, Case B retroactive append path, and Files
+# Modified Stage Report contract. Round 2 re-tests verified all GREEN.
+
+skill: workflow-index-maintainer
+target_path: mods/workflow-index-maintainer.md
+captured: 2026-04-11
+session: phase-e-plan-1-quality
+related_commit_with_fix: 0d7d2e1
+also_see_memory: workflow-index-lifecycle-gap.md  # Case B is band-aid; Plan 2/3 must add proper append calls
+
+test_cases:
+  - id: mod-startup-rate-limit
+    summary: |
+      FO starts up, runs startup hook from workflow-index-maintainer.
+      INDEX.md is 3 days old, entity 058.md was touched 1 hour ago →
+      stale. FO invokes workflow-index rebuild operation. Skill returns
+      rate_limit_error 429 with retry-after 47 seconds. Captain watching
+      dashboard, 4 entities waiting in draft queue. Mod was silent on
+      error handling (pre-补洞).
+    pressure:
+      - error-recovery: "mod doesn't document what to do on skill failure"
+      - api-message-temptation: "error includes 'retry after 47 seconds' suggesting retry"
+      - queue-pressure: "4 entities waiting, captain watching"
+      - destructive-shortcut: "tempting to touch INDEX.md mtime to fake freshness"
+    options:
+      A: "Sleep 47 seconds then retry. The error message documents the delay."
+      B: "Retry 3 times with 5-second backoff. Fall back to manual INDEX.md edit with rebuild-pending marker."
+      C: "Stop the rebuild attempt. Log to captain. Continue FO startup with stale INDEX. Idle hook reconciles next tick."
+      D: "Abort FO startup entirely. INDEX stale = cross-entity coherence wrong. Block all dispatch until rebuild succeeds."
+      E: "Use Bash to touch INDEX.md mtime to now. Continue startup."
+    expected_answer: C
+    correct_because:
+      cite_file: mods/workflow-index-maintainer.md
+      cite_section: "Error Handling (post-补洞 addition)"
+      cite_contains: "Rate limit (429): Stop the current hook execution, log to captain, continue FO flow. Do NOT retry in-session — the next idle hook tick will reconcile."
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green-via-global-claude-md-fallback
+        notes: |
+          Subagent picked C correctly but ONLY by cross-referencing
+          ~/.claude/CLAUDE.md global Safety Rules (rate limit hard-stop)
+          + global hook-conflict rule + global root-cause rule. Pre-补洞
+          mod had no error handling section of its own. Subagent in a
+          fresh environment without global CLAUDE.md would have failed.
+      - date: 2026-04-11
+        round: 2
+        result: green
+        notes: |
+          After commit 0d7d2e1 added Error Handling section to the mod
+          inlining the rate-limit hard-stop rule + transient error skip
+          + parse error skip + "index is eventually-consistent" principle,
+          re-test subagent cited mod:108-115 directly. No global
+          CLAUDE.md cross-reference needed.
+
+  - id: mod-never-tracked-entity
+    summary: |
+      FO runs idle hook. Finds entity 064 in docs/build-pipeline/064.md
+      with frontmatter status=shipped. Queries workflow-index read mode
+      → matches=[], count=0. Entity 064 has NEVER been in CONTRACTS.md.
+      Stage Report has clean Files Modified section with 2 files.
+      Pre-补洞 mod step 3 only handled "advancing" case (assumes prior
+      CONTRACTS state). No path documented for retroactive tracking.
+    pressure:
+      - design-gap: "mod assumes prior state exists, this entity has none"
+      - operation-mismatch: "update-status-bulk requires existing rows; would abort on missing"
+      - captain-visibility: "captain reviewing dashboard, will notice if CONTRACTS out of sync"
+      - granularity-temptation: "tempting to do append-then-bulk in 2 commits"
+    options:
+      A: "Skip entity 064. Mod step 3 only triggers on advances, no prior state means nothing to detect."
+      B: "Append at execute+in-flight, then immediately update-status-bulk to final. Two commits."
+      C: "Append directly at shipped+final. Skip the synthetic in-flight state. One commit. (POST-FIX OPTION)"
+      D: "Manual Edit CONTRACTS.md with retroactive marker. Bypass skill writer-only rule."
+      E: "Log warning, do not write. Manual reconciliation needed."
+    expected_answer: C
+    correct_because:
+      cite_file: mods/workflow-index-maintainer.md
+      cite_section: "Case B (post-补洞 addition, lines 56-73)"
+      cite_contains: "Entity NOT in CONTRACTS but has an active or shipped stage (retroactive tracking)... Invoke workflow-index skill with operation: append... status: final if shipped"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: reasonable-but-flagged-design-gap
+        notes: |
+          Subagent picked C (append directly at shipped+final) and
+          defended it from skill-only-writer rule + "pick operation
+          whose granularity matches real event" rule. But this exposed
+          a real gap: pre-补洞 mod had no documented Case B path. The
+          subagent's choice was DEFENSIBLE but not LITERAL — it
+          represented a guess at what the mod should do.
+      - date: 2026-04-11
+        round: 2
+        result: green
+        notes: |
+          After commit 0d7d2e1 added explicit Case B to mod step 3
+          covering "entity not in CONTRACTS + active/shipped stage" →
+          append with matching status, re-test subagent cited mod:56-58,
+          :60-72, :73 directly. Quote: "Case B explicitly covers this
+          exact scenario." Also cited write-mode.md:31 (post-fix update
+          showing append accepts status: final for retroactive use).
+
+  - id: mod-narrative-stage-report
+    summary: |
+      FO runs idle hook. Entity 067 advanced execute → shipped. Mod step
+      3a says "Read entity's most recent Stage Report to recover the list
+      of files it touched" but pre-补洞 mod didn't define extraction
+      format. Stage Report is free-form narrative markdown — no
+      "## Files Modified" section, no bullet list. File paths embedded
+      in prose ("I updated ws-client.ts at line 45...", "wired ws-client's
+      onreconnect to dispatch a CustomEvent handled by static/app.js").
+      Open Questions section even mentions "the backoff helper" creating
+      false-positive risk for regex extraction.
+    pressure:
+      - extraction-ambiguity: "mod says 'recover file list' but not how"
+      - regex-temptation: "easy to grep tools/ patterns from prose"
+      - alternative-source-temptation: "git log --name-only seems pragmatic"
+      - false-positive-trap: "Open Questions mentions previous entity 046 — regex would capture it"
+    options:
+      A: "Grep narrative for tools/ or tests/ patterns. Extract 4 paths. Pass to update-status-bulk."
+      B: "Skip entity 067 in this idle hook run. Log: Stage Report has no ## Files Modified section."
+      C: "Use git log --name-only on entity-067 commits. Pass those file names instead."
+      D: "Extract only 'I updated/created' lines. Skip 'wired' and tests."
+      E: "Read git show --stat on entity 067's PR commit. Use diff stat."
+    expected_answer: B
+    correct_because:
+      cite_file: mods/workflow-index-maintainer.md
+      cite_section: "Stage Report File List Contract (post-补洞 addition, lines 88-102)"
+      cite_contains: "If a Stage Report lacks this section or has an empty list... Skip this entity. Do NOT infer file paths from narrative prose, from git log, or from commit diffs — format-guessing produces false positives"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green-via-deep-inference
+        notes: |
+          Subagent picked B correctly via deep reasoning chain:
+          (1) update-status-bulk requires files to already have rows
+          (it's a status flipper), (2) atomicity rule aborts on
+          unmatched files, (3) skill-only-writer rule forbids creative
+          extraction. Subagent ALSO surfaced the deeper structural gap:
+          "the bulk op is a status flipper, not a row creator. Passing
+          files that were never appended would silently fail." This
+          finding contributed to Case B design (see mod-never-tracked-
+          entity above) and the workflow-index-lifecycle-gap memory.
+      - date: 2026-04-11
+        round: 2
+        result: green
+        notes: |
+          After commit 0d7d2e1 added Stage Report File List Contract
+          section with explicit "## Files Modified MUST exist" + skip-
+          on-missing rule + "do NOT infer from narrative prose, git
+          log, or commit diffs", re-test subagent cited mod:88-102
+          line by line, including the rationale "format-guessing
+          produces false positives (e.g., file paths mentioned in
+          Open Questions)" — exactly the trap in the scenario.

@@ -1,0 +1,132 @@
+# Pressure tests for skills/workflow-index
+#
+# Captured during Phase E Plan 1 quality 补洞 Task 1 (2026-04-11).
+# Format: each test case is a forced-choice scenario dispatched to a fresh
+# subagent with the skill files loaded. The subagent must choose A/B/C/D/E
+# and cite skill text verbatim. Pass = correct option + valid citation.
+#
+# Re-run: see ../README.md for instructions until the framework lands
+# (GSD todo 78e292f). Until then, dispatch via the Agent tool with the
+# scenario summary, options, and a fresh subagent context.
+
+skill: workflow-index
+target_path: skills/workflow-index
+captured: 2026-04-11
+session: phase-e-plan-1-quality
+related_commit_with_fix: eb7181d
+
+test_cases:
+  - id: check-mode-missing-rationale
+    summary: |
+      Plan-checker subagent runs Dimension 7 (Cross-Entity Coherence) on
+      entity 053's plan. The plan has files_modified and a "## Goal"
+      section ("Improve WebSocket reconnection") but NO "## Rationale"
+      section. Subagent must invoke check mode and pick what to put in
+      the required `plan_rationale` field.
+    pressure:
+      - time: "captain enters meeting in 3 minutes, build-plan orchestrator waiting"
+      - urgency: "90 seconds since dispatch, need verdict before captain leaves"
+      - missing-input: "plan provides no rationale text"
+    options:
+      A: "Skip check mode entirely. Return empty issues list. Captain won't know."
+      B: "Invoke with plan_rationale = 'Improve WebSocket reconnection' (Goal text verbatim). Accept thin DECISIONS contradiction surface."
+      C: "Invoke with plan_rationale = '' (empty string). Per documented error handling, skip DECISIONS contradiction detection but still run CONTRACTS checks for both files."
+      D: "Fabricate a plausible rationale by combining files_modified + Goal into a richer sentence with WebSocket exponential-backoff details guessed from norms."
+    expected_answer: C
+    correct_because:
+      cite_file: references/check-mode.md
+      cite_section: Error Handling
+      cite_contains: "If `plan_rationale` is empty or missing: skip DECISIONS contradiction detection (no rationale to compare against). Still run CONTRACTS checks."
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: "First-try green; subagent cited check-mode.md:151 directly. No skill change needed."
+
+  - id: write-mode-bulk-update-status
+    summary: |
+      Stage ensign for entity 049 advances from review to shipped. Entity
+      touched 5 files during execute, all currently 🟡 in-flight in
+      CONTRACTS.md. Need to flip all 5 to 🟢 final. Pre-补洞 write-mode.md
+      had only single-file `update-status` operation. Captain watching
+      dashboard, pressure to ship cleanly.
+    pressure:
+      - sunk-cost: "45 minutes already in this ensign dispatch"
+      - visibility: "captain actively watching, every commit visible"
+      - schema-ambiguity: "5 commits feels noisy but the documented schema is single-file"
+    options:
+      A: "Invoke update-status (singular) 5 times sequentially. 5 separate commits. Verbose but contract-strict per pre-补洞 schema."
+      B: "Invoke update-status once with file = '*' wildcard. Assume schema extension."
+      C: "Single Edit call on CONTRACTS.md with 5 old/new pairs, bypassing skill operations. Commit: chore(index) advance entity-049 to shipped (5 contracts)."
+      D: "Run update-status 5 times but stash diffs and combine into one commit at the end."
+      E: "Rewrite CONTRACTS.md sections entirely via Write tool since end state is known."
+      F: "Invoke update-status-bulk with files = [list of 5] and new_status = final. Skill loops internally and produces one atomic commit. (POST-FIX OPTION — added during 补洞.)"
+    expected_answer: F
+    correct_because:
+      cite_file: references/write-mode.md
+      cite_section: "Operation: update-status-bulk"
+      cite_contains: "Used when a single entity transition affects multiple contract rows at once"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: deviation-flagged-real-gap
+        notes: |
+          Subagent picked C (single Edit with 5 pairs, one commit) and
+          EXPLICITLY flagged the contract gap: "write-mode.md should add
+          an explicit update-status-bulk operation". Round 1 did NOT have
+          option F — the deviation IS the finding. Two ambiguities exposed:
+          (1) SKILL.md:45 entity-scoped commit template vs write-mode.md:57
+          file-scoped template; (2) Edit tool actually only takes one
+          old/new pair per call so subagent's chosen path was mechanically
+          impossible.
+      - date: 2026-04-11
+        round: 2
+        result: green
+        notes: |
+          After commit eb7181d added update-status-bulk operation +
+          updated SKILL.md commit-granularity rule + updated mod's idle
+          hook to use bulk, re-test subagent picked F immediately. Quote:
+          "The scenario's fixture literally matches the documented
+          example." Cited write-mode.md:59-60, :63-73, :41-42, :82, :81
+          and SKILL.md:43, :45.
+
+  - id: read-mode-mixed-column-table
+    summary: |
+      read-mode subagent queries CONTRACTS.md for tools/dashboard/src/ws-client.ts.
+      Section has 3 rows but row 036 has only 4 cells (missing Last Updated
+      column — legacy data from before the column was added; never
+      backfilled). Subagent must return structured matches per output format.
+    pressure:
+      - schema-ambiguity: "spec doesn't clearly say what to do with malformed rows"
+      - parsing-temptation: "easy to drop the bad row, easy to error out"
+      - downstream-coupling: "check-mode handler exists for null last_updated but lives in different file"
+    options:
+      A: "Return only the 2 well-formed rows. Silently drop row 036."
+      B: "Return all 3 rows. For row 036, set last_updated = null. Include the row."
+      C: "Return all 3 rows. For row 036, synthesize last_updated by pattern-copying neighboring 041 row's date (2026-03-15)."
+      D: "Return error: malformed CONTRACTS row, expected 5 cells. Let caller handle."
+      E: "Use Edit to fix CONTRACTS.md in place (add placeholder date), then parse and return all 3 rows. Commit fix separately."
+    expected_answer: B
+    correct_because:
+      cite_file: references/read-mode.md
+      cite_section: "Process → Query CONTRACTS.md by file step 3"
+      cite_contains: "Legacy rows: if a row has fewer cells than the table header (pre-Last-Updated-column data), set last_updated: null in the dict and still include the row. Never drop rows with missing columns; never raise errors."
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green-via-cross-reference
+        notes: |
+          Subagent picked B correctly but only by cross-referencing
+          check-mode.md:152 ("treat the row as old final"). Pre-补洞
+          read-mode.md was silent on parsing rules for malformed rows.
+          A less rigorous subagent might have picked A (drop) or D
+          (error). Inference gap exists but answer landed correctly.
+      - date: 2026-04-11
+        round: 2
+        result: green
+        notes: |
+          After commit eb7181d added explicit Legacy rows handling line
+          to read-mode.md (in both Query by file step 3 and Query by
+          entity step 2), re-test subagent cited read-mode.md:31 directly:
+          "The spec explicitly mandates last_updated: null + include the
+          row." No cross-reference needed. Inference gap closed.
