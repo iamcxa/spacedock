@@ -14,7 +14,7 @@ entry:
 
 ## Operation: append to CONTRACTS.md
 
-Used when an entity enters a new stage that touches files.
+Used when an entity enters a new stage that touches files. Also used retroactively by the `workflow-index-maintainer` mod's idle hook Case B when an entity reaches an active/shipped stage without prior CONTRACTS tracking.
 
 Input:
 ```yaml
@@ -28,13 +28,15 @@ entry:
   status: in-flight
 ```
 
+**`status` field**: accepts any valid CONTRACTS status (`in-flight`, `planned`, `final`, `reverted`). `in-flight` is the common case for execute-entry. `planned` is used when `build-plan` stage approves a plan but execute hasn't started. `final` is used for retroactive tracking of entities that have already shipped — see `mods/workflow-index-maintainer.md` Case B. Initial-state choice is the caller's responsibility; the skill does not reject any valid status value on append.
+
 Process:
 1. Read CONTRACTS.md.
 2. For each file in entry.files:
    a. Check if `### {file}` section exists.
    b. If yes, Edit to append a new row to the table.
    c. If no, Edit to insert a new section alphabetically with a single-row table.
-3. Commit: `chore(index): add contracts for entity-{slug} entering {stage}`
+3. Commit: `chore(index): add contracts for entity-{slug} entering {stage}` (or `chore(index): retroactive contracts for entity-{slug} ({stage}, {N} files)` when called from Case B).
 
 ## Operation: update-status in CONTRACTS.md
 

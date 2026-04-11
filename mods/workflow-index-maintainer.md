@@ -36,8 +36,11 @@ Instructions for FO:
 
 1. List all entity files in `docs/build-pipeline/*.md`.
 2. For each entity, compare its current stage (from frontmatter `status` field) against the status recorded in CONTRACTS.md for that entity.
-3. If the entity has advanced (e.g., was `execute` in CONTRACTS, now `shipped` in frontmatter):
-   a. Read the entity's most recent Stage Report to recover the list of files it touched. Invoke `workflow-index` skill **once** with the bulk operation:
+3. For each entity, compare its current frontmatter state against CONTRACTS.md state. Two cases require action:
+
+   **Case A — Entity in CONTRACTS and stage advanced** (e.g., CONTRACTS shows execute, frontmatter shows shipped):
+
+   a. Read the entity's most recent Stage Report to recover the list of files it touched (see "Stage Report File List Contract" below). Invoke `workflow-index` skill **once** with the bulk operation:
       ```yaml
       mode: write
       target: contracts
@@ -50,6 +53,25 @@ Instructions for FO:
       Rationale: `update-status-bulk` in `skills/workflow-index/references/write-mode.md` accepts the full file list, loops per-row internally, and produces a single atomic commit (`chore(index): advance entity-{slug} contracts to {new_status} ({N} files)`). This replaces the earlier per-file loop that produced N commits per shipping event. The bulk variant was added during Phase E Plan 1 quality补洞 after pressure testing surfaced commit-granularity ambiguity in the single-file `update-status`.
    b. Recently Retired age-out is delegated to the skill. The mod simply calls `update-status-bulk` with `new_status: final`; the skill inspects each row's Last Updated date and, if older than 30 days, moves it to the Recently Retired section. See `skills/workflow-index/references/write-mode.md` Operation: update-status-bulk. **Known gap (tracked for Phase E Plan 1 follow-up):** write-mode currently has no explicit `shipped_date` input and must infer age from each row's Last Updated column. If that heuristic proves unreliable, extend the skill's input schema rather than duplicating the computation here.
 
+   **Case B — Entity NOT in CONTRACTS but has an active or shipped stage** (retroactive tracking — the mod missed the execute-entry event because idle hook didn't fire during execute, or the entity ran autonomously through the pipeline):
+
+   a. Query `workflow-index` read mode for the entity slug. If `matches: [], count: 0` **and** frontmatter `status` is `execute`/`review`/`uat`/`shipped`, take the retroactive path.
+   b. Read the entity's most recent Stage Report for files touched (see "Stage Report File List Contract" below).
+   c. Invoke `workflow-index` skill with `operation: append`:
+      ```yaml
+      mode: write
+      target: contracts
+      operation: append
+      entry:
+        entity: {slug}
+        stage: {current frontmatter stage — execute/review/uat/shipped}
+        files: {list from Stage Report}
+        intent: {first line of entity title, or "retroactive — intent missing"}
+        status: {final if shipped, in-flight otherwise}
+      ```
+      This creates rows at the entity's current state. Single atomic commit: `chore(index): retroactive contracts for entity-{slug} ({stage}, {N} files)`.
+   d. **Known structural gap (tracked in memory file `workflow-index-lifecycle-gap.md`)**: Case B exists because the current pipeline has no coordinated `append` call at plan/execute entry. The proper fix lives in Phase E Plan 2 (`build-plan` skill should append rows with `status: planned` when a plan is approved) and Plan 3 (`build-execute` skill should transition rows `planned → in-flight` on entry). Until those land, Case B is the only row-creation mechanism. **Do NOT delete Case B before verifying the proper append path exists in Plans 2/3.**
+
 4. Scan DECISIONS.md for any decisions whose Related entities field references entities that have since shipped. If any, ensure the decision's Status reflects the latest state (no action needed unless explicit supersede was flagged).
 
 5. Rebuild INDEX.md (always, on every idle scan — it's cheap):
@@ -61,9 +83,40 @@ Instructions for FO:
 
 6. Log summary to captain: "Workflow index updated: {n} contract updates, INDEX rebuilt."
 
+## Stage Report File List Contract
+
+Both Case A and Case B of the idle hook extract file lists from entity Stage Reports. Stage Reports MUST include a section titled `## Files Modified` with a bullet list of repo-relative file paths:
+
+```markdown
+## Files Modified
+
+- tools/dashboard/src/ws-client.ts
+- tools/dashboard/static/app.js
+- tests/ws-client.test.ts
+```
+
+**If a Stage Report lacks this section or has an empty list**:
+
+1. Log a warning: "Entity {slug} Stage Report has no `## Files Modified` section — skipping idle hook update for this entity"
+2. **Skip** this entity. Do NOT infer file paths from narrative prose, from git log, or from commit diffs — format-guessing produces false positives (e.g., quoted example paths, unrelated entity references, file paths mentioned in "Open Questions"). The pressure test during Phase E Plan 1 quality补洞 confirmed that narrative extraction is unreliable.
+3. Follow-up: manual reconciliation, or re-write the Stage Report with the required section and wait for the next idle hook tick.
+
+**Cross-file contract**: this format requirement applies to every stage ensign's Stage Report template. Phase E Plan 3 `build-execute` skill must enforce the `## Files Modified` section in its Stage Report output format; similar requirement for Plans 4-5's quality/review/uat skills.
+
+## Error Handling
+
+If any `workflow-index` skill invocation fails during a hook:
+
+- **Rate limit (429)**: Stop the current hook execution, log to captain ("{hook} hit rate limit, skipping"), continue FO flow. Do **NOT** retry in-session — the next idle hook tick will reconcile. Per `~/.claude/CLAUDE.md` Safety Rules: "Rate limits: Stop immediately, inform user, wait for instructions. No retry/sleep-and-retry."
+- **Transient skill errors** (malformed input, missing entity file, parse failures, etc.): Log the specific entity/operation + reason, skip the affected entity, continue processing remaining entities. Do not abort the whole hook.
+- **Parse errors** on entity frontmatter or Stage Report: Log the entity slug, skip, continue. Never guess missing fields or synthesize values.
+- **INDEX.md rebuild failure during startup hook**: Graceful degradation — log, skip the rebuild, continue FO startup with stale INDEX. The idle hook will retry rebuild on next tick (step 5 always rebuilds, so staleness is self-healing).
+
+**The index is eventually-consistent, not strongly-consistent.** Never block FO startup or entity dispatch on index maintenance failures.
+
 ## Rules
 
 - **Never modify entity frontmatter from this mod.** The mod only reads entity state and writes to `_index/` files.
 - **Workflow-index skill is the only writer.** This mod never directly edits CONTRACTS/DECISIONS/INDEX files; it always goes through the skill to preserve format invariants.
-- **Separate commits per mod operation.** Each write operation commits independently with a `chore(index):` prefix.
+- **Separate commits per mod operation.** Each write operation commits independently with a `chore(index):` prefix. Case A bulk update, Case B append, and INDEX rebuild each get their own commit.
 - **Graceful on first run.** If `_index/` directory or files don't exist yet, the skill's write mode handles creation.
