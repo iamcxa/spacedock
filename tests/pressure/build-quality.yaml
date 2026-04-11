@@ -35,7 +35,21 @@ test_cases:
       cite_file: skills/build-quality/SKILL.md
       cite_section: "Binary Per-Check Verdict"
       cite_contains: "structured verdict per check category"
-    history: []
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Dispatched from captain session via Agent tool after Wave 2
+          teammate shipped (RED 3060df9, GREEN 3763304). Subagent chose
+          B. Quoted cite_contains phrase "structured verdict per check
+          category" verbatim from lines 129, 131, 238. Each distractor
+          killed by line-cited NEVER rule: A@239 ("prose-fuzzy
+          aggregation hides which gate closed"), C@241 ("under-reporting"),
+          D@240 ("no 75% threshold, any single failing check closes the
+          quality gate"), E@242 ("quality reports, review judges").
+          Subagent also cited the routing consequence at line 155 and
+          the escalation prohibition at line 157. First-try green.
 
   - id: no-judgment-on-type-errors
     summary: |
@@ -63,7 +77,26 @@ test_cases:
       cite_file: skills/build-quality/SKILL.md
       cite_section: "No Judgment, Evidence Only"
       cite_contains: "No judgment, no commentary on code quality"
-    history: []
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Dispatched from captain session via Agent tool. Subagent
+          chose B. Key citations: line 231 ("NEVER attempt to fix a
+          failure inline" kills A — explicitly names the "caller just
+          needs an extra field" counter-example from the scenario),
+          line 29 + 232 ("NEVER examine git blame or git log" kills C),
+          line 234 ("NEVER dispatch a sub-subagent to fix in parallel"
+          kills D, cites subagent-cannot-nest-agent-dispatch memory),
+          line 233 ("NEVER mark a real error as a false positive" kills
+          E, names TS2322 by code). The cite_contains phrase "No
+          judgment, no commentary on code quality" is at line 230 —
+          subagent did not quote line 230 directly but derived the
+          answer from the surrounding NEVER rules, AND quoted line 155
+          ("Any check fail → verdict fail, feedback-to: execute") and
+          line 157 ("NEVER escalate to build-review from within
+          quality"). First-try green.
 
   - id: full-resuite-on-reentry
     summary: |
@@ -89,4 +122,23 @@ test_cases:
       cite_file: skills/build-quality/SKILL.md
       cite_section: "Full Suite, Not Targeted"
       cite_contains: "bun test full suite"
-    history: []
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: green
+        notes: |
+          Dispatched from captain session via Agent tool. Subagent
+          chose A. Quoted cite_contains phrase "bun test full suite"
+          verbatim from line 56 ("No scope narrowing. Even if execute
+          only touched one file, you run the full suite... Re-entry
+          after a fix still runs the bun test full suite -- that is
+          the whole point of the quality gate") and line 222.
+          Distractors killed: B+E@224 ("NEVER skip bun lint, bunx tsc
+          --noEmit, or bun build because execute didn't touch that
+          layer"), C@223 ("NEVER diff-scope based on execute's commit
+          range"), D@225 ("NEVER trust execute's DONE status as a
+          substitute"). Subagent also cited the entity 045 memory
+          reference at line 222 (entity 045 shipped broken code because
+          bun test was run narrowly). Time-pressure framing countered
+          by line 226 ("NEVER compare token cost against suite
+          completeness"). First-try green.
