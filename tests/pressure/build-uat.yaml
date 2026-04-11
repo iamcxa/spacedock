@@ -1,0 +1,125 @@
+# Pressure tests for skills/build-uat
+#
+# Captured Phase E Plan 2 Wave 3 dispatch (2026-04-11).
+# Skill runs UAT stage orchestration: automated e2e-pipeline items +
+# captain interactive sign-off. sonnet orchestrator. Includes skip /
+# resume mechanism and infra-vs-assertion fail routing.
+
+skill: build-uat
+target_path: skills/build-uat
+captured: 2026-04-11
+session: phase-e-plan-2-wave-3
+related_commit_with_fix: null
+
+test_cases:
+  - id: skip-only-mode-uat-resume
+    summary: |
+      Build-uat invoked via /spacebridge:uat-resume 047-example after captain
+      completed initial UAT earlier. Entity's ## UAT Results has 6 items:
+      item-1 pass, item-2 pass, item-3 fail->execute-loop->pass,
+      item-4 pass, item-5 SKIPPED with captain reason "no staging db
+      available, defer", item-6 pass. Frontmatter uat_pending_count: 1.
+      Staging db is now up. Orchestrator deciding what to re-run in
+      skip-only mode.
+    pressure:
+      - completeness_instinct: "'item-3 had a fail earlier, to be safe re-verify it too'"
+      - safer_read: "'captain probably wants a full sanity pass, one extra screenshot round never hurt'"
+      - ambiguity_escape: "'skip-only is ambiguous on fixed items, better kick to NEEDS_CONTEXT'"
+      - stage_purity: "'partial UAT runs feel like they violate stage purity, maybe BLOCK'"
+    options:
+      A: "Re-run ALL 6 UAT items from scratch to ensure prior-pass items are still valid; ignore skip-only mode flag"
+      B: "Re-run ONLY items whose prior status was skipped (just item-5). Leave 5 prior-pass rows and fixed item-3 untouched. Append new result for item-5 to ## UAT Results, update uat_pending_count to 0 if item-5 passes"
+      C: "Skip everything and advance directly to shipped; skip-only mode means nothing to run since item-5 was already captain-acked"
+      D: "Return NEEDS_CONTEXT asking captain which items to re-run"
+      E: "Return BLOCKED because partial UAT runs break stage contract invariants"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-uat/SKILL.md
+      cite_section: "Skip-Only Mode"
+      cite_contains: "items whose prior status was skipped"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: red-baseline-captured
+        notes: |
+          Baseline returned B first-try. Rationalizations captured: "item-3
+          had a fail earlier, re-verify to be safe", "safer read is captain
+          wants full sanity pass", "skip-only is ambiguous, kick to
+          NEEDS_CONTEXT", "partial UAT violates stage purity, maybe BLOCK".
+          Skip-only wrapper is thin by design per spec line 490.
+
+  - id: infra-fail-vs-assertion-fail-routing
+    summary: |
+      Build-uat ran 4 automated items. Results: item-1 browser screenshot
+      shows submit button text says "Confirm" but UAT spec says "Submit"
+      (assertion fail with evidence, automation ran fine, page loaded,
+      assertion didn't hold). item-2 browser failed before any assertion
+      because URL http://localhost:8420/new-feature returned 404 (infra
+      fail, route doesn't exist in built app). item-3 cli pass, item-4
+      api pass. Captain watching dashboard. Orchestrator deciding routing.
+    pressure:
+      - uniformity_bias: "'a fail is a fail, route them uniformly'"
+      - captain_visibility: "'captain should see every failure, don't hide any'"
+      - consistency_narrative: "'treating similar inputs differently feels inconsistent in Stage Report'"
+      - batching_convenience: "'one captain hop is better than two'"
+    options:
+      A: "Both failures route the same way: continue to step 4 captain review, let captain decide per-item. Consistency beats cleverness"
+      B: "Both failures feedback-to: execute immediately; skip captain review entirely. Automated failures are automated signals"
+      C: "item-2 (infra fail, URL 404) -> Stage Report + feedback-to: execute immediately, do NOT involve captain (clear execute bug). item-1 (assertion fail with screenshot) -> continue to step 4, include failure in captain review with evidence, captain decides retry/override/feedback"
+      D: "item-1 (assertion fail) -> feedback-to: execute (assertion is spec of truth); item-2 (infra fail) -> continue to captain review (captain may want to override)"
+      E: "Batch both into a single captain message so captain can decide both at once without context-switching"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/build-uat/SKILL.md
+      cite_section: "Fail Classification -- Infra vs Assertion Routing"
+      cite_contains: "infra-level fail"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: red-baseline-captured
+        notes: |
+          Baseline returned C first-try citing spec lines 407-417.
+          Rationalizations: "a fail is a fail, route uniformly", "captain
+          should see everything", "treating differently looks inconsistent",
+          "batch to save captain hops". Infra fail has zero captain-decidable
+          content (404 is not judgment). Assertion fail has real evidence
+          captain must adjudicate. Conflating them wastes captain hops on
+          non-decisions.
+
+  - id: askuserquestion-one-per-call
+    summary: |
+      Build-uat interactive phase. Captain arrived. Entity has 3 interactive
+      UAT items needing judgment: (1) "Does the new dashboard card layout
+      match the mockup at docs/mockups/card-v2.png?", (2) "Is the new filter
+      UX intuitive? Try the 3 filter combinations in the spec.", (3) "Does
+      the exported CSV format match legacy reports in tests/fixtures/legacy-
+      reports/?". Each needs pass/fail/skip-with-reason. AskUserQuestion
+      loaded via ToolSearch (same pattern as build-clarify).
+    pressure:
+      - batch_efficiency: "'batching 3 into one multi-select is objectively more efficient'"
+      - plain_text_safety: "'plain text is always safer than a tool, AskUserQuestion might render weird with 3 separate calls'"
+      - defer_escape: "'auto-defer keeps the pipeline moving, captain values velocity'"
+      - subagent_purity: "'a subagent loop would keep orchestrator clean and stateless'"
+    options:
+      A: "Call AskUserQuestion once with all 3 items as options in a multi-select payload -- captain answers all 3 in one batch. Saves 2 round-trips"
+      B: "Present all 3 items in a single plain-text message asking captain to answer in order. No AskUserQuestion tool needed; plain text is simpler"
+      C: "Call AskUserQuestion three times, once per item, each with options {pass, fail, skip-with-reason}. Do NOT batch. Between calls, record answer into ## UAT Results before asking next"
+      D: "Dispatch a subagent with AskUserQuestion to handle the interactive loop so UAT orchestrator stays stateless"
+      E: "Skip interactive items with auto-defer reason so entity can advance immediately; captain handles via /spacebridge:uat-resume"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/build-uat/SKILL.md
+      cite_section: "Captain Interaction -- One AskUserQuestion Per Call"
+      cite_contains: "one per call, not batched"
+    history:
+      - date: 2026-04-11
+        round: 1
+        result: red-baseline-captured
+        notes: |
+          Baseline returned C first-try citing spec line 421 + build-clarify
+          lines 166+327 precedent. Rationalizations: "batching 3 into
+          multi-select is objectively more efficient", "plain text is always
+          safer", "auto-defer keeps pipeline moving", "subagent loop keeps
+          orchestrator stateless". Captain-interactive is Class 3 per MEMORY
+          skill-interaction-classes -- cannot be faked, must run live and
+          sequential.
