@@ -156,8 +156,9 @@ Paths can sequence: B → captain reviews → switches to A. FO recommends a pat
 ### Gate Resolution
 
 Gate passes when the captain explicitly approves advancement (dashboard button, comment, or channel message). On approval:
-1. Advance entity to next stage per `effective_stages()`
-2. Emit dispatch event for the new stage
+1. Write `score: {passed_count / 5}` to entity frontmatter (e.g., 5/5 → `score: 1.0`, 4/5 → `score: 0.8`). This records executability — how well-planned the feature is — as a persistent metric.
+2. Advance entity to next stage per `effective_stages()`
+3. Emit dispatch event for the new stage
 
 Never self-approve the brainstorm gate. Do not infer approval from silence.
 

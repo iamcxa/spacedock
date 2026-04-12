@@ -260,7 +260,7 @@ children:
 | `started` | ISO 8601 | When active work began (first move beyond draft) |
 | `completed` | ISO 8601 | When the feature reached terminal status |
 | `verdict` | enum | PASSED or REJECTED -- set at final stage |
-| `score` | number | Priority score, 0.0-1.0 (optional) |
+| `score` | number | Executability score, 0.0-1.0. Set by FO brainstorm triage (passed criteria / 5). Measures how well-planned a feature is. |
 | `worktree` | string | Worktree path while a dispatched agent is active, empty otherwise |
 | `issue` | string | GitHub issue reference (e.g., `#42` or `owner/repo#42`). Optional. |
 | `pr` | string | GitHub PR reference (e.g., `#57` or `owner/repo#57`). Set when a PR is created. |
