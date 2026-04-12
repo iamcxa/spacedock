@@ -1,8 +1,8 @@
 ---
 id: 051
 title: "Unix socket IPC + ChannelProvider client/server"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started:
 completed:
@@ -60,22 +60,27 @@ note: "ChannelProvider interface already extracted locally (tools/dashboard/src/
 A-1: Daemon is already running when shim connects. Entity 052 handles auto-fork startup; this entity only handles reconnect on transient mid-session failures.
 Confidence: Confident (0.85)
 Evidence: Design doc §4.2 -- auto-fork sequence ensures daemon is up before shim's connect() call; shim startup is: check socket → (auto-fork if absent) → connect.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-2: Filesystem permission is sufficient for socket auth. No application-level auth on the unix socket in v1.
 Confidence: Confident (0.90)
 Evidence: Design doc does not mention socket auth; unix socket access control via filesystem permissions is standard for same-machine daemon IPC (Docker, PostgreSQL, MySQL all use this pattern).
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-3: Unix socket guarantees FIFO per-connection message ordering. Cross-shim ordering handled by daemon's event sequencing (Drizzle autoincrement seq in events table).
 Confidence: Confident (0.95)
 Evidence: Unix stream sockets are POSIX SOCK_STREAM -- kernel guarantees in-order byte delivery per connection. Design doc §4.3 confirms daemon assigns global sequence numbers.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-4: Message format versioned via handshake version field in the register message, not a per-message magic byte.
 Confidence: Confident (0.85)
 Evidence: Brainstorm GUARDRAILS specify "v1 magic byte or handshake version field"; handshake-level versioning is simpler (one check at connection start, not per message).
+→ Confirmed: captain, 2026-04-12 (batch)
 
-A-5: Use Bun native unix socket API -- `Bun.listen({unix: path})` for server, `Bun.connect({unix: path})` for client.
-Confidence: Likely (0.70)
-Evidence: Bun docs confirm unix socket support in listen/connect. No existing usage in spacedock codebase to reference; confidence reduced because Bun unix socket error handling edge cases are undocumented.
+A-5: Use Node.js `net` module (Bun compatibility layer) for unix socket -- `net.createServer()` with `{path: '...'}` for server, `net.createConnection()` for client. Execution 第一步跑 mini-spike 驗證 Bun 環境下的 net unix socket 行為（connect, message exchange, reconnect, error events, file permissions）。
+Confidence: Confident (0.85)
+Evidence: Node.js net module is 10+ year stable API with complete documentation. Bun explicitly supports Node.js net compatibility. Mini-spike mitigates remaining risk before full implementation.
+→ Corrected by captain, 2026-04-12 (batch): "原本 Bun native API 文件不全且影響 A-1~A-4 的穩定性。改用 Node.js net module（成熟穩定）+ execution 第一步 mini-spike 驗證。"
 
 ## Option Comparisons
 
@@ -89,6 +94,8 @@ The ChannelProvider interface defines sync methods (publishEvent returns number,
 | Async ChannelProvider variant | Define new AsyncChannelProvider with Promise returns; bridge uses this; modify channel.ts to await | Clean async boundary; no staleness; no cache | Requires channel.ts refactor; breaks type contract; upstream PR surface grows | High | Viable |
 | Sync blocking via SharedArrayBuffer + Atomics | True sync RPC using shared memory and Atomics.wait() | Perfect sync compatibility; no interface changes | Extremely complex; blocks CC session thread; Bun SharedArrayBuffer support uncertain for this pattern | High | Not recommended |
 
+→ Selected: Thin shim + Daemon DB owner (captain, 2026-04-13, interactive). Shim = socket client + MCP stdio only, NO DB connection. All DB operations (createSnapshot, getChannelMessagesSince) forwarded via socket RPC to daemon. ChannelProvider interface updated to `| Promise<T>` return types; channel.ts call sites add `await` (MCP handlers already async, zero-cost change). This also enables future cloud deployment: shim→daemon transport switches from unix socket to TCP/WS without architecture change. Captain arrived at this via 3 rounds of analysis: (1) fire-and-forget rejected because snap.version needs real DB autoincrement, (2) shim-direct-DB rejected because it couples MCP to DB and prevents multi-machine deployment, (3) thin shim confirmed because MCP handlers are already async and interface change is minimal.
+
 ### O-2: Daemon-to-shim push mechanism for inbound actions
 
 When external events arrive at the daemon (comments from tunnel, stage transitions from other sessions), the daemon needs to push them to the correct shim. How?
@@ -97,6 +104,8 @@ When external events arrive at the daemon (comments from tunnel, stage transitio
 |---|---|---|---|---|
 | Bidirectional messaging on same socket | Daemon writes to the shim's connected socket directly. Same connection, same framing. Message type field distinguishes request/response/push | Single connection; simple; leverages existing framing | Must handle message interleaving (shim sends request while daemon pushes event simultaneously) | Low | Recommended |
 | Separate push socket per shim | Shim opens second connection for daemon→shim push (like Redis pub/sub pattern) | Clean separation of request/response and push channels | Double the connections; double the reconnect logic; more complex session map | Medium | Not recommended |
+
+→ Selected: Bidirectional messaging on same socket (captain, 2026-04-13, interactive)
 
 ## Open Questions
 
@@ -107,6 +116,15 @@ Domain: Behavioral/Callable
 Why it matters: channel.ts:399 calls `dashboard.snapshotStore.createSnapshot({...})` synchronously and uses the returned snapshot object (with `id`, `version`, `body`, etc.) in the same handler. If the bridge impl sends to daemon async, it cannot return a real snapshot synchronously. This affects whether the ChannelProvider interface needs modification or the bridge can use an optimistic local pattern.
 
 Suggested options: (a) Return an optimistic local stub with `id: -1, version: -1` and let daemon assign real values -- caller only needs the snapshot for logging, not for critical logic, (b) Modify ChannelProvider interface to make createSnapshot async (Promise return) -- requires upstream channel.ts changes, (c) Keep snapshot creation local in the shim process (shim has its own Drizzle DB connection to the shared spacebridge.db) -- daemon doesn't need to be involved for snapshots
+
+→ Answer: (b) Modify ChannelProvider interface to support async returns (`T | Promise<T>`). Resolved by O-1 decision: thin shim + daemon DB owner means ALL DB operations go through socket RPC. MCP handlers are already async, so adding `await` at call sites is zero-cost. Option (a) rejected because snap.version is used for autoResolveComments (line 413) -- needs real value. Option (c) rejected by captain: couples shim to DB, prevents multi-machine/cloud deployment. (captain, 2026-04-13, interactive)
+
+## Canonical References
+
+- tools/dashboard/src/channel.ts:399,455,473 -- createSnapshot sync call sites (snap.version used by autoResolveComments line 413)
+- tools/dashboard/src/channel.ts:496 -- getChannelMessagesSince sync call site (return value mapped immediately)
+- tools/dashboard/src/channel-provider.ts:32-50 -- ChannelProvider interface (6 members, will be extended with `| Promise<T>` returns)
+- tools/dashboard/src/channel-provider.test.ts:50-71 -- mock ChannelProvider pattern (reference for bridge impl mock)
 
 ## References
 
@@ -134,3 +152,21 @@ Suggested options: (a) Return an optimistic local stub with `id: -1, version: -1
   no α markers in brainstorm
 - [x] Scale assessment: confirmed Medium
   7 reference files mapped; new code estimated at 8-12 files (socket server, socket client, ChannelProvider bridge, CoordinationClient stub, framing codec, message types, tests)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- entity is Medium scope, no children proposed
+- [x] Assumptions confirmed: 5 / 5 (1 corrected)
+  A-1 through A-4 confirmed batch; A-5 corrected: Bun native API → Node.js net module + mini-spike (captain flagged underdocumented API risk propagating to A-1~A-4)
+- [x] Options selected: 2 / 2
+  O-1 Thin shim + Daemon DB owner (3 rounds: fire-and-forget rejected → shim-DB rejected → thin shim confirmed via code flow analysis + cloud deployment foresight); O-2 Bidirectional messaging on same socket
+- [x] Questions answered: 1 / 1 (0 deferred)
+  Q-1 resolved by O-1 decision: ChannelProvider interface gets `| Promise<T>` returns, channel.ts adds await (MCP handlers already async)
+- [x] Canonical refs added: 4
+  channel.ts:399,455,473,496 (sync call sites); channel-provider.ts:32-50 (interface); channel-provider.test.ts:50-71 (mock pattern)
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected, all Qs answered
+- [x] Handoff mode: loose
+  captain must say "execute 051" or launch FO in separate session
+- [x] Clarify duration: 6 questions asked, session complete
+  1 batch assumption + 3 rounds O-1 (deepest clarify in this session) + 1 O-2 + 1 Q-1 auto-resolved
