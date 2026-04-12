@@ -12,7 +12,7 @@ worktree:
 issue:
 pr:
 intent: feature
-scale: Medium
+scale: Large
 project: spacedock
 depends-on: []
 ---
@@ -62,6 +62,24 @@ The gap was identified during entity 052 clarify (2026-04-13):
 - Fallback: if TeamCreate fails (experimental gotchas), SO falls back to individual Agent dispatch
 - Recovery: if team becomes phantom (compaction, terminal disconnect), SO detects via TeamCreate error and recreates
 
+### Researcher checkpoint/continuation (distilled from GSD gsd-phase-researcher)
+- If a researcher hits context limits mid-investigation, it outputs `## CHECKPOINT REACHED` with partial findings
+- SO detects the checkpoint, spawns a continuation researcher with the partial state
+- Prevents truncated research on deep topics (e.g., entity 052 A-5 required tracing through Next.js docs, Bun compat, GitHub discussions)
+- GSD reference: `gsd-research-phase/SKILL.md` lines 156-186
+
+### Synthesis step after parallel research return (distilled from GSD discuss-phase advisor)
+- After parallel researchers return, SO runs a synthesis step BEFORE annotating the entity body
+- Synthesis validates: all expected findings present, no contradictions between parallel results, findings are relevant to the assumption being validated
+- If two researchers contradict each other: write contradiction as Open Question with both cited findings (same as build-plan's existing rule)
+- GSD reference: `discuss-phase.md` lines 567-579
+
+### Cross-entity research dedup via CONTRACTS.md (distilled from GSD cross-phase awareness)
+- When SO starts research for entity N, check CONTRACTS.md and prior entity bodies for already-researched topics
+- If entity 051 already researched "Bun unix socket compatibility", entity 052 should not re-research it — reference 051's findings
+- Mechanism: SO greps CONTRACTS.md + sibling entity `(✓ research: ...)` annotations before dispatching
+- GSD does NOT have this (each phase researches independently) — this is spacedock improving on GSD's weakness
+
 ### Shared infrastructure
 - Use existing `spacedock:researcher` agent (same as build-plan uses)
 - Add "research evidence" annotation format to `references/output-format.md`: `(✓ research: {source} -- {finding})`
@@ -81,6 +99,10 @@ The gap was identified during entity 052 clarify (2026-04-13):
 - [ ] Given a plan task that needs implementation-specific API patterns, when build-plan runs Step 1, then it dispatches a targeted researcher for that narrow topic only
 - [ ] Given SO starts a multi-entity discuss pipeline, when the first entity enters brainstorm, then SO creates a research team (TeamCreate) that persists across entities
 - [ ] Given a research team exists, when SO needs topic validation, then SO messages the team (SendMessage) instead of dispatching fresh Agent calls
+- [ ] Given a researcher outputs `## CHECKPOINT REACHED`, when SO detects the checkpoint, then it spawns a continuation researcher with the partial findings as input
+- [ ] Given parallel researchers return results, when SO runs synthesis, then it validates consistency across findings before annotating the entity body
+- [ ] Given two parallel researchers return contradictory findings, when SO synthesizes, then both findings are written as an Open Question (not silently resolved)
+- [ ] Given entity 051 already researched "Bun unix socket", when entity 052 enters explore with a related assumption, then SO references 051's findings instead of re-dispatching
 
 ## Directive
 
