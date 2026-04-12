@@ -1,14 +1,14 @@
 ---
 id: 052
 title: "L2 auto-fork daemon lifecycle"
-status: clarify
+status: plan
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
-started:
+started: 2026-04-12T17:00:00Z
 completed:
 verdict:
 score: 0.0
-worktree:
+worktree: .worktrees/spacedock-ensign-spacebridge-l2-daemon-lifecycle
 issue:
 pr:
 intent: feature
