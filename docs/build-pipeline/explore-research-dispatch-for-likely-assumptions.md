@@ -80,6 +80,13 @@ The gap was identified during entity 052 clarify (2026-04-13):
 - Mechanism: SO greps CONTRACTS.md + sibling entity `(✓ research: ...)` annotations before dispatching
 - GSD does NOT have this (each phase researches independently) — this is spacedock improving on GSD's weakness
 
+### Design principle: cross-phase skepticism (distilled from GSD, captain direction 2026-04-13)
+- Every researcher dispatch should not only validate unknowns but also RE-VALIDATE prior phase conclusions
+- Brainstorm researcher: validate APPROACH tech claims (NEW unknowns) + verify design doc claims still hold (PRIOR conclusions)
+- Explore researcher: validate Likely assumptions (NEW) + challenge brainstorm annotations marked `(✓ confirmed by explore: ...)` — did explore's surface-level grep miss something deeper? (PRIOR conclusions)
+- This is the spirit of GSD's cross-phase skepticism: "task completion ≠ goal achievement" — each phase is a skeptic of the previous phase, not a consumer
+- Implementation details (regression gate, goal-backward verify) are in a separate entity (077)
+
 ### Shared infrastructure
 - Use existing `spacedock:researcher` agent (same as build-plan uses)
 - Add "research evidence" annotation format to `references/output-format.md`: `(✓ research: {source} -- {finding})`
