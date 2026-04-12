@@ -592,3 +592,45 @@ issues:
 ### Commits
 - a286292 chore(index): add contracts for entity-spacebridge-l2-daemon-lifecycle entering plan (10 files)
 - (pending) chore(plan): spacebridge-l2-daemon-lifecycle L2 auto-fork daemon lifecycle plan
+
+## Stage Report: quality
+
+1. **`cd spacebridge && bun install`** — PASS
+   Installed 27 packages (bun-types, drizzle-kit, drizzle-orm, others). node_modules created successfully.
+
+2. **`bun test` from REPO ROOT** — FAIL (302 pass, 23 fail, 6 errors)
+   ```
+   Ran 325 tests across 38 files
+   302 pass
+   23 fail
+   6 errors
+   752 expect() calls
+   ```
+   
+   **Root causes**:
+   - Missing `@modelcontextprotocol/sdk` dependency (tests/dashboard/channel.test.ts cannot import from SDK)
+   - Missing `diff` package (tools/dashboard/src/snapshots.ts line 5)
+   - These are pre-existing issues in dashboard dependencies, not introduced by 052 code
+
+3. **`tsc --noEmit -p spacebridge/tsconfig.json`** — FAIL (as expected)
+   ```
+   TypeScript: 5 errors in 2 files
+   
+   src/daemon/integration.test.ts (4 errors TS2345):
+   - L219: Session IDs "session-1", "session-2", "s1", "s2" do not match UUID pattern
+   
+   ../tools/dashboard/src/snapshots.ts (1 error TS2307):
+   - L5: Cannot find module 'diff' or its corresponding type declarations
+   ```
+   
+   **Analysis**: 
+   - The 4 TS2345 errors in integration.test.ts are test fixtures using shortened session IDs for readability (not production code). These are benign for testing.
+   - The `diff` import error is a pre-existing dashboard issue, unrelated to 052.
+   - **Missing @types/node**: The daemon code uses node:fs, node:net, node:os, node:path, node:child_process, and process global. tsconfig.json declares only `"types": ["bun-types"]`, which does not provide Node.js types. This needs `@types/node` added to spacebridge/package.json.
+
+4. **`tsc --noEmit -p tools/dashboard/tsconfig.json`** — PASS
+   Dashboard TypeScript compilation completed without errors (has proper @types dependencies).
+
+**Verdict**: FAIL — spacebridge/tsconfig.json requires @types/node to properly type Node.js modules used by daemon code. The 023 dashboard test failures are pre-existing and out of scope for this entity.
+
+**Recommendation**: Add `@types/node` to spacebridge/package.json dependencies before shipping 052.
