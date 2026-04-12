@@ -106,12 +106,17 @@ stages:
       model: sonnet
       feedback-to: execute
       skill: spacedock:build-review
-      # Judgment-based diff-level code review.
+      dispatch: debate-driven
+      # Judgment-based diff-level code review. Uses debate-driven dispatch:
+      # FO creates 3 themed reviewer teams (security / correctness / style),
+      # reviewers analyze diff independently then debate via SendMessage,
+      # then FO dispatches ensign to classify post-debate findings + write Stage Report.
       # Pre-scan (CLAUDE.md / stale refs / import graph / plan consistency) runs
-      # inline before parallel dispatch of pr-review-toolkit + trailofbits agents.
+      # inline in ensign context before classification.
       # Invokes knowledge-capture in capture mode for D1/D2 staging.
       # CRITICAL/HIGH CODE findings -> feedback-to: execute.
       # PLAN advisory findings raise replan flag (captain decides).
+      # In bare mode (-p pipe), falls back to pre-scan only (no team dispatch).
       #
       # NAMESPACE NOTE: Migration to `spacebridge:build-review` is Phase F work (entity 055).
     - name: uat
