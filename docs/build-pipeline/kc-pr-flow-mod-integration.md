@@ -2,7 +2,7 @@
 id: 063
 title: PR Review Loop Mod -- kc-pr-create Integration + Shipped Stage Closed-Loop
 status: draft
-context_status:
+context_status: pending
 source: captain
 created: 2026-04-12T04:30:00Z
 started:
@@ -59,3 +59,34 @@ Implement `mods/pr-review-loop.md` -- the shipped stage closed-loop mod required
 - Existing mod: `docs/build-pipeline/_mods/pr-merge.md` (version 0.8.2)
 - Skills to integrate: `kc-pr-flow:kc-pr-create`, `kc-pr-flow:kc-pr-review-resolve`
 - Entity 062 lesson: FO skipped mod flow, manually created PR #28
+
+## Captain Context Snapshot
+
+- **Repo**: main @ c299e5e
+- **Session**: Entity 062 shipped (PR #28 merged), entities 063/064 drafted, Phase E audit 11/12 complete
+- **Domain**: Runnable/Invokable, Behavioral/Callable, Readable/Textual
+- **Related entities**: 062 -- Phase E Plan 4 Dogfood Trail of Bits (shipped), 064 -- Dashboard Mod Visibility (draft)
+- **Created**: 2026-04-12T04:30:00Z
+
+## Brainstorming Spec
+
+**APPROACH**: Create `mods/pr-review-loop.md` as a skill-delegating mod with three hooks (startup, idle, merge) that replaces the hardcoded PR logic in `docs/build-pipeline/_mods/pr-merge.md`. The merge hook delegates PR creation entirely to `kc-pr-flow:kc-pr-create` via `Skill` tool — the mod provides the entity context (title, branch, files changed) but the skill owns branch push, PR formatting, and GitHub interaction. The idle hook polls PR state via `gh pr view --json state,reviewDecision`; on `changes_requested`, it delegates to `kc-pr-flow:kc-pr-review-resolve` for automated review comment triage and fix-forward routing back to the execute stage. On `MERGED`, it advances the entity to terminal stage and archives. The startup hook mirrors idle's PR state checks (defense in depth). The existing `pr-merge.md` gets a deprecation notice pointing to the new mod. The FO shared core's Merge and Cleanup section is updated to reference the new mod's skill delegation pattern.
+
+**ALTERNATIVE**: Extend the existing `docs/build-pipeline/_mods/pr-merge.md` in-place by adding skill delegation calls and review loop logic to its existing hooks, keeping one mod file rather than creating a replacement. -- D-01 Rejected because: (a) pr-merge.md lives in `docs/build-pipeline/_mods/` while the canonical mod directory is `mods/` (where `workflow-index-maintainer.md` already lives), perpetuating the inconsistency; (b) the review closed-loop is genuinely new capability that would overload pr-merge's original "push and create PR" scope; (c) clean deprecation-then-replacement is safer than in-place surgery on a mod that existing documentation references.
+
+**GUARDRAILS**:
+- Captain approval guardrail MUST be preserved in the merge hook — present PR summary and wait for explicit captain approval before push/create (same pattern as current pr-merge.md)
+- Thin wrapper principle — mod describes *when* to call skills and *what context to pass*, never re-implements skill logic (entity 062 lesson, MEMORY.md thin-wrapper-agent-pattern)
+- Eventually-consistent error handling — mod errors must not block FO startup or entity dispatch (same pattern as workflow-index-maintainer error handling)
+- Do not delete `pr-merge.md` — deprecation notice only; deletion deferred to a follow-up entity after one milestone cycle
+- Mod frontmatter format must match `workflow-index-maintainer.md` (name, description, version fields)
+
+**RATIONALE**: Creating a new mod in the canonical `mods/` directory with pure skill delegation is the cleanest path because it follows the validated thin wrapper pattern (entity 062), keeps the mod focused on orchestration rather than implementation, and treats the review closed-loop as a first-class capability rather than a bolt-on. The deprecation-then-replacement strategy avoids breaking existing documentation references while clearly signaling the migration path. The three-hook structure (startup/idle/merge) mirrors workflow-index-maintainer's proven pattern, giving FO a consistent interface for both mods.
+
+## Acceptance Criteria
+
+- AC1: `mods/pr-review-loop.md` exists with startup, idle, and merge hooks documented (how to verify: file exists, grep for `## Hook: startup`, `## Hook: idle`, `## Hook: merge`)
+- AC2: merge hook specifies `kc-pr-flow:kc-pr-create` invocation via Skill tool, not raw `gh pr create` (how to verify: grep merge hook section for `kc-pr-flow:kc-pr-create`, confirm no `gh pr create` command)
+- AC3: idle hook specifies `changes_requested` detection and routing to `kc-pr-flow:kc-pr-review-resolve` (how to verify: grep idle hook for `changes_requested` and `kc-pr-review-resolve`)
+- AC4: `docs/build-pipeline/_mods/pr-merge.md` has deprecation notice with pointer to `mods/pr-review-loop.md` (how to verify: grep pr-merge.md for "deprecated" and "pr-review-loop")
+- AC5: `references/first-officer-shared-core.md` Merge and Cleanup section references the new mod (how to verify: grep shared core for `pr-review-loop`)
