@@ -14,11 +14,13 @@ Three-track system for classifying gray areas discovered during codebase explora
 
 ### Heuristic
 
-| Signal | Confidence Level |
-|---|---|
-| 2+ consistent usages of the same pattern | Confident |
-| 1 usage, clear fit for the current context | Likely |
-| 1 usage, unclear whether it applies here | Unclear |
+| Signal | Confidence Level | Numeric Range |
+|---|---|---|
+| 2+ consistent usages of the same pattern | Confident | 0.80 - 1.0 |
+| 1 usage, clear fit for the current context | Likely | 0.50 - 0.79 |
+| 1 usage, unclear whether it applies here | Unclear | 0.20 - 0.49 |
+
+The numeric score (0-1) is written alongside the label in the entity body: `Confidence: Confident (0.95)`. This gives the captain a quantitative signal for how much risk each assumption carries. Explore assigns the score based on: number of supporting usages, recency of evidence, and fit between the precedent's context and the current entity's context.
 
 If confidence is "Unclear," consider whether this is actually a Track B (competing patterns) or Track C (needs captain judgment).
 
