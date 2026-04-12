@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Coordination bridge for Spacedock — daemon, UI, role-aware work queue, and build studio skills",
   "author": { "name": "Kent" },
-  "repository": "https://github.com/patchwork-body/spacedock",
+  "repository": "https://github.com/iamcxa/spacedock",
   "license": "Apache-2.0",
   "keywords": ["coordination", "bridge", "daemon", "build-studio", "drizzle", "fmodel"]
 }
