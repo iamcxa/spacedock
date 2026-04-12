@@ -1,8 +1,8 @@
 ---
 id: 050
 title: "Spacebridge plugin skeleton + Drizzle LCD schema"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started:
 completed:
@@ -59,26 +59,32 @@ depends-on: [049]
 A-1: Use `bun:sqlite` driver for Drizzle ORM (not Postgres) as the initial storage backend.
 Confidence: Confident (0.95)
 Evidence: Design doc §3.1 -- "SQLite is the default and near-future storage"; entity 049 spike ran entirely on Bun runtime.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-2: Use `bun:test` with `:memory:` SQLite for schema validation tests, co-located with source files.
 Confidence: Confident (0.90)
 Evidence: tools/dashboard/src/db.test.ts:9 -- `openDb(":memory:")` pattern; 15 test files co-located in src/.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-3: Use INTEGER epoch-ms for all timestamp columns (deliberate break from engine's TEXT timestamps).
 Confidence: Confident (0.95)
 Evidence: Design doc §3.3 -- "Use integer timestamps (Unix epoch ms) rather than datetime/timestamptz"; current db.ts:23 uses `created_at TEXT` which is the OLD pattern being replaced.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-4: Follow standard CC plugin structure: `.claude-plugin/plugin.json` at repo root with name, version, description, author, repository, license, keywords.
 Confidence: Confident (0.95)
 Evidence: .claude-plugin/plugin.json -- spacedock plugin uses exactly this pattern; marketplace.json optional for local development.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-5: No fmodel-ts dependency in this entity -- pure Drizzle table definitions only.
 Confidence: Confident (0.90)
 Evidence: Brainstorm GUARDRAILS explicitly excludes fmodel; design doc §3.5 assigns fmodel to entities 054 (comments), 056 (leases), 057 (sessions).
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-6: Zod event schemas (when added later) must use `.passthrough()` not `.strip()` to prevent silent field loss during schema evolution.
 Confidence: Confident (0.85)
 Evidence: Design doc §3.5 -- "All event schemas use .passthrough() or explicit version tagging"; noted as hard-learned lesson from carlvoe (qnow repo).
+→ Confirmed: captain, 2026-04-12 (batch)
 
 ## Option Comparisons
 
@@ -91,6 +97,8 @@ Should the initial 5 tables include fmodel-compatible columns (event_type, aggre
 | Include fmodel columns now | Later entities start immediately without migration; schema designed for its end state from day 1 | Unused columns in v1; payload column must be opaque blob (JSON) per LCD discipline | Low | Recommended |
 | Minimal columns now, migrate later | YAGNI; cleaner initial schema; no unused columns | Requires Drizzle migration for every fmodel entity; migration bugs risk; contradicts "design for fmodel from day 1" design intent | Medium | Viable |
 
+→ Selected: Include fmodel columns now (captain, 2026-04-12, interactive)
+
 ### O-2: Namespace migration strategy
 
 How to migrate agent/skill files from `spacedock:*` to `spacebridge:*` namespace?
@@ -100,6 +108,8 @@ How to migrate agent/skill files from `spacedock:*` to `spacebridge:*` namespace
 | Copy SO-related files to spacebridge, leave originals in spacedock | Zero breaking changes; gradual migration; both namespaces work during transition | Duplicated files; drift risk between copies; maintenance burden | Low | Viable |
 | Move SO-related files to spacebridge, update all refs atomically | Single source of truth; no duplication; clean cut | Breaking change for spacedock:build-* users; requires coordinated commit across repos | Low | Recommended |
 | Move files + add alias stubs in spacedock | Single source of truth; backward compatible via stubs | CC plugin system may not support cross-plugin skill aliases; untested mechanism | Medium | Not recommended |
+
+→ Selected: Move SO-related files to spacebridge, update all refs atomically (captain, 2026-04-12, interactive). Captain note: no cross-repo coordination needed -- all development happens in kent's spacedock fork. Engine changes PR to clkao after everything is complete. This resolves the "cross-repo" concern in the Cons column.
 
 ## Open Questions
 
@@ -111,6 +121,8 @@ Why it matters: Every subsequent entity (051-060) targets this repo. The path, g
 
 Suggested options: (a) `~/Project/spacebridge/` as a standalone repo with its own git remote, (b) A directory under spacedock like `spacebridge/` with a separate `.claude-plugin/plugin.json` but shared git history, (c) A git subtree within spacedock that can be split out later
 
+→ Answer: (b) spacedock repo 內的 spacebridge/ 目錄，獨立 .claude-plugin/plugin.json，共享 git history。開發期全部在 kent's spacedock fork 完成，engine 改動完成後 PR 給 clkao。 (captain, 2026-04-12, interactive)
+
 Q-2: Which skills and agents should migrate to spacebridge vs stay in spacedock?
 
 Domain: Runnable/Invokable
@@ -119,6 +131,8 @@ Why it matters: The brainstorm assumed ALL build-* skills migrate, but design do
 
 Suggested options: (a) SO + discuss-phase skills only (build-brainstorm, build-explore, build-clarify, science-officer agent) move to spacebridge; FO + execute-phase skills stay in spacedock, (b) All build-* skills move to spacebridge since they are all "build studio" skills regardless of which agent invokes them, (c) Defer migration entirely -- just create the plugin skeleton + schema; migrate skills in a follow-up entity when the daemon exists
 
+�� Answer: (c) 延後遷移。這個 entity 只建 skeleton + schema，不搬任何 skill/agent。等 daemon 存在後再決定 skill 分割策略。這也意味著 brainstorm APPROACH 中的 namespace migration 部分從 050 scope 中移除。 (captain, 2026-04-12, interactive)
+
 Q-3: How does spacebridge consume spacedock engine types (ChannelProvider, CoordinationClient) across repo boundaries?
 
 Domain: Behavioral/Callable
@@ -126,6 +140,12 @@ Domain: Behavioral/Callable
 Why it matters: Entity 051 (IPC) implements ChannelProvider on the bridge side. The TypeScript interface is defined at `tools/dashboard/src/channel-provider.ts` in the engine repo. If spacebridge is a separate repo, it needs access to this type definition without creating a hard import dependency on the engine.
 
 Suggested options: (a) Copy the interface definition to spacebridge and keep in sync manually, (b) Publish a `@spacedock/interfaces` npm package from the engine containing only the type definitions, (c) Redefine the interface independently in spacebridge -- the unix socket wire protocol is the real contract, not the TypeScript type
+
+→ Answer: 直接 import 同 repo 的 type。Q-1 決定 spacebridge 在 spacedock repo 內，所以 spacebridge/src/ 可以直接 import tools/dashboard/src/channel-provider.ts 的 type。零摩擦，之後抽離 repo 時再處理。 (captain, 2026-04-12, interactive)
+
+## Canonical References
+
+- tools/dashboard/src/channel-provider.ts -- ChannelProvider interface (bridge ↔ engine seam, direct import target for spacebridge)
 
 ## References
 
@@ -153,3 +173,21 @@ Suggested options: (a) Copy the interface definition to spacebridge and keep in 
   α-1 (repo location) escalated to Q-1 -- requires captain decision, no codebase evidence resolves it
 - [x] Scale assessment: confirmed Medium
   9 reference files mapped; new plugin estimated at 10-15 files (plugin.json, schema files, tests, package.json, drizzle config, agent/skill stubs)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- entity is Medium scope, no children proposed
+- [x] Assumptions confirmed: 6 / 6 (0 corrected)
+  A-1 through A-6 confirmed via batch -- all Confident, captain approved without corrections
+- [x] Options selected: 2 / 2
+  O-1 Include fmodel columns now (recommended); O-2 Move files atomically (captain narrowed: no cross-repo, defer skill migration to later entity)
+- [x] Questions answered: 3 / 3 (0 deferred)
+  Q-1 spacebridge/ dir inside spacedock repo; Q-2 defer skill migration (skeleton + schema only); Q-3 direct import same-repo types
+- [x] Canonical refs added: 1
+  tools/dashboard/src/channel-provider.ts (direct import target)
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected, all Qs answered
+- [x] Handoff mode: loose
+  captain must say "execute 050" or launch FO in separate session
+- [x] Clarify duration: 5 questions asked, session complete
+  1 batch assumption confirmation + 2 option selections + 3 open questions (= 6 interactions, 5 via AskUserQuestion)
