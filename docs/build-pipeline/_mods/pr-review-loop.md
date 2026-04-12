@@ -4,6 +4,8 @@ description: Skill-delegating PR lifecycle mod with review closed-loop. Creates 
 version: 0.1.0
 ---
 
+This is the build-pipeline activation of `mods/pr-review-loop.md`. Keep in sync with the library version.
+
 # pr-review-loop
 
 This mod replaces the hardcoded PR logic in `docs/build-pipeline/_mods/pr-merge.md` with a thin-wrapper skill-delegating design following the entity 062 lesson: mods should be skill callers, not skill re-implementations. Where `pr-merge.md` embeds raw `gh pr create` commands and manual review logic, this mod delegates entirely to `kc-pr-flow:kc-pr-create` for PR creation and `kc-pr-flow:kc-pr-review-resolve` for review comment triage. The mod provides lifecycle hooks (when to act and what entity context to pass) while the skills own the implementation.
