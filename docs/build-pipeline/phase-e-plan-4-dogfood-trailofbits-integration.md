@@ -1,15 +1,15 @@
 ---
 id: 062
 title: Phase E Plan 4 -- Dogfood Trail of Bits Integration + Case B Cleanup
-status: clarify
+status: plan
 context_status: ready
 source: /build
 created: 2026-04-11T16:12:27Z
-started:
+started: 2026-04-12T00:40:59Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration
 issue:
 pr:
 intent: feature
