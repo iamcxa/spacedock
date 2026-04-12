@@ -14,7 +14,7 @@ This file captures the shared first-officer semantics. Keep it aligned with `age
    - mission
    - entity labels
    - stage ordering, defaults, and **profile definitions** from `stages.profiles` / `stages.defaults` / `stages.states`
-   - stage properties such as `initial`, `terminal`, `gate`, `worktree`, `concurrency`, `feedback-to`, and `agent`
+   - stage properties such as `initial`, `terminal`, `gate`, `worktree`, `concurrency`, `feedback-to`, `agent`, and `dispatch` (simple | task-list-driven | debate-driven)
 4. Discover mod hooks by scanning `{workflow_dir}/_mods/*.md` for `## Hook:` sections. Register `startup`, `idle`, and `merge` hooks in alphabetical order by mod filename.
 5. Run startup hooks before normal dispatch.
 6. Detect orphaned worktree entities by checking `status --where "worktree !="` and report anomalies rather than auto-redispatching.
@@ -186,17 +186,84 @@ For each entity reported by `status --next`:
 6. Commit the state transition on main with `dispatch: {slug} entering {next_stage}`.
 6.5. Emit dispatch event: `curl -s -X POST http://localhost:${DASHBOARD_PORT}/api/events -H 'Content-Type: application/json' -d "{\"type\":\"dispatch\",\"entity\":\"${SLUG}\",\"stage\":\"${NEXT_STAGE}\",\"agent\":\"${WORKER_KEY}-${SLUG}-${NEXT_STAGE}\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"detail\":\"Entering ${NEXT_STAGE}\"}"` (skip if dashboard not running).
 7. Create the worktree on first dispatch to a worktree stage.
-8. Dispatch a fresh worker using the runtime-specific mechanism. The worker assignment must include:
-   - entity identity and title
-   - target stage name
-   - the full stage definition
-   - the entity path
-   - the worktree path and branch when applicable
-   - the checklist
-   - feedback instructions when the stage has `feedback-to`
-9. Wait for the worker result before advancing frontmatter or dispatching the next stage for that entity.
+8. Select dispatch mode from the stage definition's `dispatch:` property (default `simple`). Execute the matching protocol below.
+9. Wait for the final worker result before advancing frontmatter or dispatching the next stage for that entity.
 
 Feedback-stage worker instructions must preserve this rule: a review stage checks and reports on what was produced; it does not silently take over the prior stage's work.
+
+### Dispatch Modes
+
+The `dispatch:` property on a stage definition selects the dispatch protocol. Omitted or unrecognized values fall back to `simple`. All modes share steps 1–7 above; they differ only in how workers are dispatched and how results are collected.
+
+For universal tool surface constraints and dispatch pattern definitions, see `references/agent-dispatch-guide.md`.
+
+#### simple (default)
+
+Dispatch a single worker (ensign or named agent). The worker does all work inline.
+
+```
+FO dispatches one worker:
+  - entity identity, title, target stage, stage definition
+  - entity path, worktree path and branch (when applicable)
+  - the checklist
+  - feedback instructions (when stage has feedback-to)
+Worker executes all checklist items, writes Stage Report.
+```
+
+This is the right mode for single-threaded stages where no parallel research or cross-cutting analysis is needed.
+
+#### task-list-driven
+
+Two-phase protocol for stages requiring parallel work with dependency ordering. The main session dispatches workers in Phase 1 because workers cannot dispatch further agents (Agent tool is main-session-exclusive — see `references/agent-dispatch-guide.md`).
+
+```
+Phase 1 — Worker dispatch (FO, has Agent tool):
+  1. Extract N topics/tasks from entity context
+     - Topic count is content-driven, not hardcoded at design time
+     - Cap at workflow-defined limit (typically 5)
+  2. Create team + task list with dependencies:
+     - Worker tasks 1..N: unblocked, self-claimable
+     - Synthesis task N+1: depends on 1..N (auto-unblocks)
+     - Optional verification task N+2: depends on N+1
+  3. Spawn M worker teammates (M <= N, typically 3)
+  4. Workers self-claim unblocked tasks
+     - Each writes results to entity file subsections or worktree files
+     - Workers can SendMessage each other for overlapping context
+  5. Dependency-gated synthesis task auto-unblocks when worker tasks complete
+
+Phase 2 — Ensign synthesis (simple subagent):
+  6. Dispatch ensign with the standard worker assignment (step 8 payload)
+  7. Ensign reads worker results from entity file (NOT from main session context)
+  8. Ensign writes Stage Report per normal completion flow
+```
+
+**Key constraint:** Workers write to files, not to the main session. This keeps FO's context small. The ensign reads files at synthesis time.
+
+**Completion:** FO waits on the team task list for all tasks to reach terminal state, then dispatches the ensign for synthesis. The ensign's Stage Report triggers the normal Completion and Gates flow.
+
+#### debate-driven
+
+Two-phase protocol for stages requiring cross-cutting analysis where reviewers should challenge each other's findings. Produces higher-quality output than independent parallel work.
+
+```
+Phase 1 — Reviewer dispatch (FO, has Agent tool):
+  1. Create team with 3–4 themed reviewers
+     - Each reviewer gets a focus area from the stage definition
+     - All reviewers analyze the same target (e.g., git diff, entity spec)
+  2. Reviewers work independently first, write findings to entity file
+  3. Reviewers SendMessage findings to each other and debate:
+     - Challenge severity ratings, question assumptions, cross-reference
+     - Debate is the unique value — it catches blind spots
+
+Phase 2 — Synthesis (FO inline or ensign):
+  4. FO reads debate thread + written findings
+  5. FO or ensign classifies findings (severity × root cause)
+  6. Writes Stage Report with classified findings
+```
+
+**Key constraint:** Debate happens via SendMessage between teammates, not through FO relay. FO reads the final state, not the full conversation.
+
+**Completion:** FO monitors team for idle state + all reviewers having posted findings. Then proceeds to synthesis. The Stage Report triggers the normal Completion and Gates flow.
 
 ## Completion and Gates
 
