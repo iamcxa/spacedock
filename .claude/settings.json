@@ -1,0 +1,27 @@
+{
+  "enabledPlugins": {
+    "pr-review-toolkit@claude-plugins-official": true,
+    "sharp-edges@trailofbits": true,
+    "variant-analysis@trailofbits": true,
+    "insecure-defaults@trailofbits": true,
+    "mutation-testing@trailofbits": true,
+    "differential-review@trailofbits": true,
+    "e2e-pipeline@iamcxa-plugins": true
+  },
+  "extraKnownMarketplaces": {
+    "trailofbits": {
+      "source": {
+        "source": "github",
+        "repo": "trailofbits/skills"
+      },
+      "autoUpdate": true
+    },
+    "iamcxa-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "iamcxa/kc-claude-plugins"
+      },
+      "autoUpdate": true
+    }
+  }
+}
