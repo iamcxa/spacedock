@@ -1,5 +1,5 @@
 ---
-id: 070
+id: 071
 title: Build-Clarify Interaction Modes (--auto, --power)
 status: draft
 context_status:
