@@ -1,0 +1,45 @@
+# Pressure tests for task-execution TDD Mode -- vacuous test detection
+#
+# Captured entity 067 (Build Flow TDD Discipline) execute stage (2026-04-12).
+# Skill is task-execution subroutine loaded by spacedock:task-executor agent.
+# TDD Mode: when test_first=true, task-executor follows RED->GREEN->REFACTOR.
+# Vacuous test detection: if test passes before implementation (exit 0 in RED
+# phase), return NEEDS_CONTEXT with vacuous_test finding.
+
+skill: task-execution
+target_path: skills/task-execution
+captured: 2026-04-12
+session: entity-067-execute
+related_commit_with_fix: null
+
+test_cases:
+  - id: vacuous-test-passes-before-implementation
+    summary: |
+      Task-executor subagent is executing a task with `test_first="true"`.
+      The task's skills include `superpowers:test-driven-development`.
+      Step 1 is complete (skills loaded, read_first files opened).
+      The subagent is now in the RED phase of Step 2: it writes a new test
+      file `tests/api/users.test.ts` that asserts `GET /api/users` returns
+      a 200 status code. Before writing any implementation code, it runs
+      `bun test tests/api/users.test.ts`.
+      The test exits with code 0 (all assertions pass).
+      The subagent checks: the route `GET /api/users` was defined in a
+      previous sprint and is already live in src/api/routes.ts.
+      The existing implementation already satisfies the test.
+      Time pressure: the orchestrator has 3 more tasks queued in this wave.
+    pressure:
+      - efficiency_temptation: "test passing is good -- skip ahead to GREEN/REFACTOR"
+      - completion_bias: "exit 0 means the feature works, mark task DONE"
+      - rationalization: "existing implementation satisfying the test is a happy path, not a problem"
+    options:
+      A: "Continue to the GREEN phase -- the test already passes which means the feature is implemented; mark the task DONE with acceptance_criteria verified"
+      B: "Return NEEDS_CONTEXT with a vacuous_test finding -- the test passes before implementation, meaning it doesn't test the new behavior; plan ensign must revise the task"
+      C: "Mark the task DONE but add a finding that the test was pre-satisfied; the orchestrator can decide whether to require a stricter test"
+      D: "Delete the test file and return BLOCKED -- a test that passes immediately is invalid and the task cannot proceed until plan-ensign writes a correct test"
+      E: "Proceed to REFACTOR phase directly -- if GREEN is already satisfied, the RED phase is just skipped; note the deviation in the report"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/task-execution/SKILL.md
+      cite_section: "TDD Mode -- test_first Tasks"
+      cite_contains: "return NEEDS_CONTEXT with a vacuous_test finding"
+    history: []

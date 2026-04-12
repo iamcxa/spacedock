@@ -143,7 +143,7 @@ Write three sections into the entity body:
 Task list using the PLAN task schema from spec lines 182-214:
 
 ```markdown
-<task id="task-1" model="haiku" wave="1" skills="spacedock:validation-patterns">
+<task id="task-1" model="haiku" wave="1" skills="spacedock:validation-patterns, superpowers:test-driven-development" test_first="true">
   <read_first>
     - src/models/User.ts
     - tests/models/user.test.ts
@@ -172,6 +172,9 @@ Task attributes:
 - `wave`: integer (0, 1, 2, ...). **Wave 0 is reserved for test infrastructure creation** (Nyquist 6d). Tasks in the same wave may run in parallel when `files_modified` don't overlap.
 - `skills`: optional comma-separated skill IDs that plan ensign confidently recommends for this task.
 - `serial`: optional boolean, forces serial execution even when overlap-free.
+- `test_first`: optional boolean, default `false`. When `true`, the plan ensign is declaring that this task should follow TDD discipline -- the task-executor will load `superpowers:test-driven-development` via `task.skills`, and the TDD skill governs the RED->GREEN->REFACTOR cycle within task-execution Step 2. Recommend `test_first: true` for tasks that create new functions, endpoints, handlers, or behavioral logic. Do NOT set for config changes, documentation, pure refactoring, infrastructure setup, or tasks where the behavior is already covered by an existing test. When `test_first: true`, the task's `skills` field MUST include `superpowers:test-driven-development`, and `files_modified` MUST include at least one test file (validated by plan-checker dimension 6d).
+
+**`<automated>MISSING</automated>` sentinel.** Use this token in `acceptance_criteria` when a test file referenced by the criterion does not yet exist and will be created by a Wave 0 task. Example: `<automated>MISSING</automated>tests/models/user.test.ts` signals that a Wave 0 task must create `tests/models/user.test.ts` before this task's acceptance_criteria can run. Plan-checker dimension 6d validates that every `<automated>MISSING</automated>` reference in any task has a matching Wave 0 task with that exact file path in `files_modified`.
 
 **Task 0 -- Environment Verification (when plan touches >3 files or >1 subsystem).** Per `plan-write-discipline.md` memory, every plan that edits >3 files or touches >1 subsystem must have a Task 0 at the top that mechanically verifies every file the plan claims will exist, every file the plan claims will NOT exist, and every architectural property the plan assumes. This prevents "ls-not-find" class errors from leaking into durable Stage Reports. Task 0 outputs verification command + result; if any check fails, STOP and revise the plan before writing the remaining tasks.
 
