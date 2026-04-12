@@ -84,7 +84,12 @@ The gap was identified during entity 052 clarify (2026-04-13):
 - Use existing `spacedock:researcher` agent (same as build-plan uses)
 - Add "research evidence" annotation format to `references/output-format.md`: `(✓ research: {source} -- {finding})`
 - Update `references/hybrid-classification-heuristic.md` with research-upgrade path
-- Cost guard: skip research for Small entities with all-Confident assumptions and no external API claims
+- Research depth scaling (captain decision, 2026-04-13):
+  - SKIP all research: ALL assumptions Confident ≥0.95 AND no external tech claims AND Small scale
+  - Lightweight (1 researcher, targeted): assumptions 0.85-0.94 Confident
+  - Standard (1-2 researchers, parallel): assumptions 0.70-0.84 Likely
+  - Deep (2-3 researchers, parallel + continuation): assumptions <0.70 Unclear
+  - Rationale: research includes INTERNAL deep codebase tracing (not just WebSearch) — explore's surface-level grep is not sufficient validation. Skipping research = skipping deep validation, so threshold must be high.
 - Research results are persisted in entity body — downstream stages consume them, never re-dispatch
 
 ## Acceptance Criteria
