@@ -1,7 +1,7 @@
 ---
 id: 051
 title: "Unix socket IPC + ChannelProvider client/server"
-status: plan
+status: execute
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started: 2026-04-12T16:25:00Z
