@@ -1,7 +1,7 @@
 ---
 id: 068
 title: Build-Distill Skill -- Systematic External Pattern Absorption + GSD First Pass
-status: quality
+status: review
 context_status: ready
 source: captain
 created: 2026-04-12T18:30:00+08:00
