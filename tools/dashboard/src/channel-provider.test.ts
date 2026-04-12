@@ -57,6 +57,9 @@ describe("ChannelProvider injection", () => {
         getChannelMessagesSince(_afterSeq: number, _entity?: string): SequencedEvent[] {
           return [];
         },
+        getAll(): SequencedEvent[] {
+          return [];
+        },
       },
       snapshotStore: {
         createSnapshot(input: any) {
@@ -64,6 +67,9 @@ describe("ChannelProvider injection", () => {
             frontmatter: null, author: input.author, reason: input.reason,
             source: input.source ?? "update", rollback_from_version: null,
             rollback_section: null, created_at: new Date().toISOString() };
+        },
+        listVersions(_entity: string) {
+          return [];
         },
       },
       port: 9999,

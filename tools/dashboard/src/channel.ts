@@ -122,7 +122,7 @@ export function createChannelServer(opts: ChannelServerOptions) {
     }
   };
 
-  const dashboard: ChannelProvider = opts.provider ?? createServer({
+  const dashboard = opts.provider ?? createServer({
     port: opts.port,
     hostname: "127.0.0.1",
     projectRoot: opts.projectRoot,
@@ -396,7 +396,7 @@ export function createChannelServer(opts: ChannelServerOptions) {
             return { content: [{ type: "text", text: "Permission denied or timed out" }], isError: true };
           }
           // C1: snapshot PRE-write state for rollback
-          const snap = dashboard.snapshotStore.createSnapshot({
+          const snap = await dashboard.snapshotStore.createSnapshot({
             entity: slug,
             body: parsed.body,
             frontmatter: parsed.frontmatter,
@@ -412,7 +412,7 @@ export function createChannelServer(opts: ChannelServerOptions) {
           const allHeadings = new Set(newSections.map((s) => normHeading(s.heading)));
           const autoResolved = autoResolveComments(filepath, slug, allHeadings, snap.version);
           const bodyEvent: AgentEvent = { type: "entity_update" as any, entity: slug, stage: "", agent: "fo", timestamp: new Date().toISOString(), detail: `body replaced: ${reason}` };
-          dashboard.publishEvent(bodyEvent);
+          await dashboard.publishEvent(bodyEvent);
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: autoResolved }) }] };
         }
 
@@ -452,7 +452,7 @@ export function createChannelServer(opts: ChannelServerOptions) {
           }
 
           // C1: snapshot PRE-write state for rollback
-          const snap = dashboard.snapshotStore.createSnapshot({
+          const snap = await dashboard.snapshotStore.createSnapshot({
             entity: slug,
             body: parsed.body,
             frontmatter: parsed.frontmatter,
@@ -463,14 +463,14 @@ export function createChannelServer(opts: ChannelServerOptions) {
           writeFileSync(filepath, workingText);
           const autoResolved = autoResolveComments(filepath, slug, modifiedHeadings, snap.version);
           const secEvent: AgentEvent = { type: "entity_update" as any, entity: slug, stage: "", agent: "fo", timestamp: new Date().toISOString(), detail: `sections updated: ${reason}` };
-          dashboard.publishEvent(secEvent);
+          await dashboard.publishEvent(secEvent);
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: autoResolved }) }] };
         }
 
         // Mode A only (frontmatter with no body/sections)
         if (hasFrontmatter) {
           // C1: snapshot PRE-write state for rollback
-          const snap = dashboard.snapshotStore.createSnapshot({
+          const snap = await dashboard.snapshotStore.createSnapshot({
             entity: slug,
             body: parsed.body,
             frontmatter: parsed.frontmatter,
@@ -480,7 +480,7 @@ export function createChannelServer(opts: ChannelServerOptions) {
           });
           writeFileSync(filepath, workingText);
           const fmEvent: AgentEvent = { type: "entity_update" as any, entity: slug, stage: "", agent: "fo", timestamp: new Date().toISOString(), detail: `frontmatter updated: ${reason}` };
-          dashboard.publishEvent(fmEvent);
+          await dashboard.publishEvent(fmEvent);
           return { content: [{ type: "text", text: JSON.stringify({ ok: true, new_version: snap.version, warning: null, auto_resolved_comments: [] }) }] };
         }
 
@@ -493,7 +493,7 @@ export function createChannelServer(opts: ChannelServerOptions) {
     if (name === "get_pending_messages") {
       const sinceSeq = (args.since_seq as number | undefined) ?? 0;
       const entity = args.entity as string | undefined;
-      const messages = dashboard.eventBuffer.getChannelMessagesSince(sinceSeq, entity);
+      const messages = await dashboard.eventBuffer.getChannelMessagesSince(sinceSeq, entity);
       const lastSeq = messages.length > 0 ? messages[messages.length - 1].seq : sinceSeq;
       return {
         content: [{
