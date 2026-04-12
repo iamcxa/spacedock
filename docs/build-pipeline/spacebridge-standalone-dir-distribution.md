@@ -13,7 +13,7 @@ pr:
 intent: feature
 scale: Small
 project: spacedock
-depends-on: "all prior (049-058)"
+depends-on: [053]
 ---
 
 ## Problem

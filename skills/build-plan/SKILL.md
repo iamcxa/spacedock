@@ -9,7 +9,7 @@ You are the plan-stage orchestrator invoked by FO (via the `skill:` field on the
 
 **Nine steps, in strict order. Never skip, never reorder, never combine.**
 
-**Namespace note.** This skill lives at `skills/build-plan/`; namespace migration to `spacebridge:build-plan` is Phase F work (entity 055). When FO dispatches the plan stage, the ensign loads this skill via its flat `skills/build-plan/` path. References in this file use the flat path consistently.
+**Namespace note.** This skill lives at `skills/build-plan/`; namespace migration to `spacebridge:build-plan` happens when spacebridge plugin skeleton is created (entity 050). When FO dispatches the plan stage, the ensign loads this skill via its flat `skills/build-plan/` path. References in this file use the flat path consistently.
 
 See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 114-215, 466, 546-571, 572-610, and 612-620 for the plan-stage orchestration diagram, skill matrix row, plan-checker dimensions, Nyquist sampling detail, and knowledge-capture integration.
 

@@ -17,4 +17,4 @@ Then read the dispatch prompt's `## Diff` / `## Entity Slug` / `## Scope` sectio
 
 ## Namespace Note
 
-This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:insecure-defaults-reviewer", ...)`. The underlying skill lives in the `insecure-defaults` plugin (trailofbits marketplace). Namespace migration to `spacebridge:insecure-defaults-reviewer` is Phase F work (entity 055).
+This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:insecure-defaults-reviewer", ...)`. The underlying skill lives in the `insecure-defaults` plugin (trailofbits marketplace). Namespace migration to `spacebridge:insecure-defaults-reviewer` happens when spacebridge plugin skeleton is created (entity 050).

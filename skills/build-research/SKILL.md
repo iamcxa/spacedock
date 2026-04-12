@@ -5,7 +5,7 @@ description: "Read-only research subroutine for /build. Dispatched by build-plan
 
 # Build-Research -- Read-Only Single-Topic Research Subroutine
 
-**Namespace note.** This skill lives at `skills/build-research/`; namespace migration to `spacebridge:build-research` is Phase F work (entity 055). When `build-plan` dispatches the `spacedock:researcher` agent, the agent loads this skill via its flat `skills/build-research/` path.
+**Namespace note.** This skill lives at `skills/build-research/`; namespace migration to `spacebridge:build-research` happens when spacebridge plugin skeleton is created (entity 050). When `build-plan` dispatches the `spacedock:researcher` agent, the agent loads this skill via its flat `skills/build-research/` path.
 
 You are a leaf skill invoked by `build-plan` through the `spacedock:researcher` agent. You receive one research topic and produce a structured finding that `build-plan` later synthesizes into the entity body's `## Research Findings` section. You are **read-only** and **non-interactive**: you investigate, you report, you do NOT fix code and you do NOT design solutions.
 

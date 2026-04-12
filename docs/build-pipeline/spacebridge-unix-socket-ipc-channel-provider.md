@@ -14,7 +14,7 @@ intent: feature
 scale: Medium
 project: spacedock
 depends-on: [050]
-note: "Also depends on PR1 merged into clkao/spacedock (ChannelProvider interface extraction)"
+note: "ChannelProvider interface already extracted locally (tools/dashboard/src/channel-provider.ts, 2026-04-10). PR1 to upstream is soft-blocked — can develop against local interface. This entity implements the bridge-side unix socket client that forwards ChannelProvider calls to the daemon."
 ---
 
 ## Problem

@@ -37,7 +37,7 @@ stages:
       # Hybrid classification: assumptions (Track A), options (Track B), questions (Track C).
       # Writes to entity body: ## Assumptions, ## Option Comparisons, ## Open Questions.
       #
-      # NAMESPACE NOTE: Migration to `spacebridge:build-explore` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-explore` happens when spacebridge plugin skeleton is created (entity 050).
       #
       # FALLBACK (skill not found):
       # Ensign uses inline explore definition below (basic file mapping, no question generation).
@@ -46,7 +46,7 @@ stages:
       manual: true
       gate: true
       skill: spacedock:build-clarify
-      # NAMESPACE NOTE: Migration to `spacebridge:build-clarify` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-clarify` happens when spacebridge plugin skeleton is created (entity 050).
       #
       # Science Officer (spacedock:science-officer agent) runs interactive
       # AskUserQuestion loop with captain.
@@ -80,7 +80,7 @@ stages:
       #   claude --agent spacedock:first-officer -- "entity {slug}"
       # Do NOT continue SO→FO in the same session — worktree skip breaks PR lifecycle.
       #
-      # NAMESPACE NOTE: Migration to `spacebridge:build-plan` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-plan` happens when spacebridge plugin skeleton is created (entity 050).
     - name: execute
       model: sonnet
       skill: spacedock:build-execute
@@ -91,7 +91,7 @@ stages:
       # serial across waves. Pre-commit hook fires per task commit.
       # Calls workflow-index update-status (planned -> in-flight) at stage entry.
       #
-      # NAMESPACE NOTE: Migration to `spacebridge:build-execute` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-execute` happens when spacebridge plugin skeleton is created (entity 050).
     - name: quality
       feedback-to: execute
       model: haiku
@@ -101,7 +101,7 @@ stages:
       # No judgment, no commentary. Evidence-backed Stage Report.
       # Any fail -> feedback-to: execute (max 3 rounds, then escalate to captain).
       #
-      # NAMESPACE NOTE: Migration to `spacebridge:build-quality` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-quality` happens when spacebridge plugin skeleton is created (entity 050).
     - name: review
       model: sonnet
       feedback-to: execute
@@ -118,7 +118,7 @@ stages:
       # PLAN advisory findings raise replan flag (captain decides).
       # In bare mode (-p pipe), falls back to pre-scan only (no team dispatch).
       #
-      # NAMESPACE NOTE: Migration to `spacebridge:build-review` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-review` happens when spacebridge plugin skeleton is created (entity 050).
     - name: uat
       model: sonnet
       gate: true
@@ -131,7 +131,7 @@ stages:
       # Supports skip/resume via /spacedock:uat-resume slash command.
       # Infra fails auto-route to execute; assertion fails routed through captain review.
       #
-      # NAMESPACE NOTE: Migration to `spacebridge:build-uat` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-uat` happens when spacebridge plugin skeleton is created (entity 050).
     - name: shipped
       terminal: true
       worktree: false

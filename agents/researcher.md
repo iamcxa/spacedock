@@ -17,4 +17,4 @@ Then read the dispatch prompt's `## Topic` / `## Description` / `## Entity Conte
 
 ## Namespace Note
 
-This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:researcher", ...)`. Namespace migration to `spacebridge:researcher` is Phase F work (entity 055).
+This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:researcher", ...)`. Namespace migration to `spacebridge:researcher` happens when spacebridge plugin skeleton is created (entity 050).

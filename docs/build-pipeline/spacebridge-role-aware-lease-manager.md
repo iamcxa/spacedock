@@ -13,8 +13,8 @@ pr:
 intent: feature
 scale: Large
 project: spacedock
-depends-on: [055]
-note: "Also depends on PR2 merged into clkao/spacedock (CoordinationClient interface + FO delegation)"
+depends-on: [050]
+note: "Entity 055 archived (SO done, namespace → 050, QO deferred). This entity now absorbs CoordinationClient wiring from 055 AC7. Hard-blocked on PR2 to clkao/spacedock (CoordinationClient interface + FO delegation) — design exists in spacebridge doc §5.1-5.3 but no code yet."
 ---
 
 ## Problem

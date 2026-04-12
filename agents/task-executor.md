@@ -17,4 +17,4 @@ Then read the dispatch prompt's `## Task` block (id, model, wave, skills, read_f
 
 ## Namespace Note
 
-This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:task-executor", model=task.model, ...)`. Namespace migration to `spacebridge:task-executor` is Phase F work (entity 055).
+This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:task-executor", model=task.model, ...)`. Namespace migration to `spacebridge:task-executor` happens when spacebridge plugin skeleton is created (entity 050).

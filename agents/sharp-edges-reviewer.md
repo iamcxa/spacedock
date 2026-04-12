@@ -17,4 +17,4 @@ Then read the dispatch prompt's `## Diff` / `## Entity Slug` / `## Scope` sectio
 
 ## Namespace Note
 
-This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:sharp-edges-reviewer", ...)`. The underlying skill lives in the `sharp-edges` plugin (trailofbits marketplace). Namespace migration to `spacebridge:sharp-edges-reviewer` is Phase F work (entity 055).
+This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:sharp-edges-reviewer", ...)`. The underlying skill lives in the `sharp-edges` plugin (trailofbits marketplace). Namespace migration to `spacebridge:sharp-edges-reviewer` happens when spacebridge plugin skeleton is created (entity 050).
