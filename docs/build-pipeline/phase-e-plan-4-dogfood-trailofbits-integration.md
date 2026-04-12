@@ -1277,3 +1277,51 @@ feedback-to: captain (conditional gate triggered per reasons 1-5 above)
 ### Summary
 
 First live dispatch of `spacedock:build-plan` produced an 11-task plan (Task 0 Environment Verification + 10 deliverable tasks) covering 7 ACs, with a 12-row Validation Map and full UAT Spec. Step 2 (parallel researcher dispatch) and Step 6 (plan-checker subagent dispatch) fell back to inline execution because the Agent tool is not available in the ensign subagent context -- captured as KC-062-1 for FO apply-mode review. All 7 plan-checker dimensions passed inline. Conditional gate triggered (new public APIs + new infra dependency + cross-domain impact); recommending captain architecture review before execute. Deferred to execute stage: workflow-index append via direct CONTRACTS.md Edit fallback (AC3 live verification), Case B conditional cleanup (AC5), and Pending Knowledge Capture ingestion by FO Step 6.5.
+
+## Pending Knowledge Captures
+
+<capture id="KC-062-1" severity="HIGH" root="NEW" source_stage="execute" source_date="2026-04-12">
+  <summary>
+  build-plan Step 2 and build-execute Step 4 both assume Agent tool is available in ensign subagent context; actual dispatch surface in FO-dispatched ensign (both bare and team mode) shows only SendMessage/TeamCreate/Task* plus Read/Edit/Write/Grep/Glob/Bash/ToolSearch/Skill, NOT raw Agent. Confirmed across two dispatches in this entity: build-plan (bare mode) and build-execute (team mode) both probed via ToolSearch and both got "No matching deferred tools found" for select:Agent.
+  </summary>
+  <pattern>
+  Ensign dispatches that nest further Agent calls should expect the Agent tool to be absent in both bare-mode and team-mode dispatches. Team mode does NOT change the subagent tool surface. Custom-named agents like ensign / researcher / task-executor / code-explorer dispatched by an ensign ALSO inherit this constraint -- their tool surface is determined by the dispatch context, not by their own frontmatter when running as a nested subagent.
+  </pattern>
+  <proposed_rule>
+  Any skill that documents "you can dispatch via Agent tool" for an ensign caller MUST verify tool availability at runtime and include a fallback path (inline serial execution in caller context) for when Agent is unavailable. Plan-stage graceful degradation is documented via `plan-checker-prompt.md:100-110` Dim 7 stub; the same pattern should be applied to build-plan Step 2 researcher dispatch AND to build-execute Step 4 task-executor dispatch. The Q-5 revised framing in entity 062 clarify ("custom-named agents inherit full tool surface") applies only to top-level agents that ARE the dispatch target, not to ensigns that dispatch THROUGH them.
+  </proposed_rule>
+  <three_question_test>
+  <q1>Would this rule apply to a skill we might write 3 months from now? YES -- any orchestrator skill dispatched via ensign faces the same constraint.</q1>
+  <q2>Is this rule actionable? YES -- skill authors can add "check Agent availability via ToolSearch" as the first action in their dispatch step.</q2>
+  <q3>Does this rule replace or supersede an existing one? PARTIAL -- it corrects the Q-5 revised framing's assumption that ensign context has Agent tool access. The Q-5 conclusion about top-level custom agents remains valid; the inference about nested dispatch from ensign does not.</q3>
+  </three_question_test>
+  <evidence>
+  Two live dispatches in entity 062: (a) plan stage bare-mode ensign ran ToolSearch select:Agent, got "No matching deferred tools found", fell back to inline serial research -- captured in plan Stage Report Dispatch Gaps subsection; (b) execute stage team-mode ensign ran the same probe, got the same result, fell back to inline serial task execution of all 11 wave tasks. Both dispatches completed successfully via the inline fallback, but both burned caller context and bypassed wave-parallelism. Third data point: when fetching the Skill tool schema via ToolSearch select:Skill, it DID load -- proving Skill is a deferred-but-searchable tool, whereas Agent is entirely absent from the deferred tool registry in this context.
+  </evidence>
+  <suggested_target_file>
+  skills/build-plan/SKILL.md Step 2 fallback note + skills/build-execute/SKILL.md Step 4 fallback note
+  </suggested_target_file>
+</capture>
+
+<capture id="KC-062-2" severity="MEDIUM" root="DOC" source_stage="execute" source_date="2026-04-12">
+  <summary>
+  Thin wrapper agent pattern for external skills (researcher / task-executor / code-explorer / trailofbits reviewers) is now the canonical way to integrate third-party plugins as parallel-dispatchable subagents. Entity 062 shipped 5 concrete instances of this pattern in a single wave (1 in-plugin code-explorer + 4 trailofbits wrappers), validating that the pattern scales beyond the researcher/task-executor precedent.
+  </summary>
+  <pattern>
+  Create `agents/<name>.md` (15-22 lines) with `skills: ["<namespace>:<skill>"]` frontmatter preloading exactly one external skill. The agent file is the Agent-tool-dispatchable surface; the skill is where the actual logic lives. Tool allowlist excludes `Agent` (leaf-only). For trailofbits wrappers specifically: `tools: Read, Grep, Glob, Skill` (the Skill tool is needed because the underlying trailofbits skill may itself invoke nested Skill calls -- verify per plugin).
+  </pattern>
+  <proposed_rule>
+  Whenever a skill-based third-party plugin needs to be dispatched in parallel with other reviewers/executors from an orchestrator skill, wrap it in a thin agent file. Do NOT invoke via direct Skill() from the orchestrator unless the skill is single-threaded (e.g., knowledge-capture Step 4). The wrapper pattern gives you: (a) fresh context isolation per dispatch, (b) parallel dispatch via Agent tool, (c) Phase E Guiding Principle #5 compliance, (d) symmetric authoring style across all parallel-dispatch sites.
+  </proposed_rule>
+  <three_question_test>
+  <q1>Would this rule apply to a skill we might write 3 months from now? YES -- future plugin integrations follow the same pattern.</q1>
+  <q2>Is this rule actionable? YES -- 5 concrete examples shipped in this entity (code-explorer + 4 trailofbits reviewers), plus the 2 pre-existing precedents (researcher, task-executor).</q2>
+  <q3>Does this rule replace or supersede an existing one? NO -- extends existing researcher/task-executor pattern to the trailofbits subset and to the new in-plugin code-explorer primitive.</q3>
+  </three_question_test>
+  <evidence>
+  Entity 062 Option Comparison B-1 selected Option C (thin wrapper agents) over A (direct Skill calls) and B (nested Skill from pr-review-toolkit). Five wrappers shipped in Wave 1 Tasks 2+4 (agents/code-explorer.md + agents/sharp-edges-reviewer.md + agents/variant-analysis-reviewer.md + agents/insecure-defaults-reviewer.md + agents/differential-review-reviewer.md). Pattern generalizes: the wrapper pattern is the canonical integration point for any external plugin the spacedock pipeline needs to dispatch in parallel.
+  </evidence>
+  <suggested_target_file>
+  references/claude-ensign-runtime.md or skills/build-review/SKILL.md Step 2 (canonical thin-wrapper dispatch pattern documentation)
+  </suggested_target_file>
+</capture>
