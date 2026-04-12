@@ -93,10 +93,12 @@ Dispatch the full fan of external review agents in **one single message** so the
 - `pr-review-toolkit:pr-test-analyzer` -- test coverage
 - `pr-review-toolkit:type-design-analyzer` -- type encapsulation
 - `pr-review-toolkit:code-simplifier` -- complexity
-- `trailofbits:differential-review` -- git-history-aware review
-- `trailofbits:sharp-edges` -- footgun API design
+- `spacedock:sharp-edges-reviewer` -- footgun API design (wraps `sharp-edges:sharp-edges` skill)
+- `spacedock:variant-analysis-reviewer` -- variant-bug hunting from seed patterns (wraps `variant-analysis:variant-analysis` skill)
+- `spacedock:insecure-defaults-reviewer` -- fail-open defaults / hardcoded secrets (wraps `insecure-defaults:insecure-defaults` skill)
+- `spacedock:differential-review-reviewer` -- git-history-aware differential review (wraps `differential-review:differential-review` skill)
 
-**Architectural note -- trailofbits agent identifiers are unverified at skill-authoring time.** Per spec line 351-353, "exact trailofbits agent identifiers to be confirmed at implementation time (plugin names ≠ agent names; verify via plugin discovery before writing dispatch code)." At Phase E Plan 2 Wave 3 authoring, the trailofbits plugin identifiers above are best-guess placeholders. Before dispatching in Step 2, verify the exact `subagent_type` strings via plugin discovery (Skill tool listing or documented plugin manifest). If an identifier resolves incorrectly, record the mismatch in the Stage Report's `### Dispatch Gaps` subsection and proceed with the agents that did resolve. Do NOT hardcode trailofbits names as if they were load-bearing; treat them as TBD.
+**Security-review integration model.** Per entity 062 (Phase E Plan 4) clarify decision (2026-04-12), the 4 `spacedock:*-reviewer` entries above are thin wrapper agents. Each wrapper agent file (`agents/{name}-reviewer.md`) preloads exactly one security-review skill via `skills: ["plugin:skill"]` frontmatter -- symmetric to how `agents/researcher.md` preloads `spacedock:build-research`. Dispatch happens via the standard parallel-subagent path used by the pr-review-toolkit entries above, NOT via direct `Skill()` invocations from this orchestrator. This preserves Phase E Guiding Principle #5 (fresh context via subagent dispatch) for the security-review subset while keeping build-review orchestrator context clean. `mutation-testing:mutation-testing` is deliberately NOT dispatched here per entity 062 Q-6 (it is a campaign config helper, not a diff reviewer); the plugin remains enabled in `.claude/settings.json` for direct invocation outside review.
 
 **Leaf dispatch rule.** Each dispatched agent runs as a nested subagent and CANNOT itself dispatch further Agent calls. Do NOT ask any review agent to "dispatch a sub-reviewer" or "delegate to another agent". See `subagent-cannot-nest-agent-dispatch.md` memory. Design every dispatch as a leaf operation.
 
