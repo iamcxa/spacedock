@@ -11,7 +11,7 @@ verdict:
 score: 0.80
 worktree: .worktrees/spacedock-ensign-review-stage-parallel-skill-dispatch
 issue:
-pr:
+pr: "#30"
 intent: feature
 scale: Medium
 project: spacedock
