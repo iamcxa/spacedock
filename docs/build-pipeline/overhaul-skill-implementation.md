@@ -33,7 +33,7 @@ Key deliverables:
 Constraints:
 - Must preserve engine-freeze principle (overhaul always lags engine, never leads)
 - Must handle the 6 `manual_edit` ops in the reference recipe — either implement the missing primitives or document which are deferred
-- Entity stops at clarify (same bootstrap recursion as entity 061 — captain bridges to writing-plans for execution structure)
+- ~~Entity stops at clarify~~ CORRECTED: no bootstrap recursion -- build-plan can plan overhaul normally. Proceed through full FO pipeline.
 
 ## Captain Context Snapshot
 
@@ -59,7 +59,7 @@ Constraints:
 - **`commissioned-by:` gating**: overhaul MUST refuse to operate on files lacking `commissioned-by:` frontmatter. This prevents accidental overhaul of entity files, archive files, or non-workflow docs. Source: SKILL.md line 123.
 - **Phase 3 approval gate is non-skippable**: diff preview MUST be presented to captain before any writes. No auto-advance, no "looks safe" shortcut. Source: SKILL.md line 122, `plan-payloads-are-templates.md` memory (recipes go stale).
 - **Single atomic Write**: Phase 4 writes the entire transformed README in one `Write` call. No partial writes, no Edit-based incremental patches that could leave the file in an inconsistent state if interrupted. Source: SKILL.md line 108.
-- **Stop-at-clarify**: this entity MUST NOT advance past clarify. Captain bridges to writing-plans for execution structure. Source: directive constraint, same bootstrap pattern as entity 061.
+- **~~Stop-at-clarify~~** REMOVED: originally wrote "same bootstrap pattern as entity 061" but that was incorrect pattern over-application. Entity 061 had genuine bootstrap recursion (building build-plan itself). Entity 066 builds the overhaul skill -- build-plan can plan this normally. Proceed through full FO pipeline.
 
 **RATIONALE**: The prose-driven approach is the natural fit because overhaul is a Claude Code skill -- its "runtime" is Claude reading the SKILL.md and executing steps, same as every other build-* skill in the pipeline. The existing design skeleton already describes the 4 phases in sufficient detail for Claude to execute them; the implementation work is (a) tightening the prose to be unambiguous enough for reliable execution, (b) adding the 3 missing recipe primitives to recipe-format.md, (c) writing pressure tests that force-choice the key discipline boundaries (engine-freeze, validation-before-write, approval-gate-before-apply), and (d) validating via reference recipe replay. The TypeScript alternative would be more deterministic but introduces a maintenance and distribution surface that contradicts the "skill is just a markdown file" design philosophy proven by Phase E's 8 shipped skills.
 
