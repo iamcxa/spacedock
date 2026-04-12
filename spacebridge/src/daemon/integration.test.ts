@@ -50,7 +50,7 @@ async function waitForSocket(path: string, timeoutMs = 5000): Promise<void> {
   throw new Error(`waitForSocket timed out (${path})`);
 }
 
-function makeClient(sessionId = randomUUID()) {
+function makeClient(sessionId: string = randomUUID()) {
   return createSocketClient({
     socketPath: socketPath(),
     sessionId,
