@@ -19,6 +19,16 @@
 | 6 | Verification Rigor | 0.50 | yes -- (partially covered by roadmap entity) |
 | 7 | Audit Trail | 0.25 | no -- INDEX.md + CONTRACTS.md partially cover roadmap tracking |
 
+## All-Comparisons Aggregate (Entity 068 GSD First Pass)
+
+| Comparison | Highest Gap Score | Top Dimension | Entity Draft? |
+|------------|------------------|---------------|---------------|
+| **gsd-roadmap vs build-flow** (this run) | **1.0** | **All 5 dimensions (complete absence)** | **yes -- build-flow-roadmap-orchestration** |
+| gsd-discuss-assumptions vs build-explore | 0.75 | Context Strategy (domain-aware gray areas) | yes -- build-explore-domain-aware-gray-areas |
+| gsd-discuss-phase vs build-clarify | 0.75 | Interaction Model (--auto/--power modes) | yes -- build-clarify-interaction-modes |
+| gsd-research-phase vs build-research | 0.50 | Research Depth + Checkpoint/Continuation | yes -- 2 entities |
+| gsd-plan-phase vs build-plan | 0.50 | Context Strategy (cross-entity plan context) | yes -- cross-entity context awareness |
+
 ---
 
 ## Source Summary: gsd-new-project + gsd-new-milestone

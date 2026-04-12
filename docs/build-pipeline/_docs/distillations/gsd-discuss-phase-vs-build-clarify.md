@@ -19,6 +19,16 @@
 | 6 | Research Depth | 0.00 | no evidence of gap (both are non-research skills) |
 | 7 | Execution Architecture | 0.00 | no evidence of gap (both single-context serial) |
 
+## All-Comparisons Aggregate (Entity 068 GSD First Pass)
+
+| Comparison | Highest Gap Score | Top Dimension | Entity Draft? |
+|------------|------------------|---------------|---------------|
+| gsd-roadmap vs build-flow | 1.0 | All 5 dimensions (complete absence) | yes -- build-flow-roadmap-orchestration |
+| gsd-discuss-assumptions vs build-explore | 0.75 | Context Strategy (domain-aware gray areas) | yes -- build-explore-domain-aware-gray-areas |
+| **gsd-discuss-phase vs build-clarify** (this run) | **0.75** | **Interaction Model (--auto/--power modes)** | **yes -- build-clarify-interaction-modes** |
+| gsd-research-phase vs build-research | 0.50 | Research Depth + Checkpoint/Continuation | yes -- 2 entities |
+| gsd-plan-phase vs build-plan | 0.50 | Context Strategy (cross-entity plan context) | yes -- cross-entity context awareness |
+
 ---
 
 ## Source Summary: gsd-discuss-phase
