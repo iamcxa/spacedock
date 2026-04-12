@@ -194,6 +194,76 @@ Validation: every stage in the new list must exist in the projected `states[]` a
 
 The `anchor` field is a substring that uniquely identifies the start of the block to replace. Overhaul locates it, finds the enclosing paragraph boundary, and swaps the full block. If the anchor is not unique, recipe validation fails.
 
+---
+
+**`replace-table-block`** — Replace an entire markdown table identified by a unique substring in its header row.
+
+```yaml
+- op: replace-table-block
+  anchor: "| Stage | Model | Rationale |"
+  new_content: |
+    | Stage | Model | Rationale |
+    |-------|-------|-----------|
+    | brainstorm | sonnet | FO-inline triage + approach pathing |
+    | explore | sonnet | Codebase mapping + contradiction annotation |
+    | clarify | sonnet | Captain-interactive Q&A with AskUserQuestion |
+    | plan | opus | Research-backed plan, wave graph, task decomposition |
+    | execute | sonnet | Wave-parallel task dispatch via task-executor |
+    | quality | haiku | Acceptance criteria + structural regression checks |
+    | review | sonnet | Judgment-based code review in parallel |
+    | uat | sonnet | UAT runner + captain sign-off gate |
+  reason: Phase 3 pipeline restructure -- update Model Dispatch table to 10-stage shape
+```
+
+Overhaul locates the table by finding the first line that contains `anchor` as a substring. The table extent is: from that header row through the separator row, all data rows, and the trailing blank line. The entire extent is replaced with `new_content`. If the anchor substring is not found or matches more than one table header, recipe validation fails.
+
+---
+
+**`update-yaml-block`** — Apply field-level operations to a YAML code block within a named section.
+
+```yaml
+- op: update-yaml-block
+  section: "## Schema"
+  block_index: 0
+  operations:
+    - set: { field: "uat_pending_count:", value: "" }
+    - remove: { field: "profile:" }
+  reason: Phase 3 -- remove profile field, add uat_pending_count to schema example
+```
+
+Overhaul locates the section by finding the line exactly matching `{section}` (the field value already includes `## `), then finds the `block_index`-th fenced code block with ` ```yaml ` language tag within that section. Within the code fence boundaries, `set` adds or replaces the named field line, and `remove` deletes the field line. Operates line-by-line; does not parse nested YAML structure. If the section heading is not found, or the block index is out of range, recipe validation fails.
+
+---
+
+**`update-section`** — Replace an entire H2 section (from `## Heading` to the next `## Heading` at the same level, or end of body).
+
+```yaml
+- op: update-section
+  heading: "## Prerequisites"
+  new_content: |
+    ## Prerequisites
+
+    ### Required -- core pipeline cannot function without these
+
+    | Skill | Purpose |
+    |-------|---------|
+    | spacedock:build-plan | Plan orchestrator |
+    | spacedock:build-execute | Execute orchestrator |
+  reason: Phase 3 pipeline restructure -- rebuild prerequisites for 10-stage pipeline
+```
+
+Unlike `replace-body-subsection` which targets H3 (`###`) headings, this targets H2 (`##`) headings. The section extent is: from the `{heading}` line through the line before the next `##` line at the same level (or end of file). The entire extent is replaced with `new_content`. If the heading is not found (field value already includes `## `; matched exactly), recipe validation fails.
+
+---
+
+### Deferred Primitives
+
+The following primitive is documented but not yet implemented. Recipes may reference it as `manual_edit` with a note citing this deferral.
+
+**`update-table-row`** (deferred -- entity 066 O-1) — Find a specific row in a markdown table by matching the first column value, then update individual cells. Deferred because row-level matching in pipe-delimited tables is complex for low reuse value relative to `replace-table-block`. Recipes that need single-row updates should use `replace-table-block` for the whole table, or mark the edit as `manual_edit` with a note referencing this deferral.
+
+---
+
 ## Recipe Authoring Conventions
 
 1. **Write operations in logical groups**: frontmatter ops first (stage structure), then body ops (subsection rewrites), then narrative/prose updates. This order matches Phase 4 apply ordering.
@@ -220,9 +290,21 @@ validation:
     - spacedock:build-quality
     - spacedock:build-review
     - spacedock:build-uat
+  expected_stage_names:  # optional
+    - brainstorm
+    - explore
+    - clarify
+    - plan
+    - execute
+    - quality
+    - review
+    - uat
+    - shipped
 ```
 
 Post-apply, overhaul re-reads the target README and verifies the expected state. Mismatch triggers a validation error and (future) rollback workflow.
+
+`expected_stage_names` is an optional list of stage names expected after transformation. If present, SKILL.md Step 4.3e validates that the exact set of stage names in the written `states[]` matches — same names, same count, order may vary. Use this when the recipe makes structural additions or removals and the author wants an explicit guard against silent name drift.
 
 ## Forbidden Operations
 

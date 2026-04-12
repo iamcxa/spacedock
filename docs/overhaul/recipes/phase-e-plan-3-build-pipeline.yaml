@@ -275,57 +275,116 @@ operations:
     reason: Spec §Stage Definitions / Shipped (lines 444-456) -- mod-driven terminal
 
   # ============================================================
-  # Stage 7: Free-form body edits (future primitives needed)
+  # Stage 7: Body edits using new primitives (entity 066)
   # ============================================================
 
-  - op: manual_edit
-    notes: |
-      Update intro paragraph (anchor: "A development pipeline that takes a
-      brainstormed idea"): change "14 stages" framing to "10 stages", update
-      stage list phrasing to match new pipeline shape. Future primitive:
-      update-prose-block with paragraph boundary detection.
+  - op: update-prose-block
+    anchor: "A development pipeline that takes a brainstormed idea"
+    new_content: |
+      A 10-stage development pipeline that takes a brainstormed idea through codebase exploration, clarification, planning with integrated multi-source research, wave-parallel implementation, mechanical quality gates, judgment-based code review, automated-plus-interactive UAT, and mod-driven PR lifecycle. Designed for use across projects: Spacedock, Carlove, Recce, and others.
 
-  - op: manual_edit
-    notes: |
-      Replace Model Dispatch table (anchor: "| Stage | Model | Rationale |"):
-      drop rows for research/seeding/e2e/docs/pr-draft/pr-review, add rows
-      for review/uat, flip execute row from opus to sonnet, add brainstorm
-      row (previously missing despite brainstorm having model: sonnet).
-      Future primitive: replace-table-block (find table by header row, swap
-      full table including header, rows, and trailing blank line).
+      Features enter this workflow with a completed brainstorming spec (produced by `/build` skill's interactive Phase I). The spec contains the approach, alternatives considered, guardrails, and acceptance criteria. From here, the pipeline is fully autonomous — the first officer dispatches ensigns through each stage, only escalating to the captain at conditional gates (plan architecture review, review CRITICAL/HIGH findings, UAT sign-off) when issues arise.
+    reason: |
+      Update intro paragraph from 14-stage to 10-stage framing, update stage list
+      description to match Phase E pipeline shape. Previously a manual_edit op;
+      converted to update-prose-block (entity 066 -- primitive now exists in
+      recipe-format.md, already existed as of Phase E Plan 3 per A-6).
 
-  - op: manual_edit
-    notes: |
-      Replace entire Prerequisites section. Tables restructured for 10-stage
-      pipeline: kc-pr-flow row removed entirely (pr-draft and pr-review no
-      longer exist -- moved to shipped mod); pr-review-toolkit now cites
-      review stage; trailofbits cites review; context7 cites plan (via
-      researcher); e2e-pipeline cites uat; expo-accessibility cites uat;
-      agent-browser cites uat. Verification code block updated with new
-      skill lookup examples. Future primitive: replace-section (like
-      replace-body-subsection but for H2 headings).
+  - op: replace-table-block
+    anchor: "| Stage | Model | Rationale |"
+    new_content: |
+      | Stage | Model | Rationale |
+      |-------|-------|-----------|
+      | brainstorm | sonnet | FO-inline triage + approach pathing |
+      | explore | sonnet | Codebase search and classification — no deep reasoning needed |
+      | plan | **opus** | Orchestrates parallel research, writes PLAN/UAT Spec/Validation Map, runs plan-checker loop; architecture decisions determine downstream quality |
+      | execute | sonnet | Orchestrator only — dispatches per-task subagents with `model:` hint (haiku/sonnet/opus per task) for cost-optimized implementation |
+      | quality | haiku | Parsing CLI output (bun test / lint / tsc / build); no reasoning |
+      | review | sonnet | Classifies and synthesizes parallel review agent outputs into a verdict |
+      | uat | sonnet | Orchestrates e2e-pipeline + captain AskUserQuestion flow |
+    reason: |
+      Replace Model Dispatch table: drop rows for research/seeding/e2e/docs/pr-draft/
+      pr-review, add rows for review/uat, flip execute from opus to sonnet, add
+      brainstorm row. Previously a manual_edit op; converted to replace-table-block
+      (entity 066 -- primitive added to recipe-format.md).
 
-  - op: manual_edit
-    notes: |
-      Schema yaml code block (inside "## Schema" section): remove `profile:`
-      field from example frontmatter. Add `uat_pending_count:` field (new in
-      Phase E). Future primitive: update-yaml-block (find code block by
-      language tag + position, surgically edit fields).
+  - op: update-section
+    heading: "## Prerequisites"
+    new_content: |
+      ## Prerequisites
+
+      ### Required — core pipeline cannot function without these
+
+      | Plugin | Install | Used by |
+      |--------|---------|---------|
+      | **superpowers** | `/plugin marketplace add superpowers` | explore (systematic-debugging), plan (writing-plans), execute (executing-plans) |
+
+      ### Required for full pipeline — review and UAT stages
+
+      | Plugin | Install | Used by | Without it |
+      |--------|---------|---------|------------|
+      | **pr-review-toolkit** | Bundled with superpowers | review (code-reviewer, silent-failure-hunter, comment-analyzer, pr-test-analyzer, type-design-analyzer, code-simplifier) | Review stage falls back to inline pre-scan only (CLAUDE.md compliance, stale refs, import graph, plan consistency) |
+      | **e2e-pipeline** | `/plugin add local ~/.claude/plugins/local/e2e-pipeline` | uat (e2e-map, e2e-flow, e2e-test) | UAT browser items skipped with warning; CLI/API/interactive items still run |
+
+      ### Optional — enhance quality but not required
+
+      | Plugin | Install | Used by | Without it |
+      |--------|---------|---------|------------|
+      | **trailofbits/skills** | `/plugin marketplace add trailofbits/skills` | review (differential-review, sharp-edges, variant-analysis) | Security-aware review dispatches skipped with `SKIP:` in Stage Report |
+      | **context7** MCP server | `.mcp.json` configuration | plan (via researcher agent for library doc verification) | Research falls back to Explorer (codebase) + Web Search only (two-source instead of three-source) |
+
+      ### Project-specific — only needed for certain target projects
+
+      | Plugin/Skill | Used by | When needed |
+      |--------------|---------|-------------|
+      | **expo-accessibility** | uat (accessibility audit) | Expo/React Native projects only |
+      | **agent-browser** | uat (browser automation) | Projects with web UI |
+
+      ### Verification
+
+      FO can verify prerequisites at startup by checking skill availability:
+      ```
+      Skill: "superpowers:writing-plans"         → if not found, STOP: "superpowers plugin required"
+      Skill: "pr-review-toolkit:code-reviewer"   → if not found, WARN: "review stage will run pre-scan only"
+      Skill: "e2e-pipeline:e2e-test"             → if not found, WARN: "uat browser items will be skipped"
+      Skill: "static-analysis"                   → if not found, NOTE: "trailofbits/skills not installed, security-aware review disabled"
+      ```
+    reason: |
+      Replace entire Prerequisites section: kc-pr-flow row removed (pr-draft/pr-review
+      moved to shipped mod), pr-review-toolkit/trailofbits cite review stage,
+      e2e-pipeline/expo-accessibility/agent-browser cite uat. Previously a manual_edit
+      op; converted to update-section (entity 066 -- primitive added to recipe-format.md).
+
+  - op: update-yaml-block
+    section: "## Schema"
+    block_index: 0
+    operations:
+      - remove: { field: "profile:" }
+      - set: { field: "uat_pending_count:", value: "" }
+    reason: |
+      Schema yaml code block: remove profile: field (profiles concept retired),
+      add uat_pending_count: field (new in Phase E). Previously a manual_edit op;
+      converted to update-yaml-block (entity 066 -- primitive added to recipe-format.md).
 
   - op: manual_edit
     notes: |
       Field Reference table (inside "### Field Reference" H3): remove the
       `| profile | ... |` row; update the `| status | ... |` row enum values
-      to match new states[]. Add `| uat_pending_count | ... |` row. Future
-      primitive: update-table-row (find table + row by first column match,
-      update specific cells).
+      to match new states[]. Add `| uat_pending_count | ... |` row.
+      DEFERRED: requires update-table-row primitive (entity 066 O-1 -- deferred
+      for low reuse value relative to replace-table-block; see
+      skills/overhaul/references/recipe-format.md Deferred Primitives section).
 
-  - op: manual_edit
-    notes: |
-      Feature Template yaml code block (inside "## Feature Template" section,
-      this is a large embedded example of a feature file): remove `profile:`
-      field from the yaml frontmatter example, add `uat_pending_count:`.
-      Future primitive: same as update-yaml-block above.
+  - op: update-yaml-block
+    section: "## Feature Template"
+    block_index: 0
+    operations:
+      - remove: { field: "profile:" }
+      - set: { field: "uat_pending_count:", value: "" }
+    reason: |
+      Feature Template yaml code block: remove profile: field from example
+      frontmatter, add uat_pending_count:. Previously a manual_edit op;
+      converted to update-yaml-block (entity 066 -- same primitive as Schema block).
 
 validation:
   expected_stage_count: 10
@@ -353,30 +412,34 @@ validation:
 notes: |
   This recipe is the first reference artifact under docs/overhaul/recipes/.
   It was authored AFTER the manual edit was applied to docs/build-pipeline/
-  README.md, as a record of what was done and as test input for the future
-  overhaul skill implementation (Phase E+1).
+  README.md, as a record of what was done and as test input for the overhaul
+  skill implementation (entity 066).
 
-  Validation strategy for Phase E+1 overhaul implementation:
-    1. Check out commit {PRE_EDIT_SHA} -- the state before Phase 3 manual edit
-    2. Replay this recipe via `overhaul <README path> <recipe path>` (future)
-    3. Diff result against commit {POST_EDIT_SHA} (Phase 3 commit)
-    4. Byte-equal match -> overhaul implementation is correct
-    5. Non-match -> either recipe is under-specified or overhaul has bugs
+  Entity 066 primitive conversion status (2026-04-12):
+    Originally 6 manual_edit ops. 5 of 6 converted to proper primitives:
+    - manual_edit #1 (intro paragraph) -> update-prose-block (primitive already existed)
+    - manual_edit #2 (Model Dispatch table) -> replace-table-block (added entity 066)
+    - manual_edit #3 (Prerequisites section) -> update-section (added entity 066)
+    - manual_edit #4 (Schema yaml block) -> update-yaml-block (added entity 066)
+    - manual_edit #5 (Field Reference table rows) -> DEFERRED (update-table-row, entity 066 O-1)
+    - manual_edit #6 (Feature Template yaml block) -> update-yaml-block (added entity 066)
 
-  Open design questions deferred to Phase E+1 overhaul implementation:
-    - How does replace-body-subsection handle subsections with nested tables?
-      (The old quality subsection had many nested tables; replace-body-subsection
-      needs to detect the H3 boundary correctly.)
-    - Should cross-reference updates (Model Dispatch row, Schema enum) be
-      automatic side-effects of remove-stage / rename-stage / add-stage, or
-      explicit ops in the recipe? Current recipe format says automatic,
-      but this recipe lists them as manual_edit ops because the side-effect
-      machinery doesn't exist yet.
-    - How does the recipe format express "remove yaml field from embedded
-      code block"? The Feature Template section is a code block containing
-      sample feature frontmatter -- editing it requires reaching into the
-      code block and editing yaml inside. Not a primitive yet.
+  Validation strategy for overhaul implementation:
+    Pre-edit SHA: 9d4e535 (docs/build-pipeline/README.md before Phase 3)
+    Post-edit SHA: 2885ab2 (feat(phase-e-plan-3): overhaul build-pipeline README)
+    1. git show 9d4e535:docs/build-pipeline/README.md > /tmp/pre.md
+    2. Replay this recipe via overhaul skill
+    3. diff result against git show 2885ab2:docs/build-pipeline/README.md
+    4. Expected: zero diff except in "### Field Reference" table area (the 1
+       remaining manual_edit op -- update-table-row deferred). The Field
+       Reference deviation scope: profile: row not removed, status: enum not
+       updated, uat_pending_count: row not added.
 
-  None of these unknowns block Phase 3 shipping (manual edit is complete) or
-  Phase 4 dogfood (pipeline is now wired with Phase E skills). They only
-  block overhaul Phase E+1 implementation, which is a separate work item.
+  Resolved design questions (entity 066):
+    - replace-body-subsection H3 boundary: heading-level detection (from
+      ### h to next ### h at same level). Confirmed A-4.
+    - Cross-reference updates (Model Dispatch, Schema enum) are automatic
+      side-effects of remove-stage/rename-stage/add-stage per SKILL.md
+      Step 4 Pass C. Not explicit ops in the recipe.
+    - Yaml field edits in embedded code blocks: update-yaml-block primitive
+      (section + block_index + field-level ops). Shipped entity 066.

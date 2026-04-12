@@ -54,11 +54,23 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | kc-pr-flow-mod-integration | shipped | Workflow-specific activation of pr-review-loop library mod | ✅ final | 2026-04-12 |
 
+### docs/build-pipeline/overhaul-skill-implementation.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| overhaul-skill-implementation | plan | Entity body writes Research Findings PLAN UAT Validation Map Stage Reports | planned | 2026-04-12 |
+
 ### docs/build-pipeline/README.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Correct pr-review-toolkit bundling claim at line 183 | ✅ final | 2026-04-12 |
+
+### docs/overhaul/recipes/phase-e-plan-3-build-pipeline.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| overhaul-skill-implementation | plan | Convert 5 of 6 manual_edit ops to proper recipe primitives | planned | 2026-04-12 |
 
 ### docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md
 
@@ -102,6 +114,18 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | New subroutine skill for codebase mapping symmetric to build-research | ✅ final | 2026-04-12 |
 
+### skills/overhaul/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| overhaul-skill-implementation | plan | Rewrite design skeleton into full pseudo-code implementation (Phases 1-4) | planned | 2026-04-12 |
+
+### skills/overhaul/references/recipe-format.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| overhaul-skill-implementation | plan | Add 3 new recipe primitives (replace-table-block, update-yaml-block, update-section) | planned | 2026-04-12 |
+
 ### tests/fixtures/pr-review-loop-pipeline/README.md
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -137,6 +161,18 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Pressure test YAML for 3 trailofbits integration contract scenarios | ✅ final | 2026-04-12 |
+
+### tests/pressure/overhaul.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| overhaul-skill-implementation | plan | Pressure test YAML for 4 overhaul discipline scenarios | planned | 2026-04-12 |
+
+### tests/pressure/README.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| overhaul-skill-implementation | plan | Update file index table with overhaul entry | planned | 2026-04-12 |
 
 ## Recently Retired (last 30 days)
 

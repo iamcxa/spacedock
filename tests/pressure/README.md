@@ -40,8 +40,9 @@ text). See the GSD todo for design notes.
 | `knowledge-capture.yaml` | `skills/knowledge-capture/SKILL.md` + 5 references | 3 | (no fix needed — all first-try green) |
 | `workflow-index-maintainer.yaml` | `mods/workflow-index-maintainer.md` | 3 | `0d7d2e1` |
 | `first-officer-shared-core.yaml` | `references/first-officer-shared-core.md` step 3.6 | 3 | (no fix needed) |
+| `overhaul.yaml` | `skills/overhaul/SKILL.md` + 1 reference | 4 | (pending -- entity 066) |
 
-**Total: 12 unique scenarios.** 5 of them have round-2 history entries
+**Total: 16 unique scenarios.** 5 of them have round-2 history entries
 (re-tested after fix-forward commits), giving 17+ total subagent dispatches
 captured in the history fields.
 
