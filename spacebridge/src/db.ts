@@ -9,6 +9,7 @@ import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { homedir } from "node:os";
 import * as schema from "./schema";
 
 export type SpacebridgeDb = ReturnType<typeof drizzle<typeof schema>>;
@@ -97,6 +98,7 @@ function applySchema(sqlite: Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       token TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
+      hash_algorithm TEXT DEFAULT 'argon2id',
       entity_paths TEXT NOT NULL,
       stages TEXT NOT NULL,
       label TEXT NOT NULL,
@@ -111,6 +113,5 @@ function applySchema(sqlite: Database): void {
 }
 
 function defaultDbPath(): string {
-  const home = process.env.HOME ?? process.env.USERPROFILE ?? ".";
-  return `${home}/.spacedock/spacebridge.db`;
+  return `${homedir()}/.spacedock/spacebridge.db`;
 }
