@@ -100,7 +100,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-flow-tdd-discipline | plan | Add given/when/then AC guidance to step 4 for TDD-friendly spec generation | planned | 2026-04-12 |
+| build-flow-tdd-discipline | execute | Add given/when/then AC guidance to step 4 for TDD-friendly spec generation | in-flight | 2026-04-12 |
 
 ### skills/build-explore/SKILL.md
 
@@ -112,13 +112,13 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-flow-tdd-discipline | plan | Add test_first attribute to task schema and TDD plan intelligence in step 4a | planned | 2026-04-12 |
+| build-flow-tdd-discipline | execute | Add test_first attribute to task schema and TDD plan intelligence in step 4a | in-flight | 2026-04-12 |
 
 ### skills/build-plan/references/plan-checker-prompt.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-flow-tdd-discipline | plan | Add dimension 6d test_first validation sub-rule for test file and TDD skill checks | planned | 2026-04-12 |
+| build-flow-tdd-discipline | execute | Add dimension 6d test_first validation sub-rule for test file and TDD skill checks | in-flight | 2026-04-12 |
 
 ### skills/build-review/SKILL.md
 
@@ -148,7 +148,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-flow-tdd-discipline | plan | Add TDD Mode RED-GREEN-REFACTOR sub-cycle activated by test_first flag | planned | 2026-04-12 |
+| build-flow-tdd-discipline | execute | Add TDD Mode RED-GREEN-REFACTOR sub-cycle activated by test_first flag | in-flight | 2026-04-12 |
 
 ### tests/fixtures/pr-review-loop-pipeline/README.md
 
@@ -190,19 +190,19 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-flow-tdd-discipline | plan | Pressure test: task without test_first skips TDD cycle entirely | planned | 2026-04-12 |
+| build-flow-tdd-discipline | execute | Pressure test: task without test_first skips TDD cycle entirely | in-flight | 2026-04-12 |
 
 ### tests/pressure/build-tdd-plan-checker-missing-test-file.yaml
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-flow-tdd-discipline | plan | Pressure test: plan-checker 6d flags test_first task missing test file | planned | 2026-04-12 |
+| build-flow-tdd-discipline | execute | Pressure test: plan-checker 6d flags test_first task missing test file | in-flight | 2026-04-12 |
 
 ### tests/pressure/build-tdd-vacuous-test-detection.yaml
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-flow-tdd-discipline | plan | Pressure test: task-executor detects vacuous test passing before implementation | planned | 2026-04-12 |
+| build-flow-tdd-discipline | execute | Pressure test: task-executor detects vacuous test passing before implementation | in-flight | 2026-04-12 |
 
 ### tests/pressure/overhaul.yaml
 
@@ -215,7 +215,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | overhaul-skill-implementation | plan | Update file index table with overhaul entry | planned | 2026-04-12 |
-| build-flow-tdd-discipline | plan | Update file index table with 3 TDD pressure test entries | planned | 2026-04-12 |
+| build-flow-tdd-discipline | execute | Update file index table with 3 TDD pressure test entries | in-flight | 2026-04-12 |
 
 ## Recently Retired (last 30 days)
 
