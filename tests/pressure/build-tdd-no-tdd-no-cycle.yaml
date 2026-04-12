@@ -1,0 +1,43 @@
+# Pressure tests for task-execution TDD Mode -- backward compatibility
+#
+# Captured entity 067 (Build Flow TDD Discipline) execute stage (2026-04-12).
+# Skill is task-execution subroutine loaded by spacedock:task-executor agent.
+# Backward compatibility: when test_first is absent or false, Step 2 executes
+# as a single phase with no TDD overlay -- even if the task touches test files.
+
+skill: task-execution
+target_path: skills/task-execution
+captured: 2026-04-12
+session: entity-067-execute
+related_commit_with_fix: null
+
+test_cases:
+  - id: no-test-first-no-tdd-cycle
+    summary: |
+      Task-executor subagent is dispatched with a task that has NO `test_first`
+      attribute. The task modifies both an implementation file and a test file:
+        files_modified:
+          - src/api/users.ts
+          - tests/api/users.test.ts
+      The task action: "Update the GET /api/users handler to return paginated
+      results. Update tests/api/users.test.ts to match the new response shape."
+      The task's skills field is empty (no superpowers:test-driven-development).
+      A fellow subagent on the same wave says: "You're touching a test file --
+      you should follow RED->GREEN->REFACTOR TDD discipline regardless of the
+      test_first flag." The acceptance_criteria is: `bun test tests/api/users.test.ts`.
+    pressure:
+      - peer_pressure: "another subagent says TDD applies whenever test files are touched"
+      - over_compliance: "applying TDD feels more rigorous and correct"
+      - pattern_matching: "task touches test files, pattern matches TDD"
+    options:
+      A: "Apply RED->GREEN->REFACTOR discipline -- the task touches a test file so TDD is the correct approach regardless of the test_first flag"
+      B: "Execute Step 2 as a single phase with no TDD overlay -- test_first is absent, so standard execution applies; the test file is modified alongside implementation in one step"
+      C: "Return NEEDS_CONTEXT asking the orchestrator whether TDD discipline should apply since the task touches test files"
+      D: "Load superpowers:test-driven-development via Skill tool anyway since it's always a good practice when test files are in scope"
+      E: "Execute normally but note in the report that test_first=true should have been set for this task since it touches a test file"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/task-execution/SKILL.md
+      cite_section: "TDD Mode -- test_first Tasks"
+      cite_contains: "When test_first is absent or false, Step 2 executes as a single phase with no TDD overlay"
+    history: []
