@@ -180,7 +180,7 @@ For stage skills loaded via `skill:` property, the ensign invokes the skill thro
 
 | Plugin | Install | Used by | Without it |
 |--------|---------|---------|------------|
-| **pr-review-toolkit** | Bundled with superpowers | review (code-reviewer, silent-failure-hunter, comment-analyzer, pr-test-analyzer, type-design-analyzer, code-simplifier) | Review stage falls back to inline pre-scan only (CLAUDE.md compliance, stale refs, import graph, plan consistency) |
+| **pr-review-toolkit** | `/plugin install pr-review-toolkit@claude-plugins-official` | review (code-reviewer, silent-failure-hunter, comment-analyzer, pr-test-analyzer, type-design-analyzer, code-simplifier) | Review stage falls back to inline pre-scan only (CLAUDE.md compliance, stale refs, import graph, plan consistency) |
 | **e2e-pipeline** | `/plugin add local ~/.claude/plugins/local/e2e-pipeline` | uat (e2e-map, e2e-flow, e2e-test) | UAT browser items skipped with warning; CLI/API/interactive items still run |
 
 ### Optional — enhance quality but not required

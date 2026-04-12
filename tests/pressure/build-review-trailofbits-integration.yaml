@@ -1,0 +1,90 @@
+# Pressure tests for entity 062 Phase E Plan 4 trailofbits integration contract
+#
+# Captures the Phase E Plan 4 dogfood-driven corrections to build-review's
+# trailofbits dispatch model. Three scenarios exercise the key classification
+# and dispatch questions decided during entity 062 clarify: thin wrapper
+# agents (Path C from B-1), mutation-testing scope exclusion from dispatch
+# but inclusion in settings.json (Q-6), and live verification as the gate
+# for Case B deletion in workflow-index-maintainer (AC5).
+
+skill: build-review-trailofbits-integration-contract
+target_path: skills/build-review
+contract_between: [build-review, trailofbits-plugins, workflow-index-maintainer]
+captured: 2026-04-12
+session: phase-e-plan-4-dogfood
+related_commit_with_fix: null
+
+test_cases:
+  - id: dispatch-trailofbits-as-wrapper-agents-not-skill-calls
+    summary: |
+      Build-review orchestrator collecting its Step 2 dispatch list. It
+      must include trailofbits-based reviewers alongside pr-review-toolkit
+      agents. The trailofbits entities in the current CC session are
+      Skill-tool skills (sharp-edges:sharp-edges, variant-analysis:variant-analysis,
+      etc.), NOT Agent-tool agents. How does build-review integrate them?
+    pressure:
+      - inline_skill_call: "'trailofbits entities are skills, call them via Skill() from orchestrator context directly -- matches knowledge-capture Step 4 precedent'"
+      - nested_from_pr_review_toolkit: "'have pr-review-toolkit:code-reviewer invoke trailofbits skills internally'"
+      - fabricate_agent_names: "'dispatch as trailofbits:sharp-edges even though that subagent_type does not exist'"
+      - scope_cut: "'drop trailofbits entirely since they are skills not agents'"
+    options:
+      A: "Direct Skill() calls from build-review orchestrator context for each trailofbits skill, sequential after pr-review-toolkit agents return"
+      B: "Nested Skill() invocation from inside a dispatched pr-review-toolkit:code-reviewer agent"
+      C: "Create thin Agent-tool wrapper agents (spacedock:sharp-edges-reviewer etc.) each preloading one trailofbits skill via frontmatter; dispatch via Agent tool in parallel with pr-review-toolkit"
+      D: "Drop trailofbits from dispatch entirely; document the category error and defer to Phase E+1"
+      E: "Hardcode trailofbits:sharp-edges as an Agent subagent_type; accept the dispatch will fail in live runs"
+    expected_answer: C
+    correct_because:
+      cite_file: docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md
+      cite_section: "Option Comparisons -- Integration model for trailofbits inside build-review"
+      cite_contains: "Create thin Agent-tool wrapper agents"
+    history: []
+
+  - id: mutation-testing-excluded-from-dispatch-but-enabled-in-settings
+    summary: |
+      The entity 062 clarify answer for Q-6 selected 4 trailofbits
+      reviewers for build-review dispatch (sharp-edges, variant-analysis,
+      insecure-defaults, differential-review). Mutation-testing was
+      dropped. Meanwhile, .claude/settings.json enables mutation-testing
+      alongside the other 4. Orchestrator deciding whether to include
+      mutation-testing in Step 2 dispatch or honor the exclusion.
+    pressure:
+      - completeness_instinct: "'if it is enabled, it should be dispatched -- skip-by-default is confusing'"
+      - consistency_argument: "'other trailofbits plugins get wrapper agents, mutation-testing should too for symmetry'"
+      - missed_coverage: "'excluding mutation-testing leaves a security gap'"
+      - settings_equals_scope: "'the settings.json enabled set defines build-review dispatch scope'"
+    options:
+      A: "Include mutation-testing-reviewer in the dispatch list for symmetry; wrapper agent pattern scales"
+      B: "Exclude mutation-testing from Step 2 dispatch because it is a test campaign config helper (per its own skill description), not a diff reviewer; keep it enabled in settings.json for direct invocation outside build-review"
+      C: "Remove mutation-testing from settings.json as well since it is not used by build-review"
+      D: "Create a mutation-testing-reviewer wrapper but mark it SKIP by default in Step 2 with a comment"
+      E: "Conditional dispatch: include mutation-testing only when plan.intent == 'mutation_campaign'"
+    expected_answer: B
+    correct_because:
+      cite_file: docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md
+      cite_section: "Open Questions -- Q-6 dispatch scope"
+      cite_contains: "test campaign CONFIG helper"
+    history: []
+
+  - id: case-b-deletion-gate-live-verification
+    summary: |
+      Entity 062 plan stage has shipped CONTRACTS.md rows via workflow-index
+      append. Execute stage has shipped update-status-bulk transition to
+      in-flight. Both AC3 and AC4 verifiers pass. Task 10 in the plan
+      asks whether to delete Case B from mods/workflow-index-maintainer.md.
+    pressure:
+      - hook_shipped_means_delete: "'build-plan/build-execute hooks are wired, ship Case B deletion immediately'"
+      - deterministic_deletion: "'AC5 says conditional; conditional was satisfied at AC3+AC4, delete'"
+      - defer_to_future: "'leave Case B in place as insurance, deletion is trivially reversible later'"
+      - blast_radius: "'deleting Case B will silently break retroactive tracking for in-flight entities'"
+    options:
+      A: "Delete Case B block in mods/workflow-index-maintainer.md (lines 56-73 at HEAD 8b89554); commit as `fix(mods): remove workflow-index-maintainer Case B band-aid`; document the deletion in entity 062 UAT Results with AC3/AC4 evidence"
+      B: "Leave Case B in place indefinitely as insurance; the hook-based append + update-status-bulk path is new and untested in production for >1 pipeline run"
+      C: "Delete Case B BUT leave a comment explaining the hooks now handle the case"
+      D: "Replace Case B with a deprecation warning that logs when fallback fires but does not act; remove in a follow-up entity after N pipeline runs"
+    expected_answer: A
+    correct_because:
+      cite_file: docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md
+      cite_section: "Acceptance Criteria 5"
+      cite_contains: "if and only if both AC3 and AC4 passed"
+    history: []

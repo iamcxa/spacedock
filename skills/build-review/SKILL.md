@@ -22,12 +22,11 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
 - `Read` -- open the entity file, CLAUDE.md (walking dirname upward from each changed file), PLAN section for `files_modified` cross-check
 - `Grep` / `Glob` -- pre-scan's stale-reference pass and CLAUDE.md rule walk
 - `Write` / `Edit` -- only to append `## Stage Report: review` and `## Pending Knowledge Captures` to the entity body
-- `Agent` -- dispatch the 8 external review agents in parallel during Step 2. You run in the **main orchestrator context** (sonnet) so Agent dispatch is available to you.
 - `Skill` -- invoke `spacedock:knowledge-capture` in Step 4 (mode: capture)
 
-**NOT available (by policy, even though the tools may technically be loaded):**
-- `AskUserQuestion` -- you run as an ensign subagent dispatched by FO. FO owns captain interaction. If escalation is genuinely needed, write `feedback-to: captain` in the Stage Report and return; FO routes to captain.
-- Recursive Agent dispatch from the subagents you dispatch. The review agents you dispatch in Step 2 run as leaf subagents and CANNOT themselves dispatch further Agent calls (see `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md`). Design Step 2 accordingly -- never ask a review agent to "dispatch a sub-reviewer".
+**NOT available (see `references/agent-dispatch-guide.md`):**
+- `Agent` -- you run as an ensign subagent, which does not have the Agent tool. FO dispatches themed reviewer teammates (debate-driven pattern) before invoking you. You read their findings from the entity file and classify them.
+- `AskUserQuestion` -- FO owns captain interaction. If escalation is genuinely needed, write `feedback-to: captain` in the Stage Report and return; FO routes to captain.
 
 ---
 
@@ -83,26 +82,29 @@ Pre-scan findings flow into Step 3 classification **alongside** findings from th
 
 ---
 
-## Step 2: Parallel Agent Dispatch
+## Step 2: Read Review Findings
 
-Dispatch the full fan of external review agents in **one single message** so they run in parallel. The target set per spec line 341-349:
+Read the review findings from the entity file. These were produced by FO-dispatched reviewer teammates using the **debate-driven** pattern (see `docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md` and `references/agent-dispatch-guide.md`).
 
-- `pr-review-toolkit:code-reviewer` -- CLAUDE.md, style, bugs
-- `pr-review-toolkit:silent-failure-hunter` -- error handling
-- `pr-review-toolkit:comment-analyzer` -- stale comments
-- `pr-review-toolkit:pr-test-analyzer` -- test coverage
-- `pr-review-toolkit:type-design-analyzer` -- type encapsulation
-- `pr-review-toolkit:code-simplifier` -- complexity
-- `trailofbits:differential-review` -- git-history-aware review
-- `trailofbits:sharp-edges` -- footgun API design
+### Debate-driven review model
 
-**Architectural note -- trailofbits agent identifiers are unverified at skill-authoring time.** Per spec line 351-353, "exact trailofbits agent identifiers to be confirmed at implementation time (plugin names ≠ agent names; verify via plugin discovery before writing dispatch code)." At Phase E Plan 2 Wave 3 authoring, the trailofbits plugin identifiers above are best-guess placeholders. Before dispatching in Step 2, verify the exact `subagent_type` strings via plugin discovery (Skill tool listing or documented plugin manifest). If an identifier resolves incorrectly, record the mismatch in the Stage Report's `### Dispatch Gaps` subsection and proceed with the agents that did resolve. Do NOT hardcode trailofbits names as if they were load-bearing; treat them as TBD.
+FO creates a team of 3 themed reviewer teammates before invoking you:
 
-**Leaf dispatch rule.** Each dispatched agent runs as a nested subagent and CANNOT itself dispatch further Agent calls. Do NOT ask any review agent to "dispatch a sub-reviewer" or "delegate to another agent". See `subagent-cannot-nest-agent-dispatch.md` memory. Design every dispatch as a leaf operation.
+- **security-reviewer** -- focuses on `sharp-edges`, `variant-analysis`, `insecure-defaults`, `differential-review` concerns
+- **correctness-reviewer** -- focuses on `code-reviewer`, `silent-failure-hunter` concerns (bugs, error handling, logic errors)
+- **style-reviewer** -- focuses on `comment-analyzer`, `type-design-analyzer`, `code-simplifier` concerns (clarity, types, complexity)
 
-**Diff scope.** Every dispatch prompt includes the `git diff {execute_base}..HEAD` output and the entity slug. Scope is strictly that diff -- agents do NOT review the whole project. Do NOT re-run the full-project checks that build-quality already executed.
+Each reviewer independently analyzes `git diff {execute_base}..HEAD`, then they SendMessage each other to challenge findings. The inter-teammate debate produces higher-quality classifications than independent parallel review. Reviewers write their final (post-debate) findings into the entity file.
 
-**Timeout / truncation handling.** If an agent times out or returns truncated output, record it in the Stage Report's `### Dispatch Gaps` subsection and proceed with the agents that returned. Do NOT re-dispatch inline -- if a gap materially undermines the review, escalate via `feedback-to: captain`.
+`mutation-testing:mutation-testing` is deliberately NOT part of the review fan per entity 062 Q-6 (it is a campaign config helper, not a diff reviewer); the plugin remains enabled in `.claude/settings.json` for direct invocation outside review.
+
+### Your job in Step 2
+
+1. Read the reviewer findings from the entity file (look for `### Review Findings` or similar section written by FO/reviewers).
+2. If findings are present: proceed to Step 3 (classification). The debate already happened; you classify the final output.
+3. If findings are absent (FO ran in simple subagent mode, no team dispatch): fall back to **inline pre-scan only** (Step 1 results are your entire evidence base). Log the fallback in `### Dispatch Gaps`. The 10-agent review fan does not fire in this mode.
+
+**Diff scope.** Review scope is strictly `git diff {execute_base}..HEAD` -- do NOT review the whole project. Do NOT re-run the full-project checks that build-quality already executed.
 
 ---
 

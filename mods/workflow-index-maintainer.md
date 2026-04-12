@@ -53,24 +53,7 @@ Instructions for FO:
       Rationale: `update-status-bulk` in `skills/workflow-index/references/write-mode.md` accepts the full file list, loops per-row internally, and produces a single atomic commit (`chore(index): advance entity-{slug} contracts to {new_status} ({N} files)`). This replaces the earlier per-file loop that produced N commits per shipping event. The bulk variant was added during Phase E Plan 1 quality补洞 after pressure testing surfaced commit-granularity ambiguity in the single-file `update-status`.
    b. Recently Retired age-out is delegated to the skill. The mod simply calls `update-status-bulk` with `new_status: final`; the skill inspects each row's Last Updated date and, if older than 30 days, moves it to the Recently Retired section. See `skills/workflow-index/references/write-mode.md` Operation: update-status-bulk. **Known gap (tracked for Phase E Plan 1 follow-up):** write-mode currently has no explicit `shipped_date` input and must infer age from each row's Last Updated column. If that heuristic proves unreliable, extend the skill's input schema rather than duplicating the computation here.
 
-   **Case B — Entity NOT in CONTRACTS but has an active or shipped stage** (retroactive tracking — the mod missed the execute-entry event because idle hook didn't fire during execute, or the entity ran autonomously through the pipeline):
-
-   a. Query `workflow-index` read mode for the entity slug. If `matches: [], count: 0` **and** frontmatter `status` is `execute`/`review`/`uat`/`shipped`, take the retroactive path.
-   b. Read the entity's most recent Stage Report for files touched (see "Stage Report File List Contract" below).
-   c. Invoke `workflow-index` skill with `operation: append`:
-      ```yaml
-      mode: write
-      target: contracts
-      operation: append
-      entry:
-        entity: {slug}
-        stage: {current frontmatter stage — execute/review/uat/shipped}
-        files: {list from Stage Report}
-        intent: {first line of entity title, or "retroactive — intent missing"}
-        status: {final if shipped, in-flight otherwise}
-      ```
-      This creates rows at the entity's current state. Single atomic commit: `chore(index): retroactive contracts for entity-{slug} ({stage}, {N} files)`.
-   d. **Known structural gap (tracked in memory file `workflow-index-lifecycle-gap.md`)**: Case B exists because the current pipeline has no coordinated `append` call at plan/execute entry. The proper fix lives in Phase E Plan 2 (`build-plan` skill should append rows with `status: planned` when a plan is approved) and Plan 3 (`build-execute` skill should transition rows `planned → in-flight` on entry). Until those land, Case B is the only row-creation mechanism. **Do NOT delete Case B before verifying the proper append path exists in Plans 2/3.**
+   **Retired (2026-04-12, entity 062 Phase E Plan 4)**: Case B (retroactive CONTRACTS append for entities that skipped plan-time tracking) has been removed. The proper append path now lives in `skills/build-plan/SKILL.md` Step 9a (unconditional append at plan approval) and `skills/build-execute/SKILL.md` Step 2 (unconditional update-status-bulk at execute entry). Retroactive tracking is no longer needed because every entity acquires its CONTRACTS rows at plan time. See entity 062's Stage Report for the live verification that gated this deletion.
 
 4. Scan DECISIONS.md for any decisions whose Related entities field references entities that have since shipped. If any, ensure the decision's Status reflects the latest state (no action needed unless explicit supersede was flagged).
 
@@ -85,7 +68,7 @@ Instructions for FO:
 
 ## Stage Report File List Contract
 
-Both Case A and Case B of the idle hook extract file lists from entity Stage Reports. Stage Reports MUST include a section titled `## Files Modified` with a bullet list of repo-relative file paths:
+Case A of the idle hook extracts file lists from entity Stage Reports (Case B was retired 2026-04-12 per entity 062; retroactive tracking is no longer needed). Stage Reports MUST include a section titled `## Files Modified` with a bullet list of repo-relative file paths:
 
 ```markdown
 ## Files Modified
@@ -118,5 +101,5 @@ If any `workflow-index` skill invocation fails during a hook:
 
 - **Never modify entity frontmatter from this mod.** The mod only reads entity state and writes to `_index/` files.
 - **Workflow-index skill is the only writer.** This mod never directly edits CONTRACTS/DECISIONS/INDEX files; it always goes through the skill to preserve format invariants.
-- **Separate commits per mod operation.** Each write operation commits independently with a `chore(index):` prefix. Case A bulk update, Case B append, and INDEX rebuild each get their own commit.
+- **Separate commits per mod operation.** Each write operation commits independently with a `chore(index):` prefix. Case A bulk update and INDEX rebuild each get their own commit.
 - **Graceful on first run.** If `_index/` directory or files don't exist yet, the skill's write mode handles creation.

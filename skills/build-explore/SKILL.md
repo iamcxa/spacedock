@@ -16,9 +16,8 @@ This skill is loaded by the ensign during the `explore` stage of the build pipel
 - `Grep` -- search the codebase for keywords, patterns, and file references
 - `Glob` -- find files by pattern when grep is too broad
 - `Bash` -- git commands, file counting, and shell pipelines for mapping
-- `context-lake MCP` -- `search_insights` (lookup prior findings) and `store_insight` (record purpose/pattern/gotcha/correction for every file read in depth)
-
-**NOT available:**
+**NOT available (see `references/agent-dispatch-guide.md`):**
+- `Agent` -- you run as an ensign subagent (or SO-direct), which may or may not have the Agent tool depending on context. SO-direct mode HAS Agent (SO is the main session); ensign mode does NOT. Step 2 handles both cases.
 - `AskUserQuestion` -- this skill is non-interactive. Write findings to the entity body; build-clarify handles captain interaction.
 
 **Mode-dependent Write/Edit:**
@@ -52,28 +51,66 @@ The domain(s) recorded in the Captain Context Snapshot determine which gray area
 
 ## Step 2: Codebase Mapping
 
-Based on APPROACH, grep for keywords -- function names, file names, component names, API routes, schema names, and anything else the brainstorming spec names specifically.
+Based on APPROACH, identify the mapping topic (keywords, scope anchors, layer hints from the Domain line in Captain Context Snapshot).
 
-Group discovered files by layer:
-- domain
-- contract
-- router
-- view
-- seed
-- frontend
-- test
-- config
+See `docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md` for dispatch ownership and `references/agent-dispatch-guide.md` for tool surface constraints.
 
-For each file (up to 20 files total), read it, form a 1-line purpose note, and call `store_insight` to the context lake with tags `[purpose]`, `[pattern]`, or `[gotcha]` as appropriate. Use `[correction]` when the finding overturns a prior insight.
+### Two execution modes
 
-After mapping completes, count the total number of files and compare against the frontmatter `scale`:
+**Mode A -- SO-direct or FO-pre-dispatched (has code-explorer results):**
+When SO runs explore (the default owner per SO/FO split), SO has Agent tool and dispatches `spacedock:code-explorer` directly. When FO runs explore for Large entities, FO dispatches code-explorer before invoking the ensign. In both cases, the code-explorer results are either:
+- Already in your context (SO-direct mode: you dispatched and received the return), or
+- Written to the entity file by FO-dispatched explorer teammates
+
+Read the code-explorer output and consume it in Step 3 onward.
+
+**Mode B -- Inline fallback (no code-explorer dispatch):**
+When running as an ensign without pre-dispatched results (FO simple subagent mode for Small/Medium entities), do inline codebase mapping:
+- Use Read/Grep/Glob on the entity context paths
+- Write findings directly into the mapping output format (same structure as code-explorer step 6)
+- This is the original pre-entity-062 behavior and remains the default for Small/Medium entities
+
+### Dispatching code-explorer (Mode A, when you have Agent tool)
+
+If running in SO-direct mode (you ARE the main session and have Agent tool), dispatch:
+
+```
+Agent(
+  subagent_type="spacedock:code-explorer",
+  model="sonnet",
+  prompt="""
+  ## Topic
+  {1-line topic title from APPROACH keywords}
+
+  ## Entity Context
+  {paths the explorer should focus on, drawn from APPROACH + Domain line}
+
+  ## Scope Constraint
+  {20-file cap; what NOT to touch; layers out of scope for this entity}
+
+  ## Layer Hint
+  {domain|contract|router|view|seed|frontend|test|config or "unknown -- sweep all"}
+
+  Load skill: skills/code-explorer (flat path).
+  Return structured output per code-explorer step 6 format.
+  """
+)
+```
+
+**Fresh-context dispatch rationale (Phase E Guiding Principle #5).** Inline grep/Read/store pollutes the caller's context with raw file content. Delegating to `spacedock:code-explorer` isolates the mapping pass in a fresh context; the caller only consumes the structured summary. See `agents/code-explorer.md` for the thin-wrapper agent definition.
+
+**Leaf dispatch rule.** `spacedock:code-explorer` runs as a leaf subagent. It does NOT further dispatch other agents. For multiple mapping passes, dispatch multiple `spacedock:code-explorer` calls in parallel from this step.
+
+### Scale assessment (both modes)
+
+After mapping completes (code-explorer return or inline), count total files and compare against frontmatter `scale`:
 - Small: <5 files
 - Medium: 5-15 files
 - Large: >15 files
 
-Note the result in the Stage Report later. If the actual count disagrees with the frontmatter scale, record `revised from X to Y` in the Stage Report (Step 7).
+Note the result in the Stage Report (Step 7). If the actual count disagrees with the frontmatter scale, record `revised from X to Y`.
 
-For `intent: bugfix` entities, prioritize root cause diagnosis. Trace from the reported symptom back to the underlying cause -- do not stop at the first file that mentions the symptom. Store the trace as insights with `[purpose]` tags.
+**Bugfix intent.** For `intent: bugfix` entities, include "trace from symptom to root cause; do not stop at first symptom match" in the mapping scope. Code-explorer returns a trace-ordered file list instead of a breadth-first layer sweep.
 
 ---
 
@@ -152,6 +189,8 @@ Preserve all existing content. Only modify sections this skill owns. Never modif
 ---
 
 ## Step 7: Stage Report
+
+File counts and layer breakdowns come from the Step 2 code-explorer dispatch return; the caller does NOT independently re-grep.
 
 Write `## Stage Report: explore` as the LAST section of the entity body with exactly six metrics, in this order:
 

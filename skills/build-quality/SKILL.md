@@ -147,12 +147,32 @@ Repeat this shape for `lint`, `typecheck`, `build`, `coverage`.
 
 ---
 
+## Step 6.5: Classify Failures by Entity Diff Scope
+
+This step runs ONLY when (a) at least one check has verdict=fail AND (b) the dispatch prompt included an execute_base_sha. If either condition is unmet, skip to Step 7 and treat all failures as entity-scope (the safe default).
+
+This step does NOT narrow the test suite (that is prohibited by Rule "Full Suite, Not Targeted"). It classifies ROUTING after the full suite has already run. The distinction: Step 1-5 answer "does the project pass?"; Step 6.5 answers "who broke it?".
+
+1. Run `git diff --name-only {execute_base_sha}..HEAD` to get the entity's file delta.
+2. For each failing check, extract the failing file paths from the evidence (test file for bun test, source file for tsc, etc.).
+3. Classify each failure:
+   - **entity-scope** -- at least one failing file appears in the entity's diff. Normal feedback-to: execute.
+   - **pre-existing** -- NO failing file appears in the entity's diff. Logged in Stage Report as `scope: pre-existing ({file} not in entity diff {execute_base_sha}..HEAD)`. Does NOT trigger feedback-to: execute.
+4. Record the classification inline in each check's Stage Report subsection (add a `scope:` line after `verdict:`).
+
+**Aggregate routing override:** If ALL failures are classified pre-existing, the overall verdict becomes `pass (pre-existing failures noted)` and no `feedback-to` is emitted. FO advances normally. If ANY failure is entity-scope, the overall verdict is `fail` with `feedback-to: execute` containing only the entity-scope evidence.
+
+**This is NOT git blame or history spelunking.** `git diff --name-only` is a pure file-delta check with zero judgment. It answers "did this entity's execute stage touch the failing file?" -- a mechanical question. The prohibition on `git blame` and `git log -p` in the Tools Available section targets causal investigation ("who introduced this and why?"), which remains prohibited.
+
+---
+
 ## Step 7: Determine Routing and Write Stage Report
 
 ### Routing Rule
 
-- **All non-skipped checks `pass`** → verdict `pass`, no `feedback-to` field, FO advances entity to `review`.
-- **Any check `fail`** → verdict `fail`, `feedback-to: execute`, Stage Report includes the failing output verbatim, FO routes entity back to `execute`.
+- **All non-skipped checks `pass`** (including `pass (pre-existing failures noted)` from Step 6.5) → verdict `pass`, no `feedback-to` field, FO advances entity to `review`.
+- **Any check `fail` with entity-scope classification** → verdict `fail`, `feedback-to: execute`, Stage Report includes the entity-scope failing output verbatim, FO routes entity back to `execute`.
+- **All failures pre-existing (Step 6.5 override)** → verdict `pass (pre-existing failures noted)`, no `feedback-to`, Stage Report includes pre-existing failures as informational evidence. FO advances and optionally spawns a follow-up entity for the pre-existing drift.
 
 Quality reports, review judges. **NEVER** escalate to `build-review` from within quality -- even when a failure "feels like it needs judgment". Route via `feedback-to: execute`. If the fix later turns out to require a replan, review or captain will surface that; it is not your call.
 
@@ -243,7 +263,8 @@ Write the report with the Write or Edit tool into the entity body at the `## Sta
 
 ### Routing and Scope
 
-- **Any single failing check** → `feedback-to: execute`. Not review, not captain, not UAT.
+- **Any single entity-scope failing check** → `feedback-to: execute`. Not review, not captain, not UAT. Pre-existing failures (Step 6.5 classification) are logged but do NOT trigger feedback-to.
+- **The diff-scope prohibition (Rule "Full Suite, Not Targeted") applies to TEST RUNS, not to ROUTING.** Always run the full suite. Then use Step 6.5 to classify failures for routing purposes. These are separate concerns: the full suite catches drift; the classification prevents routing drift back to the wrong entity's execute stage.
 - **Never invoke other skills** from within quality. You are a leaf stage skill.
 - **Never edit code** -- your Write/Edit scope is strictly the entity body's `## Stage Report: quality` section.
 - **Use `--` (double dash)** everywhere. Never `—` (em dash). Matches the rest of the build skill family.
