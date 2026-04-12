@@ -125,6 +125,8 @@ Rationale: you (sonnet orchestrator) have reasoning budget for skill selection; 
 
 Iterate waves sequentially (wave 0, then wave 1, then wave 2, ...). Inside each wave, dispatch tasks in parallel where possible.
 
+**Runtime probe fallback.** Before invoking `Agent` to dispatch task-executor subagents, probe its availability: `ToolSearch(query="select:Agent", max_results=1)`. If the schema fails to load, the Agent tool is absent from this subagent's context -- this happens when the execute ensign is dispatched nested via in-session `Agent()` (both bare mode and team mode exhibit this; see `subagent-cannot-nest-agent-dispatch.md` memory + entity 062 execute stage KC-062-1 for live evidence). Fall back to **inline serial task execution** inside the ensign's own context: for each task in wave order, Read its read_first files, Write/Edit the files_modified per the task.action block, run its acceptance_criteria commands via Bash, and commit serially per task. Wave parallelism is lost but wave ordering is preserved and per-task commit discipline stays intact. Log the fallback in `## Stage Report: execute` under `### Dispatch Gaps` so reviewers know this execute run had no true per-task subagents.
+
 ### 4a -- Parallelism Decision
 
 For each wave, decide serial vs parallel:
