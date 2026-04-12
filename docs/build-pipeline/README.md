@@ -369,9 +369,10 @@ Judgment-based diff-level code review using `dispatch: debate-driven`. Scope is 
 - **Reviewer count scales with diff scope:** small diff (< 5 files) = correctness + style; medium (5-15 files) = all 3; large (> 15 files) = all 3 with full trailofbits
 - **Bare-mode fallback** (when `-p` pipe mode or TeamCreate fails): ensign runs pre-scan only — no reviewer dispatch. Mechanical issues still caught; debate-quality depth not available.
 - **Verdict routing:**
-  - No CRITICAL/HIGH CODE findings → advance to uat
-  - Any CRITICAL/HIGH CODE finding → `feedback-to: execute`
+  - Zero findings (all clean) → advance to uat
+  - Any finding ≥ INFO severity → `feedback-to: execute` for auto-fix (no captain gate). FO bounces entity back to execute stage with the classified findings table as fix instructions. Execute ensign fixes all items, then entity re-enters quality → review. Truly redundant INFO items may be marked SKIP with rationale in the Stage Report.
   - Any PLAN finding → raise replan flag in Stage Report (advisory — captain decides whether to reset status to plan)
+  - Captain is NOT consulted for CODE/DOC/STYLE findings — auto-fix is the default. Only PLAN findings (architectural scope changes) escalate to captain.
 - **Good:** Debate between themed reviewers catches false positives before classification; pre-scan locks in mechanical floor before paying for reviewer dispatch; D2 candidates staged (not applied) so FO handles captain interaction
 - **Bad:** Skipping Phase 1 reviewer dispatch and relying on pre-scan only outside bare mode; treating NIT findings as blockers; silently applying D2 candidates without FO handoff; dispatching review agents on the entire branch instead of `execute_base..HEAD` diff
 
