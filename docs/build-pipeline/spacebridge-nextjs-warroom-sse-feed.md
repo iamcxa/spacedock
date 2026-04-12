@@ -45,3 +45,6 @@ The spacebridge daemon needs a web UI that replaces the current `tools/dashboard
 
 - Design doc §3.4 (Events over SSE): rationale for SSE over WebSocket
 - Design doc §4.4 (File watcher): debouncing strategy for file change events
+- Entity 052 A-5 research: Next.js standalone server.js is NOT importable -- daemon.ts must spawn it as child process OR use custom server API (mutually exclusive with standalone). This is a key architecture decision for 053.
+- Entity 052 Q-1 decision: direct import + child process hybrid composition -- 053's Next.js server is the child process case
+- Captain note (2026-04-13): evaluate shadcn/UI + Tailwind + Radix as the component library for the Next.js rewrite. Current dashboard uses vanilla JS IIFEs with inline CSS -- no component library. shadcn is the standard stack for new Next.js App Router projects.
