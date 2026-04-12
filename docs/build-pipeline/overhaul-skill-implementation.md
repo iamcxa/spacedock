@@ -813,3 +813,67 @@ All 6 tasks completed across waves 0-5. Task 0 verified the environment (9/9 che
 ### Summary
 
 All mechanical quality checks executed from worktree root. Test suite passes at 344/345 (99.7%); the single failure is a pre-existing test fixture drift (parseStagesBlock field expansion, non-critical). TypeScript compilation clean. Linting and building skipped: no project-level configuration exists (linting deferred to phase with config), and build has no entrypoints (Bun build would require explicit file targets or configuration). All dashboard dependencies installed and available. No blockers to advancing to review stage.
+
+## Stage Report: review
+
+- [x] Pre-scan completed (CLAUDE.md compliance, stale references, plan consistency)
+  No CLAUDE.md violations. All 5 Related Memory references resolve to files in /memory/. Plan tasks all implemented. Acceptance criteria verified: 7 occurrences of the 3 new primitive names in recipe-format.md (>= 3), pressure test count = 4 (>= 3). Reference recipe YAML parses cleanly.
+- [x] Parallel review agents dispatched (pr-review-toolkit + trailofbits if available)
+  pr-review-toolkit:review-pr invoked. No trailofbits reviewers dispatched -- this diff is markdown/YAML only, no TypeScript or executable code paths; security review tools are not applicable.
+- [x] Findings classified by severity (CRITICAL/HIGH/MEDIUM/LOW/NIT) × root (CODE/DOC/NEW/PLAN)
+  1 MEDIUM/CODE finding; all other checks pass. See findings table below.
+- [ ] SKIP: Knowledge-capture invoked in capture mode for D1/D2 staging
+  No CRITICAL or HIGH findings to stage. MEDIUM finding is documented inline in this report for execute-stage fix.
+
+### Findings Table
+
+| Severity | Root | File | Location | Description |
+|----------|------|------|----------|-------------|
+| MEDIUM | CODE | `skills/overhaul/SKILL.md` + `skills/overhaul/references/recipe-format.md` | SKILL.md:145-146, 244-245; recipe-format.md:234, 255 | `update-yaml-block` and `update-section` field convention inconsistency: prose says "Find `## {section}`" / "Find `## {heading}`" but YAML examples set `section: "## Schema"` and `heading: "## Prerequisites"` — field values already include `##`. A literal reading of the prose would search for `## ## Schema` and fail. Contrast with `replace-body-subsection` which correctly uses bare name in `heading:` field and constructs `### {heading}` in prose. |
+| LOW | DOC | `skills/overhaul/SKILL.md` | Line 140 | Step 2 validation table for `replace-body-subsection` says `heading exists as ### {heading}` — but the actual heading format in the target README uses backtick-quoted stage names (`` ### `plan` ``). Step 4 Pass B correctly notes "may be backtick-quoted". The Step 2 description is slightly simplified; acceptable since validation only needs to confirm the heading exists, not the exact quoting style. |
+| NIT | DOC | `tests/pressure/overhaul.yaml` | All `cite_contains` fields | Backtick-formatted identifiers in cite_contains are written without backticks (e.g. `manual_edit` written as `manual_edit`). This is intentional since cite_contains is a substring check — acceptable. Verified all 4 cite_contains strings match SKILL.md after stripping markdown bold markers. |
+
+### MEDIUM Finding Detail — Fix Required Before Merge
+
+**Issue**: `update-yaml-block` and `update-section` use an inconsistent field-value/prose convention compared to the established `replace-body-subsection` pattern.
+
+**Convention in `replace-body-subsection`** (correct and established):
+- Field value: bare name, e.g. `heading: plan`
+- Prose: "Find `` ### `{heading}` ``" — prose constructs the full heading
+
+**Convention in `update-yaml-block` and `update-section`** (inconsistent):
+- Field value: full heading with `##` prefix, e.g. `section: "## Schema"`, `heading: "## Prerequisites"`
+- Prose: "Find `## {section}` heading" / "Find `## {heading}`" — which would construct `## ## Schema`
+
+**Two valid fixes** (execute stage should pick one and apply consistently):
+
+Option A — Make field value the bare name (aligns with `replace-body-subsection` convention):
+- Change recipe-format.md examples: `section: "Schema"` and `heading: "Prerequisites"`
+- Change SKILL.md validation table: already correct for this reading
+- Change reference recipe ops: `section: "Schema"`, `heading: "Prerequisites"`
+- Fix prose to match: "Find `## {section}` heading" stays (correctly constructs `## Schema`)
+
+Option B — Keep full heading in field value, fix prose (clearer for recipe authors):
+- Keep recipe-format.md examples: `section: "## Schema"`, `heading: "## Prerequisites"` (unchanged)
+- Fix SKILL.md Step 2 validation: "`section` heading exists as `{section}` in body" (drop extra `##`)
+- Fix SKILL.md Step 4: "Find `{section}` heading" and "Find `{heading}`" (drop extra `##`)
+- Fix recipe-format.md prose: "finding the `{section}` heading" (drop extra `##`)
+- Keep reference recipe unchanged (already uses full heading values)
+
+**Recommendation**: Option B — the reference recipe and recipe-format.md examples are already correct. Fix only the prose descriptions in SKILL.md (2 lines) and recipe-format.md (2 lines). The field value including `##` is more readable for recipe authors who need to match the exact heading text.
+
+**Files and lines to fix**:
+- `skills/overhaul/SKILL.md` line 145: `## {section}` → `{section}` in body
+- `skills/overhaul/SKILL.md` line 146: `## {heading}` in body → `{heading}` in body
+- `skills/overhaul/SKILL.md` line 244: "Find `## {section}` heading" → "Find `{section}` heading (exact match)"
+- `skills/overhaul/SKILL.md` line 245: "Find `## {heading}` (exact H2 match)" → "Find `{heading}` (exact match — field value already includes `##`)"
+- `skills/overhaul/references/recipe-format.md` line 234: "finding the `## {section}` heading" → "finding the line exactly matching `{section}`"
+- `skills/overhaul/references/recipe-format.md` line 255: "from the `## {heading}` line" → "from the `{heading}` line"
+
+### Summary
+
+Pre-scan clean: no CLAUDE.md violations, all memory references resolve, plan consistency confirmed, acceptance criteria verified. One MEDIUM/CODE finding: `update-yaml-block` and `update-section` have a prose description that conflicts with the YAML example field values — prose says "Find `## {section}`" but the field value already includes `##`, so a literal execution would look for `## ## Schema` and fail. All pressure test cite_contains verified against SKILL.md. Low/NIT items are documentation precision issues only. Verdict: **REJECTED — feedback-to: execute** to fix the 6 prose description lines before merge.
+
+### Verdict: REJECTED
+
+Feedback-to: execute. Fix required: 6 prose description lines across SKILL.md (lines 145, 146, 244, 245) and recipe-format.md (lines 234, 255). Apply Option B from the MEDIUM finding detail above. No other changes needed.
