@@ -142,8 +142,8 @@ For each operation in `operations[]`, validate in index order:
 | `add-body-subsection` | `after` heading exists as `### {after}` in body |
 | `update-prose-block` | `anchor` substring appears exactly once in body |
 | `replace-table-block` | `anchor` substring appears exactly once as a table header row (line starting with `\|` and containing anchor) |
-| `update-yaml-block` | `section` heading exists as `## {section}` in body; `block_index` is within range of ` ```yaml ` code blocks in that section |
-| `update-section` | `heading` exists as `## {heading}` in body (exact H2 match) |
+| `update-yaml-block` | `section` heading exists in body (field value already includes `##`); `block_index` is within range of ` ```yaml ` code blocks in that section |
+| `update-section` | `{heading}` exists in body (exact H2 match; field value already includes `##`) |
 | `manual_edit` | No validation -- log as informational only |
 
 **Cross-cutting checks (apply after per-op validation):**
@@ -241,8 +241,8 @@ Apply this transformation?
 - `add-body-subsection`: Find the `after` subsection's end boundary. Insert `content` immediately after.
 - `update-prose-block`: Find the line containing `anchor` as a substring. Identify paragraph boundaries (blank lines above and below). Replace the full paragraph block with `new_content`.
 - `replace-table-block`: Find the first line containing `anchor` as a substring where the line starts with `|`. Extent: from that header row through the separator row (line starting with `|---`), all data rows (lines starting with `|`), and the trailing blank line. Replace with `new_content`.
-- `update-yaml-block`: Find `## {section}` heading. Within that section, find the `block_index`-th ` ```yaml ` code fence (0-indexed). Within the fence boundaries: for each `set` op, find the field line (by field name prefix) and replace it, or append it before the closing ` ``` ` if not found. For each `remove` op, delete the field line.
-- `update-section`: Find `## {heading}` (exact H2 match). Extent: from that heading line to the line before the next `## ` at the same level, or end of file. Replace entire extent with `new_content`.
+- `update-yaml-block`: Find `{section}` heading (field value already includes `## `). Within that section, find the `block_index`-th ` ```yaml ` code fence (0-indexed). Within the fence boundaries: for each `set` op, find the field line (by field name prefix) and replace it, or append it before the closing ` ``` ` if not found. For each `remove` op, delete the field line.
+- `update-section`: Find `{heading}` (exact H2 match; field value already includes `## `). Extent: from that heading line to the line before the next `## ` at the same level, or end of file. Replace entire extent with `new_content`.
 
 **Pass C: Cross-reference side-effects** (triggered automatically by frontmatter ops applied in Pass A):
 

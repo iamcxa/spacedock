@@ -231,7 +231,7 @@ Overhaul locates the table by finding the first line that contains `anchor` as a
   reason: Phase 3 -- remove profile field, add uat_pending_count to schema example
 ```
 
-Overhaul locates the section by finding the `## {section}` heading (exact H2 match), then finds the `block_index`-th fenced code block with ` ```yaml ` language tag within that section. Within the code fence boundaries, `set` adds or replaces the named field line, and `remove` deletes the field line. Operates line-by-line; does not parse nested YAML structure. If the section heading is not found, or the block index is out of range, recipe validation fails.
+Overhaul locates the section by finding the line exactly matching `{section}` (the field value already includes `## `), then finds the `block_index`-th fenced code block with ` ```yaml ` language tag within that section. Within the code fence boundaries, `set` adds or replaces the named field line, and `remove` deletes the field line. Operates line-by-line; does not parse nested YAML structure. If the section heading is not found, or the block index is out of range, recipe validation fails.
 
 ---
 
@@ -252,7 +252,7 @@ Overhaul locates the section by finding the `## {section}` heading (exact H2 mat
   reason: Phase 3 pipeline restructure -- rebuild prerequisites for 10-stage pipeline
 ```
 
-Unlike `replace-body-subsection` which targets H3 (`###`) headings, this targets H2 (`##`) headings. The section extent is: from the `## {heading}` line through the line before the next `##` line at the same level (or end of file). The entire extent is replaced with `new_content`. If the heading is not found as an exact H2 match, recipe validation fails.
+Unlike `replace-body-subsection` which targets H3 (`###`) headings, this targets H2 (`##`) headings. The section extent is: from the `{heading}` line through the line before the next `##` line at the same level (or end of file). The entire extent is replaced with `new_content`. If the heading is not found (field value already includes `## `; matched exactly), recipe validation fails.
 
 ---
 
