@@ -137,6 +137,105 @@ The current build-review SKILL.md already describes a debate-driven model with 3
 
 → Selected: Debate-driven -- wire it properly. Fix the 3 structural blockers (dispatch property, single-entity mode teams, SKILL.md transformation) to make the original debate-driven design actually execute. 3 themed teams (security/correctness/style) + SendMessage debate. Quality is the priority. (captain, 2026-04-12, interactive)
 
+## Stage Report: quality
+
+### 1. Run `bun test` from repo root
+
+**Command:** `bun test 2>&1`
+
+**Result:** FAILED
+
+**Output:**
+```
+bun test v1.3.9 (cf6cdbbb)
+
+tests/dashboard/parsing.test.ts:
+84 |       "Body",
+85 |     ].join("\n"));
+86 |     const stages = parseStagesBlock(filepath);
+87 |     expect(stages).not.toBeNull();
+88 |     expect(stages!.length).toBe(3);
+89 |     expect(stages![0]).toEqual({
+                            ^
+error: expect(received).toEqual(expected)
+
+@@ -2,6 +2,7 @@
+    "concurrency": 3,
++   "conditional": false,
++   "feedback_to": "",
+    "gate": true,
+    "initial": false,
++   "model": "",
+    "name": "plan",
+
+- Expected  - 0
++ Received  + 3
+
+      at <anonymous> (/Users/kent/Project/spacedock/tests/dashboard/parsing.test.ts:89:24)
+(fail) parseStagesBlock > parses stages with defaults and states [0.62ms]
+
+ 344 pass
+ 1 fail
+ 810 expect() calls
+Ran 345 tests across 25 files. [4.42s]
+```
+
+**Analysis:** One test failure in `tests/dashboard/parsing.test.ts:89`. The test expects a stage object with 4 fields but received 7 fields. The extra fields are `conditional`, `feedback_to`, and `model`. This indicates the stage parsing has changed in the codebase but the test expectations have not been updated to reflect new required stage properties.
+
+---
+
+### 2. Run `bun lint` from repo root
+
+**Command:** `bun lint 2>&1`
+
+**Result:** SKIPPED
+
+**Rationale:** No lint script defined in project configuration. `bun lint` is not a built-in bun command and requires a script in package.json or bunfig.toml. The project does not have these configuration files at the repo root. Linting tool would need to be explicitly invoked (e.g., `eslint`, `deno lint`, etc.) if configured, but no such tooling is present in this codebase.
+
+---
+
+### 3. Run `tsc --noEmit` from repo root
+
+**Command:** `tsc --noEmit 2>&1`
+
+**Result:** PASSED
+
+**Output:**
+```
+TypeScript compilation completed
+[full output logged to ~/Library/Application Support/rtk/tee/{timestamp}_tsc.log]
+```
+
+**Analysis:** TypeScript compilation completes with no errors. All TypeScript code in the project type-checks correctly.
+
+---
+
+### 4. Run `bun build` from repo root
+
+**Command:** `bun build` (attempted)
+
+**Result:** SKIPPED
+
+**Rationale:** No entrypoint specified. `bun build` requires an entrypoint file as an argument (e.g., `bun build src/index.ts`). The project structure is a monorepo with discrete tools (dashboard under tools/dashboard/). There is no root-level build target. Dashboard itself is not built with `bun build` — it's a Bun server process run directly. No build step is applicable at the repo level.
+
+---
+
+### 5. Coverage threshold
+
+**Status:** SKIPPED
+
+**Rationale:** No coverage threshold defined in workflow config. The entity specification does not define a coverage requirement, and no .coveragerc or similar config exists.
+
+---
+
+## Binary Verdict
+
+**FAIL** — One test failure in `tests/dashboard/parsing.test.ts:89` must be resolved before this can advance.
+
+**Failing check:** `bun test` — parseStagesBlock test expects stage properties that have changed. The stage object now includes `conditional`, `feedback_to`, and `model` fields but the test expectation was not updated.
+
+**Next step:** Route feedback to execute stage with failing test output above.
+
 ## Open Questions
 
 Q-1: Is the current debate-driven model actually implemented and working, or is it aspirational design?
@@ -477,3 +576,65 @@ PASS (iteration 1/3). No revision needed.
 - `references/claude-first-officer-runtime.md` -- unbind single-entity from bare mode
 - `references/first-officer-shared-core.md` -- clarify team creation policy in single-entity mode
 - `skills/build-review/SKILL.md` -- add FO Guidance section, restructure for two-phase model
+
+## Stage Report: quality
+
+**Verdict**: FAIL
+
+**Ran at**: 2026-04-12T23:15:00Z
+
+### Quality Checklist
+
+1. **Run `bun test` from repo root**
+   - **Status**: FAILED
+   - **Output**:
+     ```
+     344 pass
+     1 fail
+     810 expect() calls
+     Ran 345 tests across 25 files. [4.42s]
+     ```
+   - **Failing Test**:
+     ```
+     tests/dashboard/parsing.test.ts:89
+     error: expect(received).toEqual(expected)
+     
+     @@ -2,6 +2,7 @@
+         "concurrency": 3,
+     +   "conditional": false,
+     +   "feedback_to": "",
+         "gate": true,
+         "initial": false,
+     +   "model": "",
+         "name": "plan",
+     ```
+   - **Analysis**: Test `parseStagesBlock > parses stages with defaults and states` expects stage object with 4 fields (`concurrency`, `gate`, `initial`, `name`) but the code now returns 7 fields including new properties `conditional`, `feedback_to`, and `model`. This indicates a recent change to the stage schema was not reflected in test expectations.
+
+2. **Run `bun lint` from repo root**
+   - **Status**: SKIPPED
+   - **Rationale**: No lint script defined in project configuration. The project has no root-level `package.json` or `bunfig.toml` defining a lint script. No linting tool is installed or configured at the repo level.
+
+3. **Run `tsc --noEmit` from repo root**
+   - **Status**: PASSED
+   - **Output**: TypeScript compilation completed with no errors.
+   - **Analysis**: All TypeScript code type-checks correctly across the project.
+
+4. **Run `bun build` from repo root**
+   - **Status**: SKIPPED
+   - **Rationale**: `bun build` requires an entrypoint file. The project is a monorepo without a root build target. Dashboard is a Bun server process run directly, not built via `bun build`. No applicable build step at repo level.
+
+5. **Coverage threshold**
+   - **Status**: SKIPPED
+   - **Rationale**: No coverage threshold defined in workflow configuration.
+
+### Summary
+
+**Binary verdict**: FAIL
+
+One test failure must be resolved before this entity can advance to the next stage.
+
+**Failing check**: `bun test` — test expectation does not match current stage schema. The stage parsing code now includes three new optional properties (`conditional`, `feedback_to`, `model`) that the test does not expect.
+
+**Root cause**: The stage schema was extended (likely during execute or a prior commit) but the corresponding test snapshot was not updated.
+
+**Action required**: Route feedback to execute stage with failing test details above for fixing the test expectation.
