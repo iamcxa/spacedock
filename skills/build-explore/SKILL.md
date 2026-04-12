@@ -16,7 +16,7 @@ This skill is loaded by the ensign during the `explore` stage of the build pipel
 - `Grep` -- search the codebase for keywords, patterns, and file references
 - `Glob` -- find files by pattern when grep is too broad
 - `Bash` -- git commands, file counting, and shell pipelines for mapping
-- `context-lake MCP` -- `search_insights` (lookup prior findings) and `store_insight` (record purpose/pattern/gotcha/correction for every file read in depth)
+- `Agent` -- dispatch `spacedock:code-explorer` in Step 2 for fresh-context codebase mapping (replaces the former inline grep/Read/store pattern). Code-explorer handles its own insight storage if the code-explorer skill opts in; this skill no longer calls `store_insight` directly.
 
 **NOT available:**
 - `AskUserQuestion` -- this skill is non-interactive. Write findings to the entity body; build-clarify handles captain interaction.
@@ -52,28 +52,45 @@ The domain(s) recorded in the Captain Context Snapshot determine which gray area
 
 ## Step 2: Codebase Mapping
 
-Based on APPROACH, grep for keywords -- function names, file names, component names, API routes, schema names, and anything else the brainstorming spec names specifically.
+Based on APPROACH, identify the mapping topic (keywords, scope anchors, layer hints from the Domain line in Captain Context Snapshot). Then dispatch `spacedock:code-explorer` for fresh-context codebase mapping:
 
-Group discovered files by layer:
-- domain
-- contract
-- router
-- view
-- seed
-- frontend
-- test
-- config
+```
+Agent(
+  subagent_type="spacedock:code-explorer",
+  model="sonnet",
+  prompt="""
+  ## Topic
+  {1-line topic title from APPROACH keywords}
 
-For each file (up to 20 files total), read it, form a 1-line purpose note, and call `store_insight` to the context lake with tags `[purpose]`, `[pattern]`, or `[gotcha]` as appropriate. Use `[correction]` when the finding overturns a prior insight.
+  ## Entity Context
+  {paths the explorer should focus on, drawn from APPROACH + Domain line}
 
-After mapping completes, count the total number of files and compare against the frontmatter `scale`:
+  ## Scope Constraint
+  {20-file cap; what NOT to touch; layers out of scope for this entity}
+
+  ## Layer Hint
+  {domain|contract|router|view|seed|frontend|test|config or "unknown -- sweep all"}
+
+  Load skill: skills/code-explorer (flat path).
+  Return structured output per code-explorer step 6 format.
+  """
+)
+```
+
+The code-explorer agent runs in a fresh subagent context with read-only tools (Read, Grep, Glob, Bash), executes its 6-step mapping, and returns a plain-text report grouped by layer. Consume the returned report in this skill's Step 3 onward.
+
+**Fresh-context dispatch rationale (Phase E Guiding Principle #5).** Inline grep/Read/store pollutes the caller's context with raw file content. Delegating to `spacedock:code-explorer` isolates the mapping pass in a fresh context; the caller only consumes the structured summary. Matches the dispatch pattern used by `build-plan` (researcher) and `build-execute` (task-executor). See `agents/code-explorer.md` for the thin-wrapper agent definition.
+
+**Leaf dispatch rule.** `spacedock:code-explorer` runs as a leaf subagent. It does NOT further dispatch other agents. If the topic genuinely needs decomposition into multiple mapping passes, dispatch multiple `spacedock:code-explorer` calls from this step in parallel; do NOT ask one code-explorer to delegate to another.
+
+**Scale assessment.** After the code-explorer returns, count the total files in its output and compare against the frontmatter `scale`:
 - Small: <5 files
 - Medium: 5-15 files
 - Large: >15 files
 
-Note the result in the Stage Report later. If the actual count disagrees with the frontmatter scale, record `revised from X to Y` in the Stage Report (Step 7).
+Note the result in the Stage Report (Step 7). If the actual count disagrees with the frontmatter scale, record `revised from X to Y`.
 
-For `intent: bugfix` entities, prioritize root cause diagnosis. Trace from the reported symptom back to the underlying cause -- do not stop at the first file that mentions the symptom. Store the trace as insights with `[purpose]` tags.
+**Bugfix intent.** For `intent: bugfix` entities, include "trace from symptom to root cause; do not stop at first symptom match" in the dispatch prompt's Scope Constraint section. Code-explorer will return a trace-ordered file list instead of a breadth-first layer sweep.
 
 ---
 
@@ -152,6 +169,8 @@ Preserve all existing content. Only modify sections this skill owns. Never modif
 ---
 
 ## Step 7: Stage Report
+
+File counts and layer breakdowns come from the Step 2 code-explorer dispatch return; the caller does NOT independently re-grep.
 
 Write `## Stage Report: explore` as the LAST section of the entity body with exactly six metrics, in this order:
 
