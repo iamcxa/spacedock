@@ -15,7 +15,10 @@ This file captures the shared first-officer semantics. Keep it aligned with `age
    - entity labels
    - stage ordering, defaults, and **profile definitions** from `stages.profiles` / `stages.defaults` / `stages.states`
    - stage properties such as `initial`, `terminal`, `gate`, `worktree`, `concurrency`, `feedback-to`, `agent`, and `dispatch` (simple | task-list-driven | debate-driven)
-4. Discover mod hooks by scanning `{workflow_dir}/_mods/*.md` for `## Hook:` sections. Register `startup`, `idle`, and `merge` hooks in alphabetical order by mod filename.
+4. Discover mod hooks by scanning two directories for `## Hook:` sections:
+   a. **Library mods**: `mods/*.md` (repo root) -- shared across all workflows in this project.
+   b. **Workflow mods**: `{workflow_dir}/_mods/*.md` -- workflow-specific activation and overrides.
+   Register `startup`, `idle`, and `merge` hooks. Within each directory, process files in alphabetical order. Library mods run before workflow mods. If a library mod and a workflow mod share the same `name:` frontmatter field, the workflow mod overrides (the library mod is skipped for that name).
 5. Run startup hooks before normal dispatch.
 6. Detect orphaned worktree entities by checking `status --where "worktree !="` and report anomalies rather than auto-redispatching.
 6.5. Check dashboard — read `~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)/channel_port`. If the file exists and `curl -sf http://127.0.0.1:$PORT/api/events` succeeds, the dashboard is running. If not running, prompt captain: "Dashboard is not running. It requires an active Claude Code session with the spacedock-dashboard MCP channel. Ensure .mcp.json has the spacedock-dashboard entry and restart Claude Code. (http://localhost:8420/)" Wait for captain response. Yes — guide captain to restart CC with the channel configured. No — skip.
@@ -126,48 +129,35 @@ Score the entity spec on 5 criteria (1 point each):
 
 ### Routing
 
-**5/5 + small (express path):**
-Post a profile recommendation to the captain and await gate approval:
-```
-Brainstorm: {entity title}
+Present the executability score to the captain and await gate approval. When score is 5/5, FO may include a one-sentence readiness summary. When score is ≤4/5, FO presents the gap and asks which path the captain prefers:
 
-Executability: 5/5 ✅
-Recommendation: express — {rationale (1-2 sentences)}
-
-Approve to assign profile: express and advance to execute.
-```
-On captain approval: write `profile: express` to entity frontmatter (git commit on main), advance to next effective stage.
-
-**≤4/5 (captain choice path):**
-Present the gap and three options:
 ```
 Brainstorm: {entity title}
 
 Executability: {N}/5
-Gap: {which criteria failed and why}
+{If <5/5: Gap: {which criteria failed and why}}
 
 Options:
   A) Interactive brainstorm — walk through design together (superpowers:brainstorming)
   B) Ensign analysis — dispatch ensign to explore codebase, post approach options to dashboard
   C) Direct — you provide the approach, I'll update the spec
 
-Which path? (A/B/C)
+Which path? (A/B/C or approve to advance)
 ```
 
-**Path A:** Invoke `Skill: "superpowers:brainstorming"`. After spec is produced, present profile recommendation and await gate.
+**Path A:** Invoke `Skill: "superpowers:brainstorming"`. After spec is produced, present updated score and await gate.
 
-**Path B:** Create a worktree for the entity (standard worktree creation flow). Dispatch an ensign with instructions to produce: codebase exploration, 2–3 approach options with tradeoffs, profile recommendation, and open questions. The ensign posts its analysis as a comment on the entity (read-only on spec body — no `update_entity` calls). After ensign completes, summarize the analysis to the captain. Captain may switch to Path A with ensign's analysis as context. Once captain decides on approach, FO updates spec via `update_entity`, presents profile recommendation, awaits gate.
+**Path B:** Create a worktree for the entity (standard worktree creation flow). Dispatch an ensign with instructions to produce: codebase exploration, 2–3 approach options with tradeoffs, and open questions. The ensign posts its analysis as a comment on the entity (read-only on spec body -- no `update_entity` calls). After ensign completes, summarize the analysis to the captain. Captain may switch to Path A with ensign's analysis as context. Once captain decides on approach, FO updates spec via `update_entity` and re-presents gate.
 
-**Path C:** Captain provides the approach directly in their response. FO updates the spec with the approach, presents profile recommendation, awaits gate.
+**Path C:** Captain provides the approach directly in their response. FO updates the spec with the approach and re-presents gate.
 
 Paths can sequence: B → captain reviews → switches to A. FO recommends a path based on executability score but captain always decides.
 
 ### Gate Resolution
 
-Gate passes when the captain explicitly approves the profile assignment (dashboard button, comment, or channel message). On approval:
-1. Write `profile: {full|standard|express}` to entity frontmatter via git commit on main
-2. Advance entity to next stage per `effective_stages()`
-3. Emit dispatch event for the new stage
+Gate passes when the captain explicitly approves advancement (dashboard button, comment, or channel message). On approval:
+1. Advance entity to next stage per `effective_stages()`
+2. Emit dispatch event for the new stage
 
 Never self-approve the brainstorm gate. Do not infer approval from silence.
 
@@ -315,6 +305,7 @@ The first officer owns the `### Feedback Cycles` section and keeps it on the mai
 When an entity reaches its terminal stage:
 
 1. Run registered merge hooks before any local merge, archival, or status advancement.
+   The `pr-review-loop` mod (library: `mods/pr-review-loop.md`) is the canonical merge hook for PR-based workflows. It delegates PR creation to `kc-pr-flow:kc-pr-create` and review triage to `kc-pr-flow:kc-pr-review-resolve`. When this mod is active, its merge hook handles branch push and PR creation -- FO skips the default local merge per step 2.
 2. If a merge hook created or set a `pr` field, report the PR-pending state and do not local-merge.
 3. If no merge hook handled the merge, perform the default local merge from the stage worktree branch.
 3.5. After successful merge, emit merge event with detail "Merged to main" (skip if dashboard not running).
@@ -331,7 +322,12 @@ When an entity reaches its terminal stage:
 
 ## Mod Hook Convention
 
-Mods live in `{workflow_dir}/_mods/` and use `## Hook: {point}` headings.
+Mods use a layered architecture with two directories:
+
+- **Library** (`mods/` at repo root): Shared mod definitions available to all workflows. Contains canonical implementations (e.g., `pr-review-loop.md`, `workflow-index-maintainer.md`, `pr-merge.md`).
+- **Workflow-specific** (`{workflow_dir}/_mods/`): Per-workflow mod activation. A workflow activates a library mod by placing a copy or override in `_mods/`. Workflow mods with the same `name:` frontmatter as a library mod override the library version.
+
+Both directories use `## Hook: {point}` headings.
 
 Supported lifecycle points:
 - `startup`

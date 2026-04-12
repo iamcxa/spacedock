@@ -63,15 +63,16 @@ stages:
       gate: true
       model: opus
       skill: spacedock:build-plan
-      # Plan orchestrator (opus) dispatches parallel research subagents internally
-      # (each loads spacedock:build-research via spacedock:researcher agent).
+      # Plan orchestrator (opus) dispatches parallel research subagents internally.
       # Writes ## Research Findings / ## PLAN / ## UAT Spec / ## Validation Map.
       # Runs self-review + plan-checker subagent through up to 3 revision iterations.
       # Calls workflow-index append unconditionally at plan approval.
       #
-      # CONDITIONAL gate: only when plan involves schema change, cross-domain,
-      # new public API, or new infra dependency. Otherwise auto-advance.
-      # Architecture review by captain before execute begins.
+      # CONFIDENCE-BASED GATE: FO computes plan confidence (0-100%) across 5 factors:
+      # context completeness, scope clarity, risk level, precedent strength, AC testability.
+      # If confidence > 95%: auto-advance to execute (no captain gate).
+      # If confidence <= 95%: present plan to captain for review.
+      # Captain interaction is concentrated in SO phase (brainstorm/explore/clarify).
       #
       # NAMESPACE NOTE: Migration to `spacebridge:build-plan` is Phase F work (entity 055).
     - name: execute
