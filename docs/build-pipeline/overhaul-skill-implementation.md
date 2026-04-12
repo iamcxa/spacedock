@@ -1,15 +1,15 @@
 ---
 id: 066
 title: Overhaul Skill Implementation -- Recipe Engine + Pressure Tests
-status: uat
+status: shipped
 context_status: ready
 source: captain
 created: 2026-04-12T16:00:00+08:00
 started: 2026-04-12T20:30:00+08:00
-completed:
-verdict:
+completed: 2026-04-12T22:30:00+08:00
+verdict: PASSED
 score:
-worktree: .worktrees/spacedock-ensign-overhaul-skill-implementation
+worktree:
 issue:
 pr:
 intent: feature
