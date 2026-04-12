@@ -6,8 +6,8 @@ context_status: ready
 source: captain
 created: 2026-04-12T16:00:00+08:00
 started: 2026-04-12T20:30:00+08:00
-completed: 2026-04-12T22:30:00+08:00
-verdict: PASSED
+completed:
+verdict:
 score:
 worktree:
 issue:
