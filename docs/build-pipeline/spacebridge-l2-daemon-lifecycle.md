@@ -504,6 +504,45 @@ None
 | AC-6: SPACEBRIDGE_NO_AUTOFORK=1 skips auto-fork, reports error | task-2 | `bun test spacebridge/src/daemon/auto-fork.test.ts` (no-autofork test) | pending | -- |
 | AC-7: SPACEBRIDGE_AUTO_STOP=1 daemon stops on last disconnect | task-3, task-4 | `bun test spacebridge/src/daemon/integration.test.ts` (auto-stop test) | pending | -- |
 
+## Stage Report: execute
+
+- [x] Build wave graph from ## PLAN
+  Waves: 0 (env verification), 1 (pid + lock TDD), 2 (auto-fork TDD), 3 (daemon entry), 4 (integration tests + barrel export). 6 tasks total across 5 waves.
+- [x] Execute Wave 0: env verification (051 IPC layer exists)
+  Verified: spacebridge/src/ipc/ contains all 6 expected files (socket-server.ts, socket-client.ts, types.ts, index.ts, coordination-client-stub.ts, channel-provider-bridge.ts). spacebridge/src/daemon/ ABSENT, spacebridge/bin/ ABSENT — fresh directories as expected.
+- [x] Execute Wave 1: PID file utils + mkdir-based lock (TDD)
+  pid.ts: writePidFile, readPidFile, isProcessAlive, cleanStalePidFile — 14 tests pass. lock.ts: acquireLock (fresh/contended/stale), releaseLock — 6 tests pass. Fix: tmpdir import moved from node:path → node:os.
+- [x] Execute Wave 2: shim auto-fork logic (TDD)
+  auto-fork.ts: autoForkDaemon + resolveDaemonCommand — 8 tests pass. Tests use real socket server (createSocketServer from entity 051), real child process spawn, real temp dirs. No mocks.
+- [x] Execute Wave 3: daemon.ts entry with start/stop/status
+  spacebridge/bin/daemon.ts: start (socket bind first, PID write, SIGTERM/SIGINT/exit handlers, SPACEBRIDGE_AUTO_STOP support), stop (SIGTERM or stale cleanup), status (__status RPC over socket, reports pid/uptime/sessions). SPACEBRIDGE_STATE_DIR env var for test isolation. Manual smoke: start creates files, stop cleans them.
+- [x] Execute Wave 4: lifecycle integration tests + barrel export
+  integration.test.ts: 7 tests covering start+connect+stop lifecycle, auto-fork creates daemon, second shim no re-fork, sticky daemon, SPACEBRIDGE_AUTO_STOP=1 auto-stop, stop subcommand, status subcommand — all pass. index.ts barrel exports all public symbols. Full suite: 35 tests pass, 0 fail.
+- [x] Write ## Stage Report: execute
+  Written. Commit: 1927705 feat(052): L2 auto-fork daemon lifecycle — pid, lock, auto-fork, daemon entry, integration tests (9 files, 1247 insertions).
+
+**Files created**:
+- spacebridge/src/daemon/pid.ts — PID file read/write/alive-check/stale-cleanup
+- spacebridge/src/daemon/pid.test.ts — 14 tests
+- spacebridge/src/daemon/lock.ts — mkdir-based atomic lock acquire/release
+- spacebridge/src/daemon/lock.test.ts — 6 tests
+- spacebridge/src/daemon/auto-fork.ts — shim auto-fork logic + resolveDaemonCommand
+- spacebridge/src/daemon/auto-fork.test.ts — 8 tests (real socket server, no mocks)
+- spacebridge/src/daemon/integration.test.ts — 7 full lifecycle integration tests
+- spacebridge/src/daemon/index.ts — barrel export for daemon module
+- spacebridge/bin/daemon.ts — daemon entry point (start/stop/status subcommands)
+
+**Validation Map update**:
+| AC | Status |
+|----|--------|
+| AC-1: First shim auto-forks, waits for socket, connects | PASS |
+| AC-2: Second shim blocks on lock, no second spawn | PASS |
+| AC-3: Sticky daemon survives shim disconnect | PASS |
+| AC-4: status reports PID, uptime, sessions | PASS |
+| AC-5: stop sends SIGTERM, cleans files | PASS |
+| AC-6: SPACEBRIDGE_NO_AUTOFORK=1 skips fork, errors | PASS |
+| AC-7: SPACEBRIDGE_AUTO_STOP=1 stops on last disconnect | PASS |
+
 ## Stage Report: plan
 
 - [x] Load and execute the spacedock:build-plan skill
