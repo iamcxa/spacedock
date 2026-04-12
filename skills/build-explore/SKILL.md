@@ -103,6 +103,8 @@ When you have the Agent tool (SO-direct mode), choose between Mode A and Mode B:
 - **Use Mode A** (dispatch code-explorer) when: this is a fresh session with no prior reads of the entity's target files, OR the entity touches >10 files across multiple layers, OR you need a clean context boundary to avoid polluting your remaining context budget.
 - **Use Mode B** (inline mapping) when: you already read >50% of the relevant files in this session (e.g., during a multi-entity SO pipeline run), OR the entity is Small/Medium with well-known target files, OR the parent entity's clarify decisions already narrowed the file scope significantly.
 
+In ensign mode (no Agent tool), always use Mode B regardless of entity scale -- Mode A requires Agent dispatch which is unavailable.
+
 The heuristic optimizes for: Mode A = fresh context isolation, Mode B = avoid redundant subagent dispatch. When in doubt, prefer Mode A for Large entities and Mode B for Small/Medium.
 
 ### Dispatching code-explorer (Mode A, when you have Agent tool)
