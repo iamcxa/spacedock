@@ -2,7 +2,7 @@
 id: 068
 title: Build-Distill Skill -- Systematic External Pattern Absorption + GSD First Pass
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: captain
 created: 2026-04-12T18:30:00+08:00
 started:
@@ -103,22 +103,80 @@ Compare these GSD capabilities against their build flow counterparts:
 - The GSD first pass produces ≥3 draft entities in `docs/build-pipeline/` with `source: build-distill` in their frontmatter, each targeting a gap scored ≥0.5. (how to verify: `grep -rl "source: build-distill" docs/build-pipeline/*.md` returns ≥3 files)
 - Entity 067 (TDD discipline) is retroactively documented in a distillation report as the "pre-skill exemplar" — showing what an ad-hoc distillation looks like vs what the skill produces. (how to verify: `grep "067" docs/build-pipeline/_docs/distillations/*.md` returns ≥1 match)
 
-## Open Questions
-
-(explore stage will populate)
-
 ## Assumptions
 
-(explore stage will populate)
+A-1: build-distill is non-interactive (same class as build-brainstorm). Reads sources, compares, outputs reports. Captain reviews output separately.
+Confidence: Confident (0.85)
+Evidence: skills/build-brainstorm/SKILL.md:1 -- "No interaction with the user at any point"; skills/build-explore/SKILL.md:1 -- "never ask the captain questions". 2+ consistent non-interactive build-* skills establish the pattern.
+
+A-2: Skill is manually triggered by SO or captain, not auto-dispatched by FO. It's a meta-skill for pipeline evolution, not a pipeline stage.
+Confidence: Confident (0.90)
+Evidence: No existing build-* skill auto-dispatches another build-* skill for meta-analysis. build-distill is closer to /build (captain-initiated) than to explore (FO-dispatched stage).
+
+A-3: "No equivalent" is a valid comparison result — scored 1.0 on the gap dimension. GSD roadmap vs build flow has no target skill; the comparison report documents the absence as a complete gap.
+Confidence: Confident (0.85)
+Evidence: Entity 068 Directive table already lists "No equivalent" for roadmap/new-milestone. The 0-1 scoring scale naturally accommodates absence (1.0) as the maximum gap.
+
+A-4: Comparison reports go to `docs/build-pipeline/_docs/distillations/`, entity drafts to `docs/build-pipeline/`. Follows existing _docs/ pattern for internal documentation.
+Confidence: Confident (0.90)
+Evidence: docs/build-pipeline/_docs/ already contains CONTEXT-LAKE-PROTOCOL.md and SO-FO-DISPATCH-SPLIT.md — internal reference docs that inform the pipeline but aren't pipeline entities.
+
+A-5: Comparison reports are point-in-time snapshots, dated and immutable. No migration needed when build-* skills change — new comparisons produce new reports.
+Confidence: Confident (0.95)
+Evidence: Same pattern as Stage Reports in entities — they capture state at a moment, not a living contract. Updating a comparison means re-running build-distill, not editing old reports.
+
+A-6: Entity drafts produced by build-distill follow the 067 exemplar — full Directive + Captain Context Snapshot + Acceptance Criteria, ready for brainstorm stage.
+Confidence: Confident (0.85)
+Evidence: docs/build-pipeline/build-flow-tdd-discipline.md -- entity 067 as the ad-hoc distillation exemplar that this skill formalizes. Same frontmatter schema, same section structure.
 
 ## Option Comparisons
 
-(explore stage will populate)
+### Fixed vs extensible comparison dimensions
+
+Should the 7 comparison dimensions be fixed (every run uses the same 7) or extensible (each comparison can add domain-specific dimensions)?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Fixed 7 dimensions for all comparisons | Comparable across runs -- every distillation report has the same axes; easier to build aggregate views; simpler skill logic | May miss domain-specific gaps that don't fit the 7 dimensions (e.g., a security-focused comparison might need an "Authorization Model" dimension) | Low | Recommended |
+| Extensible -- base 7 + optional domain-specific | Captures nuance per comparison pair; richer gap analysis | Reports not directly comparable; aggregate views harder; skill logic needs to handle variable dimensions; risk of dimension creep | Medium | Viable |
+
+## Open Questions
+
+Q-1: How should gap scores (0-1) be calculated from the three factors (frequency of use, downstream effect, captain pain points)?
+
+Domain: Organizational / Data-transforming
+
+Why it matters: Without a defined formula, gap scores are subjective and non-comparable across runs. A formula makes the audit trail meaningful. But over-engineering the formula (weighted averages, calibration curves) adds complexity the captain may not want.
+
+Suggested options: (a) Simple max -- score = max(frequency, downstream, pain) on 0-1 each, (b) Weighted average -- score = 0.4*downstream + 0.3*frequency + 0.3*pain, (c) Qualitative bands -- Low/Medium/High mapped to 0.25/0.5/0.75, with manual override to 0.0 or 1.0 for extreme cases
+
+Q-2: After running 5 individual GSD comparisons, should build-distill produce an aggregate summary report?
+
+Domain: Readable / Textual
+
+Why it matters: 5 individual reports are thorough but fragmented. A summary would give the captain a single-page view of all gaps ranked by score. But it's extra work and might be redundant if the entity drafts already capture the actionable items.
+
+Suggested options: (a) Yes -- produce `distillations/gsd-summary.md` with ranked gap table, (b) No -- individual reports + entity drafts are sufficient, (c) Minimal -- a gap ranking table appended to each individual report's header for cross-reference
 
 ## Decomposition Recommendation
 
-(explore stage will populate if scope warrants it)
+Scope flag present but decomposition not recommended: the skill (2 files) is meaningless without its first execution (5 comparison reports). The comparisons ARE the validation that the skill works. Splitting "create skill" from "run skill" creates an artificial dependency with no independent shippable value. 11-14 new files total is within Medium scale.
 
 ## Canonical References
 
 (clarify stage will populate)
+
+## Stage Report: explore
+
+- [x] Files mapped: 18 across contract, config layers
+  9 build-* SKILL.md files (2,720 lines total target surface); 7 GSD skills (~514 lines source surface); 2 existing _docs/ files
+- [x] Assumptions formed: 6 (Confident: 6, Likely: 0, Unclear: 0)
+  A-1 non-interactive; A-2 manual trigger; A-3 "no equivalent" = score 1.0; A-4 _docs/ output path; A-5 immutable snapshots; A-6 entity draft format follows 067
+- [x] Options surfaced: 1
+  O-1 fixed vs extensible comparison dimensions (fixed recommended)
+- [x] Questions generated: 2
+  Q-1 gap scoring formula; Q-2 aggregate summary report
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorming spec
+- [x] Scale assessment: confirmed Medium
+  11-14 new files (2 skill + 5 reports + 3-5 entity drafts + 1 optional summary), all NEW creation, no existing file modifications
