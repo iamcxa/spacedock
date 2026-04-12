@@ -217,6 +217,72 @@ Each section lists a file path with entities that have modified it, their stage,
 | overhaul-skill-implementation | plan | Update file index table with overhaul entry | planned | 2026-04-12 |
 | build-flow-tdd-discipline | execute | Update file index table with 3 TDD pressure test entries | in-flight | 2026-04-12 |
 
+### docs/build-pipeline/_docs/distillations/067-tdd-pre-skill-exemplar.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | Retroactive 067 documentation as pre-skill distillation exemplar | planned | 2026-04-12 |
+
+### docs/build-pipeline/_docs/distillations/gsd-discuss-assumptions-vs-build-explore.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | GSD discuss-phase assumptions model vs build-explore comparison report | planned | 2026-04-12 |
+
+### docs/build-pipeline/_docs/distillations/gsd-discuss-phase-vs-build-clarify.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | GSD discuss-phase vs build-clarify comparison report | planned | 2026-04-12 |
+
+### docs/build-pipeline/_docs/distillations/gsd-plan-phase-vs-build-plan.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | GSD plan-phase vs build-plan comparison report | planned | 2026-04-12 |
+
+### docs/build-pipeline/_docs/distillations/gsd-research-phase-vs-build-research.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | GSD research-phase vs build-research comparison report | planned | 2026-04-12 |
+
+### docs/build-pipeline/_docs/distillations/gsd-roadmap-vs-build-flow.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | GSD roadmap capability vs build flow (no equivalent) comparison report | planned | 2026-04-12 |
+
+### docs/build-pipeline/build-clarify-interaction-modes.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | Draft entity for build-clarify interaction modes gap from GSD distillation | planned | 2026-04-12 |
+
+### docs/build-pipeline/build-explore-domain-aware-gray-areas.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | Draft entity for domain-aware gray area generation gap from GSD distillation | planned | 2026-04-12 |
+
+### docs/build-pipeline/build-flow-roadmap-orchestration.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | Draft entity for multi-entity roadmap orchestration gap from GSD distillation | planned | 2026-04-12 |
+
+### skills/build-distill/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | Create build-distill skill -- 6-step semi-interactive comparison process | planned | 2026-04-12 |
+
+### skills/build-distill/references/comparison-dimensions.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | Define 7 fixed comparison dimensions for cross-run comparability | planned | 2026-04-12 |
+
 ## Recently Retired (last 30 days)
 
 <!-- Empty until entities ship and their contracts age out. -->
