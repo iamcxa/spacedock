@@ -22,13 +22,11 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
 - `Grep` / `Glob` -- locate referenced files during pre-task skill selection if a task lacks a `skills` hint
 - `Write` / `Edit` -- append the `## Stage Report: execute` section to the entity body and update the `## Validation Map` status column per task
 - `Bash` -- `git status`, `git diff`, `git rev-parse`, `git add`, `git commit` for serial per-task commits; `bun` for pre-task ToolSearch fallback if needed
-- `Agent` -- dispatch `spacedock:task-executor` agents, one per wave task, with per-task model hint. You run in the **ensign orchestrator context** (sonnet), so Agent dispatch is available to you.
 - `Skill` -- invoke `spacedock:workflow-index` (step 2, mandatory stage-entry transition) and `spacedock:knowledge-capture` (step 8, optional)
 
-**NOT available:**
-- `AskUserQuestion` -- you run as an ensign subagent dispatched by FO. FO owns captain interaction. If escalation is needed at step 7 or 8, write `feedback-to: {execute|plan|captain}` in the Stage Report and return; FO routes.
-
-**Important dispatch constraint.** You are the orchestrator in your own ensign context -- you CAN dispatch `spacedock:task-executor` agents via the `Agent` tool. The task-executors you dispatch, however, run as nested subagents and **cannot themselves dispatch further Agent calls**. See `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md`. Design every task dispatch to be leaf-complete -- the task-executor must have everything it needs in its prompt, and it will never fan out to more subagents. If a task genuinely needs decomposition, that is a plan defect -- the task-executor returns `BLOCKED` and you escalate per step 7.
+**NOT available (see `references/agent-dispatch-guide.md`):**
+- `Agent` -- you run as an ensign subagent, which does not have the Agent tool. FO dispatches task-executor teammates per wave before or instead of invoking you. When FO uses the task-list-driven pattern, task-executors self-claim wave tasks and commit directly; you read their commits and write the Stage Report. When running in inline fallback mode (no FO team dispatch), you execute tasks serially in your own context.
+- `AskUserQuestion` -- FO owns captain interaction. If escalation is needed at step 7 or 8, write `feedback-to: {execute|plan|captain}` in the Stage Report and return; FO routes.
 
 ---
 
@@ -121,65 +119,50 @@ Rationale: you (sonnet orchestrator) have reasoning budget for skill selection; 
 
 ---
 
-## Step 4: Wave Dispatch Loop
+## Step 4: Wave Execution Loop
 
-Iterate waves sequentially (wave 0, then wave 1, then wave 2, ...). Inside each wave, dispatch tasks in parallel where possible.
+Iterate waves sequentially (wave 0, then wave 1, then wave 2, ...). Inside each wave, tasks may have been executed by FO-dispatched task-executor teammates or need to be executed inline by you.
 
-**Runtime probe fallback.** Before invoking `Agent` to dispatch task-executor subagents, probe its availability: `ToolSearch(query="select:Agent", max_results=1)`. If the schema fails to load, the Agent tool is absent from this subagent's context -- this happens when the execute ensign is dispatched nested via in-session `Agent()` (both bare mode and team mode exhibit this; see `subagent-cannot-nest-agent-dispatch.md` memory + entity 062 execute stage KC-062-1 for live evidence). Fall back to **inline serial task execution** inside the ensign's own context: for each task in wave order, Read its read_first files, Write/Edit the files_modified per the task.action block, run its acceptance_criteria commands via Bash, and commit serially per task. Wave parallelism is lost but wave ordering is preserved and per-task commit discipline stays intact. Log the fallback in `## Stage Report: execute` under `### Dispatch Gaps` so reviewers know this execute run had no true per-task subagents.
+See `docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md` for the dispatch ownership model and `references/agent-dispatch-guide.md` for why ensigns cannot dispatch Agent.
 
-### 4a -- Parallelism Decision
+### Two execution modes
 
-For each wave, decide serial vs parallel:
-- Read the plan's explicit `serial="true"` hint on any task; if any task in the wave carries it, run the entire wave serial.
-- Otherwise auto-detect: if any two tasks in the wave have overlapping `files_modified`, run the entire wave serial (sibling blast radius collision makes parallel unsafe).
-- If no overlap and no serial hint, dispatch in parallel.
+**Mode A -- FO task-list-driven (preferred):** FO dispatched task-executor teammates per wave before invoking you. Teammates self-claimed tasks via the shared task list, wrote files, and committed on the worktree branch. Your job is to:
+1. Read the git log to identify per-task commits since the wave base SHA.
+2. Run each task's `acceptance_criteria` commands to verify the work.
+3. Record per-task results (commit SHA, pass/fail, deviations) for the Stage Report.
+4. If any task was not completed by a teammate (no matching commit), execute it inline per Mode B.
 
-### 4b -- Parallel Dispatch Task Subagents
+**Mode B -- Inline serial fallback:** No task-executor teammates were dispatched (FO ran in simple subagent mode, or this is a re-entry after feedback). Execute each task yourself in wave order:
+1. Read the task's `read_first` files.
+2. Write/Edit the `files_modified` per the task's `action` block.
+3. Run the task's `acceptance_criteria` commands via Bash.
+4. Commit per task with a conventional commit message.
 
-For each task in the wave (or one at a time for serial waves):
+Wave parallelism exists only in Mode A (via FO's task-list dispatch). Mode B is always serial. Log which mode was used in `## Stage Report: execute` under `### Dispatch Mode`.
 
+### Detect which mode you are in
+
+Check for teammate commits since the execute base SHA:
+```bash
+git log --oneline {execute_base_sha}..HEAD
 ```
-Agent(
-  subagent_type="spacedock:task-executor",
-  model=task.model,
-  prompt="""
-  ## Task
+If commits exist with task-executor conventional messages (e.g., `feat(execute): {slug} task-{N} -- ...`), you are in Mode A. If no such commits exist, you are in Mode B.
 
-  <task id="{task.id}" model="{task.model}" wave="{task.wave}" skills="{resolved_skills}">
-    <read_first>
-  {task.read_first items, one per line}
-    </read_first>
+### 4a -- Parallelism Decision (Mode B only)
 
-    <action>
-  {task.action verbatim}
-    </action>
+When executing inline (Mode B), tasks within a wave run serially. For Mode A, parallelism was already handled by FO's task-list dispatch.
 
-    <acceptance_criteria>
-  {task.acceptance_criteria items, one per line}
-    </acceptance_criteria>
+### 4b -- Per-Task Execution (Mode B) or Verification (Mode A)
 
-    <files_modified>
-  {task.files_modified items, one per line}
-    </files_modified>
-  </task>
+**Mode A (verify):** For each task in wave order, find its commit, run `acceptance_criteria`, record pass/fail.
 
-  ## Context
-
-  Entity: {slug}
-  Wave base SHA: {git rev-parse HEAD}
-  Plan reference: {entity_path}#PLAN
-
-  Load skill: skills/task-execution (flat path). Return per the task-execution
-  step 7 output format with task_id, status (DONE | NEEDS_CONTEXT | BLOCKED),
-  changed_files list, acceptance_criteria_results, findings. Do NOT commit --
-  orchestrator commits serially after wave closes.
-  """
-)
-```
-
-Dispatch all parallel tasks in a **single message** so they run concurrently. For serial waves, dispatch one at a time and wait for each return before the next.
-
-**Leaf dispatch rule.** The task-executor agent loads `skills/task-execution/SKILL.md` which is leaf-only by design. It reads, implements, verifies, reports. It does NOT commit and it does NOT dispatch further Agent calls. The task-executor's tool surface (per spec line 497) is `Read, Write, Edit, Bash, Grep, Glob, Skill` -- no `Agent`. Design each prompt as self-contained: all context the task-executor needs must be in the prompt text or reachable via the files named in `read_first`.
+**Mode B (execute):** For each task in wave order:
+1. Read `read_first` files.
+2. Execute `action` block (Write/Edit files per `files_modified`).
+3. Run `acceptance_criteria` via Bash.
+4. Commit: `git add {files_modified} && git commit -m "{type}(execute): {slug} task-{id} -- {summary}"`.
+5. If task returns BLOCKED, escalate per Step 7.
 
 ### 4c -- Collect Subagent Results
 

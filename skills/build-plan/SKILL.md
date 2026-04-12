@@ -22,8 +22,10 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
 - `Grep` / `Glob` -- locate related artifacts during topic extraction and Context Compliance checks
 - `Write` / `Edit` -- write plan sections into the entity body and the final `## Stage Report: plan`
 - `Bash` -- `git` commands (branch, sha, commit), `workflow-index` CLI invocations if applicable
-- `Agent` -- dispatch `spacedock:researcher` (step 2) and `general-purpose` plan-checker (step 6). You run in the **main orchestrator context** (opus), so Agent dispatch is available to you.
 - `Skill` -- invoke `spacedock:workflow-index` (step 9) and `spacedock:knowledge-capture` (step 8, optional)
+
+**NOT available (see `references/agent-dispatch-guide.md`):**
+- `Agent` -- you run as an ensign subagent, which does not have the Agent tool. FO (or SO) dispatches researcher teammates before invoking you. You read their results from the entity file.
 
 **NOT available:**
 - `AskUserQuestion` -- you run as an ensign subagent dispatched by FO. FO owns captain interaction. If escalation is needed at step 7, write `feedback-to: captain` in the Stage Report and return; FO routes to captain.
@@ -83,40 +85,18 @@ Output of this step: a list of `(topic title, topic description, entity context 
 
 ---
 
-## Step 2: Research Dispatch (Parallel)
+## Step 2: Read Research Findings
 
-For every topic from step 1, dispatch a researcher in parallel:
+Read the `## Research Findings` section from the entity file. This section was populated by FO-dispatched researcher teammates (or SO-dispatched researchers) before you were invoked. See `docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md` for the dispatch ownership model and `references/agent-dispatch-guide.md` for why ensigns cannot dispatch Agent.
 
-```
-Agent(
-  subagent_type="spacedock:researcher",
-  model="sonnet",
-  prompt="""
-  ## Topic
-  {topic title}
+**Expected content:** 5 subsections (Upstream Constraints / Existing Patterns / Library/API Surface / Known Gotchas / Reference Examples), each with file:line or URL citations from the dispatched researchers.
 
-  ## Description
-  {topic description, 1-3 sentences}
+**Verify completeness.** Cross-check the research findings against the topic list you extracted in Step 1:
+- Every topic from Step 1 should have at least one finding in the corresponding subsection.
+- If a topic is missing coverage (researcher timed out, was truncated, or topic was not dispatched), record it as "Unknown Unknowns" in that subsection and flag it in Step 3's Open Question mechanism.
+- If `## Research Findings` is entirely absent or empty, fall back to **inline serial research** inside your own context: for each topic, use Read/Grep/Glob on the entity context paths and write the finding directly into the corresponding subsection, one topic at a time. Keep the 5-subsection output format and citation discipline identical. Log the fallback in `## Stage Report: plan` under `### Dispatch Gaps`.
 
-  ## Entity Context
-  {paths the researcher should focus on}
-
-  ## Scope Constraint
-  {what NOT to touch; what's out of scope}
-
-  Load skill: skills/build-research (flat path).
-  Return structured finding per build-research step 6 output format.
-  """
-)
-```
-
-Dispatch all researchers in a **single message** so they run in parallel. Wait for all to return before proceeding to step 3.
-
-**Runtime probe fallback.** Before invoking `Agent`, probe its availability: `ToolSearch(query="select:Agent", max_results=1)`. If the schema fails to load (response: "No matching deferred tools found"), the Agent tool is absent from this subagent's context -- this happens when the plan ensign is dispatched nested via in-session `Agent()` (both bare mode and team mode exhibit this; see `subagent-cannot-nest-agent-dispatch.md` memory + entity 062 plan/execute stage KC-062-1 for live evidence). Fall back to **inline serial research** inside the ensign's own context: for each topic, use Read/Grep/Glob on the entity context paths and write the finding directly into the corresponding `## Research Findings` subsection, one topic at a time. Skip the multi-researcher parallel dispatch, but keep the 5-subsection output format and citation discipline identical. Log the fallback in `## Stage Report: plan` under `### Dispatch Gaps` so reviewers know this plan was produced without parallel research.
-
-**Leaf dispatch rule.** The researcher agent loads `skills/build-research/SKILL.md` which is read-only and non-interactive by design. It investigates, it reports, it does NOT dispatch further. Do not instruct a researcher to "dispatch a sub-researcher" -- subagents cannot nest Agent dispatch (see `subagent-cannot-nest-agent-dispatch.md` memory).
-
-**Timeout / truncation handling.** If a researcher times out or returns truncated output, record it as "Unknown Unknowns" in that topic's finding and proceed. Do NOT re-dispatch for the same topic in step 2 -- handle any gaps via step 3's Open Question mechanism or a follow-up researcher in step 3 only if genuinely necessary.
+**Contradiction handling stays the same** -- proceed to Step 3 for contradiction resolution regardless of whether research was pre-populated or inline.
 
 ---
 
