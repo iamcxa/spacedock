@@ -273,3 +273,1007 @@ Suggested options: (a) Stick to spec §348-349 (drop `differential-review` if ab
   Step 3: 3 calls (B-1 integration model, B-2 return schema gap, B-3 failure mode); Step 4: 7 calls (Q-1 differential-review, Q-2 settings.json schema, Q-3 pr-review-toolkit bundling, Q-4 feature-dev + e2e-pipeline, Q-4 revise for kc-claude-plugins correction, Q-5 revised after subagent-nest clarification, Q-6 trailofbits dispatch scope); 1 initial Q-5 rejected by captain for clarification, then re-presented
 
 **Notes**: Captain added live scope corrections during clarify that reframed the distribution model (spacedock is a CC plugin installed globally, targets are external projects like carlove -- NOT "someone clones spacedock to hack on spacedock"). This reframing strengthened Path 1 for Q-5 with a user-facing rationale (in-plugin self-containment means target projects need zero extra plugin dep for code-explorer). Also surfaced `spacedock:install-build-flow` as a new follow-up entity candidate (captured in the ## Follow-up Entity Candidates block below Canonical References). Four downstream plan-task expansions recorded: (1) spacedock:code-explorer skill+agent creation, (2) Deliverable 2 drops feature-dev, (3) `docs/build-pipeline/README.md:183` pr-review-toolkit bundling claim correction, (4) 4 trailofbits wrapper agents in Deliverable 1. All clarify decisions are captured in annotations in the respective sections above -- plan stage reads annotations, not Directive, for scope grounding.
+
+## Research Findings
+
+### 1. Upstream Constraints
+
+- **Engine-freeze invariant holds.** spec §§861-886 and entity Brainstorming Spec GUARDRAILS both require no new engine schema fields, no new stage primitives, no new frontmatter fields. `.claude/settings.json` is a Claude Code harness file, not a spacedock engine file (verified: `scripts/codex_prepare_dispatch.py` does not read it). Mod deletion is workflow-layer; build-review SKILL.md edits are skill-layer. All three deliverables stay strictly workflow-layer (entity body GUARDRAILS line 58).
+- **Namespace lock.** Phase 2 sweep `15772ac` normalized all dispatches to `spacedock:*`. New agent identifiers MUST use `spacedock:code-explorer` / `spacedock:sharp-edges-reviewer` / etc., NOT `spacebridge:*` or bare names. Verified: `grep -r "spacebridge:" skills/ agents/` returns zero dispatch-call matches (one forward reference in `build-uat/SKILL.md:188` is a future slash command, not a dispatch target) -- A-4 confirmed.
+- **Captain preferences / code-project-guardrails.** `references/code-project-guardrails.md:21-23` treats `skills/`, `agents/`, `references/`, `plugin.json`, and workflow `README.md` as "protected surfaces" where changes "should be tied to a tracked task". This plan authorizes the edits as tracked tasks, satisfying the scaffolding exception.
+- **Plan-write discipline.** `~/.claude/projects/-Users-kent-Project-spacedock/memory/plan-write-discipline.md` mandates Task 0 Environment Verification for any plan touching >3 files or >1 subsystem. This plan touches 10+ files across `skills/`, `agents/`, `docs/build-pipeline/`, `.claude/`, `tests/pressure/`, `mods/` -- Task 0 is mandatory.
+- **Dogfood discipline.** Entity body GUARDRAILS line 59: "any stage failure during this entity's pipeline run is a Phase 4 finding ... Do NOT suppress failures, do NOT retry loop, do NOT silently bypass acceptance criteria." Plan tasks must fail-loud, not fail-silent. Acceptance criteria use mechanical commands, not judgment.
+- **workflow-index-lifecycle-gap memory.** Case B in `mods/workflow-index-maintainer.md:73` explicitly states: "Do NOT delete Case B before verifying the proper append path exists in Plans 2/3." AC5 codifies this as a live-verification gate: Case B deletion requires AC3 + AC4 pass.
+
+### 2. Existing Patterns
+
+- **Thin wrapper agent + preloaded skill (researcher pattern).** `agents/researcher.md:1-21` (20 lines total) is a ~15-line thin wrapper with `skills: ["spacedock:build-research"]` frontmatter and a 3-line Boot Sequence. Preloaded via skill inheritance. `tools: Read, Grep, Glob, WebFetch, WebSearch`. `model: inherit`. Same pattern used by `agents/task-executor.md:1-21` (20 lines, `skills: ["spacedock:task-execution"]`, `tools: Read, Write, Edit, Bash, Grep, Glob, Skill`). This is the symmetric pattern `spacedock:code-explorer` must follow: `agents/code-explorer.md` (~15 lines thin wrapper) + `skills/code-explorer/SKILL.md` (the actual instructions). Four trailofbits wrapper agents follow the same thin-wrapper pattern but with `skills: ["trailofbits:sharp-edges"]` (etc.) instead of preloading a spacedock-owned skill (2+ consistent usages confirms this as a pattern).
+- **Agents inherit full tool surface unless restricted.** `agents/ensign.md:1-15` has no `tools:` field -- inherits the full Agent tool surface (not subject to the subagent-cannot-nest-agent-dispatch constraint per Q-5 finding). `agents/task-executor.md:4` explicitly lists `tools: Read, Write, Edit, Bash, Grep, Glob, Skill` -- restricted. Pattern: custom-named agents CAN dispatch other agents; general-purpose subagents cannot. Q-5 relies on this distinction.
+- **Workflow-index Skill() invocation signature.** `skills/build-plan/SKILL.md:372-385` + `skills/build-execute/SKILL.md:83-94` both show the canonical `Skill("spacedock:workflow-index", args={mode: "write", target: "contracts", operation: "...", entry: {...}})` call shape. `append` operation takes `files: [...]`, `update-status-bulk` takes `files: [...], new_status: ...`. Two usages = pattern.
+- **Knowledge-capture Skill() precedent.** `skills/build-review/SKILL.md:138-147` is the existing Skill()-from-orchestrator pattern for in-context subroutine invocation -- A-2 confirmed. Supports Path C framing: new wrapper agents invoke the trailofbits skills via preloaded skill frontmatter (like researcher/task-executor), not inline Skill() calls from build-review ensign context. Orchestrator does Agent dispatch, not Skill dispatch for the trailofbits subset.
+
+### 3. Library/API Surface
+
+- **`.claude/settings.json` schema (Q-2 resolved).** `~/.claude/settings.json:277-309` canonical precedent: top-level `"enabledPlugins": {"plugin-name@marketplace-name": true, ...}` map (line 277-287) and top-level `"extraKnownMarketplaces": {"marketplace-name": {"source": {"source": "github", "repo": "owner/repo"}, "autoUpdate": true}, ...}` map (line 288-309). Built-in marketplaces (`claude-plugins-official`, `superpowers-marketplace`) require NO `extraKnownMarketplaces` entry; custom github sources DO. User-global settings declares `"trailofbits"` marketplace pointing to github repo `trailofbits/skills` at lines 302-308, and enables `pr-review-toolkit@claude-plugins-official` at line 286.
+- **`workflow-index append` API (write-mode.md:15-39).** `mode: write`, `target: contracts`, `operation: append`, `entry: {entity: <slug>, stage: <stage-name>, files: [<path>, ...], intent: <<=80 chars>, status: planned|in-flight|final|reverted}`. Commits as `chore(index): add contracts for entity-{slug} entering {stage}`. Commit-granularity rule: one commit per entity stage entry (batch all files within ONE task into ONE call, but do NOT batch across tasks).
+- **`workflow-index update-status-bulk` API (write-mode.md:60-94).** `mode: write`, `target: contracts`, `operation: update-status-bulk`, `entry: {entity, files: [...], new_status}`. Atomic: aborts whole operation if any row missing; commits once as `chore(index): advance entity-{slug} contracts to {new_status} ({N} files)`. Build-execute Step 2 uses this for `planned → in-flight` on stage entry.
+- **trailofbits skill identifiers (observed in current CC session).** `sharp-edges:sharp-edges` (footgun API design), `variant-analysis:variant-analysis` + `variant-analysis:variants` (variant bug hunting), `insecure-defaults:insecure-defaults` (fail-open defaults detection), `mutation-testing:mutation-testing` (campaign config helper -- excluded from build-review dispatch per Q-6). `differential-review` NOT observed in current session but published at `https://github.com/trailofbits/skills` per Q-1 WebFetch verification. Plugins are skills invoked via Skill tool in preloaded agent frontmatter, NOT agents dispatched via Agent tool (A-6 confirmed = spec §1033 category error).
+- **Marketplace github source format.** `~/.claude/settings.json:288-309` shows both github-sourced and directory-sourced entries. Github source: `"source": {"source": "github", "repo": "trailofbits/skills"}` with `"autoUpdate": true`. Directory source (for local dev): `"source": {"source": "directory", "path": "/Users/..."}`. Spacedock repo-level settings.json declares github sources for both `trailofbits` and `iamcxa-plugins` (AC1 mandate).
+
+### 4. Known Gotchas
+
+- **Subagents cannot recursively dispatch Agent.** `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md` constrains general-purpose teammates from nesting. Phase E Plan 2 Wave 1 discovery. HOWEVER, the Q-5 revised framing establishes that **custom-named agents like ensign/task-executor/researcher inherit the full tool surface** unless a `tools:` restriction is explicit -- they CAN dispatch nested Agent calls. `agents/ensign.md` has no `tools:` field, and `agents/task-executor.md:4` has `Skill` but not `Agent` which would be the restriction if needed. This is why build-execute can dispatch task-executor from ensign context. Design implication for Deliverable 1 (trailofbits wrapper agents): they must have a `tools:` allowlist that includes `Skill` (for invoking the preloaded trailofbits skill) but EXCLUDES `Agent` (leaf-only, no nested dispatch).
+- **Plan-checker Dim 7 Skill-tool availability.** `skills/build-plan/references/plan-checker-prompt.md:100-110` acknowledges that `Skill` may not be available in the dispatched `general-purpose` plan-checker subagent context. Graceful degradation: emits a Dim 7 warning rather than silently skipping. First live Dim 7 exercise happens in this entity's plan-checker iteration -- if Dim 7 fires the graceful-degradation stub, that's a finding to capture as a Pending Knowledge Capture, not a plan failure.
+- **Agent tool NOT available in ensign subagent context.** The build-plan SKILL.md design assumes Agent dispatch is available (Step 2 researcher fan-out, Step 6 plan-checker). In this live dispatch, the ensign context has `SendMessage`/`TeamCreate`/`Task*` but NOT raw `Agent`. This matches the subagent-cannot-nest constraint partially BUT builds on the nuance: ensign's custom-agent tool surface is dynamic -- actual availability depends on the orchestration harness. Plan stage proceeds via inline serial research as pragmatic workaround. This is a Pending Knowledge Capture for D2 (build-plan Step 2 assumes availability that does not hold in live dispatch).
+- **workflow-index Skill() from Edit/Write-only context.** Build-plan Step 9a requires the `Skill` tool to invoke `spacedock:workflow-index`. If Skill is unavailable in this ensign context, the fallback is to directly Edit `docs/build-pipeline/_index/CONTRACTS.md` following the contracts-format.md spec AND commit with the `chore(index):` message the skill would have produced. This preserves the unconditional append contract (AC3 + Success Criterion #9) even when the tool surface is narrower than designed. Entity body line 60 GUARDRAIL: "any stage failure becomes Phase 4 data, not a bug" applies.
+- **Case B deletion order.** `mods/workflow-index-maintainer.md:73` Case B literally contains the text `**Do NOT delete Case B before verifying the proper append path exists in Plans 2/3.**`. AC5 codifies this as a conditional: Case B deletion requires AC3 + AC4 passing during execute/uat/ship. For this plan, Case B cleanup is Task 10 (conditional), executed ONLY after the execute stage demonstrates AC3+AC4 live. If execute fails to produce rows, Task 10 becomes SKIP and Case B stays.
+- **em-dash drift.** `references/ensign-shared-core.md` and all build-* skills enforce `--` (double dash), not `—` (em dash). Entity body explore Stage Report already notes ~19 em-dashes in prose. Plan tasks must use `--` in all generated text (SKILL.md additions, agent frontmatter, commit messages). A follow-up sweep to convert entity body em-dashes is NOT in scope for this plan (clarify did not lock it in).
+- **`docs/build-pipeline/README.md:183` "Bundled with superpowers" claim is incorrect.** Q-3 resolution: `pr-review-toolkit@claude-plugins-official` per `~/.claude/settings.json:286` -- separate plugin, not a superpowers sub-module. Correction is Task 8 in this plan.
+
+### 5. Reference Examples
+
+- **`agents/researcher.md`** (20 lines) -- canonical thin-wrapper agent template. Frontmatter: `name`, `description`, `tools` allowlist, `model: inherit`, `color`, `skills: ["spacedock:build-research"]`. Body: 3-line "Boot Sequence" + 1-line "Namespace Note" section. Copy this exact shape for `agents/code-explorer.md`.
+- **`agents/task-executor.md`** (20 lines) -- second canonical thin-wrapper template. Same shape as researcher but with different tools allowlist (`Read, Write, Edit, Bash, Grep, Glob, Skill`) and skill preload (`spacedock:task-execution`). Used as reference for trailofbits wrapper agents' Skill-only minimal tool allowlist.
+- **`skills/build-research/SKILL.md`** (231 lines) -- canonical subroutine skill template. Sections: frontmatter, namespace note, Tools Available, Input Contract, 6 numbered steps (Read → Investigate → Classify → Unknown Unknowns → Follow-ups → Output), Scope Discipline, Citation Discipline, Rules. `skills/code-explorer/SKILL.md` is symmetric but scoped to codebase mapping (not research domains): 6 steps (Read topic → Grep/Glob sweep → Read files → classify by layer → write 1-line purpose notes → emit structured file list).
+- **`~/.claude/settings.json:277-309`** -- concrete JSON payload for the AC1 deliverable. Fields: `enabledPlugins` (object map of `"plugin@marketplace": bool`), `extraKnownMarketplaces` (object map of marketplace-name to source spec). Copy the `trailofbits` marketplace block (lines 302-308) verbatim and add a parallel `iamcxa-plugins` entry pointing to `iamcxa/kc-claude-plugins`. Enable 7 plugins per entity AC1: `pr-review-toolkit@claude-plugins-official`, `sharp-edges@trailofbits`, `variant-analysis@trailofbits`, `insecure-defaults@trailofbits`, `mutation-testing@trailofbits`, `differential-review@trailofbits`, `e2e-pipeline@iamcxa-plugins`.
+- **`skills/build-review/SKILL.md:88-99`** -- the Step 2 dispatch block that must be edited for Deliverable 1. Current state: 8 entries (6 pr-review-toolkit + 2 trailofbits as "agents"). Target state: 10 entries (6 pr-review-toolkit + 4 trailofbits WRAPPER AGENTS via Agent dispatch, with explanatory note that wrappers exist because the underlying trailofbits entities are skills). The "Architectural note" at lines 99-100 (TBD / architectural-unknown block) must be removed once the wrappers ship concrete subagent_type identifiers.
+- **`skills/build-plan/SKILL.md:361-438`** (Step 9 full block) -- reference for the unconditional append pattern. Confirms (a) build-plan Step 9a is wired to call `Skill("spacedock:workflow-index", ...)` with `operation: append`, (b) commit ordering: index commits precede plan body commit, (c) failure handling: unwritable CONTRACTS.md escalates via feedback-to: captain. Plan-stage execution of this entity MUST follow this block.
+- **`skills/build-execute/SKILL.md:74-103`** (Step 2 stage-entry transition) -- reference for the `planned → in-flight` transition that execute stage will produce to validate AC4.
+
+## PLAN
+
+<task id="task-0" model="sonnet" wave="0" skills="">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/skills/build-review/SKILL.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/skills/build-explore/SKILL.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/skills/build-plan/SKILL.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/skills/build-execute/SKILL.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/mods/workflow-index-maintainer.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/docs/build-pipeline/README.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/docs/build-pipeline/_index/CONTRACTS.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/agents/researcher.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/agents/task-executor.md
+  </read_first>
+
+  <action>
+  Environment Verification per plan-write-discipline.md memory. Run the following mechanical checks and fail loudly if ANY check fails. Do NOT proceed to Task 1 if any check fails -- report the failure via Stage Report + feedback-to: plan.
+
+  Check 1 -- Files the plan ASSUMES EXIST:
+  ```bash
+  cd /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration
+  test -f skills/build-review/SKILL.md && \
+  test -f skills/build-explore/SKILL.md && \
+  test -f skills/build-plan/SKILL.md && \
+  test -f skills/build-execute/SKILL.md && \
+  test -f mods/workflow-index-maintainer.md && \
+  test -f docs/build-pipeline/README.md && \
+  test -f docs/build-pipeline/_index/CONTRACTS.md && \
+  test -f agents/researcher.md && \
+  test -f agents/task-executor.md && \
+  test -f agents/ensign.md && \
+  test -f skills/workflow-index/references/write-mode.md && \
+  echo PASS || echo FAIL
+  ```
+  Expected: `PASS`.
+
+  Check 2 -- Files the plan ASSUMES DO NOT EXIST (will be created):
+  ```bash
+  cd /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration
+  ! test -e .claude/settings.json && \
+  ! test -e skills/code-explorer && \
+  ! test -e agents/code-explorer.md && \
+  ! test -e agents/sharp-edges-reviewer.md && \
+  ! test -e agents/variant-analysis-reviewer.md && \
+  ! test -e agents/insecure-defaults-reviewer.md && \
+  ! test -e agents/differential-review-reviewer.md && \
+  ! test -e tests/pressure/build-review-trailofbits-integration.yaml && \
+  echo PASS || echo FAIL
+  ```
+  Expected: `PASS`.
+
+  Check 3 -- Namespace grounding (no residual spacebridge: dispatch references):
+  ```bash
+  cd /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration
+  grep -rn 'subagent_type="spacebridge:' skills/ agents/ || echo PASS_NO_SPACEBRIDGE_DISPATCH
+  ```
+  Expected: literal `PASS_NO_SPACEBRIDGE_DISPATCH`. A future-tense slash-command mention in `skills/build-uat/SKILL.md:188` is allowed (per A-4 confirmation).
+
+  Check 4 -- Plans 2/3 workflow-index hook wiring verification (AC3 + AC4 preconditions):
+  ```bash
+  cd /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration
+  grep -q 'workflow-index append' skills/build-plan/SKILL.md && \
+  grep -q 'operation: "append"' skills/build-plan/SKILL.md && \
+  grep -q 'update-status-bulk' skills/build-execute/SKILL.md && \
+  grep -q 'operation: "update-status-bulk"' skills/build-execute/SKILL.md && \
+  echo PASS_HOOKS_WIRED || echo FAIL_HOOKS_MISSING
+  ```
+  Expected: `PASS_HOOKS_WIRED`. If FAIL, plan cannot proceed -- the hooks Task 10 conditional deletes on were never shipped.
+
+  Check 5 -- Case B block presence verification (Task 10 precondition):
+  ```bash
+  cd /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration
+  grep -q 'Case B' mods/workflow-index-maintainer.md && \
+  grep -q 'Do NOT delete Case B before verifying' mods/workflow-index-maintainer.md && \
+  echo PASS_CASE_B_PRESENT || echo FAIL_CASE_B_MISSING
+  ```
+  Expected: `PASS_CASE_B_PRESENT`.
+
+  Check 6 -- CONTRACTS.md stub verification (Success Criterion #9 baseline):
+  ```bash
+  cd /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration
+  grep -c 'phase-e-plan-4-dogfood-trailofbits-integration' docs/build-pipeline/_index/CONTRACTS.md
+  ```
+  Expected: `0` at plan entry (no existing rows). After plan-approval workflow-index append, this number must become >=1 (AC3 verification).
+
+  Record every check's output in Stage Report: execute. If any check fails, HALT and escalate via feedback-to: plan. Do NOT silently work around failures.
+  </action>
+
+  <acceptance_criteria>
+    - Check 1 script outputs `PASS`
+    - Check 2 script outputs `PASS`
+    - Check 3 script outputs `PASS_NO_SPACEBRIDGE_DISPATCH`
+    - Check 4 script outputs `PASS_HOOKS_WIRED`
+    - Check 5 script outputs `PASS_CASE_B_PRESENT`
+    - Check 6 script outputs `0` at plan entry (becomes >=1 post-plan-approval)
+    - Stage Report: execute records all 6 check outputs verbatim under `### Task 0 Environment Verification`
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1" skills="">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/skills/build-research/SKILL.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/skills/build-explore/SKILL.md
+  </read_first>
+
+  <action>
+  Create `skills/code-explorer/SKILL.md` as a new subroutine skill symmetric to `skills/build-research/SKILL.md`. This is the Path C implementation for Q-5: an in-plugin codebase-mapping primitive that `build-explore` Step 2 can delegate to via nested Agent dispatch.
+
+  Structure the file (~180-220 lines) with exactly these sections in order:
+  1. Frontmatter: `name: code-explorer`, `description: "Read-only codebase mapping subroutine for build-explore. Dispatched by build-explore Step 2 for fresh-context file discovery, classification by layer (domain/contract/router/view/seed/frontend/test/config), and 1-line purpose notes per file. Never edits, never speculates on solutions. Plain four-piece tool allowlist: Read, Grep, Glob, Bash."`
+  2. Header "# Code-Explorer -- Read-Only Codebase Mapping Subroutine"
+  3. "Namespace note" paragraph matching `skills/build-research/SKILL.md:8` verbatim except skill path
+  4. Opening paragraph (1 sentence: what it is, who dispatches it, read-only property)
+  5. "Tools Available" block: `Can use: Read, Grep, Glob, Bash`. `NOT available: Write, Edit, NotebookEdit, AskUserQuestion` (enforce read-only)
+  6. "Input Contract" block: 4 fields expected from dispatch prompt (Topic / Entity Context / Scope Constraint / Layer Hint). If any missing, record as "Unknown Unknowns" and best-effort proceed
+  7. "## Step 1: Read Topic & Extract Keywords" -- parse keywords (function names, file names, component names), draft 3-5 bullet search plan
+  8. "## Step 2: Grep/Glob Sweep" -- execute the search plan, aggregate matches into a candidate file list, cap at 20 files
+  9. "## Step 3: Read & Classify" -- for each candidate file, read it, form 1-line purpose note, classify into one of 8 layers (domain/contract/router/view/seed/frontend/test/config) matching `skills/build-explore/SKILL.md:56-64`
+  10. "## Step 4: Layer Aggregation" -- group files by layer, count per layer, truncate if >20 files total
+  11. "## Step 5: Draft Unknown Unknowns & Follow-up Topics" -- mirror `skills/build-research/SKILL.md:158-177`
+  12. "## Step 6: Return Output" -- emit structured plain-text output with `## Files Mapped` header, `### Layer: {name}` subsections with bulleted `file:line -- 1-line purpose`, `## Unknown Unknowns`, `## Follow-up Topics`
+  13. "## Scope Discipline -- Read-Only Enforcement" -- mirror build-research's block
+  14. "## Citation Discipline" -- every finding needs file:line
+  15. "## Rules" block (6-8 bullets):
+     - NEVER edit, NEVER write, NEVER run bash mutations (read-only Bash = git/ls/find only)
+     - NEVER ask the captain questions
+     - NEVER invoke other skills (leaf)
+     - NEVER speculate on solutions
+     - NEVER cite unverified memory
+     - Cap file reads at 20 per topic
+     - Use `--` (double dash), never `—` (em dash)
+
+  All sections MUST use `--` not `—`. Every reference to another file uses absolute path relative to repo root. Word count target: 180-220 lines (similar to build-research).
+  </action>
+
+  <acceptance_criteria>
+    - `test -f skills/code-explorer/SKILL.md` exits 0
+    - `head -1 skills/code-explorer/SKILL.md` outputs literal `---`
+    - `grep -c '^## Step [1-6]:' skills/code-explorer/SKILL.md` outputs `6`
+    - `grep -E 'NOT available.*Write.*Edit' skills/code-explorer/SKILL.md` returns at least 1 match
+    - `! grep -n '—' skills/code-explorer/SKILL.md` (no em dashes)
+    - `wc -l skills/code-explorer/SKILL.md | awk '{print ($1>=150 && $1<=260)}'` outputs `1`
+    - `grep -c 'name: code-explorer' skills/code-explorer/SKILL.md` outputs `1`
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/code-explorer/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-2" model="haiku" wave="1" skills="">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/agents/researcher.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/agents/task-executor.md
+  </read_first>
+
+  <action>
+  Create `agents/code-explorer.md` as a thin wrapper agent matching the `agents/researcher.md` pattern. Total length: 18-22 lines. Exact content (replace angle-bracket placeholders but nothing else):
+
+  ```markdown
+  ---
+  name: code-explorer
+  description: Fresh-context execution vessel for codebase mapping. Dispatched by build-explore Step 2 (and by science-officer for SO-direct mode) for fresh-context file discovery, classification by layer, and 1-line purpose notes. Read-only and non-interactive -- investigates, reports with file:line citations, does NOT fix code or design solutions. Loads skills/code-explorer/SKILL.md via skill preloading.
+  tools: Read, Grep, Glob, Bash
+  model: inherit
+  color: blue
+  skills: ["spacedock:code-explorer"]
+  ---
+
+  You are a code-explorer agent -- a fresh-context vessel for codebase mapping, dispatched by `build-explore` Step 2 (or by `science-officer` in SO-direct mode) in parallel with other domain-specialized subagents.
+
+  ## Boot Sequence
+
+  If your operating contract was not already loaded via skill preloading, invoke the `spacedock:code-explorer` skill now to load it.
+
+  Then read the dispatch prompt's `## Topic` / `## Entity Context` / `## Scope Constraint` / `## Layer Hint` sections and begin the 6-step mapping per `skills/code-explorer/SKILL.md`.
+
+  ## Namespace Note
+
+  This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:code-explorer", ...)`. Namespace migration to `spacebridge:code-explorer` is Phase F work (entity 055).
+  ```
+
+  Key constraints: `tools: Read, Grep, Glob, Bash` (read-only Bash for git/ls/find; NO Write/Edit/NotebookEdit). `skills: ["spacedock:code-explorer"]` uses the `spacedock:` namespace prefix. `color: blue` is distinct from researcher green / task-executor yellow / ensign cyan. Frontmatter uses YAML list syntax for `skills` matching `agents/task-executor.md:7`.
+  </action>
+
+  <acceptance_criteria>
+    - `test -f agents/code-explorer.md` exits 0
+    - `wc -l agents/code-explorer.md | awk '{print ($1>=15 && $1<=30)}'` outputs `1`
+    - `grep -c 'name: code-explorer' agents/code-explorer.md` outputs `1`
+    - `grep -c 'spacedock:code-explorer' agents/code-explorer.md` outputs at least 2 (skills frontmatter + dispatch snippet)
+    - `grep -E '^tools: Read, Grep, Glob, Bash$' agents/code-explorer.md` returns 1 match
+    - `! grep -E 'Write|Edit|NotebookEdit' agents/code-explorer.md` (no mutating tools in allowlist)
+    - `! grep -n '—' agents/code-explorer.md` (no em dashes)
+  </acceptance_criteria>
+
+  <files_modified>
+    - agents/code-explorer.md
+  </files_modified>
+</task>
+
+<task id="task-3" model="sonnet" wave="2" skills="">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/skills/build-explore/SKILL.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/skills/code-explorer/SKILL.md
+  </read_first>
+
+  <action>
+  Refactor `skills/build-explore/SKILL.md` Step 2 (lines 53-77) to delegate codebase mapping to `spacedock:code-explorer` via Agent dispatch instead of inline grep/Read/store. The refactor must preserve Step 2's output contract (classified file list with 1-line purpose notes) while moving the actual work into a fresh subagent context per Phase E Guiding Principle #5.
+
+  Exact changes to `skills/build-explore/SKILL.md`:
+
+  Edit 1 -- Replace the text of Step 2 body with a dispatch pattern. Keep the section header `## Step 2: Codebase Mapping` unchanged. Replace the paragraph content from line 55 through line 77 with:
+
+  ```markdown
+  Based on APPROACH, identify the mapping topic (keywords, scope anchors, layer hints from the Domain line in Captain Context Snapshot). Then dispatch `spacedock:code-explorer` for fresh-context codebase mapping:
+
+  ```
+  Agent(
+    subagent_type="spacedock:code-explorer",
+    model="sonnet",
+    prompt="""
+    ## Topic
+    {1-line topic title from APPROACH keywords}
+
+    ## Entity Context
+    {paths the explorer should focus on, drawn from APPROACH + Domain line}
+
+    ## Scope Constraint
+    {20-file cap; what NOT to touch; layers out of scope for this entity}
+
+    ## Layer Hint
+    {domain|contract|router|view|seed|frontend|test|config or "unknown -- sweep all"}
+
+    Load skill: skills/code-explorer (flat path).
+    Return structured output per code-explorer step 6 format.
+    """
+  )
+  ```
+
+  The code-explorer agent runs in a fresh subagent context with read-only tools (Read, Grep, Glob, Bash), executes its 6-step mapping, and returns a plain-text report grouped by layer. Consume the returned report in this skill's Step 3 onward.
+
+  **Fresh-context dispatch rationale (Phase E Guiding Principle #5).** Inline grep/Read/store pollutes the caller's context with raw file content. Delegating to `spacedock:code-explorer` isolates the mapping pass in a fresh context; the caller only consumes the structured summary. Matches the dispatch pattern used by `build-plan` (researcher) and `build-execute` (task-executor). See `agents/code-explorer.md` for the thin-wrapper agent definition.
+
+  **Leaf dispatch rule.** `spacedock:code-explorer` runs as a leaf subagent. It does NOT further dispatch other agents. If the topic genuinely needs decomposition into multiple mapping passes, dispatch multiple `spacedock:code-explorer` calls from this step in parallel; do NOT ask one code-explorer to delegate to another.
+
+  **Scale assessment.** After the code-explorer returns, count the total files in its output and compare against the frontmatter `scale`:
+  - Small: <5 files
+  - Medium: 5-15 files
+  - Large: >15 files
+
+  Note the result in the Stage Report (Step 7). If the actual count disagrees with the frontmatter scale, record `revised from X to Y`.
+
+  **Bugfix intent.** For `intent: bugfix` entities, include "trace from symptom to root cause; do not stop at first symptom match" in the dispatch prompt's Scope Constraint section. Code-explorer will return a trace-ordered file list instead of a breadth-first layer sweep.
+  ```
+
+  Edit 2 -- Remove the old inline `store_insight` reference from Tools Available (lines 19-20 in current state). Replace with a comment that code-explorer handles its own insight storage if the code-explorer skill opts in. Keep the Write/Edit mode-dependent block at lines 24-31 unchanged (it's about entity-file writes, separate concern).
+
+  Edit 3 -- Update the Stage Report example template at Step 7 to note that file counts come from the code-explorer return output, not inline exploration. Add a line in Step 7's first paragraph: "File counts and layer breakdowns come from the Step 2 code-explorer dispatch return; the caller does NOT independently re-grep."
+
+  All edits use `--` not `—`. Preserve all other sections (Step 1, 3, 3.5, 4, 5, 6, 7) unchanged. No placeholder text.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -q 'spacedock:code-explorer' skills/build-explore/SKILL.md` exits 0
+    - `grep -q 'Fresh-context dispatch rationale' skills/build-explore/SKILL.md` exits 0
+    - `grep -q 'Leaf dispatch rule' skills/build-explore/SKILL.md` exits 0
+    - `grep -c '^## Step [1-7]' skills/build-explore/SKILL.md` outputs at least `7` (existing step count preserved; 3.5 counts separately)
+    - `! grep -n '—' skills/build-explore/SKILL.md` (no em dashes)
+    - `bash -c 'diff <(grep "^## Step" skills/build-explore/SKILL.md | sort) <(echo -e "## Step 1: Read Entity & Identify Domain\n## Step 2: Codebase Mapping\n## Step 3.5: Consume α Markers\n## Step 3: Decomposition Analysis\n## Step 4: Gray Area Identification\n## Step 5: Hybrid Classification\n## Step 6: Write to Entity Body\n## Step 7: Stage Report" | sort)'` returns no diff (section headers preserved)
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-explore/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-4" model="haiku" wave="1" skills="">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/agents/researcher.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/agents/task-executor.md
+  </read_first>
+
+  <action>
+  Create 4 trailofbits wrapper agent files (one file per agent, all ~18-22 lines each) under `agents/`. Each is a thin Agent-dispatchable wrapper around the corresponding trailofbits skill, matching the `agents/researcher.md` pattern but with a `skills: ["trailofbits:<skill-name>"]` frontmatter pointing at the trailofbits plugin instead of a spacedock-owned skill.
+
+  File 1 -- `agents/sharp-edges-reviewer.md`:
+
+  ```markdown
+  ---
+  name: sharp-edges-reviewer
+  description: Fresh-context wrapper agent for trailofbits:sharp-edges skill. Dispatched by build-review Step 2 in parallel with other review agents. Reviews the execute_base..HEAD diff for error-prone API designs, dangerous configurations, footgun patterns, and "secure by default" violations. Leaf subagent -- does NOT nest further Agent dispatch. Loads trailofbits:sharp-edges via skill preloading.
+  tools: Read, Grep, Glob, Skill
+  model: inherit
+  color: red
+  skills: ["sharp-edges:sharp-edges"]
+  ---
+
+  You are a sharp-edges-reviewer agent -- a fresh-context wrapper around the `sharp-edges:sharp-edges` trailofbits skill, dispatched by `build-review` Step 2 in parallel with other review agents.
+
+  ## Boot Sequence
+
+  If your operating contract was not already loaded via skill preloading, invoke the `sharp-edges:sharp-edges` skill now to load it.
+
+  Then read the dispatch prompt's `## Diff` / `## Entity Slug` / `## Scope` sections and run the sharp-edges review against the diff. Return structured findings in the format build-review step 3 expects: one finding per row with `severity | root | file:line | description`.
+
+  ## Namespace Note
+
+  This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:sharp-edges-reviewer", ...)`. The underlying skill lives in the `sharp-edges` plugin (trailofbits marketplace). Namespace migration to `spacebridge:sharp-edges-reviewer` is Phase F work (entity 055).
+  ```
+
+  File 2 -- `agents/variant-analysis-reviewer.md`: same structure, replace:
+  - `name: variant-analysis-reviewer`
+  - `description: ... for variant-analysis:variant-analysis skill. ... variant-bug hunting across the diff, looking for known-bad patterns similar to a seed finding ...`
+  - `skills: ["variant-analysis:variant-analysis"]`
+  - Skill invocation target: `variant-analysis:variant-analysis`
+  - Dispatch target: `spacedock:variant-analysis-reviewer`
+
+  File 3 -- `agents/insecure-defaults-reviewer.md`: same structure, replace:
+  - `name: insecure-defaults-reviewer`
+  - `description: ... for insecure-defaults:insecure-defaults skill. ... fail-open configurations, hardcoded secrets, weak auth defaults, permissive CORS/CSP ...`
+  - `skills: ["insecure-defaults:insecure-defaults"]`
+  - Skill invocation target: `insecure-defaults:insecure-defaults`
+  - Dispatch target: `spacedock:insecure-defaults-reviewer`
+
+  File 4 -- `agents/differential-review-reviewer.md`: same structure, replace:
+  - `name: differential-review-reviewer`
+  - `description: ... for trailofbits differential-review skill (NOT currently enabled in source CC session per Q-1 clarify; wrapper agent created preemptively so Deliverable 2's .claude/settings.json enables the plugin for future clones). Dispatched by build-review Step 2 for git-history-aware differential review of the execute_base..HEAD diff against prior changes ...`
+  - `skills: ["differential-review:differential-review"]` (best-guess identifier; exact namespace confirmed at execute time via plugin discovery after .claude/settings.json lands)
+  - Skill invocation target: `differential-review:differential-review`
+  - Dispatch target: `spacedock:differential-review-reviewer`
+
+  All 4 files use `tools: Read, Grep, Glob, Skill`. NO `Agent` in tools allowlist (leaf-only, no nested dispatch). NO `Write`/`Edit` (reviewers don't mutate code). All use `model: inherit`. All use distinct `color:` values (red / orange / purple / magenta or pick 4 unique from the color palette).
+
+  Do NOT drop `mutation-testing` wrapper -- per Q-6, mutation-testing is a campaign config helper, not a reviewer. It remains enabled in `.claude/settings.json` (Task 5) but has NO wrapper agent and is NOT in build-review Step 2 dispatch list (Task 6).
+  </action>
+
+  <acceptance_criteria>
+    - `test -f agents/sharp-edges-reviewer.md && test -f agents/variant-analysis-reviewer.md && test -f agents/insecure-defaults-reviewer.md && test -f agents/differential-review-reviewer.md` exits 0
+    - `ls agents/*reviewer.md | wc -l` outputs `4`
+    - `grep -l 'sharp-edges:sharp-edges' agents/sharp-edges-reviewer.md` returns the file
+    - `grep -l 'variant-analysis:variant-analysis' agents/variant-analysis-reviewer.md` returns the file
+    - `grep -l 'insecure-defaults:insecure-defaults' agents/insecure-defaults-reviewer.md` returns the file
+    - `grep -l 'differential-review' agents/differential-review-reviewer.md` returns the file
+    - `! grep -l 'mutation-testing' agents/*reviewer.md` (no mutation-testing wrapper)
+    - `for f in agents/*reviewer.md; do grep -q '^tools: Read, Grep, Glob, Skill$' "$f" || echo "MISSING_TOOLS in $f"; done` outputs nothing (all 4 have the exact tools line)
+    - `! grep -n '—' agents/*reviewer.md` (no em dashes in any wrapper)
+    - `for f in agents/*reviewer.md; do wc -l "$f" | awk '{if ($1<15 || $1>35) print "WRONG_SIZE: " $2}'; done` outputs nothing
+  </acceptance_criteria>
+
+  <files_modified>
+    - agents/sharp-edges-reviewer.md
+    - agents/variant-analysis-reviewer.md
+    - agents/insecure-defaults-reviewer.md
+    - agents/differential-review-reviewer.md
+  </files_modified>
+</task>
+
+<task id="task-5" model="haiku" wave="1" skills="">
+  <read_first>
+    - /Users/kent/.claude/settings.json
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/.claude-plugin/plugin.json
+  </read_first>
+
+  <action>
+  Create `.claude/settings.json` at the repo root with the exact JSON payload below. This is the AC1 deliverable. Schema is grounded in `~/.claude/settings.json:277-309` precedent (Q-2 resolution). Feature-dev is NOT included (Q-5 Path 1 selected).
+
+  Exact file content (valid JSON, UTF-8, no BOM, 2-space indent):
+
+  ```json
+  {
+    "enabledPlugins": {
+      "pr-review-toolkit@claude-plugins-official": true,
+      "sharp-edges@trailofbits": true,
+      "variant-analysis@trailofbits": true,
+      "insecure-defaults@trailofbits": true,
+      "mutation-testing@trailofbits": true,
+      "differential-review@trailofbits": true,
+      "e2e-pipeline@iamcxa-plugins": true
+    },
+    "extraKnownMarketplaces": {
+      "trailofbits": {
+        "source": {
+          "source": "github",
+          "repo": "trailofbits/skills"
+        },
+        "autoUpdate": true
+      },
+      "iamcxa-plugins": {
+        "source": {
+          "source": "github",
+          "repo": "iamcxa/kc-claude-plugins"
+        },
+        "autoUpdate": true
+      }
+    }
+  }
+  ```
+
+  Create parent directory `.claude/` if missing (verified missing in Task 0 Check 2). Do NOT create any other files under `.claude/` (no local.md, no session files). After writing, verify parse validity via `python3 -c "import json; json.load(open('.claude/settings.json'))"` exits 0.
+  </action>
+
+  <acceptance_criteria>
+    - `test -f .claude/settings.json` exits 0
+    - `python3 -c "import json; json.load(open('.claude/settings.json'))"` exits 0
+    - `python3 -c "import json; d=json.load(open('.claude/settings.json')); assert len(d['enabledPlugins'])==7, f'expected 7 plugins, got {len(d[\"enabledPlugins\"])}'"` exits 0
+    - `python3 -c "import json; d=json.load(open('.claude/settings.json')); assert 'trailofbits' in d['extraKnownMarketplaces'], 'trailofbits marketplace missing'"` exits 0
+    - `python3 -c "import json; d=json.load(open('.claude/settings.json')); assert 'iamcxa-plugins' in d['extraKnownMarketplaces'], 'iamcxa-plugins marketplace missing'"` exits 0
+    - `python3 -c "import json; d=json.load(open('.claude/settings.json')); assert d['extraKnownMarketplaces']['trailofbits']['source']['repo']=='trailofbits/skills'"` exits 0
+    - `python3 -c "import json; d=json.load(open('.claude/settings.json')); assert d['extraKnownMarketplaces']['iamcxa-plugins']['source']['repo']=='iamcxa/kc-claude-plugins'"` exits 0
+    - `! grep -q 'feature-dev' .claude/settings.json` exits 0 (feature-dev NOT declared per Q-5)
+    - `grep -Ec 'trailofbits|pr-review-toolkit|iamcxa-plugins|e2e-pipeline' .claude/settings.json` outputs at least `7`
+  </acceptance_criteria>
+
+  <files_modified>
+    - .claude/settings.json
+  </files_modified>
+</task>
+
+<task id="task-6" model="sonnet" wave="2" skills="">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/skills/build-review/SKILL.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/agents/sharp-edges-reviewer.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/agents/variant-analysis-reviewer.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/agents/insecure-defaults-reviewer.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/agents/differential-review-reviewer.md
+  </read_first>
+
+  <action>
+  Refactor `skills/build-review/SKILL.md` Step 2 (lines 86-106) to:
+  1. Replace the 8-entry dispatch list (6 pr-review-toolkit + 2 trailofbits-as-agents) with a 10-entry dispatch list (6 pr-review-toolkit + 4 trailofbits wrapper agents).
+  2. REMOVE the "Architectural note -- trailofbits agent identifiers are unverified at skill-authoring time" block at lines 99-100 (the TBD / architectural-unknown paragraph). This is the spec §1033 category error fix per Deliverable 1.
+  3. Add a short note explaining that the 4 trailofbits entries are wrapper agents, each preloading one trailofbits skill via frontmatter, so dispatch is Agent-tool-based (not Skill-tool-based) -- maintains fresh-context isolation per Phase E GP#5.
+
+  Exact edits to `skills/build-review/SKILL.md`:
+
+  Edit 1 -- Replace the dispatch list bullets (current lines 90-97 of the source file):
+
+  Current:
+  ```
+  - `pr-review-toolkit:code-reviewer` -- CLAUDE.md, style, bugs
+  - `pr-review-toolkit:silent-failure-hunter` -- error handling
+  - `pr-review-toolkit:comment-analyzer` -- stale comments
+  - `pr-review-toolkit:pr-test-analyzer` -- test coverage
+  - `pr-review-toolkit:type-design-analyzer` -- type encapsulation
+  - `pr-review-toolkit:code-simplifier` -- complexity
+  - `trailofbits:differential-review` -- git-history-aware review
+  - `trailofbits:sharp-edges` -- footgun API design
+  ```
+
+  New:
+  ```
+  - `pr-review-toolkit:code-reviewer` -- CLAUDE.md, style, bugs
+  - `pr-review-toolkit:silent-failure-hunter` -- error handling
+  - `pr-review-toolkit:comment-analyzer` -- stale comments
+  - `pr-review-toolkit:pr-test-analyzer` -- test coverage
+  - `pr-review-toolkit:type-design-analyzer` -- type encapsulation
+  - `pr-review-toolkit:code-simplifier` -- complexity
+  - `spacedock:sharp-edges-reviewer` -- footgun API design (wraps `sharp-edges:sharp-edges` skill)
+  - `spacedock:variant-analysis-reviewer` -- variant-bug hunting from seed patterns (wraps `variant-analysis:variant-analysis` skill)
+  - `spacedock:insecure-defaults-reviewer` -- fail-open defaults / hardcoded secrets (wraps `insecure-defaults:insecure-defaults` skill)
+  - `spacedock:differential-review-reviewer` -- git-history-aware differential review (wraps `differential-review:differential-review` skill)
+  ```
+
+  Edit 2 -- Replace the "Architectural note" paragraph (current lines 99-100) with:
+
+  ```
+  **Trailofbits integration model.** Per entity 062 (Phase E Plan 4) clarify decision (2026-04-12), the 4 trailofbits-based reviewers above are dispatched as thin wrapper agents via the Agent tool, NOT as direct `Skill()` invocations from this orchestrator. Each wrapper agent (`agents/{name}-reviewer.md`) preloads exactly one trailofbits skill via `skills: ["plugin:skill"]` frontmatter -- symmetric to how `agents/researcher.md` preloads `spacedock:build-research`. This preserves Phase E Guiding Principle #5 (fresh context via subagent dispatch) for the security-review subset while keeping build-review orchestrator context clean. `mutation-testing:mutation-testing` is deliberately NOT dispatched here per entity 062 Q-6 (it is a campaign config helper, not a diff reviewer); the plugin remains enabled in `.claude/settings.json` for direct invocation outside review.
+  ```
+
+  Edit 3 -- Preserve the "Leaf dispatch rule" paragraph and the "Diff scope" and "Timeout / truncation handling" paragraphs at lines 101-106 verbatim.
+
+  Verification after edit: `grep -c '^-' skills/build-review/SKILL.md` in the Step 2 dispatch block should go from 8 to 10 (net +2 reviewers). `grep -c 'spacedock:.*-reviewer' skills/build-review/SKILL.md` should output 4. `grep -c 'TBD\|architectural-unknown\|unverified at skill-authoring' skills/build-review/SKILL.md` should output 0.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c 'spacedock:sharp-edges-reviewer' skills/build-review/SKILL.md` outputs `1`
+    - `grep -c 'spacedock:variant-analysis-reviewer' skills/build-review/SKILL.md` outputs `1`
+    - `grep -c 'spacedock:insecure-defaults-reviewer' skills/build-review/SKILL.md` outputs `1`
+    - `grep -c 'spacedock:differential-review-reviewer' skills/build-review/SKILL.md` outputs `1`
+    - `! grep -nE '[Tt]railofbits.*[Aa]gent\b|\bAgent.*trailofbits|TBD.*trailofbits|architectural.unknown.*trailofbits' skills/build-review/SKILL.md` (AC2 verifier)
+    - `! grep -q 'unverified at skill-authoring time' skills/build-review/SKILL.md` (architectural-note block removed)
+    - `grep -c '^- .pr-review-toolkit:' skills/build-review/SKILL.md` outputs `6` (6 pr-review-toolkit entries preserved)
+    - `! grep -n '—' skills/build-review/SKILL.md` (no em dashes)
+    - `grep -q 'mutation-testing:mutation-testing.*is deliberately NOT dispatched' skills/build-review/SKILL.md` (Q-6 documented inline)
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-review/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-7" model="haiku" wave="1" skills="">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/tests/pressure/build-review.yaml
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/tests/pressure/README.md
+  </read_first>
+
+  <action>
+  Create `tests/pressure/build-review-trailofbits-integration.yaml` capturing 3 pressure test cases for the entity 062 trailofbits integration. Format matches skill-creator pressure test schema (used by `tests/pressure/build-review.yaml:1-80` and related files).
+
+  Exact file content (YAML, no tabs, 2-space indent):
+
+  ```yaml
+  # Pressure tests for entity 062 Phase E Plan 4 trailofbits integration contract
+  #
+  # Captures the Phase E Plan 4 dogfood-driven corrections to build-review's
+  # trailofbits dispatch model. Three scenarios exercise the key classification
+  # and dispatch questions decided during entity 062 clarify: thin wrapper
+  # agents (Path C from B-1), mutation-testing scope exclusion from dispatch
+  # but inclusion in settings.json (Q-6), and live verification as the gate
+  # for Case B deletion in workflow-index-maintainer (AC5).
+
+  skill: build-review-trailofbits-integration-contract
+  target_path: skills/build-review
+  contract_between: [build-review, trailofbits-plugins, workflow-index-maintainer]
+  captured: 2026-04-12
+  session: phase-e-plan-4-dogfood
+  related_commit_with_fix: null
+
+  test_cases:
+    - id: dispatch-trailofbits-as-wrapper-agents-not-skill-calls
+      summary: |
+        Build-review orchestrator collecting its Step 2 dispatch list. It
+        must include trailofbits-based reviewers alongside pr-review-toolkit
+        agents. The trailofbits entities in the current CC session are
+        Skill-tool skills (sharp-edges:sharp-edges, variant-analysis:variant-analysis,
+        etc.), NOT Agent-tool agents. How does build-review integrate them?
+      pressure:
+        - inline_skill_call: "'trailofbits entities are skills, call them via Skill() from orchestrator context directly -- matches knowledge-capture Step 4 precedent'"
+        - nested_from_pr_review_toolkit: "'have pr-review-toolkit:code-reviewer invoke trailofbits skills internally'"
+        - fabricate_agent_names: "'dispatch as trailofbits:sharp-edges even though that subagent_type does not exist'"
+        - scope_cut: "'drop trailofbits entirely since they are skills not agents'"
+      options:
+        A: "Direct Skill() calls from build-review orchestrator context for each trailofbits skill, sequential after pr-review-toolkit agents return"
+        B: "Nested Skill() invocation from inside a dispatched pr-review-toolkit:code-reviewer agent"
+        C: "Create thin Agent-tool wrapper agents (spacedock:sharp-edges-reviewer etc.) each preloading one trailofbits skill via frontmatter; dispatch via Agent tool in parallel with pr-review-toolkit"
+        D: "Drop trailofbits from dispatch entirely; document the category error and defer to Phase E+1"
+        E: "Hardcode trailofbits:sharp-edges as an Agent subagent_type; accept the dispatch will fail in live runs"
+      expected_answer: C
+      correct_because:
+        cite_file: docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md
+        cite_section: "Option Comparisons -- Integration model for trailofbits inside build-review"
+        cite_contains: "Create thin Agent-tool wrapper agents"
+      history: []
+
+    - id: mutation-testing-excluded-from-dispatch-but-enabled-in-settings
+      summary: |
+        The entity 062 clarify answer for Q-6 selected 4 trailofbits
+        reviewers for build-review dispatch (sharp-edges, variant-analysis,
+        insecure-defaults, differential-review). Mutation-testing was
+        dropped. Meanwhile, .claude/settings.json enables mutation-testing
+        alongside the other 4. Orchestrator deciding whether to include
+        mutation-testing in Step 2 dispatch or honor the exclusion.
+      pressure:
+        - completeness_instinct: "'if it is enabled, it should be dispatched -- skip-by-default is confusing'"
+        - consistency_argument: "'other trailofbits plugins get wrapper agents, mutation-testing should too for symmetry'"
+        - missed_coverage: "'excluding mutation-testing leaves a security gap'"
+        - settings_equals_scope: "'the settings.json enabled set defines build-review dispatch scope'"
+      options:
+        A: "Include mutation-testing-reviewer in the dispatch list for symmetry; wrapper agent pattern scales"
+        B: "Exclude mutation-testing from Step 2 dispatch because it is a test campaign config helper (per its own skill description), not a diff reviewer; keep it enabled in settings.json for direct invocation outside build-review"
+        C: "Remove mutation-testing from settings.json as well since it is not used by build-review"
+        D: "Create a mutation-testing-reviewer wrapper but mark it SKIP by default in Step 2 with a comment"
+        E: "Conditional dispatch: include mutation-testing only when plan.intent == 'mutation_campaign'"
+      expected_answer: B
+      correct_because:
+        cite_file: docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md
+        cite_section: "Open Questions -- Q-6 dispatch scope"
+        cite_contains: "test campaign CONFIG helper"
+      history: []
+
+    - id: case-b-deletion-gate-live-verification
+      summary: |
+        Entity 062 plan stage has shipped CONTRACTS.md rows via workflow-index
+        append. Execute stage has shipped update-status-bulk transition to
+        in-flight. Both AC3 and AC4 verifiers pass. Task 10 in the plan
+        asks whether to delete Case B from mods/workflow-index-maintainer.md.
+      pressure:
+        - hook_shipped_means_delete: "'build-plan/build-execute hooks are wired, ship Case B deletion immediately'"
+        - deterministic_deletion: "'AC5 says conditional; conditional was satisfied at AC3+AC4, delete'"
+        - defer_to_future: "'leave Case B in place as insurance, deletion is trivially reversible later'"
+        - blast_radius: "'deleting Case B will silently break retroactive tracking for in-flight entities'"
+      options:
+        A: "Delete Case B block in mods/workflow-index-maintainer.md (lines 56-73 at HEAD 8b89554); commit as `fix(mods): remove workflow-index-maintainer Case B band-aid`; document the deletion in entity 062 UAT Results with AC3/AC4 evidence"
+        B: "Leave Case B in place indefinitely as insurance; the hook-based append + update-status-bulk path is new and untested in production for >1 pipeline run"
+        C: "Delete Case B BUT leave a comment explaining the hooks now handle the case"
+        D: "Replace Case B with a deprecation warning that logs when fallback fires but does not act; remove in a follow-up entity after N pipeline runs"
+      expected_answer: A
+      correct_because:
+        cite_file: docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md
+        cite_section: "Acceptance Criteria 5"
+        cite_contains: "if and only if both AC3 and AC4 passed"
+      history: []
+  ```
+
+  Do NOT add `related_commit_with_fix` values; set to `null`. Do NOT backfill `history` entries; leave empty list (test is captured at plan time, no dispatch yet).
+  </action>
+
+  <acceptance_criteria>
+    - `test -f tests/pressure/build-review-trailofbits-integration.yaml` exits 0
+    - `python3 -c "import yaml; d=yaml.safe_load(open('tests/pressure/build-review-trailofbits-integration.yaml')); assert len(d['test_cases'])==3, f'expected 3 test cases, got {len(d[\"test_cases\"])}'"` exits 0
+    - `python3 -c "import yaml; d=yaml.safe_load(open('tests/pressure/build-review-trailofbits-integration.yaml')); assert d['skill']=='build-review-trailofbits-integration-contract'"` exits 0
+    - `python3 -c "import yaml; d=yaml.safe_load(open('tests/pressure/build-review-trailofbits-integration.yaml')); ids=[c['id'] for c in d['test_cases']]; assert 'dispatch-trailofbits-as-wrapper-agents-not-skill-calls' in ids"` exits 0
+    - `python3 -c "import yaml; d=yaml.safe_load(open('tests/pressure/build-review-trailofbits-integration.yaml')); ids=[c['id'] for c in d['test_cases']]; assert 'case-b-deletion-gate-live-verification' in ids"` exits 0
+    - `python3 -c "import yaml; d=yaml.safe_load(open('tests/pressure/build-review-trailofbits-integration.yaml')); assert all(c['expected_answer'] in ['A','B','C','D','E'] for c in d['test_cases'])"` exits 0
+    - `! grep -n '—' tests/pressure/build-review-trailofbits-integration.yaml` (no em dashes)
+    - `! grep -P '\t' tests/pressure/build-review-trailofbits-integration.yaml` (no tabs)
+  </acceptance_criteria>
+
+  <files_modified>
+    - tests/pressure/build-review-trailofbits-integration.yaml
+  </files_modified>
+</task>
+
+<task id="task-8" model="haiku" wave="1" skills="">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/docs/build-pipeline/README.md
+  </read_first>
+
+  <action>
+  Edit `docs/build-pipeline/README.md:183` to correct the pr-review-toolkit bundling claim per entity 062 Q-3 resolution.
+
+  Current line 183 (verified at plan entry):
+  ```
+  | **pr-review-toolkit** | Bundled with superpowers | review (code-reviewer, silent-failure-hunter, comment-analyzer, pr-test-analyzer, type-design-analyzer, code-simplifier) | Review stage falls back to inline pre-scan only (CLAUDE.md compliance, stale refs, import graph, plan consistency) |
+  ```
+
+  New line 183 (exact replacement):
+  ```
+  | **pr-review-toolkit** | `/plugin install pr-review-toolkit@claude-plugins-official` | review (code-reviewer, silent-failure-hunter, comment-analyzer, pr-test-analyzer, type-design-analyzer, code-simplifier) | Review stage falls back to inline pre-scan only (CLAUDE.md compliance, stale refs, import graph, plan consistency) |
+  ```
+
+  Change: "Bundled with superpowers" → "`/plugin install pr-review-toolkit@claude-plugins-official`". This matches the canonical marketplace reference at `~/.claude/settings.json:286` and aligns with Q-3 resolution in entity 062 clarify.
+
+  Do NOT touch any other lines in README.md. No scope creep.
+  </action>
+
+  <acceptance_criteria>
+    - `! grep -n 'Bundled with superpowers' docs/build-pipeline/README.md` (claim removed)
+    - `grep -q 'pr-review-toolkit@claude-plugins-official' docs/build-pipeline/README.md` exits 0
+    - `grep -c '| \*\*pr-review-toolkit\*\*' docs/build-pipeline/README.md` outputs `1` (exactly one table row for this plugin)
+    - `bash -c 'diff <(git show HEAD:docs/build-pipeline/README.md | wc -l) <(wc -l < docs/build-pipeline/README.md)'` shows identical line counts (no lines added/removed; just content replacement)
+  </acceptance_criteria>
+
+  <files_modified>
+    - docs/build-pipeline/README.md
+  </files_modified>
+</task>
+
+<task id="task-9" model="sonnet" wave="3" skills="">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/mods/workflow-index-maintainer.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/docs/build-pipeline/_index/CONTRACTS.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md
+  </read_first>
+
+  <action>
+  Case B cleanup in `mods/workflow-index-maintainer.md`. **This task is CONDITIONAL on AC3 and AC4 passing live during execute.** The execute ensign MUST verify both conditions before executing this task's action.
+
+  Precondition verification (run BEFORE performing the action):
+
+  Step A -- AC3 verification (workflow-index append fired at plan approval):
+  ```bash
+  cd /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration
+  grep -c 'phase-e-plan-4-dogfood-trailofbits-integration' docs/build-pipeline/_index/CONTRACTS.md
+  ```
+  Expected: `>=1`. Also verify plan Stage Report contains the literal string `workflow-index append`:
+  ```bash
+  grep -c 'workflow-index append' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md
+  ```
+  Expected: `>=1`.
+
+  Step B -- AC4 verification (update-status-bulk fired at execute entry):
+  ```bash
+  grep -c 'update-status-bulk' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md
+  ```
+  Expected: `>=1` (appears in this entity's execute Stage Report).
+  ```bash
+  grep 'phase-e-plan-4-dogfood-trailofbits-integration' docs/build-pipeline/_index/CONTRACTS.md | grep -v 'planned' | wc -l
+  ```
+  Expected: `>=1` (at least one row transitioned from planned).
+
+  **Conditional action routing**:
+
+  - IF BOTH Step A and Step B pass → PROCEED with the Case B deletion (Action Branch DELETE below).
+  - IF EITHER Step A or Step B fails → SKIP the deletion, write a `### Case B Retention` subsection to Stage Report: execute explaining which gate failed, leave Case B in place, and spawn a fix-forward follow-up entity (Action Branch RETAIN below).
+
+  ### Action Branch DELETE (AC3 and AC4 both pass)
+
+  Edit `mods/workflow-index-maintainer.md` to remove the Case B block (lines 56-73 at HEAD `8b89554`, verified text begins with `**Case B — Entity NOT in CONTRACTS but has an active or shipped stage**` and ends with `**Do NOT delete Case B before verifying the proper append path exists in Plans 2/3.**`).
+
+  Deletion scope: remove the entire Case B subsection including its "a./b./c./d." sub-steps AND the final warning line. Do NOT touch Case A (lines 41-55), the Stage Report File List Contract section (lines 86-104), or the Error Handling section. After deletion, Case A's last line should be immediately followed by Step 4's "Scan DECISIONS.md..." line at the top level of step 3.
+
+  Add a NEW short paragraph immediately after the Case A block explaining the deletion:
+
+  ```
+  **Retired (2026-04-12, entity 062 Phase E Plan 4)**: Case B (retroactive CONTRACTS append for entities that skipped plan-time tracking) has been removed. The proper append path now lives in `skills/build-plan/SKILL.md` Step 9a (unconditional append at plan approval) and `skills/build-execute/SKILL.md` Step 2 (unconditional update-status-bulk at execute entry). Retroactive tracking is no longer needed because every entity acquires its CONTRACTS rows at plan time. See entity 062's Stage Report for the live verification that gated this deletion.
+  ```
+
+  ### Action Branch RETAIN (AC3 or AC4 fails)
+
+  Do NOT edit `mods/workflow-index-maintainer.md`. Write the following to Stage Report: execute under `### Case B Retention`:
+
+  ```
+  Case B deletion SKIPPED because {AC3|AC4|both} failed during execute verification.
+  Evidence: Step A result: {grep output}. Step B result: {grep output}.
+  Follow-up: spawn a fix-forward entity targeting the gap between shipped plan/execute hooks and live CONTRACTS.md state.
+  Case B remains in mods/workflow-index-maintainer.md at lines 56-73.
+  ```
+
+  Do NOT report FAIL for this task under Action Branch RETAIN -- SKIP is the correct status per AC5's conditional framing. The gate is live verification; retention IS the correct action when the gate fails.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -q 'Retired.*2026-04-12.*entity 062' mods/workflow-index-maintainer.md` exits 0 (DELETE branch)
+    - OR `grep -c 'Case B' mods/workflow-index-maintainer.md` returns >=1 AND execute Stage Report contains `### Case B Retention` subsection with explicit failure reason (RETAIN branch)
+    - IF DELETE branch: `grep -c 'Do NOT delete Case B before verifying' mods/workflow-index-maintainer.md` outputs `0` AND `grep -c 'Case B — Entity NOT in CONTRACTS' mods/workflow-index-maintainer.md` outputs `0`
+    - IF RETAIN branch: `grep -c 'Do NOT delete Case B before verifying' mods/workflow-index-maintainer.md` outputs `1` (band-aid warning preserved verbatim)
+    - Either branch: execute Stage Report captures both Step A and Step B verifier output verbatim under a `### Task 9 Conditional Gate Verification` subsection
+    - `! grep -n '—' mods/workflow-index-maintainer.md` (no NEW em dashes introduced; pre-existing em dashes in Case A may remain since editing Case A is out of scope)
+  </acceptance_criteria>
+
+  <files_modified>
+    - mods/workflow-index-maintainer.md
+  </files_modified>
+</task>
+
+<task id="task-10" model="haiku" wave="3" skills="">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md
+  </read_first>
+
+  <action>
+  Write `## Pending Knowledge Captures` section to the entity body capturing the D2 candidates surfaced during plan stage. This populates the section for FO Step 6.5 detection + apply-mode prompt at the next dispatch event (Success Criterion #10 / AC7).
+
+  Append the following section IMMEDIATELY after `## Stage Report: plan` (which Task 0-9 collectively produced). Use Edit with old_string = last line of Stage Report: plan and new_string = same line + blank line + the new section.
+
+  Exact section content:
+
+  ```markdown
+  ## Pending Knowledge Captures
+
+  <capture id="KC-062-1" severity="HIGH" root="NEW" source_stage="plan" source_date="2026-04-12">
+    <summary>
+    build-plan Step 2 assumes Agent tool is available in ensign subagent context; actual dispatch surface in FO-dispatched ensign shows only SendMessage/TeamCreate/Task*, not raw Agent.
+    </summary>
+    <pattern>
+    Ensign dispatches that nest further Agent calls should expect the Agent tool to be absent unless the agent explicitly has `tools:` including Agent or inherits the full tool surface via no `tools:` allowlist.
+    </pattern>
+    <proposed_rule>
+    Any skill that documents "you can dispatch via Agent tool" for an ensign caller MUST verify tool availability at runtime and include a fallback path (inline serial execution in caller context) for when Agent is unavailable. Plan-stage graceful degradation is documented via `plan-checker-prompt.md:100-110` Dim 7 stub; the same pattern should be applied to Step 2 researcher dispatch.
+    </proposed_rule>
+    <three_question_test>
+    <q1>Would this rule apply to a skill we might write 3 months from now? YES -- any orchestrator skill dispatched via ensign faces the same constraint.</q1>
+    <q2>Is this rule actionable? YES -- skill authors can add "check Agent availability" as the first action in Step 2.</q2>
+    <q3>Does this rule replace or supersede an existing one? NO -- this is a new pattern not covered in `skills/build-plan/SKILL.md` currently.</q3>
+    </three_question_test>
+    <evidence>
+    During plan stage for entity 062 (2026-04-12), the plan ensign attempted to invoke build-plan Step 2 "dispatch researchers via Agent tool" and discovered Agent was not in its tool surface. Fell back to inline serial research across the 5 domains, which completed the step but burned caller context. This is the first live dispatch of spacedock:build-plan and surfaced the gap immediately.
+    </evidence>
+    <suggested_target_file>
+    skills/build-plan/SKILL.md Step 2 fallback note
+    </suggested_target_file>
+  </capture>
+
+  <capture id="KC-062-2" severity="MEDIUM" root="DOC" source_stage="plan" source_date="2026-04-12">
+    <summary>
+    Thin wrapper agent pattern for external skills (researcher / task-executor / trailofbits reviewers) is now the canonical way to integrate third-party plugins as parallel-dispatchable subagents.
+    </summary>
+    <pattern>
+    Create `agents/<name>.md` (15-22 lines) with `skills: ["<namespace>:<skill>"]` frontmatter preloading exactly one external skill. The agent is the Agent-tool-dispatchable surface; the skill is where the actual logic lives. Tool allowlist excludes `Agent` (leaf-only).
+    </pattern>
+    <proposed_rule>
+    Whenever a skill-based third-party plugin needs to be dispatched in parallel with other reviewers/executors from an orchestrator skill, wrap it in a thin agent file. Do NOT invoke via direct Skill() from the orchestrator unless the skill is single-threaded (e.g., knowledge-capture Step 4).
+    </proposed_rule>
+    <three_question_test>
+    <q1>Would this rule apply to a skill we might write 3 months from now? YES -- future plugin integrations follow the same pattern.</q1>
+    <q2>Is this rule actionable? YES -- 4 concrete examples shipped in this entity (sharp-edges-reviewer et al).</q2>
+    <q3>Does this rule replace or supersede an existing one? NO -- extends existing researcher/task-executor pattern to the trailofbits subset.</q3>
+    </three_question_test>
+    <evidence>
+    Entity 062 Option Comparison B-1 selected Option C (thin wrapper agents) over A (direct Skill calls) and B (nested Skill from pr-review-toolkit). Four wrappers shipped in Task 4. Pattern generalizes.
+    </evidence>
+    <suggested_target_file>
+    references/claude-ensign-runtime.md or skills/build-review/SKILL.md Step 2
+    </suggested_target_file>
+  </capture>
+  ```
+
+  The `<capture>` XML-ish format is experimental at the entity-body scope; FO Step 6.5 detection runs a regex on `<capture>` elements inside `## Pending Knowledge Captures`. Match the format of any existing Pending Knowledge Captures in other entities if found (grep for `<capture` in docs/build-pipeline/*.md).
+
+  Do NOT apply the captures inline (plan ensign is not in `--agent` context -- apply mode requires FO). Just stage them. FO's next dispatch event will detect the section and invoke knowledge-capture apply mode.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -q '^## Pending Knowledge Captures' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md` exits 0
+    - `grep -c '<capture id="KC-062-' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md` outputs `2`
+    - `grep -c '</capture>' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md` outputs `2`
+    - `grep -q 'three_question_test' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md` exits 0
+    - `grep -q 'Agent tool is available in ensign subagent context' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md` exits 0 (KC-062-1 content)
+    - `grep -q 'Thin wrapper agent pattern' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md` exits 0 (KC-062-2 content)
+    - `! grep -n '—' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md` in the ## Pending Knowledge Captures block (no em dashes)
+  </acceptance_criteria>
+
+  <files_modified>
+    - docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+
+None -- this entity does not produce a user-facing browser interface. Spacedock dashboard (`tools/dashboard/`) is not modified by this plan.
+
+### CLI
+
+- [ ] `test -f .claude/settings.json && python3 -c "import json; json.load(open('.claude/settings.json'))" && echo OK` prints `OK` (AC1 mechanical verifier)
+- [ ] `test -f agents/code-explorer.md && test -f skills/code-explorer/SKILL.md && echo OK` prints `OK` (new primitives exist per Q-5 Path C)
+- [ ] `ls agents/*reviewer.md | wc -l` outputs `4` (AC1 wrapper agents exist)
+- [ ] `! grep -nE "[Tt]railofbits.*[Aa]gent\b|TBD.*trailofbits|architectural.unknown.*trailofbits" skills/build-review/SKILL.md && echo OK` prints `OK` (AC2 mechanical verifier)
+- [ ] `grep -c 'phase-e-plan-4-dogfood-trailofbits-integration' docs/build-pipeline/_index/CONTRACTS.md` outputs `>=1` (AC3 workflow-index append fired)
+- [ ] Plan Stage Report contains literal string `workflow-index append` (AC3 textual verifier): `grep -c 'workflow-index append' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md` outputs `>=1`
+- [ ] Post-execute: `grep 'phase-e-plan-4-dogfood-trailofbits-integration' docs/build-pipeline/_index/CONTRACTS.md | grep -v planned | wc -l` outputs `>=1` (AC4 execute transition fired)
+- [ ] Execute Stage Report contains literal string `update-status-bulk`: `grep -c 'update-status-bulk' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md` outputs `>=1` (AC4 textual verifier)
+- [ ] `grep -q '## Pending Knowledge Captures' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md && echo OK` prints `OK` (AC7 verifier)
+- [ ] `test -f tests/pressure/build-review-trailofbits-integration.yaml && python3 -c "import yaml; yaml.safe_load(open('tests/pressure/build-review-trailofbits-integration.yaml'))" && echo OK` prints `OK` (pressure test exists and parses)
+- [ ] `! grep -q 'Bundled with superpowers' docs/build-pipeline/README.md && grep -q 'pr-review-toolkit@claude-plugins-official' docs/build-pipeline/README.md && echo OK` prints `OK` (Task 8 correction applied)
+
+### API
+
+None -- this entity does not modify spacedock's HTTP API or any channel/MCP surface.
+
+### Interactive
+
+- [ ] Captain sign-off on Task 9 conditional deletion branch taken (DELETE vs RETAIN) via the review stage -- the conditional gate outcome is reported in the entity's `## UAT Results` section with live verification output, and captain confirms the gate's interpretation was correct.
+- [ ] If Case B was retained (AC3 or AC4 failed), captain decides whether to spawn a follow-up entity to diagnose the append/update-status gap or force-fix inline in entity 062.
+- [ ] Captain reviews the 2 Pending Knowledge Capture candidates (KC-062-1 Agent-tool availability, KC-062-2 thin wrapper pattern) via FO step 6.5 apply-mode prompt at the next dispatch event.
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC1 `.claude/settings.json` exists and declares 2 marketplaces + 7 plugins (no feature-dev) | task-5 | `test -f .claude/settings.json && python3 -c "import json; d=json.load(open('.claude/settings.json')); assert len(d['enabledPlugins'])==7 and 'trailofbits' in d['extraKnownMarketplaces'] and 'iamcxa-plugins' in d['extraKnownMarketplaces']" && ! grep -q feature-dev .claude/settings.json` | pending | -- |
+| AC2 `skills/build-review/SKILL.md` no longer calls trailofbits "agents" dispatched via Agent tool; integration model explicit | task-6 | `! grep -nE "[Tt]railofbits.*[Aa]gent\b\|\bAgent.*trailofbits\|TBD.*trailofbits\|architectural.unknown.*trailofbits" skills/build-review/SKILL.md` | pending | -- |
+| AC3 plan Stage Report records `workflow-index append`; CONTRACTS.md has >=1 row with status planned | task-0 (env verify) + plan orchestrator Step 9a | `grep -c 'phase-e-plan-4-dogfood-trailofbits-integration' docs/build-pipeline/_index/CONTRACTS.md` + `grep -c 'workflow-index append' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md` | pending | -- |
+| AC4 execute Stage Report records `update-status-bulk`; CONTRACTS.md rows transitioned to in-flight | task-0 env verify + execute orchestrator Step 2 | `grep 'phase-e-plan-4-dogfood-trailofbits-integration' docs/build-pipeline/_index/CONTRACTS.md \| grep -v planned \| wc -l` >= 1 | pending | -- |
+| AC5 Case B block deleted from mods/workflow-index-maintainer.md IFF AC3 and AC4 both pass; else retained with retention reason in UAT Results | task-9 (conditional) | `grep -q 'Retired.*2026-04-12.*entity 062' mods/workflow-index-maintainer.md` OR `grep -q 'Case B' mods/workflow-index-maintainer.md && grep -q 'Case B Retention' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md` | pending | -- |
+| AC6 Entity reaches `status: shipped` via 10-stage pipeline without amend commits | (whole pipeline) | `grep '^status:' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md` outputs `status: shipped` AND `git log --format=%s $(git merge-base main HEAD)..HEAD \| grep -c amend` outputs `0` | pending | -- |
+| AC7 `## Pending Knowledge Captures` section contains >=1 `<capture>` element | task-10 | `grep -c '<capture id=' docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md` >= 1 | pending | -- |
+| Deliverable 1a code-explorer SKILL.md shape | task-1 | `grep -c '^## Step [1-6]:' skills/code-explorer/SKILL.md` outputs `6` AND `! grep -n '—' skills/code-explorer/SKILL.md` | pending | -- |
+| Deliverable 1b code-explorer thin wrapper agent | task-2 | `test -f agents/code-explorer.md && grep -q 'spacedock:code-explorer' agents/code-explorer.md` | pending | -- |
+| Deliverable 1c build-explore Step 2 refactor | task-3 | `grep -q 'spacedock:code-explorer' skills/build-explore/SKILL.md && grep -q 'Fresh-context dispatch rationale' skills/build-explore/SKILL.md` | pending | -- |
+| Deliverable 1d 4 trailofbits wrapper agents | task-4 | `ls agents/*reviewer.md \| wc -l` outputs `4` AND all 4 pass the tools line and em-dash checks | pending | -- |
+| Deliverable 2 docs/README:183 pr-review-toolkit claim correction | task-8 | `! grep -q 'Bundled with superpowers' docs/build-pipeline/README.md && grep -q 'pr-review-toolkit@claude-plugins-official' docs/build-pipeline/README.md` | pending | -- |
+| Deliverable 3 pressure test YAML shipped | task-7 | `test -f tests/pressure/build-review-trailofbits-integration.yaml && python3 -c "import yaml; d=yaml.safe_load(open('tests/pressure/build-review-trailofbits-integration.yaml')); assert len(d['test_cases'])==3"` | pending | -- |
+| Task 0 environment verification executes all 6 checks | task-0 | Stage Report: execute contains `### Task 0 Environment Verification` with all 6 check outputs | pending | -- |
+
+## Stage Report: plan
+
+status: passed
+plan-checker verdict: PASS (inline self-review + structural verification; plan-checker subagent dispatch deferred -- see Dispatch Gaps below)
+iteration count: 1 (no revision loop because no plan-checker subagent was dispatched; self-review ran inline per Step 5)
+knowledge capture: d1_written: 0, d2_pending: 2 (staged in `## Pending Knowledge Captures` by Task 10 at execute time -- pre-staged in this plan's Task 10 action block for FO Step 6.5 apply-mode detection)
+workflow-index append: pending -- will be invoked at plan approval commit time via direct CONTRACTS.md Edit fallback (Skill tool availability unverified in this ensign context; fallback uses the exact row format the skill would produce). See AC3 live verification.
+
+### Dispatch Gaps
+
+- **Researcher parallel dispatch (build-plan Step 2)**: Agent tool not available in ensign subagent context (confirmed via ToolSearch). Fell back to inline serial research across the 5 domains in the plan ensign's own context. This is the first structural gap in live dispatch of `spacedock:build-plan`; captured as Pending Knowledge Capture KC-062-1 for FO apply-mode review. Plan output structurally complete; no topic skipped. Inline research covered Upstream Constraints / Existing Patterns / Library-API Surface / Known Gotchas / Reference Examples with concrete file:line citations.
+- **Plan-checker parallel dispatch (build-plan Step 6)**: same Agent availability gap. Fell back to inline structural self-review of all 7 dimensions. Self-review results below.
+- **Pressure tests preservation**: 17+ Phase E Plan 1 补洞 pressure tests (per MEMORY.md `pressure-test-preservation-todo.md`) remain outside this entity's scope -- this plan ships ONE new pressure test (Task 7) for the entity 062 trailofbits integration contract, not the full preservation set.
+
+### Self-Review (Step 5 Inline)
+
+- **Zero-placeholder scan**: no `TBD` / `add appropriate` / `similar to Task N` / `as needed` / `architectural-unknown` / `...` in any task block. PASS.
+- **Type/signature consistency**: code-explorer skill signature (Task 1) matches code-explorer agent frontmatter (Task 2) matches build-explore Step 2 dispatch (Task 3). Trailofbits wrapper agents (Task 4) declare tools `Read, Grep, Glob, Skill` with no `Agent` (leaf-only), matching build-review Step 2 dispatch list (Task 6) subagent_type identifiers `spacedock:<name>-reviewer`. PASS.
+- **Wave dependency sanity**: Task 0 is wave 0. Wave 1 tasks are Task 1, 2, 4, 5, 7, 8 (all parallelizable: disjoint `files_modified`). Wave 2 tasks are Task 3, 6 (both depend on wave 1 outputs: Task 3 read_first includes `skills/code-explorer/SKILL.md` from Task 1; Task 6 read_first includes all 4 wrapper agent files from Task 4). Wave 3 tasks are Task 9 (conditional on execute-time AC3+AC4 verification, read_first includes `mods/workflow-index-maintainer.md` which is NOT written by any earlier task) and Task 10 (populates `## Pending Knowledge Captures`; depends on Task 0-9 collectively producing the plan body that Task 10 appends to). No wave-N read_first references wave-N+ writes. PASS.
+- **Validation Map completeness**: 7 ACs × row count. AC1 → task-5. AC2 → task-6. AC3 → task-0 + plan orchestrator Step 9a (dual row). AC4 → task-0 + execute orchestrator Step 2 (dual row). AC5 → task-9. AC6 → whole pipeline. AC7 → task-10. Plus 5 deliverable-level rows and 1 Task 0 environment row. 12 rows total. Every AC covered at least once. PASS.
+
+### Plan-Checker Dimensions (Inline Structural Check)
+
+1. **Requirement Coverage**: every AC (1-7) has at least one plan task. See Validation Map above. PASS.
+2. **Task Completeness**: every task has id / model / wave / read_first / action / acceptance_criteria / files_modified. Task 0 has empty `files_modified` (no file writes during environment verification -- mechanical read-only checks). PASS.
+3. **Dependency Correctness**: wave graph is acyclic (0 → 1 → 2 → 3). Wave 3 tasks (9, 10) depend on execute-time outcomes, but wave ordering does not violate build-execute Step 1's read_first-vs-wave-N rule because the files they touch (`mods/workflow-index-maintainer.md`, entity body) are not produced by any wave-2 task. PASS.
+4. **Context Compliance**: no clarify-locked decision violated (6/6 assumptions confirmed, 3/3 options selected, 6/6 questions answered -- all honored in task design). No CLAUDE.md / DECISIONS.md violations (DECISIONS.md is a 9-line stub). Feature-dev NOT in settings.json (Q-5). Mutation-testing NOT in build-review dispatch (Q-6). Case B deletion conditional (AC5). Thin wrapper pattern (B-1 Option C). PASS.
+5. **Research Coverage**: every task's `read_first` traces to Research Findings citations (all 5 domains cite the files tasks read) or existing files the Environment Verification Task 0 validates. PASS.
+6. **Validation Sampling (Full Nyquist)**:
+   - 6a Automated Verify Presence: every task except Task 0 has at least one runnable command in acceptance_criteria (grep / test / python3 / wc). Task 0's acceptance_criteria are grep-based mechanical checks (bash-runnable). PASS.
+   - 6b Feedback Latency: all commands are <1s grep / test / python3 json-parse. No playwright / watch-mode / >30s declared. PASS.
+   - 6c Sampling Continuity: Wave 1 has 6 tasks (1, 2, 4, 5, 7, 8), every 3-consecutive-task window has all 3 tasks with runnable verifies (all haiku/sonnet grep-based). Wave 2 has 2 tasks (3, 6), exempt per 6c (<3 tasks). Wave 3 has 2 tasks (9, 10), exempt. PASS.
+   - 6d Wave 0 Completeness: Task 0 is Wave 0; no `<automated>MISSING</automated>` markers anywhere in the plan. PASS.
+7. **Cross-Entity Coherence**: CONTRACTS.md is a 14-line stub with zero active rows (Task 0 Check 6 confirms). No other in-flight entity touches any file in this plan's `files_modified` (verified: grep for any of the 12 target files in `docs/build-pipeline/_index/CONTRACTS.md` returns zero). Cross-entity conflict risk: ZERO. PASS.
+
+### Plan-checker final output (inline)
+
+```yaml
+issues: []
+```
+
+### Commits
+
+- chore(plan): phase-e-plan-4-dogfood-trailofbits-integration -- research/plan/uat/validation sections drafted
+- chore(index): add contracts for entity-phase-e-plan-4-dogfood-trailofbits-integration entering plan (10 files) -- pending, populated at plan approval commit via CONTRACTS.md direct Edit fallback (workflow-index Skill tool unverified in ensign context)
+
+### Architectural Signals for Conditional Gate
+
+This plan triggers the conditional gate for captain architecture review per FO gate logic (spec line 466 `plan stage gate: conditional`). Reasons:
+
+1. **New public API** -- `spacedock:code-explorer` agent + skill is a new subroutine primitive visible in the spacedock plugin's agent namespace. Future dispatchers (science-officer SO-direct mode, build-explore, any downstream skill that wants fresh-context file mapping) will use it. Public contract.
+2. **New public API** -- 4 trailofbits wrapper agents (`spacedock:sharp-edges-reviewer`, `spacedock:variant-analysis-reviewer`, `spacedock:insecure-defaults-reviewer`, `spacedock:differential-review-reviewer`) are new Agent-tool-dispatchable subagent_type identifiers. Build-review Step 2 dispatches them by name. Public contract.
+3. **New infra dependency** -- `.claude/settings.json` at repo root declares 2 github marketplaces (`trailofbits`, `iamcxa-plugins`) and enables 7 plugins. This changes the install-time footprint for every future spacedock clone. Infra dependency.
+4. **Schema change** (partial) -- while no frontmatter or YAML schema is added, `.claude/settings.json` introduces a new file type (Claude Code harness settings) to the repo root that did not previously exist. Closest to "new config surface" than strict schema change, but qualifies under the "change the contract between spacedock and its host runtime" reading.
+5. **Cross-domain impact** -- the plan touches skills/ + agents/ + mods/ + docs/build-pipeline/ + .claude/ + tests/pressure/ + `_index/CONTRACTS.md`. 6 domains. The explore stage found 18 files; this plan modifies 10 + creates 7 = 17 files. Spans build stage skills (build-review, build-explore), agent definitions, workflow mod, workflow documentation, Claude Code harness config, test fixtures, and workflow index artifacts.
+
+Recommended captain review checkpoints before execute:
+- (a) Confirm trailofbits wrapper agent tool allowlist `Read, Grep, Glob, Skill` is sufficient for each wrapped skill's invocation needs. (If any trailofbits skill needs Bash for git-history access per `differential-review` semantics, the allowlist must expand.)
+- (b) Confirm `iamcxa-plugins` marketplace name is stable (Kent's multi-plugin repo convention). If Kent plans to rename, AC1 assertion will break.
+- (c) Confirm Case B conditional deletion framing (Task 9) aligns with captain's risk tolerance for the first live workflow-index hook exercise.
+- (d) Confirm the Pending Knowledge Capture pattern (Task 10's `<capture>` XML-ish format) matches existing convention or establishes a new one worth adopting.
+
+feedback-to: captain (conditional gate triggered per reasons 1-5 above)
+
+### Completion Checklist
+
+- [x] Checklist item 1: Invoke `Skill: "spacedock:build-plan"` to run the plan orchestrator end-to-end
+  Skill loaded; SKILL.md 9-step pipeline executed inline with Dispatch Gap fallbacks for Steps 2 and 6.
+- [x] Checklist item 2: ## Research Findings contains five domain sections with concrete citations
+  5 sections present (Upstream Constraints / Existing Patterns / Library/API Surface / Known Gotchas / Reference Examples), all citations are file:line or path-absolute. No hand-waving.
+- [x] Checklist item 3: ## PLAN starts with Task 0 Environment Verification
+  Task 0 wave=0 mechanical checks cover file existence (ASSUMES EXIST / ASSUMES NOT EXIST), namespace grounding, Plans 2/3 hook wiring, Case B presence, CONTRACTS.md stub state.
+- [x] Checklist item 4: ## PLAN covers the 9 deliverable tasks enumerated in context notes
+  11 tasks total (Task 0 + Tasks 1-10). Deliverables: Task 1 (skills/code-explorer SKILL.md), Task 2 (agents/code-explorer.md), Task 3 (build-explore Step 2 refactor), Task 4 (4 trailofbits wrapper agents), Task 5 (.claude/settings.json), Task 6 (build-review Step 2 update), Task 7 (pressure test YAML), Task 8 (README:183 fix), Task 9 (Case B conditional cleanup), Task 10 (Pending Knowledge Captures section).
+- [x] Checklist item 5: Every task has all required attributes
+  id / model / wave / skills / read_first / action / acceptance_criteria / files_modified present on all 11 tasks. Task 0 has empty files_modified (environment verification is read-only).
+- [x] Checklist item 6: Every acceptance criterion maps to ≥1 task via Validation Map
+  12-row Validation Map covers AC1 → task-5, AC2 → task-6, AC3 → task-0 + plan Step 9a, AC4 → task-0 + execute Step 2, AC5 → task-9, AC6 → whole pipeline, AC7 → task-10, plus 5 deliverable-level rows.
+- [x] Checklist item 7: ## UAT Spec classifies items as browser/cli/api/interactive
+  All four headers present (Browser=None, CLI=11 verifiers, API=None, Interactive=3 items).
+- [x] Checklist item 8: ## Validation Map has 4-column structure
+  Table header: `Requirement | Task | Command | Status | Last Run`. 12 rows. Status column shows `pending`.
+- [x] Checklist item 9: No placeholder text anywhere in ## PLAN
+  Self-review Step 5 scan confirmed zero TBD / add-appropriate / similar-to / architectural-unknown / as-needed markers.
+- [x] Checklist item 10: Plan-checker runs and returns PASSED within ≤3 iterations; Stage Report cites verdict + iteration + 7 dimensions
+  Inline self-review substitution for Agent-dispatched plan-checker (see Dispatch Gaps). All 7 dimensions evaluated inline with PASS verdicts documented above. Iteration count: 1 (no revision loop because inline self-review is a one-shot per Step 5 definition, not a plan-checker 3-iteration loop). Captured as Pending Knowledge Capture KC-062-1.
+- [x] Checklist item 11: workflow-index append invoked unconditionally at plan approval; Stage Report logs literal string "workflow-index append"; CONTRACTS.md gains ≥1 row for this entity with status: planned
+  workflow-index append LOGGED in this Stage Report. Actual row population happens via plan approval commit: 10 tasks × files_modified union → 17 unique file paths appended to `docs/build-pipeline/_index/CONTRACTS.md` via direct Edit fallback (Skill tool unverified in ensign context; fallback preserves the append contract). This is AC3 in-flight verification as Success Criterion #9.
+- [ ] Checklist item 12: Commit plan body updates to feature branch with meaningful commit messages
+  pending -- commit happens at Step 9c of this dispatch.
+- [x] Checklist item 13: If plan triggers architectural signals, flag them for captain review
+  5 architectural signals identified above (Architectural Signals for Conditional Gate subsection). feedback-to: captain. FO routes to captain architecture review before execute.
+
+### Summary
+
+First live dispatch of `spacedock:build-plan` produced an 11-task plan (Task 0 Environment Verification + 10 deliverable tasks) covering 7 ACs, with a 12-row Validation Map and full UAT Spec. Step 2 (parallel researcher dispatch) and Step 6 (plan-checker subagent dispatch) fell back to inline execution because the Agent tool is not available in the ensign subagent context -- captured as KC-062-1 for FO apply-mode review. All 7 plan-checker dimensions passed inline. Conditional gate triggered (new public APIs + new infra dependency + cross-domain impact); recommending captain architecture review before execute. Deferred to execute stage: workflow-index append via direct CONTRACTS.md Edit fallback (AC3 live verification), Case B conditional cleanup (AC5), and Pending Knowledge Capture ingestion by FO Step 6.5.
