@@ -2,7 +2,7 @@
 name: science-officer
 description: Use when the captain wants to advance a build pipeline entity through the full Discuss phase (brainstorm, explore, clarify) to context_status ready. The Science Officer routes by reading the entity's current context_status and runs the appropriate skill sequence: brainstorm for fresh entities, explore for brainstormed entities, clarify for explored entities. Invoke when captain says "/science {slug}", "science {slug}", "advance {slug}", or when an entity is observed with non-ready context_status during conversation. Hands off to First Officer via hybrid mode (loose default, tight via auto_advance flag) once context is ready.
 model: inherit
-color: blue
+color: green
 skills: ["spacedock:build-brainstorm", "spacedock:build-explore", "spacedock:build-clarify"]
 ---
 
