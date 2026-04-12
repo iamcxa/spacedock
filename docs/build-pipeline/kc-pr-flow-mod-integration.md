@@ -418,6 +418,14 @@ Create `mods/pr-review-loop.md` with skill-delegating design, update FO shared c
   ```
   The `pr-review-loop` mod (library: `mods/pr-review-loop.md`) is the canonical merge hook for PR-based workflows. It delegates PR creation to `kc-pr-flow:kc-pr-create` and review triage to `kc-pr-flow:kc-pr-review-resolve`. When this mod is active, its merge hook handles branch push and PR creation -- FO skips the default local merge per step 2.
   ```
+
+  **Change 4 -- Brainstorm Triage section** (around lines 111-172):
+  The Brainstorm Triage section references express/standard/full profiles that no longer exist in the README. The pipeline now uses a single flat stage list with no profile branching. Replace the profile-dependent routing logic:
+  - Remove the "5/5 + small (express path)" subsection that recommends assigning `profile: express`
+  - Remove the "≤4/5 (captain choice path)" three-option routing (A/B/C paths)
+  - Replace with a simplified flow: FO presents executability score to captain, then advances to next stage. No profile assignment gate since all entities traverse the full pipeline.
+  - Keep the 5-criteria executability assessment table (Intent clear, Approach decidable, Scope bounded, Verification possible, Size estimable) -- it's still useful as a pre-dispatch health check even without profile routing.
+  - Update the "Gate Resolution" subsection to remove profile assignment (`profile: {full|standard|express}`) -- gate simply approves advancement to next stage.
   </action>
 
   <acceptance_criteria>
@@ -426,6 +434,8 @@ Create `mods/pr-review-loop.md` with skill-delegating design, update FO shared c
     - `grep 'pr-review-loop' references/first-officer-shared-core.md` finds the Merge and Cleanup reference
     - `grep 'layered' references/first-officer-shared-core.md` finds the layered architecture description
     - `grep 'Library mods' references/first-officer-shared-core.md` finds the library-before-workflow ordering
+    - `grep -c 'express' references/first-officer-shared-core.md` returns 0 (profile references removed)
+    - `grep 'Executability' references/first-officer-shared-core.md` still finds the assessment table
   </acceptance_criteria>
 
   <files_modified>
