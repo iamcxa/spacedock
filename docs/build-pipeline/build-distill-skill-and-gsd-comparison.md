@@ -9,7 +9,7 @@ started: 2026-04-12T14:00:00Z
 completed:
 verdict:
 score: 0.70
-worktree: .worktrees/spacedock-ensign-build-distill-skill-and-gsd-comparison
+worktree:
 issue:
 pr: "#31"
 intent: feature
