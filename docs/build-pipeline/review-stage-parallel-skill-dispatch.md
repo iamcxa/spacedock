@@ -1,8 +1,8 @@
 ---
 id: 069
 title: Review Stage -- Parallel Ensign Skill Dispatch
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: captain
 created: 2026-04-12T21:30:00+08:00
 started:
@@ -104,20 +104,24 @@ Trailofbits skills (when installed + applicable):
 ## Assumptions
 
 A-1: FO already has Agent tool and can dispatch parallel review agents — this is existing capability, not new infrastructure.
-Confidence: Confident (0.95)
-Evidence: skills/build-review/SKILL.md:91-97 -- FO already dispatches 3 themed reviewer teammates (security-reviewer, correctness-reviewer, style-reviewer) in the debate-driven model. The dispatch mechanism exists.
+Confidence: Confident (0.85)
+Evidence: FO has Agent tool (confirmed by all existing dispatches); however, the debate-driven review dispatch described in SKILL.md:91-97 has NEVER actually executed due to 3 structural blockers (no dispatch: property on review stage, single-entity mode kills teams, ensign lacks Agent tool). The capability exists but is unwired. (⚠ contradicted: original evidence "FO already dispatches 3 themed reviewers" was wrong -- captain Directive update confirmed it's aspirational)
+→ Confirmed: captain, 2026-04-12 (batch) -- capability exists but unwired; 069 wires it
 
 A-2: Pre-scan (CLAUDE.md compliance, stale refs, dependency chain, plan consistency) should stay inline in the review orchestrator, not be dispatched as a separate ensign.
 Confidence: Confident (0.90)
 Evidence: skills/build-review/SKILL.md:59 -- "Runs INLINE in your own orchestrator context before any parallel dispatch. These four checks are mechanical -- they do not need fresh context." Line 226 repeats as No-Exceptions rule.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-3: The ensign = leaf / no sub-dispatch boundary is non-negotiable. Entity 069 must work within this constraint, not circumvent it.
 Confidence: Confident (0.95)
 Evidence: skills/build-review/SKILL.md:28 -- "Agent -- you run as an ensign subagent, which does not have the Agent tool"; memory: subagent-cannot-nest-agent-dispatch.md confirmed in Phase E Plan 2 + entity 063.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-4: Knowledge-capture in capture mode (D1 auto-append + D2 staging) remains a post-classification step, invoked by the review orchestrator, not by individual reviewers.
 Confidence: Confident (0.90)
 Evidence: skills/build-review/SKILL.md:134-157 -- Step 4 invokes knowledge-capture from ensign context in mode:capture. Individual reviewers don't touch knowledge-capture.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 ## Option Comparisons
 
@@ -131,6 +135,8 @@ The current build-review SKILL.md already describes a debate-driven model with 3
 | Switch to 1-per-skill (N single-skill ensigns, no debate) | Simpler dispatch; each ensign is pure leaf; scales linearly; no SendMessage dependency | No inter-reviewer debate -- findings may be redundant or contradictory; more dispatches; FO synthesis is harder with 10 independent reports | Medium | Viable |
 | Hybrid -- themed groups for core, 1-per-skill for trailofbits | Core review uses debate (security/correctness/style groups); trailofbits skills dispatch as independent single-skill ensigns because they're add-on and don't need to debate core reviewers | Best of both; debate for depth, independence for add-ons | Medium | Viable |
 
+→ Selected: Debate-driven -- wire it properly. Fix the 3 structural blockers (dispatch property, single-entity mode teams, SKILL.md transformation) to make the original debate-driven design actually execute. 3 themed teams (security/correctness/style) + SendMessage debate. Quality is the priority. (captain, 2026-04-12, interactive)
+
 ## Open Questions
 
 Q-1: Is the current debate-driven model actually implemented and working, or is it aspirational design?
@@ -141,6 +147,8 @@ Why it matters: build-review SKILL.md line 105 has a fallback: "If findings are 
 
 Suggested options: (a) It's working -- entity 062 used parallel reviewers successfully, (b) It's partially working -- some dispatches happen but debate via SendMessage doesn't, (c) It's aspirational -- the skill describes it but FO doesn't actually dispatch themed teams
 
+→ Answer: Aspirational, never executed (option c). Captain's Directive update identified 3 structural blockers: (1) README review stage has no dispatch: property → FO defaults to simple → one ensign, (2) single-entity mode blanket-kills teams even in interactive sessions, (3) ensign has no Agent tool for internal fan-out. The debate-driven design in SKILL.md was never wired. (captain, 2026-04-12, Directive update)
+
 Q-2: Should entity 069 preserve the debate pattern (SendMessage between reviewers) or simplify to independent parallel dispatch?
 
 Domain: Runnable / Invokable
@@ -149,13 +157,17 @@ Why it matters: The debate pattern produces higher-quality findings (reviewers c
 
 Suggested options: (a) Preserve debate -- it's the design's competitive advantage over simple parallel, (b) Drop debate -- simplify to independent parallel for reliability, (c) Make debate optional -- works without it (independent), better with it (debate)
 
+→ Answer: Preserve debate (option a). Follows from O-1 decision: debate-driven is the chosen architecture. SendMessage cross-challenge between themed reviewer teams is the quality differentiator. When teams infra is unavailable (-p pipe mode), fallback to inline pre-scan only is acceptable. (captain, 2026-04-12, interactive -- implied by O-1 selection)
+
 ## Decomposition Recommendation
 
 Not applicable -- 3 files to modify (build-review SKILL.md, FO shared core, FO runtime adapter), clearly Medium scope.
 
 ## Canonical References
 
-(clarify stage will populate)
+- `skills/build-review/SKILL.md:91-97` -- Debate-driven review model design (3 themed teammates: security/correctness/style with SendMessage). Aspirational, never executed due to 3 structural blockers. (captain Directive update, Q-1 resolution)
+- `references/claude-first-officer-runtime.md` -- Contains single-entity mode teams skip rule that 069 must fix (only skip in -p pipe mode, not interactive). (captain Directive Problem 2)
+- `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md` -- Confirms ensign=leaf as hard constraint. (A-3 evidence)
 
 ## Stage Report: explore
 
@@ -170,4 +182,23 @@ Not applicable -- 3 files to modify (build-review SKILL.md, FO shared core, FO r
 - [x] α markers resolved: 0 / 0
   No α markers in brainstorming spec
 - [x] Scale assessment: confirmed Medium
-  3 files to modify, 6 files mapped total
+  4 files to modify (README review stage, build-review SKILL.md, FO runtime adapter, FO shared core), 6 files mapped total
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  4 files to modify, single coherent architectural change
+- [x] Assumptions confirmed: 4 / 4 (1 corrected)
+  A-1 evidence corrected: debate-driven never executed, FO capability exists but unwired; A-2 through A-4 confirmed batch
+- [x] Options selected: 1 / 1
+  O-1 Debate-driven -- wire the 3 structural blockers to make the original design execute
+- [x] Questions answered: 2 / 2
+  Q-1 aspirational/never executed (captain Directive update); Q-2 preserve debate (implied by O-1)
+- [x] Canonical refs added: 3
+  build-review SKILL.md debate model; FO runtime single-entity teams rule; subagent-cannot-nest memory
+- [x] Context status: ready
+  gate passed: all items resolved, 6 ACs present, captain Directive update enriched scope with 3 structural problems
+- [x] Handoff mode: loose
+  auto_advance not set; captain must say "execute 069" for FO to advance
+- [x] Clarify duration: 3 interactions, session complete
+  1 batch confirmation (1 corrected) + 1 option + Q-1 answered by Directive update + Q-2 implied by O-1
