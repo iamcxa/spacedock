@@ -290,9 +290,21 @@ validation:
     - spacedock:build-quality
     - spacedock:build-review
     - spacedock:build-uat
+  expected_stage_names:  # optional
+    - brainstorm
+    - explore
+    - clarify
+    - plan
+    - execute
+    - quality
+    - review
+    - uat
+    - shipped
 ```
 
 Post-apply, overhaul re-reads the target README and verifies the expected state. Mismatch triggers a validation error and (future) rollback workflow.
+
+`expected_stage_names` is an optional list of stage names expected after transformation. If present, SKILL.md Step 4.3e validates that the exact set of stage names in the written `states[]` matches — same names, same count, order may vary. Use this when the recipe makes structural additions or removals and the author wants an explicit guard against silent name drift.
 
 ## Forbidden Operations
 

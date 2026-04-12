@@ -137,9 +137,9 @@ For each operation in `operations[]`, validate in index order:
 | `remove-stage-field` | `stage` exists in projected states; `field` is present on that stage entry |
 | `remove-frontmatter-path` | `path` resolves to a present YAML subtree (line-scan for path segments) |
 | `update-profile` | `name` exists in profiles block; every stage in `stages[]` will exist in projected states after all ops apply |
-| `replace-body-subsection` | `heading` exists as `### {heading}` in body (exact H3 match) |
-| `remove-body-subsection` | `heading` exists as `### {heading}` in body |
-| `add-body-subsection` | `after` heading exists as `### {after}` in body |
+| `replace-body-subsection` | `heading` exists as `### {heading}` in body (exact H3 match; heading may be backtick-quoted as `` ### `{heading}` ``) |
+| `remove-body-subsection` | `heading` exists as `### {heading}` in body (heading may be backtick-quoted as `` ### `{heading}` ``) |
+| `add-body-subsection` | `after` heading exists as `### {after}` in body (heading may be backtick-quoted as `` ### `{after}` ``) |
 | `update-prose-block` | `anchor` substring appears exactly once in body |
 | `replace-table-block` | `anchor` substring appears exactly once as a table header row (line starting with `\|` and containing anchor) |
 | `update-yaml-block` | `section` heading exists in body (field value already includes `##`); `block_index` is within range of ` ```yaml ` code blocks in that section |
@@ -226,8 +226,8 @@ Apply this transformation?
 
 **Pass A: Frontmatter ops** (operating on the YAML block between the first `---` and second `---`):
 
-- `remove-stage`: Delete the stage entry block (from `  - name: {name}` through all indented field lines until the next `  - name:` or end of states block). Also remove the stage name from every profile array line (find lines matching `    - {name}` within any profile's stage list block).
-- `add-stage`: Insert stage entry block after the last line of the `after` stage's entry block. Stage entry format follows existing entries. Add all `fields` as indented YAML lines.
+- `remove-stage`: Delete the stage entry block (from `  - name: {name}` through all indented field lines until the next `  - name:` or end of states block). Also remove the stage name from every profile array line (find lines matching `    - {name}` within any profile's stage list block). Delete the `### {name}` body subsection (from the H3 heading to the next H3 at the same level, or end of the parent H2 section). The heading may be backtick-quoted as `` ### `{name}` ``.
+- `add-stage`: Insert stage entry block after the last line of the `after` stage's entry block. Stage entry format follows existing entries. Add all `fields` as indented YAML lines. If `body_content` is present, insert it into the body after the `after` stage's existing body subsection (find `` ### `{after}` `` subsection end, insert `body_content` there — same position logic as `add-body-subsection`).
 - `rename-stage`: Find-replace stage name in `states[]` (`  - name: {old}` → `  - name: {new}`), in profile arrays (` - {old}` → ` - {new}`), in body headings (`` ### `{old}` `` → `` ### `{new}` ``).
 - `set-stage-field`: Locate the target stage block. If field line exists, replace it. If not, insert it after the `  - name:` line.
 - `remove-stage-field`: Locate the target stage block. Delete the field line.
@@ -255,6 +255,9 @@ For each `rename-stage` op processed in Pass A:
 - Update the Model Dispatch row: find `| {old} |` and replace with `| {new} |`
 - Update the Schema enum: find `{old}` in the status enum and replace with `{new}`
 - Update Prerequisites table rows referencing the old name
+
+For each `add-stage` op processed in Pass A:
+- Add `{name}` to the Schema `status` enum list (after the `after` stage's position in the list)
 
 For each `add-stage` op with a `model_dispatch_row` field:
 - Insert the `model_dispatch_row` string into the Model Dispatch table (after the row for the `after` stage, or at the end of the table if `after` is the last stage in the table)
@@ -287,6 +290,8 @@ grep -c "  - name:" {target_readme_path}
 Compare against `validation.expected_stage_count` from recipe.
 
 e. Profile count check (count profile entries in written frontmatter, compare against `validation.expected_profile_count`).
+
+4.3e: If `expected_stage_names` is present in the recipe validation block, verify the stage names in the written `states[]` match exactly (same names, same count, order may vary).
 
 **4.4 On validation failure:** Present errors to captain (no automatic rollback per Q-1 answer):
 ```
