@@ -1,8 +1,8 @@
 ---
 id: 063
 title: PR Review Loop Mod -- kc-pr-create Integration + Shipped Stage Closed-Loop
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: captain
 created: 2026-04-12T04:30:00Z
 started:
@@ -96,22 +96,27 @@ Implement `mods/pr-review-loop.md` -- the shipped stage closed-loop mod required
 A-1: Mod file lives at `mods/pr-review-loop.md` (repo root), matching the canonical mod directory.
 Confidence: Confident
 Evidence: mods/workflow-index-maintainer.md:1 + mods/pr-merge.md:1 -- both existing mods at repo root; README:126 references `mods/pr-review-loop.md`
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-2: Mod format follows the YAML frontmatter (name/description/version) + `## Hook:` section pattern.
 Confidence: Confident
 Evidence: mods/workflow-index-maintainer.md:1-5 + mods/pr-merge.md:1-5 -- both use identical frontmatter schema and hook heading convention
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-3: Captain approval guardrail in merge hook -- present PR summary, wait for explicit approval before push/create.
 Confidence: Confident
 Evidence: mods/pr-merge.md:29-36 -- merge hook guardrail pattern; README:383 -- "ask captain approval"
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-4: Skill invocation described as inline instruction text with context params (not YAML block like workflow-index-maintainer).
 Confidence: Likely
 Evidence: mods/workflow-index-maintainer.md:43-48 -- uses inline YAML params for skill invocation (1 usage, clear fit). However, kc-pr-flow skills are external plugins invoked via `Skill("kc-pr-flow:kc-pr-create")` -- the mod describes the invocation, not the skill internals.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-5: New mod starts at version 0.1.0.
 Confidence: Likely
 Evidence: mods/workflow-index-maintainer.md:4 -- `version: 0.1.0` (only new-mod precedent)
+→ Confirmed: captain, 2026-04-12 (batch)
 
 ## Option Comparisons
 
@@ -123,6 +128,8 @@ Evidence: mods/workflow-index-maintainer.md:4 -- `version: 0.1.0` (only new-mod 
 | Reset-to-execute: reset entity status to execute, clear pr field, log context | Simple, no external dependency, matches README:386 pattern | Loses PR context, no comment triage, manual-heavy | Low | Viable |
 | Hybrid: invoke skill first, fall back to reset-to-execute if skill unavailable | Graceful degradation, best of both worlds | Two code paths in hook, more complex instructions | Medium | Viable |
 
+→ Selected: Skill-first: invoke kc-pr-review-resolve (captain, 2026-04-12, interactive)
+
 ## Open Questions
 
 Q-1: Should entity 063 update FO shared core startup step 4 to scan `mods/` (repo root) instead of `{workflow_dir}/_mods/`?
@@ -133,6 +140,8 @@ Why it matters: FO shared core line 18 scans `{workflow_dir}/_mods/*.md` for mod
 
 Suggested options: (a) Update FO shared core line 18 to scan `mods/*.md` (repo root) -- aligns with actual file layout (recommended), (b) Scan both `mods/` and `{workflow_dir}/_mods/` for backward compatibility, (c) Out of scope -- create a separate entity for FO scan path migration
 
+→ Answer: Scan both -- mods/ (shared library) + {workflow_dir}/_mods/ (workflow-specific). Layered mod architecture: mods/ holds the library, _mods/ holds per-workflow activation/overrides. (captain, 2026-04-12, interactive -- revised from initial "mods/ only")
+
 Q-2: Should both copies of pr-merge.md get deprecation notices?
 
 Domain: Readable/Textual
@@ -141,6 +150,8 @@ Why it matters: `docs/build-pipeline/_mods/pr-merge.md` (v0.8.2) and `mods/pr-me
 
 Suggested options: (a) Deprecate both copies with pointer to `mods/pr-review-loop.md`, (b) Delete `_mods/` copy + deprecate `mods/` copy (clean break), (c) Deprecate `_mods/` copy per AC4 only, leave `mods/` copy for separate cleanup
 
+→ Answer: Replace _mods/pr-merge.md with _mods/pr-review-loop.md. pr-merge.md stays in mods/ library (not deprecated). Build-pipeline activates pr-review-loop via its _mods/ directory. (captain, 2026-04-12, interactive -- reframed from deprecation to activation swap)
+
 Q-3: Should entity 063 include writing mod-hook fixture tests to satisfy Phase E SC#5?
 
 Domain: Runnable/Invokable
@@ -148,6 +159,12 @@ Domain: Runnable/Invokable
 Why it matters: Phase E spec SC#5 requires "Both new mods exist and pass mod-hook fixture tests (distilled from tests/fixtures/merge-hook-pipeline)". Entity 063 directive has no test-related ACs. Without tests, SC#5 is technically incomplete.
 
 Suggested options: (a) Include fixture tests in entity 063 scope -- expands to ~6 files, still Small, (b) Create a separate entity for mod fixture tests, (c) Defer tests to Phase E+1 and mark SC#5 as partially met
+
+→ Answer: Include in entity 063 scope (captain, 2026-04-12, interactive)
+
+## Canonical References
+
+(No external files cited by captain during clarify session.)
 
 ## Stage Report: explore
 
@@ -163,3 +180,22 @@ Suggested options: (a) Include fixture tests in entity 063 scope -- expands to ~
   No α markers in brainstorming spec (directive was precise)
 - [x] Scale assessment: confirmed
   6 files mapped, 3-4 files changed (mod + deprecation + FO shared core) -- Small confirmed
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  entity is Small scope, no children proposed
+- [x] Assumptions confirmed: 5 / 5 (0 corrected)
+  A-1 through A-5 confirmed via batch -- mod location, format, guardrail, invocation style, version
+- [x] Options selected: 1 / 1
+  O-1 review feedback routing -- skill-first via kc-pr-review-resolve (recommended)
+- [x] Questions answered: 3 / 3
+  Q-1 layered mod scan (both mods/ + _mods/); Q-2 activation swap (replace _mods/pr-merge with pr-review-loop); Q-3 fixture tests in scope
+- [x] Canonical refs added: 0
+  no external files cited by captain during session
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected, all Qs answered
+- [x] Handoff mode: loose
+  auto_advance not set; captain must say "execute 063" to advance
+- [x] Clarify duration: 4 questions asked, session complete
+  1 batch assumption confirmation + 1 option AskUserQuestion + 3 question AskUserQuestion (Q-2 rejected once, reframed)
