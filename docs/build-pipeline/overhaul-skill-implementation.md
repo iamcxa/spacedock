@@ -11,7 +11,7 @@ verdict: PASSED
 score:
 worktree:
 issue:
-pr:
+pr: "#29"
 intent: feature
 scale: Medium
 project: spacedock
