@@ -54,6 +54,88 @@ No other files are touched. You do NOT edit code. You do NOT edit PLAN. You do N
 
 ---
 
+## FO Guidance: Phase 1 -- Reviewer Dispatch
+
+**This section is for FO (main session), not the ensign.** FO reads this before dispatching the review ensign. The ensign reads from Step 1 onward.
+
+### Overview
+
+Review uses the **debate-driven** dispatch mode (declared in the README review stage as `dispatch: debate-driven`). FO creates a team of 3 themed reviewer teammates, dispatches them in parallel, waits for debate to complete, then dispatches the review ensign (this skill) to classify findings and write the Stage Report.
+
+### Diff Scope
+
+FO computes the review scope before dispatch:
+
+```bash
+git diff {execute_base}..HEAD --stat
+```
+
+Count the changed files to determine reviewer count (see Dispatch Table below).
+
+### Themed Reviewer Groups
+
+FO creates exactly 3 themed reviewer teammates. Each reviewer independently reads `git diff {execute_base}..HEAD`, writes findings to the entity file, then debates via SendMessage.
+
+| Reviewer | Skills to Load | Focus |
+|----------|---------------|-------|
+| **security-reviewer** | `differential-review:diff-review`, `sharp-edges:sharp-edges`, `variant-analysis:variant-analysis`, `insecure-defaults:insecure-defaults` (when installed) | Security holes, unsafe defaults, dangerous patterns, attack surface |
+| **correctness-reviewer** | `pr-review-toolkit:code-reviewer`, `pr-review-toolkit:silent-failure-hunter` | Bugs, error handling, logic errors, silent failures, regressions |
+| **style-reviewer** | `pr-review-toolkit:comment-analyzer`, `pr-review-toolkit:type-design-analyzer`, `pr-review-toolkit:code-simplifier`, `pr-review-toolkit:pr-test-analyzer` | Clarity, types, complexity, test coverage |
+
+### Dispatch Table -- Reviewer Count by Diff Scope
+
+| Diff scope | Reviewers dispatched | Notes |
+|------------|---------------------|-------|
+| Small (< 5 files) | correctness + style | Skip security for trivial diffs |
+| Medium (5-15 files) | correctness + style + security | All 3 core reviewers |
+| Large (> 15 files) | correctness + style + security (with trailofbits when installed) | Full fan |
+
+When trailofbits skills (`differential-review`, `sharp-edges`, `variant-analysis`) are not installed, security-reviewer loads only `insecure-defaults`. If no security skills are available, dispatch correctness + style only regardless of diff size.
+
+### Debate Protocol
+
+1. Dispatch all reviewers in parallel via `Agent()` with `team_name` set to the active team.
+2. Each reviewer independently analyzes `git diff {execute_base}..HEAD` and writes `### Review Findings: {reviewer-name}` to the entity file.
+3. Reviewers SendMessage each other to cross-challenge findings (e.g., security flags a pattern, correctness responds with context, security updates severity).
+4. FO monitors for completion: all 3 reviewers in idle state AND all `### Review Findings:` sections written to entity file.
+5. FO does NOT synthesize or classify findings -- that is the ensign's job in Phase 2.
+
+### Findings Format (Written by Each Reviewer)
+
+Each reviewer appends to the entity file:
+
+```markdown
+### Review Findings: {reviewer-name}
+
+| Severity | File:Line | Description |
+|----------|-----------|-------------|
+| HIGH | src/api.ts:42 | Silent swallow of upstream 4xx |
+| MEDIUM | src/types.ts:10 | Stale comment references removed field |
+
+**Post-debate notes**: {any severity updates from SendMessage debate, or "none"}
+```
+
+### Bare-Mode Fallback
+
+When teams are unavailable (`-p` pipe mode or TeamCreate probe fails), FO dispatches the review ensign in **simple mode** (no `team_name`). The ensign runs pre-scan only (Step 1) -- no reviewer dispatch. See Step 2 fallback path.
+
+This is an acceptable degradation: bare-mode review catches mechanical issues (CLAUDE.md violations, stale refs, broken imports, plan consistency). It does not provide debate-quality finding depth.
+
+### After Reviewer Dispatch Completes
+
+Once all reviewers have posted findings and debate has settled, FO dispatches the review ensign normally:
+
+```
+Agent(
+    subagent_type="spacedock:ensign",
+    prompt="... skill: spacedock:build-review ..."
+)
+```
+
+The ensign reads reviewer findings from the entity file, classifies them (Step 3), invokes knowledge-capture (Step 4), and writes the Stage Report (Step 6).
+
+---
+
 ## Step 1: Pre-Scan (Inline in Ensign Context)
 
 **Runs INLINE in your own orchestrator context before any parallel dispatch.** These four checks are mechanical -- they do not need fresh context and they do not benefit from subagent isolation. Per spec lines 332-339, run them in the review ensign's own context before paying for subagent dispatch overhead. The pre-scan findings feed classification in Step 3 alongside the agent findings.

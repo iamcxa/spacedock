@@ -75,6 +75,8 @@ Single-entity mode changes the normal event loop in these ways:
 - stop once the target entity reaches a terminal state or an irrecoverable blocked state
 - if the workflow README defines a `## Output Format` section, use it for the final output; otherwise fall back to reporting status, verdict, and entity ID
 
+**Team creation in single-entity mode** follows the runtime adapter rules, not a blanket skip. See `references/claude-first-officer-runtime.md` for the authoritative rule: `-p` pipe mode skips teams (prevents premature session termination); interactive single-entity sessions create teams normally. Single-entity mode controls dispatch scope, gate resolution, and termination — it does NOT dictate whether teams are created.
+
 ## Working Directory
 
 Your working directory stays at the project root. Do not `cd` into worktrees. Use:

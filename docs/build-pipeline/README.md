@@ -106,12 +106,17 @@ stages:
       model: sonnet
       feedback-to: execute
       skill: spacedock:build-review
-      # Judgment-based diff-level code review.
+      dispatch: debate-driven
+      # Judgment-based diff-level code review. Uses debate-driven dispatch:
+      # FO creates 3 themed reviewer teams (security / correctness / style),
+      # reviewers analyze diff independently then debate via SendMessage,
+      # then FO dispatches ensign to classify post-debate findings + write Stage Report.
       # Pre-scan (CLAUDE.md / stale refs / import graph / plan consistency) runs
-      # inline before parallel dispatch of pr-review-toolkit + trailofbits agents.
+      # inline in ensign context before classification.
       # Invokes knowledge-capture in capture mode for D1/D2 staging.
       # CRITICAL/HIGH CODE findings -> feedback-to: execute.
       # PLAN advisory findings raise replan flag (captain decides).
+      # In bare mode (-p pipe), falls back to pre-scan only (no team dispatch).
       #
       # NAMESPACE NOTE: Migration to `spacebridge:build-review` is Phase F work (entity 055).
     - name: uat
@@ -349,21 +354,26 @@ Project-wide mechanical verification — "does the whole project still work?" **
 
 ### `review`
 
-Judgment-based diff-level code review. Scope is `git diff {execute_base}..HEAD` — only what this execute iteration changed. Combines a mechanical pre-scan (inline, no dispatch) with parallel dispatches of pr-review-toolkit and trailofbits review agents.
+Judgment-based diff-level code review using `dispatch: debate-driven`. Scope is `git diff {execute_base}..HEAD` — only what this execute iteration changed. Two-phase protocol: (1) FO creates 3 themed reviewer teams that analyze and debate in parallel, then (2) FO dispatches the review ensign to classify post-debate findings and write the Stage Report.
 
 - **Inputs:** Feature branch, execute base commit SHA, context lake
 - **Outputs:**
-  - **Pre-scan** (inline): CLAUDE.md compliance walk, stale references grep, dependency chain check, plan consistency (diff matches PLAN's `files_modified`)
-  - **Parallel dispatches**: `pr-review-toolkit:code-reviewer`, `silent-failure-hunter`, `comment-analyzer`, `pr-test-analyzer`, `type-design-analyzer`, `code-simplifier`, plus trailofbits `differential-review` / `sharp-edges` / `variant-analysis` (if installed)
-  - Findings classified: severity (CRITICAL/HIGH/MEDIUM/LOW/NIT) × root (CODE/DOC/NEW/PLAN)
+  - **Phase 1 -- FO reviewer dispatch** (debate-driven): FO creates 3 themed reviewer teammates (security / correctness / style), dispatches them in parallel, reviewers independently analyze `git diff {execute_base}..HEAD`, then cross-challenge findings via SendMessage debate. Each reviewer writes `### Review Findings: {name}` to entity file.
+  - **Phase 2 -- Ensign classification** (review ensign, this skill): reads reviewer findings from entity file, runs inline pre-scan (CLAUDE.md compliance walk, stale refs grep, dependency chain check, plan consistency), classifies all findings: severity (CRITICAL/HIGH/MEDIUM/LOW/NIT) × root (CODE/DOC/NEW/PLAN)
   - `spacedock:knowledge-capture` invoked in `capture` mode: D1 patterns auto-appended to plugin learned-patterns.md, D2 candidates staged to entity body `## Pending Knowledge Captures`
   - `## Stage Report: review` — classified findings table
+- **Themed reviewer groups:**
+  - **security-reviewer**: `differential-review:diff-review`, `sharp-edges:sharp-edges`, `variant-analysis:variant-analysis`, `insecure-defaults:insecure-defaults` (trailofbits when installed)
+  - **correctness-reviewer**: `pr-review-toolkit:code-reviewer`, `pr-review-toolkit:silent-failure-hunter`
+  - **style-reviewer**: `pr-review-toolkit:comment-analyzer`, `pr-review-toolkit:type-design-analyzer`, `pr-review-toolkit:code-simplifier`, `pr-review-toolkit:pr-test-analyzer`
+- **Reviewer count scales with diff scope:** small diff (< 5 files) = correctness + style; medium (5-15 files) = all 3; large (> 15 files) = all 3 with full trailofbits
+- **Bare-mode fallback** (when `-p` pipe mode or TeamCreate fails): ensign runs pre-scan only — no reviewer dispatch. Mechanical issues still caught; debate-quality depth not available.
 - **Verdict routing:**
   - No CRITICAL/HIGH CODE findings → advance to uat
   - Any CRITICAL/HIGH CODE finding → `feedback-to: execute`
   - Any PLAN finding → raise replan flag in Stage Report (advisory — captain decides whether to reset status to plan)
-- **Good:** Pre-scan catches mechanical issues before paying for subagent dispatch; consistent classification; D2 candidates staged (not applied) so FO handles captain interaction
-- **Bad:** Skipping pre-scan, treating NIT findings as blockers, silently applying D2 candidates without FO handoff, dispatching review agents on the entire branch instead of `execute_base..HEAD` diff
+- **Good:** Debate between themed reviewers catches false positives before classification; pre-scan locks in mechanical floor before paying for reviewer dispatch; D2 candidates staged (not applied) so FO handles captain interaction
+- **Bad:** Skipping Phase 1 reviewer dispatch and relying on pre-scan only outside bare mode; treating NIT findings as blockers; silently applying D2 candidates without FO handoff; dispatching review agents on the entire branch instead of `execute_base..HEAD` diff
 
 ### `uat`
 

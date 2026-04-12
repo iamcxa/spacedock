@@ -22,7 +22,9 @@ At startup (after reading the README, before dispatch):
    All workflow functionality is preserved. Dispatch and gate behavior are unchanged.
    ```
 
-In single-entity mode, skip team creation entirely. Use bare-mode dispatch for all agent spawning — the Agent tool without `team_name` blocks until the subagent completes, which prevents premature session termination in `-p` mode.
+In **`-p` pipe mode** (non-interactive stdin), skip team creation entirely. Use bare-mode dispatch for all agent spawning — the Agent tool without `team_name` blocks until the subagent completes, which prevents premature session termination when the session exits on completion.
+
+In **interactive single-entity mode** (named entity, but session stays alive), create teams normally using the TeamCreate probe above. The rationale for skipping teams (premature session termination) does not apply when the session is interactive. Debate-driven review and other team-dependent dispatch modes are fully available.
 
 ## Worker Resolution
 
