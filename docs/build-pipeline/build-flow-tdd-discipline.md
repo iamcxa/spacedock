@@ -662,3 +662,34 @@ status: passed
    - ✓ Fix applied: Updated parsing.test.ts to match new Stage interface fields
    
    No blockers. All quality gates satisfied.
+
+## Stage Report: review
+
+### Pre-scan
+
+1. **Stale references**: All `cite_file` paths in pressure test YAMLs resolve to existing files. Section headers referenced by `cite_section` exist: `## TDD Mode -- test_first Tasks` at `skills/task-execution/SKILL.md:70`; `#### 6d -- Wave 0 Completeness` at `skills/build-plan/references/plan-checker-prompt.md:88`. No dead references introduced.
+
+2. **Plan consistency**: Diff matches PLAN `files_modified` across tasks 1-5 with one legitimate addition. `tests/dashboard/parsing.test.ts` was not in any task's `files_modified` — it was a fix-forward commit (f4f34c1) added during quality stage when pre-existing Stage type field omissions surfaced in the test suite. This is consistent with the fix-forward pattern and correctly documented in Stage Report: quality.
+
+### Findings
+
+| # | Severity | Root | Location | Finding |
+|---|----------|------|----------|---------|
+| F-1 | LOW | DOC | `docs/build-pipeline/build-flow-tdd-discipline.md:95` (Acceptance Criteria) | AC-3 says plan-checker 6d sub-rule "checks for test files in `files_modified` and **dual-phase acceptance_criteria**". The actual implementation only validates test file presence + TDD skill in `skills` -- no dual-phase acceptance_criteria check. This is intentional per O-1 resolution (RED/GREEN differentiation does not belong in acceptance_criteria; the TDD skill governs the cycle internally), but the AC text was not updated after the design pivot. |
+| F-2 | NIT | DOC | `tests/pressure/build-tdd-plan-checker-missing-test-file.yaml` | `skill: plan-checker` -- there is no top-level skill named `plan-checker`; the actual skill is `build-plan` (which dispatches plan-checker as an internal subagent). Other pressure tests use `skill: task-execution` which correctly names the top-level skill. Inconsistency with the existing pressure test schema convention. |
+
+### Checklist
+
+1. [x] Pre-scan stale references -- no dead file/section references
+2. [x] Pre-scan plan consistency -- diff matches PLAN files_modified (parsing.test.ts fix-forward is documented)
+3. [x] Skill file changes accuracy and backward compatibility -- `test_first` optional boolean default false; no breaking changes to existing task format; TDD Mode section correctly gated on `test_first: true`; backward compatibility clause present
+4. [x] Pressure test YAML validity -- all 3 parse without error; cite_file paths exist; cite_section headers match; expected answers correct
+5. [x] Cross-file consistency -- `test_first` attribute name consistent across build-plan SKILL.md, task-execution SKILL.md, plan-checker-prompt.md, and build-brainstorm SKILL.md; no em dashes introduced in modified lines
+6. [x] Findings classified -- 2 findings (1 LOW/DOC, 1 NIT/DOC)
+7. [x] Verdict
+
+### Verdict
+
+**ADVANCE to uat**
+
+No CRITICAL or HIGH CODE findings. F-1 (LOW/DOC) is a stale AC description post O-1 pivot -- the implementation is correct, only the AC text is out of date. F-2 (NIT/DOC) is a schema naming inconsistency in a pressure test `skill` field. Neither affects runtime behavior or correctness of the skill contracts.
