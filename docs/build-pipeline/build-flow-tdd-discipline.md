@@ -693,3 +693,67 @@ status: passed
 **ADVANCE to uat**
 
 No CRITICAL or HIGH CODE findings. F-1 (LOW/DOC) is a stale AC description post O-1 pivot -- the implementation is correct, only the AC text is out of date. F-2 (NIT/DOC) is a schema naming inconsistency in a pressure test `skill` field. Neither affects runtime behavior or correctness of the skill contracts.
+
+## UAT Results
+
+| # | Type | Command | Expected | Actual | Status |
+|---|------|---------|----------|--------|--------|
+| 1 | CLI | `grep -n "test_first" skills/build-plan/SKILL.md` | >= 2 matches | 2 matches (lines 146, 175) | PASS |
+| 2 | CLI | `grep -c "test_first\|RED.*GREEN\|vacuous" skills/task-execution/SKILL.md` | >= 3 | 5 matches | PASS |
+| 3 | CLI | `grep -A 5 "test_first" skills/build-plan/references/plan-checker-prompt.md` | sub-rule text within 6d section | Returns 3-line sub-rule: files_modified test file check (blocker) + TDD skill in skills check (blocker) | PASS |
+| 4 | CLI | `ls tests/pressure/build-tdd-*.yaml` returns 3 files; each parses via python3 YAML | 3 files, all valid YAML | 3 files (build-tdd-no-tdd-no-cycle.yaml, build-tdd-plan-checker-missing-test-file.yaml, build-tdd-vacuous-test-detection.yaml); all parse without error | PASS |
+
+### CLI Evidence
+
+**Item 1** -- `grep -n "test_first" skills/build-plan/SKILL.md`:
+```
+146: ...ock:validation-patterns, superpowers:test-driven-development" test_first="true">
+175: - `test_first`: optional boolean, default `false`. When `true`, the plan ensign ...
+```
+Matches: 2 (>= 2 required). PASS.
+
+**Item 2** -- `grep -c "test_first\|RED.*GREEN\|vacuous" skills/task-execution/SKILL.md`:
+```
+5
+```
+Matches: 5 (>= 3 required). PASS.
+
+**Item 3** -- `grep -A 5 "test_first" skills/build-plan/references/plan-checker-prompt.md`:
+```
+Additionally, for tasks with `test_first="true"`:
+- The task's `files_modified` MUST include at least one test file (file path containing `.test.`, `.spec.`, `tests/`, or `__tests__/`). Missing test file in `files_modified` for a `test_first` task -- **blocker**.
+- The task's `skills` attribute MUST include `superpowers:test-driven-development`. Missing TDD skill in `skills` for a `test_first` task -- **blocker**.
+```
+Sub-rule text returned within 6d section. PASS.
+
+**Item 4** -- `ls tests/pressure/build-tdd-*.yaml`:
+```
+tests/pressure/build-tdd-no-tdd-no-cycle.yaml
+tests/pressure/build-tdd-plan-checker-missing-test-file.yaml
+tests/pressure/build-tdd-vacuous-test-detection.yaml
+```
+3 files returned. All 3 parse via `python3 -c "import yaml; yaml.safe_load(open(f))"` with exit code 0. PASS.
+
+## Stage Report: uat
+
+status: passed
+
+### Checklist
+
+1. [x] Execute all CLI items, capture evidence
+   - Item 1: `grep -n "test_first" skills/build-plan/SKILL.md` -- 2 matches, PASS
+   - Item 2: `grep -c "test_first\|RED.*GREEN\|vacuous" skills/task-execution/SKILL.md` -- 5 matches, PASS
+   - Item 3: `grep -A 5 "test_first" skills/build-plan/references/plan-checker-prompt.md` -- sub-rule text present, PASS
+   - Item 4: `ls tests/pressure/build-tdd-*.yaml` -- 3 files, all YAML-valid, PASS
+
+2. [x] Write ## UAT Results with per-item table
+   All 4 CLI items documented with expected vs actual and status.
+
+3. [x] Write ## Stage Report: uat with verdict
+   See this section.
+
+### Verdict
+
+**PASS**
+
+All 4 CLI items passed. No browser, API, or interactive items. All acceptance criteria verified via executable commands against the worktree. The implementation is consistent with the plan and the quality stage validation map.
