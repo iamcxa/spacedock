@@ -82,8 +82,26 @@ Without this step, the routing table cannot advance -- `build-explore` leaves `c
 
 After routing lands on `context_status: ready`:
 
-- **Loose mode (default)**: present the summary, wait for captain to say "execute {slug}". You do not touch the `status` field -- First Officer owns that transition.
-- **Tight mode** (`auto_advance: true` in frontmatter): the clarify skill's Step 6 already updated `status: plan`. Report the transition to the captain and exit.
+- **Loose mode (default)**: present the summary and the FO launch command. You do not touch the `status` field -- First Officer owns that transition.
+
+  **Session boundary**: SO-direct mode runs in the captain's main session. FO execution MUST run in a separate CC instance to ensure proper worktree creation and dispatch isolation. Present two options:
+
+  ```
+  Context complete for {entity title}. Ready for FO execution.
+
+  Option A — New terminal (recommended):
+    claude --agent spacedock:first-officer -- "entity {slug}"
+
+  Option B — Same terminal, new session:
+    /clear
+    Then: /spacedock:first-officer {slug}
+  ```
+
+  **Why a separate instance**: FO dispatch creates worktrees for execute/quality/review/uat stages (README `defaults: worktree: true`). Without a worktree, all commits land on main directly, and the shipped stage's `pr-review-loop` merge hook has no branch to push -- the PR lifecycle breaks. SO-direct mode deliberately skips worktree creation (SO only reads/annotates entity files). The session boundary ensures FO follows its proper startup sequence.
+
+  Do NOT offer to "continue as FO" in the current session. The SO→FO handoff is a session boundary, not a persona switch.
+
+- **Tight mode** (`auto_advance: true` in frontmatter): the clarify skill's Step 6 already updated `status: plan`. Present the same FO launch command and exit.
 
 ### Chicken-and-egg note
 

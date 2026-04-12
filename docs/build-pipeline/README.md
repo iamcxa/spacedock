@@ -74,6 +74,12 @@ stages:
       # If confidence <= 95%: present plan to captain for review.
       # Captain interaction is concentrated in SO phase (brainstorm/explore/clarify).
       #
+      # SESSION BOUNDARY: If SO ran clarify in the captain's main session (SO-direct mode),
+      # FO execution MUST start in a separate CC instance to ensure worktree creation.
+      # SO handoff (Step 4) provides the launch command:
+      #   claude --agent spacedock:first-officer -- "entity {slug}"
+      # Do NOT continue SO→FO in the same session — worktree skip breaks PR lifecycle.
+      #
       # NAMESPACE NOTE: Migration to `spacebridge:build-plan` is Phase F work (entity 055).
     - name: execute
       model: sonnet
