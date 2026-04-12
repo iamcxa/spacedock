@@ -1,7 +1,7 @@
 ---
 id: 069
 title: Review Stage -- Parallel Ensign Skill Dispatch
-status: uat
+status: shipped
 context_status: ready
 source: captain
 created: 2026-04-12T21:30:00+08:00
