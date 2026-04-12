@@ -809,6 +809,105 @@ issues: []
 | AC-3 | `grep -rl "source: build-distill" docs/build-pipeline/*.md \| wc -l` (4 >= 3) | PASS |
 | AC-4 | `grep "067" docs/build-pipeline/_docs/distillations/067-tdd-pre-skill-exemplar.md` | PASS |
 
+## Stage Report: review
+
+### Checklist
+
+1. **Pre-scan: CLAUDE.md compliance** -- DONE
+   - No version numbers fabricated in any new file. No specific version pins found.
+   - No em dashes found in new files (all `--` double-dash). SKILL.md Rules section explicitly enforces this convention.
+   - No destructive operations, no force-push, no sensitive files introduced.
+   - Context window safety: all files are documentation-sized (< 200 lines each). No large input embedding.
+   - Status: PASS
+
+2. **Pre-scan: stale references grep** -- DONE
+   - `skills/build-distill/SKILL.md` references `references/comparison-dimensions.md` (exists at `skills/build-distill/references/comparison-dimensions.md`). ✓
+   - SKILL.md references `docs/build-pipeline/_docs/distillations/{source-name}-vs-{target-name}.md` (output pattern, not a stale ref). ✓
+   - `067-tdd-pre-skill-exemplar.md` references `docs/build-pipeline/_archive/build-flow-tdd-discipline.md` (entity 067, verified in execute stage). ✓
+   - Entity drafts reference comparison report paths (e.g., `docs/build-pipeline/_docs/distillations/gsd-discuss-phase-vs-build-clarify.md`). All 5 reports exist. ✓
+   - GSD skill paths (`~/.claude/skills/gsd-*/SKILL.md`) are runtime references for future skill invocations; not stale (verified readable in task-0 environment check). ✓
+   - Status: PASS -- no stale references found.
+
+3. **Pre-scan: plan consistency (diff matches PLAN's files_modified)** -- DONE
+   - PLAN lists 12 files across tasks 1-9 (+ entity file updates). Diff from execute_base (3092e45) to HEAD shows exactly 12 files changed:
+     - `skills/build-distill/SKILL.md` ✓
+     - `skills/build-distill/references/comparison-dimensions.md` ✓
+     - 5 distillation reports in `_docs/distillations/` ✓
+     - `_docs/distillations/067-tdd-pre-skill-exemplar.md` ✓
+     - 3 entity drafts in `docs/build-pipeline/` ✓
+     - `docs/build-pipeline/build-distill-skill-and-gsd-comparison.md` (entity file, stage reports added) ✓
+   - Extra commit `b0680f5` (ID renumber 069→070) modifies 3 entity draft files already in the diff; no net-new files.
+   - Status: PASS -- diff is 100% consistent with PLAN files_modified.
+
+4. **Review: SKILL.md accuracy and completeness (6 steps, tools, input/output contract, rules)** -- DONE
+   - 6-step declaration: `"Six steps, in strict order. Steps 1-4 non-interactive, Step 5 semi-interactive (AskUserQuestion per gap), Step 6 non-interactive."` -- present at line 14. ✓
+   - Tools Available section: correctly lists Read/Grep/Glob/Bash(git)/Write/Edit/AskUserQuestion(Step 5 only); explicitly declares `Agent` NOT available. ✓
+   - Input Contract: `source` and `target` parameters documented with examples and `"none"` handling. ✓
+   - Output Contract: one report per invocation, zero or more entity drafts, read-only on source/target. ✓
+   - Rules section: 8 rules covering read-only, AskUserQuestion never-skip, evidence requirement, threshold enforcement, delegation follow-through, `--` convention, dimensions-fixed, qualitative-bands-only. All align with captain decisions (Q-1: qualitative bands; O-1: fixed dimensions; A-1: semi-interactive).
+   - Step 5 correctly specifies: ToolSearch for AskUserQuestion, AskUserQuestion format (header/question/options), and Create/Skip/Modify paths including frontmatter schema with `source: build-distill`.
+   - **Minor finding (LOW)**: Rule at line 170 reads `"Use '--' (double dash) in markers and annotations, never '--' em dash"` -- the second `--` is itself a double-dash, not an em dash character. The rule's self-referential phrasing is slightly confusing but technically correct (no em dash character present). Not a functional issue.
+   - Status: PASS
+
+5. **Review: comparison-dimensions.md completeness (7 dimensions with scoring guidance)** -- DONE
+   - 7 H2 sections present (## Dimension 1: Interaction Model ... ## Dimension 7: Audit Trail). ✓
+   - Each dimension has: Definition, Source indicators, Target indicators, Scoring guidance (Low/Medium/High/Complete absence bands). ✓
+   - Notes section confirms dimensions-fixed by captain O-1 decision. ✓
+   - Low (0.25) / Medium (0.5) / High (0.75) / Complete absence (1.0) / 0.0 (no evidence) -- all 5 score bands documented. ✓
+   - Evidence requirement documented in Notes: "every score >= 0.25 requires file:line or session observation citation." ✓
+   - Status: PASS
+
+6. **Review: comparison reports use all 7 dimensions consistently with Score: entries** -- DONE
+   - All 5 reports have `Score:` counts: discuss-phase (9), research-phase (9), plan-phase (8), roadmap (9), discuss-assumptions (9).
+   - plan-phase report has 8 matches (not 9) because one dimension combines a score with a QUALIFIES note in the same line. Actual 7 unique dimension scores are present. ✓
+   - All reports have: Cross-Comparison Gap Ranking table, All-Comparisons Aggregate table, Source Summary, Target Summary, Dimensional Comparison (7 entries), Gap Score Summary, Proposed Entity Drafts. ✓
+   - Score format: plain `Score: High (0.75)` not `**Score**:` -- the task-3 format fix (deviation 1 in execute stage) was applied. ✓
+   - All Proposed Entity Drafts sections are present in reports with qualifying gaps (discuss-phase: 2 gaps; research: 2 gaps; plan: 1 gap; roadmap: 2 gaps; discuss-assumptions: 2 gaps). ✓
+   - Status: PASS
+
+7. **Review: entity drafts have proper frontmatter (source: build-distill, status: draft) and required sections** -- DONE
+   - 3 draft entities created: `build-flow-roadmap-orchestration.md` (id: 070), `build-clarify-interaction-modes.md` (id: 071), `build-explore-domain-aware-gray-areas.md` (id: 072).
+   - All 3 have `source: build-distill` in frontmatter. ✓
+   - All 3 have `status: draft`. ✓
+   - All 3 have `intent: feature`, `project: spacedock`. ✓
+   - All 3 have `## Directive`, `## Captain Context Snapshot`, `## Acceptance Criteria` sections. ✓
+   - **ID renumber is justified**: Entity 069 (`review-stage-parallel-skill-dispatch.md`) exists in active pipeline. IDs 070-072 are correct. Commit `b0680f5` documents this fix. ✓
+   - **Cross-reference accuracy check**: build-clarify-interaction-modes.md references `gsd-discuss-phase-vs-build-clarify.md` (exists). build-explore-domain-aware-gray-areas.md references `gsd-discuss-assumptions-vs-build-explore.md` (exists). build-flow-roadmap-orchestration.md references `gsd-roadmap-vs-build-flow.md` (exists). ✓
+   - **Deviation noted**: Step 5 AskUserQuestion was skipped in ensign execute context (cannot present to captain). Entity drafts were written from comparison report proposed content without captain confirmation. This is an acknowledged deviation in execute Stage Report. Captain is expected to review at UAT. Status: EXPECTED DEVIATION -- see UAT spec.
+   - Status: PASS (with UAT gate for captain entity review)
+
+8. **Review: 067-tdd-pre-skill-exemplar.md accurately documents the ad-hoc process** -- DONE
+   - Documents: source (superpowers:test-driven-development), target (build-plan + task-execution), process (ad-hoc captain-initiated). ✓
+   - "What Worked" section: identifies real gap, actionable entity, fast, domain-specific insight. ✓
+   - "What Was Missed" section: 3 explicit weaknesses documented (O-1 RED/GREEN misframe, numeric scoring skipped, no formal dimensions, no gap scoring). Content is accurate against entity 067 history recorded in the entity file. ✓
+   - Contrast table comparing ad-hoc vs formal build-distill on 7 aspects. ✓
+   - Cross-references to entity 067 archive file, SKILL.md, entity 068, and GSD comparison reports. All paths verified. ✓
+   - **AC-4 verification**: `grep "067" docs/build-pipeline/_docs/distillations/067-tdd-pre-skill-exemplar.md` returns 12 matches. AC-4 PASS. ✓
+   - Status: PASS
+
+9. **Classified findings table** -- DONE
+
+   | Severity | Finding | Root Cause | Actionable? |
+   |----------|---------|-----------|-------------|
+   | LOW | SKILL.md Rule line 170 self-referential `--` phrasing confusing | Awkward sentence construction when avoiding the rule's own target character | No code change needed; meaning is unambiguous |
+   | LOW | Execute deviation: AskUserQuestion skipped in Step 5 (3 entity drafts written without captain confirmation) | Ensign leaf context cannot present AskUserQuestion to captain | Acknowledged deviation; UAT interactive item requires captain entity review |
+   | INFO | ID renumber (069→070) after entity 069 conflict found post-execute | ID allocation at draft time without checking full pipeline ID space | Already fixed in commit b0680f5; no further action needed |
+   | INFO | gsd-plan-phase report has 8 Score: grep matches (not 9) due to combined line | Multi-score line format in one dimension entry | Dimension count is correct (7); extra match in other reports comes from QUALIFIES lines. No content gap. |
+
+   No CRITICAL or HIGH findings. No code changes required (documentation-only entity).
+
+### Verdict
+
+**PASS** -- all 9 checklist items pass. No CRITICAL or HIGH findings. Two LOW findings are process-level (ensign context limitation, minor phrasing) with no content defects. All 4 ACs verified:
+- AC-1: `skills/build-distill/SKILL.md` + `references/comparison-dimensions.md` both exist with required content. ✓
+- AC-2: 5 GSD comparison reports exist; each has >= 7 `Score:` entries. ✓
+- AC-3: 3 entity drafts with `source: build-distill` in `docs/build-pipeline/`. ✓
+- AC-4: `067-tdd-pre-skill-exemplar.md` exists with 12 references to entity 067. ✓
+
+UAT interactive item (captain entity review) remains the gate before shipped.
+
+---
+
 ## Stage Report: quality
 
 Mechanical verification conducted from repo root. Entity 068 created 11 new markdown and SKILL files (no TypeScript changes), so pre-existing test suite results reflect unchanged codebase.
