@@ -1278,9 +1278,9 @@ feedback-to: captain (conditional gate triggered per reasons 1-5 above)
 
 First live dispatch of `spacedock:build-plan` produced an 11-task plan (Task 0 Environment Verification + 10 deliverable tasks) covering 7 ACs, with a 12-row Validation Map and full UAT Spec. Step 2 (parallel researcher dispatch) and Step 6 (plan-checker subagent dispatch) fell back to inline execution because the Agent tool is not available in the ensign subagent context -- captured as KC-062-1 for FO apply-mode review. All 7 plan-checker dimensions passed inline. Conditional gate triggered (new public APIs + new infra dependency + cross-domain impact); recommending captain architecture review before execute. Deferred to execute stage: workflow-index append via direct CONTRACTS.md Edit fallback (AC3 live verification), Case B conditional cleanup (AC5), and Pending Knowledge Capture ingestion by FO Step 6.5.
 
-## Pending Knowledge Captures
+## Processed Knowledge Captures
 
-<capture id="KC-062-1" severity="HIGH" root="NEW" source_stage="execute" source_date="2026-04-12">
+<capture id="KC-062-1" severity="HIGH" root="NEW" source_stage="execute" source_date="2026-04-12" status="applied" applied_at="2026-04-12" applied_target="skills/build-plan/SKILL.md Step 2 + skills/build-execute/SKILL.md Step 4">
   <summary>
   build-plan Step 2 and build-execute Step 4 both assume Agent tool is available in ensign subagent context; actual dispatch surface in FO-dispatched ensign (both bare and team mode) shows only SendMessage/TeamCreate/Task* plus Read/Edit/Write/Grep/Glob/Bash/ToolSearch/Skill, NOT raw Agent. Confirmed across two dispatches in this entity: build-plan (bare mode) and build-execute (team mode) both probed via ToolSearch and both got "No matching deferred tools found" for select:Agent.
   </summary>
@@ -1303,7 +1303,7 @@ First live dispatch of `spacedock:build-plan` produced an 11-task plan (Task 0 E
   </suggested_target_file>
 </capture>
 
-<capture id="KC-062-2" severity="MEDIUM" root="DOC" source_stage="execute" source_date="2026-04-12">
+<capture id="KC-062-2" severity="MEDIUM" root="DOC" source_stage="execute" source_date="2026-04-12" status="applied" applied_at="2026-04-12" applied_target="references/claude-ensign-runtime.md new section 'Third-Party Plugin Integration -- Thin Wrapper Pattern'">
   <summary>
   Thin wrapper agent pattern for external skills (researcher / task-executor / code-explorer / trailofbits reviewers) is now the canonical way to integrate third-party plugins as parallel-dispatchable subagents. Entity 062 shipped 5 concrete instances of this pattern in a single wave (1 in-plugin code-explorer + 4 trailofbits wrappers), validating that the pattern scales beyond the researcher/task-executor precedent.
   </summary>
