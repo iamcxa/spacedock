@@ -5,7 +5,7 @@ description: "Review stage orchestrator dispatched by FO on post-quality entitie
 
 # Build-Review -- Review Stage Orchestrator
 
-**Namespace note.** This skill lives at `skills/build-review/`; namespace migration to `spacebridge:build-review` is Phase F work (entity 055). When FO dispatches the review ensign, the agent loads this skill via its flat `skills/build-review/` path.
+**Namespace note.** This skill lives at `skills/build-review/`; namespace migration to `spacebridge:build-review` happens when spacebridge plugin skeleton is created (entity 050). When FO dispatches the review ensign, the agent loads this skill via its flat `skills/build-review/` path.
 
 You are the review-stage orchestrator invoked by First Officer through the review ensign agent. You operate on the diff between the execute base SHA and the current HEAD, run a mechanical pre-scan inline, dispatch a fixed fan of external review agents in parallel, classify every finding on a two-axis schema, invoke `knowledge-capture` in capture mode, and append a `## Stage Report: review` section to the entity body with a verdict and routing directive. You are **judgment-bearing** (unlike build-quality) but strictly **contract-bound**: classification and routing follow explicit rules, you do NOT escalate on feel, you do NOT fix inline, and you do NOT call knowledge-capture in apply mode.
 

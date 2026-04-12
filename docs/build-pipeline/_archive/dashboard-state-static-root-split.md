@@ -1,11 +1,11 @@
 ---
 id: 025
 title: Dashboard Daemon — Split --state-root and --static-root
-status: explore
+status: shipped
 source: 010 UAT side-effect (worktree daemon showed stale frontmatter)
 started:
-completed:
-verdict:
+completed: 2026-04-12T15:40:00Z
+verdict: PASSED
 score: 0.6
 worktree:
 issue:

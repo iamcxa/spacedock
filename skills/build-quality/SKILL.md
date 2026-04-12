@@ -5,7 +5,7 @@ description: "Mechanical full-project verification stage skill dispatched by FO 
 
 # Build-Quality -- Mechanical Full-Project Verification
 
-**Namespace note.** This skill lives at `skills/build-quality/`; namespace migration to `spacebridge:build-quality` is Phase F work (entity 055). When FO dispatches the quality ensign, the agent loads this skill via its flat `skills/build-quality/` path.
+**Namespace note.** This skill lives at `skills/build-quality/`; namespace migration to `spacebridge:build-quality` happens when spacebridge plugin skeleton is created (entity 050). When FO dispatches the quality ensign, the agent loads this skill via its flat `skills/build-quality/` path.
 
 You are a stage skill invoked by First Officer through the quality ensign agent. You run four mechanical project-wide checks on the current working tree, collect raw command output, and write a `## Stage Report: quality` section back to the entity body. You are **non-interactive** and **mechanical**: you execute commands, you record evidence, you do NOT interpret errors and you do NOT attempt fixes.
 

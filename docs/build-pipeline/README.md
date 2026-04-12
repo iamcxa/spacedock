@@ -37,7 +37,7 @@ stages:
       # Hybrid classification: assumptions (Track A), options (Track B), questions (Track C).
       # Writes to entity body: ## Assumptions, ## Option Comparisons, ## Open Questions.
       #
-      # NAMESPACE NOTE: Migration to `spacebridge:build-explore` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-explore` happens when spacebridge plugin skeleton is created (entity 050).
       #
       # FALLBACK (skill not found):
       # Ensign uses inline explore definition below (basic file mapping, no question generation).
@@ -46,7 +46,7 @@ stages:
       manual: true
       gate: true
       skill: spacedock:build-clarify
-      # NAMESPACE NOTE: Migration to `spacebridge:build-clarify` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-clarify` happens when spacebridge plugin skeleton is created (entity 050).
       #
       # Science Officer (spacedock:science-officer agent) runs interactive
       # AskUserQuestion loop with captain.
@@ -80,7 +80,7 @@ stages:
       #   claude --agent spacedock:first-officer -- "entity {slug}"
       # Do NOT continue SO→FO in the same session — worktree skip breaks PR lifecycle.
       #
-      # NAMESPACE NOTE: Migration to `spacebridge:build-plan` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-plan` happens when spacebridge plugin skeleton is created (entity 050).
     - name: execute
       model: sonnet
       skill: spacedock:build-execute
@@ -91,7 +91,7 @@ stages:
       # serial across waves. Pre-commit hook fires per task commit.
       # Calls workflow-index update-status (planned -> in-flight) at stage entry.
       #
-      # NAMESPACE NOTE: Migration to `spacebridge:build-execute` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-execute` happens when spacebridge plugin skeleton is created (entity 050).
     - name: quality
       feedback-to: execute
       model: haiku
@@ -101,7 +101,7 @@ stages:
       # No judgment, no commentary. Evidence-backed Stage Report.
       # Any fail -> feedback-to: execute (max 3 rounds, then escalate to captain).
       #
-      # NAMESPACE NOTE: Migration to `spacebridge:build-quality` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-quality` happens when spacebridge plugin skeleton is created (entity 050).
     - name: review
       model: sonnet
       feedback-to: execute
@@ -118,7 +118,7 @@ stages:
       # PLAN advisory findings raise replan flag (captain decides).
       # In bare mode (-p pipe), falls back to pre-scan only (no team dispatch).
       #
-      # NAMESPACE NOTE: Migration to `spacebridge:build-review` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-review` happens when spacebridge plugin skeleton is created (entity 050).
     - name: uat
       model: sonnet
       gate: true
@@ -131,7 +131,7 @@ stages:
       # Supports skip/resume via /spacedock:uat-resume slash command.
       # Infra fails auto-route to execute; assertion fails routed through captain review.
       #
-      # NAMESPACE NOTE: Migration to `spacebridge:build-uat` is Phase F work (entity 055).
+      # NAMESPACE NOTE: Migration to `spacebridge:build-uat` happens when spacebridge plugin skeleton is created (entity 050).
     - name: shipped
       terminal: true
       worktree: false
@@ -369,9 +369,10 @@ Judgment-based diff-level code review using `dispatch: debate-driven`. Scope is 
 - **Reviewer count scales with diff scope:** small diff (< 5 files) = correctness + style; medium (5-15 files) = all 3; large (> 15 files) = all 3 with full trailofbits
 - **Bare-mode fallback** (when `-p` pipe mode or TeamCreate fails): ensign runs pre-scan only — no reviewer dispatch. Mechanical issues still caught; debate-quality depth not available.
 - **Verdict routing:**
-  - No CRITICAL/HIGH CODE findings → advance to uat
-  - Any CRITICAL/HIGH CODE finding → `feedback-to: execute`
+  - Zero findings (all clean) → advance to uat
+  - Any finding ≥ INFO severity → `feedback-to: execute` for auto-fix (no captain gate). FO bounces entity back to execute stage with the classified findings table as fix instructions. Execute ensign fixes all items, then entity re-enters quality → review. Truly redundant INFO items may be marked SKIP with rationale in the Stage Report.
   - Any PLAN finding → raise replan flag in Stage Report (advisory — captain decides whether to reset status to plan)
+  - Captain is NOT consulted for CODE/DOC/STYLE findings — auto-fix is the default. Only PLAN findings (architectural scope changes) escalate to captain.
 - **Good:** Debate between themed reviewers catches false positives before classification; pre-scan locks in mechanical floor before paying for reviewer dispatch; D2 candidates staged (not applied) so FO handles captain interaction
 - **Bad:** Skipping Phase 1 reviewer dispatch and relying on pre-scan only outside bare mode; treating NIT findings as blockers; silently applying D2 candidates without FO handoff; dispatching review agents on the entire branch instead of `execute_base..HEAD` diff
 

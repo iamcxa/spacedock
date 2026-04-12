@@ -47,6 +47,32 @@ Extract frontmatter fields:
 
 The domain(s) recorded in the Captain Context Snapshot determine which gray area templates apply in Step 4. Preserve them exactly.
 
+### 1a -- Parent Entity Decision Consumption
+
+Check the frontmatter `depends-on` field. For each listed parent entity:
+
+1. Read the parent entity file.
+2. Scan for `→ Answer:`, `→ Selected:`, and `→ Corrected by` annotations -- these are clarify decisions.
+3. Record decisions that constrain THIS entity's design space. Examples:
+   - Parent chose "spacebridge/ dir inside spacedock repo" → this entity's file paths must reflect that
+   - Parent chose "thin shim, daemon owns DB" → this entity cannot assume shim has DB access
+   - Parent deferred skill migration → this entity should not plan for namespace changes
+
+Failure to consume parent decisions causes contradictions that waste clarify rounds. If a parent entity has `context_status: ready`, its decisions are authoritative. If the parent is still in `draft` or `pending`, note the dependency as tentative and flag as a Track C question if any assumption depends on the parent's unresolved state.
+
+### 1b -- Design Doc Invariant Loading
+
+Check the frontmatter `source` field. If it references a design doc (e.g., `source: spacebridge design doc`):
+
+1. Read the design doc.
+2. Extract all **stated invariants, goals, and forward-looking sections** -- not just the section directly relevant to this entity, but cross-cutting concerns:
+   - Architecture invariants (e.g., "engine is headless-capable", "bridge is a consumer not a fork")
+   - Forward-looking goals (e.g., Postgres migration, cloud deployment, multi-machine, SaaS)
+   - Distribution constraints (e.g., "all private to bridge", plugin packaging)
+3. Record these as a compact list for use in Step 5's Recommendation Validation.
+
+Failure to load invariants causes explore to recommend options that conflict with the broader architecture -- the captain catches this in clarify, but the wasted rounds degrade trust and signal quality. Example: entity 051 explore recommended "shim direct DB" without checking the design doc's multi-machine/cloud goals (§3.3, §6.1), requiring 3 rounds of clarify correction.
+
 ---
 
 ## Step 2: Codebase Mapping
@@ -69,6 +95,17 @@ When running as an ensign without pre-dispatched results (FO simple subagent mod
 - Use Read/Grep/Glob on the entity context paths
 - Write findings directly into the mapping output format (same structure as code-explorer step 6)
 - This is the original pre-entity-062 behavior and remains the default for Small/Medium entities
+
+### Mode selection heuristic
+
+When you have the Agent tool (SO-direct mode), choose between Mode A and Mode B:
+
+- **Use Mode A** (dispatch code-explorer) when: this is a fresh session with no prior reads of the entity's target files, OR the entity touches >10 files across multiple layers, OR you need a clean context boundary to avoid polluting your remaining context budget.
+- **Use Mode B** (inline mapping) when: you already read >50% of the relevant files in this session (e.g., during a multi-entity SO pipeline run), OR the entity is Small/Medium with well-known target files, OR the parent entity's clarify decisions already narrowed the file scope significantly.
+
+In ensign mode (no Agent tool), always use Mode B regardless of entity scale -- Mode A requires Agent dispatch which is unavailable.
+
+The heuristic optimizes for: Mode A = fresh context isolation, Mode B = avoid redundant subagent dispatch. When in doubt, prefer Mode A for Large entities and Mode B for Small/Medium.
 
 ### Dispatching code-explorer (Mode A, when you have Agent tool)
 
@@ -141,11 +178,25 @@ Count resolved vs. unresolved α markers. Both counts feed Step 7's Stage Report
 
 ---
 
+## Step 3.7: Brainstorm Claim Verification
+
+Before identifying gray areas, cross-reference the Brainstorming Spec's APPROACH claims against codebase evidence found during mapping (Step 2) and parent entity decisions (Step 1a).
+
+For each concrete claim in APPROACH:
+1. **Confirmed**: codebase or parent decision supports it. Prepare `(✓ confirmed by explore: {evidence})` annotation for Step 6.
+2. **Contradicted**: codebase evidence refutes it. Prepare `(⚠ contradicted: {evidence} -- see Q-{n})` annotation AND immediately add the contradiction to the gray area list for Step 4 classification. Do NOT wait until Step 6 to discover contradictions -- they must feed into Step 4's gray area identification so the resulting Options/Questions reflect the conflict.
+
+Example: entity 051 APPROACH claimed "serialize each method call as JSON-RPC". Step 2 found channel.ts:399 calls createSnapshot synchronously and uses snap.version (autoincrement) immediately. Contradiction detected → feeds into Step 4 → becomes O-1 (sync-to-async bridge strategy) with the stub option pre-eliminated because the 2-level trace shows snap.version is consumed by autoResolveComments.
+
+Record confirmed/contradicted annotations for later application in Step 6. The annotations are written in Step 6; the contradictions feed into Step 4 NOW.
+
+---
+
 ## Step 4: Gray Area Identification
 
 Read `references/gray-area-templates.md`.
 
-Apply the domain-specific template(s) matching the entity's domain(s) from Step 1. For multi-domain entities, apply ALL matching templates and deduplicate overlapping gray areas -- if two templates surface the same gray area, keep one instance and note both domains.
+Apply the domain-specific template(s) matching the entity's domain(s) from Step 1. For multi-domain entities, apply ALL matching templates and deduplicate overlapping gray areas -- if two templates surface the same gray area, keep one instance and note both domains. **Also include any contradictions discovered in Step 3.7** -- these are pre-identified gray areas that bypass the template matching.
 
 Skip a gray area when:
 - It is already decided in the Brainstorming Spec (carries a D-01 or similar decision marker).
@@ -160,12 +211,14 @@ The output of this step is a deduplicated list of open gray areas, each ready fo
 
 Read `references/hybrid-classification-heuristic.md`.
 
-For each remaining gray area from Step 4, assign exactly one track:
+For each remaining gray area from Step 4 (including contradictions from Step 3.7), assign exactly one track:
 - **Track A -- Assumption**: codebase has precedent. 2+ usages gives Confident; 1 usage gives Likely or Unclear depending on fit.
 - **Track B -- Option Comparison**: no single precedent, but 2+ viable approaches exist (competing codebase patterns or standard domain options).
 - **Track C -- Open Question**: genuinely open, no codebase signal, no standard domain answer. Also used for unresolved α markers from Step 3.5.
 
 **Priority rule**: prefer A over B over C. The goal is to minimize captain interaction -- only escalate when the evidence genuinely requires it. When Track A is "Unclear" confidence, reconsider whether it should actually be Track B (competing patterns) or Track C (needs captain judgment).
+
+**Recommendation Validation (Track B only)**: before marking any option as `Recommended`, run the two validation checks defined in `references/hybrid-classification-heuristic.md` § "Recommendation Validation": (1) return value trace for Behavioral/Callable domain -- trace return values 2 levels deep, and (2) design doc invariant cross-reference -- check against ALL stated goals from Step 1b. If either check fails, fix the recommendation or downgrade to `Viable` before writing to the entity body. Do NOT defer validation to clarify.
 
 ---
 

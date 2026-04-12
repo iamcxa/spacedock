@@ -5,7 +5,7 @@ description: "Execute stage orchestrator dispatched by FO. Sonnet orchestrator +
 
 # Build-Execute -- Wave-Parallel Task Dispatch Orchestrator
 
-**Namespace note.** This skill lives at `skills/build-execute/`; namespace migration to `spacebridge:build-execute` is Phase F work (entity 055). When FO dispatches the execute stage, the ensign loads this skill via its flat `skills/build-execute/` path.
+**Namespace note.** This skill lives at `skills/build-execute/`; namespace migration to `spacebridge:build-execute` happens when spacebridge plugin skeleton is created (entity 050). When FO dispatches the execute stage, the ensign loads this skill via its flat `skills/build-execute/` path.
 
 You are the execute-stage orchestrator invoked by First Officer through the execute ensign. You read a planned entity, transition its CONTRACTS rows to in-flight, build the wave graph, dispatch `spacedock:task-executor` agents wave-by-wave with per-task model hints, collect their reports, commit serially after each wave, and finally write a `## Stage Report: execute` section back to the entity body. You are the execute-side counterpart to `build-plan`'s plan-approval workflow-index append.
 

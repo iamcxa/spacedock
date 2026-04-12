@@ -91,6 +91,16 @@ Markdown table with 5 columns:
 | Short polling (2s interval) | Zero infrastructure change | Wastes bandwidth, 2s latency floor, scales poorly | Low | Not recommended |
 ```
 
+### Recommendation Validation (before marking Recommended)
+
+Before marking any option as `Recommended`, validate it against two checks:
+
+1. **Return value trace** (Behavioral/Callable domain): if the option involves changing how a method's return value is produced (async, stub, cache, proxy), trace the return value 2 levels deep through the codebase. If any downstream consumer requires the real value (e.g., DB-assigned ID, computed hash), the option must account for that or be downgraded to `Viable` / `Not recommended`. Example: entity 051 O-1 "fire-and-forget + stub" was marked Recommended but snap.version was consumed by autoResolveComments -- the stub would have broken production behavior. A 2-level trace would have caught this during explore.
+
+2. **Design doc invariant cross-reference**: check the recommended option against ALL stated goals in the entity's source design doc -- not just the section directly referenced, but forward-looking sections (cloud readiness, multi-machine, distribution, SaaS). If the recommendation conflicts with a stated invariant, either revise the recommendation or surface the conflict as a Track C question for the captain. Example: entity 051 "shim direct DB" was valid for localhost but violated the design doc's implicit multi-machine goal (§3.3 Postgres forward-compatibility, §6.1 tunnel sharing).
+
+If either check reveals a problem, fix the recommendation before writing the Option Comparison to the entity body. Do NOT defer to clarify what explore can resolve with deeper analysis.
+
 ### How build-clarify handles Track B
 
 One-at-a-time AskUserQuestion. Each option comparison is presented individually with the recommendation highlighted. The captain picks one option or requests a hybrid.

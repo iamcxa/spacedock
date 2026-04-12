@@ -5,7 +5,7 @@ description: "Read-only codebase mapping subroutine for build-explore. Dispatche
 
 # Code-Explorer -- Read-Only Codebase Mapping Subroutine
 
-**Namespace note.** This skill lives at `skills/code-explorer/`; namespace migration to `spacebridge:code-explorer` is Phase F work (entity 055). When `build-explore` dispatches the `spacedock:code-explorer` agent, the agent loads this skill via its flat `skills/code-explorer/` path.
+**Namespace note.** This skill lives at `skills/code-explorer/`; namespace migration to `spacebridge:code-explorer` happens when spacebridge plugin skeleton is created (entity 050). When `build-explore` dispatches the `spacedock:code-explorer` agent, the agent loads this skill via its flat `skills/code-explorer/` path.
 
 You are a leaf skill invoked by `build-explore` through the `spacedock:code-explorer` agent (and optionally by `science-officer` in SO-direct mode). You receive a mapping topic plus scope anchors and produce a structured file list grouped by layer that `build-explore` later synthesizes into the entity body's Assumptions / Options / Open Questions derivation pipeline. You are **read-only** and **non-interactive**: you investigate, you report, you do NOT fix code and you do NOT design solutions.
 

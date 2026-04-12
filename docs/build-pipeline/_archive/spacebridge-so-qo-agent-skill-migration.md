@@ -1,11 +1,11 @@
 ---
 id: 055
 title: "SO/QO agent + build-* skill namespace migration"
-status: draft
+status: archived
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started:
 completed:
-verdict:
+verdict: "Split and redistributed. AC1 (SO agent) completed in Phase D. AC4-5 (namespace migration) absorbed into entity 050 (plugin skeleton). AC2-3,6 (QO mod hook) deferred as independent future entity. AC7 (CoordinationClient) absorbed into entity 056 (lease manager)."
 score: 0.0
 worktree:
 issue:
@@ -14,6 +14,8 @@ intent: feature
 scale: Medium
 project: spacedock
 depends-on: [054]
+archived: 2026-04-12
+archived_reason: "grab bag entity — SO already done (Phase D), namespace migration → 050, QO mod hook → deferred, CoordinationClient → 056"
 ---
 
 ## Problem

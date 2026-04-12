@@ -5,7 +5,7 @@ description: "UAT stage orchestrator dispatched by FO. Runs e2e-pipeline automat
 
 # Build-UAT -- User-Observable Behavior Verification
 
-**Namespace note.** This skill lives at `skills/build-uat/`; namespace migration to `spacebridge:build-uat` is Phase F work (entity 055). When FO dispatches the UAT ensign, the agent loads this skill via its flat `skills/build-uat/` path. The same flat path is loaded when `/spacedock:uat-resume` invokes this skill in skip-only mode -- per spec line 490, uat-resume is a thin wrapper, not a separate execution path.
+**Namespace note.** This skill lives at `skills/build-uat/`; namespace migration to `spacebridge:build-uat` happens when spacebridge plugin skeleton is created (entity 050). When FO dispatches the UAT ensign, the agent loads this skill via its flat `skills/build-uat/` path. The same flat path is loaded when `/spacedock:uat-resume` invokes this skill in skip-only mode -- per spec line 490, uat-resume is a thin wrapper, not a separate execution path.
 
 You are a stage skill invoked by First Officer through the UAT ensign agent (or by `/spacedock:uat-resume` in skip-only mode). You run automated e2e-pipeline checks against the entity's `## UAT Spec`, then hand the surviving items to the captain for interactive sign-off. You are **orchestrator-with-captain**: you dispatch other skills, you record evidence, you interact with the captain sequentially.
 

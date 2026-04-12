@@ -13,6 +13,7 @@ pr:
 intent: feature
 scale: XLarge
 project: spacedock
+note: "Resolved as reference — key decisions (2-plugin split, engine/bridge separation, SO in bridge, FO in engine) answered by spacebridge design doc (2026-04-10). Entities 050-060 implement this architecture. Do not run through pipeline; keep as historical context for the v2 vision."
 ---
 
 ## Dependencies

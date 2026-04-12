@@ -5,7 +5,7 @@ description: "Per-task execution subroutine for build-execute. Loaded by the spa
 
 # Task-Execution -- Per-Task Execution Subroutine
 
-**Namespace note.** This skill lives at `skills/task-execution/`; namespace migration to `spacebridge:task-execution` is Phase F work (entity 055). When `build-execute` dispatches the `spacedock:task-executor` agent, the agent loads this skill via its flat `skills/task-execution/` path plus any additional skills named in the dispatch prompt's `skills` field.
+**Namespace note.** This skill lives at `skills/task-execution/`; namespace migration to `spacebridge:task-execution` happens when spacebridge plugin skeleton is created (entity 050). When `build-execute` dispatches the `spacedock:task-executor` agent, the agent loads this skill via its flat `skills/task-execution/` path plus any additional skills named in the dispatch prompt's `skills` field.
 
 You are a leaf subroutine invoked by `build-execute` through the `spacedock:task-executor` agent. You receive one plan task in the dispatch prompt and implement it against the current worktree. You do NOT commit -- you return a `changed_files` list and a status code that the orchestrator collects, then commits serially after the wave closes.
 

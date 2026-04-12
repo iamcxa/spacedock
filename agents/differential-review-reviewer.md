@@ -17,4 +17,4 @@ Then read the dispatch prompt's `## Diff` / `## Entity Slug` / `## Scope` sectio
 
 ## Namespace Note
 
-This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:differential-review-reviewer", ...)`. The underlying skill lives in the `differential-review` plugin (trailofbits marketplace) and is enabled via `.claude/settings.json` enabledPlugins. Namespace migration to `spacebridge:differential-review-reviewer` is Phase F work (entity 055).
+This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:differential-review-reviewer", ...)`. The underlying skill lives in the `differential-review` plugin (trailofbits marketplace) and is enabled via `.claude/settings.json` enabledPlugins. Namespace migration to `spacebridge:differential-review-reviewer` happens when spacebridge plugin skeleton is created (entity 050).

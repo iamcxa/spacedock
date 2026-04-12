@@ -1,11 +1,11 @@
 ---
 id: 008
 title: Dashboard as Standalone Plugin — Independent Packaging & Distribution
-status: plan
+status: archived
 source: session discussion
 started: 2026-04-05T18:00:00+08:00
 completed:
-verdict:
+verdict: "Superseded by spacebridge Next.js rewrite (entities 050-060). The 'extract current Bun/TS dashboard into standalone plugin' approach replaced by full Next.js App Router rewrite inside a new spacebridge plugin."
 score: 0.85
 worktree:
 issue:
@@ -13,6 +13,8 @@ pr:
 intent: feature
 scale: Medium
 project: spacedock
+archived: 2026-04-12
+archived_reason: "superseded by spacebridge design doc (2026-04-10)"
 ---
 
 ## Dependencies

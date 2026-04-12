@@ -1,7 +1,7 @@
 ---
 id: 068
 title: Build-Distill Skill -- Systematic External Pattern Absorption + GSD First Pass
-status: plan
+status: shipped
 context_status: ready
 source: captain
 created: 2026-04-12T18:30:00+08:00
@@ -9,9 +9,9 @@ started: 2026-04-12T14:00:00Z
 completed:
 verdict:
 score: 0.70
-worktree: .worktrees/spacedock-ensign-build-distill-skill-and-gsd-comparison
+worktree:
 issue:
-pr:
+pr: "#31"
 intent: feature
 scale: Medium
 project: spacedock

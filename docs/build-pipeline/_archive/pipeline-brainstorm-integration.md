@@ -1,11 +1,11 @@
 ---
 id: 036
 title: Pipeline Brainstorm + Profiles — Integration & E2E
-status: explore
+status: shipped
 source: spec 2026-04-08-pipeline-brainstorm-profiles-design.md (WP6)
 started:
-completed:
-verdict:
+completed: 2026-04-12T15:33:00Z
+verdict: PASSED
 score: 0.7
 worktree:
 issue:

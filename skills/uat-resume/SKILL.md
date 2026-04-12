@@ -7,7 +7,7 @@ argument-hint: "[entity-slug]"
 
 # UAT-Resume -- Thin Wrapper Over Build-UAT
 
-**Namespace note.** This skill lives at `skills/uat-resume/`; namespace migration to `spacebridge:uat-resume` is Phase F work (entity 055). When the captain invokes `/spacedock:uat-resume`, the slash command loads this skill via its flat `skills/uat-resume/` path.
+**Namespace note.** This skill lives at `skills/uat-resume/`; namespace migration to `spacebridge:uat-resume` happens when spacebridge plugin skeleton is created (entity 050). When the captain invokes `/spacedock:uat-resume`, the slash command loads this skill via its flat `skills/uat-resume/` path.
 
 You are a user-invoked wrapper skill. The captain runs `/spacedock:uat-resume {slug}` against an entity that previously shipped with one or more UAT items in `status: skipped`. Your job is to dispatch `build-uat` in skip-only mode so it re-runs those items. You are **NOT** a UAT runner. You own input validation and dispatch; build-uat owns scope selection, captain interaction, result writing, and `uat_pending_count` mutation.
 

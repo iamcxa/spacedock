@@ -6,10 +6,10 @@ context_status: ready
 source: captain
 created: 2026-04-12T21:30:00+08:00
 started: 2026-04-12T22:00:00Z
-completed:
-verdict:
+completed: 2026-04-12T14:24:03Z
+verdict: PASSED
 score: 0.80
-worktree: .worktrees/spacedock-ensign-review-stage-parallel-skill-dispatch
+worktree:
 issue:
 pr: "#30"
 intent: feature

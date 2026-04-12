@@ -38,6 +38,7 @@ Gray areas for functions, APIs, event handlers, and state management logic.
 |---|---|---|
 | New endpoint vs. existing extension | Whether to add a new API route or extend an existing handler | "Fetch entity history" -- new `GET /api/entities/:slug/history` or add a `?include=history` param to the existing entity endpoint? |
 | Caller surface | What invokes this logic -- UI, CLI, another service, cron, WebSocket message | Stage transition handler -- called by the FO dispatch, the dashboard UI, or both? |
+| Return value trace | When a method returns a value, trace who consumes it and what breaks if the value is wrong/delayed/stub. Trace at least 2 levels deep: `callee → caller → caller's caller`. | `createSnapshot()` returns `snap` → `snap.version` used by `autoResolveComments()` → needs real DB autoincrement, not a stub. Without this trace, a "fire-and-forget + stub" recommendation passes explore but fails in clarify. |
 | Error contract | What errors are possible and how they surface to callers | SQLite write fails mid-transaction -- return 500 with rollback, or queue for retry? |
 | Auth / permission boundary | Whether the callable requires authentication or role checks | Entity update endpoint -- open to all dashboard viewers, or restricted to the captain? |
 | Idempotency | Whether repeated calls produce the same result or cause side effects | "Mark entity as shipped" -- safe to call twice, or does it create duplicate events? |

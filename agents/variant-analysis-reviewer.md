@@ -17,4 +17,4 @@ Then read the dispatch prompt's `## Diff` / `## Entity Slug` / `## Scope` sectio
 
 ## Namespace Note
 
-This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:variant-analysis-reviewer", ...)`. The underlying skill lives in the `variant-analysis` plugin (trailofbits marketplace). Namespace migration to `spacebridge:variant-analysis-reviewer` is Phase F work (entity 055).
+This agent lives in the `spacedock` plugin (per `.claude-plugin/plugin.json`); dispatch as `Agent(subagent_type="spacedock:variant-analysis-reviewer", ...)`. The underlying skill lives in the `variant-analysis` plugin (trailofbits marketplace). Namespace migration to `spacebridge:variant-analysis-reviewer` happens when spacebridge plugin skeleton is created (entity 050).
