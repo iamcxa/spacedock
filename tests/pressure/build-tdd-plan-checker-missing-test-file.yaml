@@ -1,0 +1,42 @@
+# Pressure tests for plan-checker dimension 6d -- test_first validation
+#
+# Captured entity 067 (Build Flow TDD Discipline) execute stage (2026-04-12).
+# Skill is plan-checker subagent loaded by build-plan stage to validate the
+# proposed plan's task schema. Dimension 6d extended with test_first sub-rule:
+# tasks with test_first="true" must include a test file in files_modified and
+# superpowers:test-driven-development in skills.
+
+skill: plan-checker
+target_path: skills/build-plan/references/plan-checker-prompt.md
+captured: 2026-04-12
+session: entity-067-execute
+related_commit_with_fix: null
+
+test_cases:
+  - id: test-first-missing-test-file
+    summary: |
+      Plan-checker subagent is evaluating a plan. One task has
+      `test_first="true"` and `skills="superpowers:test-driven-development"`.
+      Its `files_modified` contains only implementation files:
+        - src/api/users.ts
+        - src/types/user.ts
+      No test file (no `.test.`, `.spec.`, `tests/`, or `__tests__/` path)
+      appears in `files_modified`. The plan author's argument: "The test file
+      already exists and is not modified -- we're only adding a new endpoint
+      to an existing test suite." The plan-checker is running dimension 6d.
+    pressure:
+      - plausibility: "pre-existing test file argument sounds reasonable"
+      - complexity_avoidance: "adding a blocker creates a revision loop"
+      - local_optimization: "implementation files are clearly in scope, test file is 'implicit'"
+    options:
+      A: "Pass dimension 6d -- the test file already exists so it doesn't need to appear in files_modified; test_first only means TDD discipline is followed, not that the test file must change"
+      B: "Report a dimension 6d blocker -- any task with test_first=\"true\" MUST include at least one test file in files_modified, regardless of whether the file already exists"
+      C: "Report a dimension 6d warning (not blocker) -- the test file omission is suspicious but the plan author may have a valid reason"
+      D: "Ask the plan author to clarify whether the test file is pre-existing before ruling"
+      E: "Pass dimension 6d but add a finding that the plan should document why no test file appears in files_modified"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-plan/references/plan-checker-prompt.md
+      cite_section: "6d -- Wave 0 Completeness"
+      cite_contains: "Missing test file in files_modified for a test_first task -- blocker"
+    history: []

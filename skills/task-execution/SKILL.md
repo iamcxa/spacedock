@@ -43,6 +43,7 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
 6. **action** -- 1-3 sentence description of what to implement
 7. **acceptance_criteria** -- one or more shell commands and/or observable conditions that must hold after the action. Every command here is non-negotiable.
 8. **files_modified** -- list of file paths. This is your **WRITE boundary** -- you edit only these files.
+9. **test_first** -- optional boolean, default `false`. When `true`, the task follows TDD discipline. The task's `skills` field will include `superpowers:test-driven-development`, which governs the RED->GREEN->REFACTOR cycle within Step 2. See "TDD Mode" section below.
 
 If any field is missing or empty, treat the task as malformed and return `BLOCKED` with a `malformed_task` finding. Do NOT guess defaults -- a missing `files_modified` means you have no writable surface, and a missing `acceptance_criteria` means you have no termination condition.
 
@@ -63,6 +64,22 @@ Do NOT expand the read scope beyond `task.read_first` plus what Grep surfaces fr
 Implement `task.action` using Write/Edit on files listed in `task.files_modified`. If the action names additional constraints (e.g. "using the pattern from src/foo.ts:42"), honor them.
 
 If the action is internally contradictory (e.g. "add field X to src/types/user.ts" but `files_modified` lists only `src/api/user.ts`, not `src/types/user.ts`), return `BLOCKED` with a `scope_mismatch` finding. Do NOT unilaterally expand `files_modified`.
+
+---
+
+## TDD Mode -- test_first Tasks
+
+When `task.test_first` is `true`, the task's `skills` field includes `superpowers:test-driven-development`. This skill is loaded in Step 1 and governs the RED->GREEN->REFACTOR sub-cycle within Step 2:
+
+1. **RED phase**: Write the failing test file. Run the test command. Verify the test fails -- exit code must be non-zero. Any non-zero exit (assertion failure, compile error, runtime error) counts as RED-verified.
+
+2. **GREEN phase**: Implement the code in the files listed in `files_modified`. Run the test command again. Verify the test passes -- exit code must be zero.
+
+3. **REFACTOR phase** (optional): Restructure the implementation for clarity or efficiency. Re-run the test command. Verify still GREEN (exit zero). REFACTOR is bounded by the same `files_modified` scope discipline -- no new files may be edited.
+
+**Vacuous test detection**: If the test passes on the first run (exit code 0 during the RED phase, before any implementation code is written), return `NEEDS_CONTEXT` with a `vacuous_test` finding. A test that passes before implementation does not test the new behavior -- it is either testing already-existing behavior or is a no-op assertion. The TDD skill's own rule applies: "Test passes? You're testing existing behavior. Fix test." Surface this as a structured finding so the plan ensign can revise the task.
+
+**Backward compatibility**: When `test_first` is absent or `false`, Step 2 executes as a single phase with no TDD overlay. All existing tasks and plans are unaffected.
 
 ---
 

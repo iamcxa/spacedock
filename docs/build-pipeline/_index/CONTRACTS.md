@@ -104,11 +104,29 @@ Each section lists a file path with entities that have modified it, their stage,
 | kc-pr-flow-mod-integration | shipped | Update FO shared core for layered mod scanning and pr-review-loop reference | ✅ final | 2026-04-12 |
 | review-stage-parallel-skill-dispatch | execute | Clarify team creation policy in single-entity mode section | 🟡 in-flight | 2026-04-12 |
 
+### skills/build-brainstorm/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-flow-tdd-discipline | execute | Add given/when/then AC guidance to step 4 for TDD-friendly spec generation | in-flight | 2026-04-12 |
+
 ### skills/build-explore/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Refactor Step 2 to dispatch spacedock:code-explorer for fresh-context mapping | ✅ final | 2026-04-12 |
+
+### skills/build-plan/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-flow-tdd-discipline | execute | Add test_first attribute to task schema and TDD plan intelligence in step 4a | in-flight | 2026-04-12 |
+
+### skills/build-plan/references/plan-checker-prompt.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-flow-tdd-discipline | execute | Add dimension 6d test_first validation sub-rule for test file and TDD skill checks | in-flight | 2026-04-12 |
 
 ### skills/build-review/SKILL.md
 
@@ -134,6 +152,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | overhaul-skill-implementation | plan | Add 3 new recipe primitives (replace-table-block, update-yaml-block, update-section) | planned | 2026-04-12 |
+
+### skills/task-execution/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-flow-tdd-discipline | execute | Add TDD Mode RED-GREEN-REFACTOR sub-cycle activated by test_first flag | in-flight | 2026-04-12 |
 
 ### tests/fixtures/pr-review-loop-pipeline/README.md
 
@@ -171,6 +195,24 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Pressure test YAML for 3 trailofbits integration contract scenarios | ✅ final | 2026-04-12 |
 
+### tests/pressure/build-tdd-no-tdd-no-cycle.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-flow-tdd-discipline | execute | Pressure test: task without test_first skips TDD cycle entirely | in-flight | 2026-04-12 |
+
+### tests/pressure/build-tdd-plan-checker-missing-test-file.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-flow-tdd-discipline | execute | Pressure test: plan-checker 6d flags test_first task missing test file | in-flight | 2026-04-12 |
+
+### tests/pressure/build-tdd-vacuous-test-detection.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-flow-tdd-discipline | execute | Pressure test: task-executor detects vacuous test passing before implementation | in-flight | 2026-04-12 |
+
 ### tests/pressure/overhaul.yaml
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -182,6 +224,73 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | overhaul-skill-implementation | plan | Update file index table with overhaul entry | planned | 2026-04-12 |
+| build-flow-tdd-discipline | execute | Update file index table with 3 TDD pressure test entries | in-flight | 2026-04-12 |
+
+### docs/build-pipeline/_docs/distillations/067-tdd-pre-skill-exemplar.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | Retroactive 067 documentation as pre-skill distillation exemplar | planned | 2026-04-12 |
+
+### docs/build-pipeline/_docs/distillations/gsd-discuss-assumptions-vs-build-explore.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | GSD discuss-phase assumptions model vs build-explore comparison report | planned | 2026-04-12 |
+
+### docs/build-pipeline/_docs/distillations/gsd-discuss-phase-vs-build-clarify.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | GSD discuss-phase vs build-clarify comparison report | planned | 2026-04-12 |
+
+### docs/build-pipeline/_docs/distillations/gsd-plan-phase-vs-build-plan.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | GSD plan-phase vs build-plan comparison report | planned | 2026-04-12 |
+
+### docs/build-pipeline/_docs/distillations/gsd-research-phase-vs-build-research.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | GSD research-phase vs build-research comparison report | planned | 2026-04-12 |
+
+### docs/build-pipeline/_docs/distillations/gsd-roadmap-vs-build-flow.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | GSD roadmap capability vs build flow (no equivalent) comparison report | planned | 2026-04-12 |
+
+### docs/build-pipeline/build-clarify-interaction-modes.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | Draft entity for build-clarify interaction modes gap from GSD distillation | planned | 2026-04-12 |
+
+### docs/build-pipeline/build-explore-domain-aware-gray-areas.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | Draft entity for domain-aware gray area generation gap from GSD distillation | planned | 2026-04-12 |
+
+### docs/build-pipeline/build-flow-roadmap-orchestration.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | Draft entity for multi-entity roadmap orchestration gap from GSD distillation | planned | 2026-04-12 |
+
+### skills/build-distill/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | Create build-distill skill -- 6-step semi-interactive comparison process | planned | 2026-04-12 |
+
+### skills/build-distill/references/comparison-dimensions.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-distill-skill-and-gsd-comparison | plan | Define 7 fixed comparison dimensions for cross-run comparability | planned | 2026-04-12 |
 
 ## Recently Retired (last 30 days)
 

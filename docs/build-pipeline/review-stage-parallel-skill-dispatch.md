@@ -1,7 +1,7 @@
 ---
 id: 069
 title: Review Stage -- Parallel Ensign Skill Dispatch
-status: plan
+status: shipped
 context_status: ready
 source: captain
 created: 2026-04-12T21:30:00+08:00
@@ -11,7 +11,7 @@ verdict:
 score: 0.80
 worktree: .worktrees/spacedock-ensign-review-stage-parallel-skill-dispatch
 issue:
-pr:
+pr: "#30"
 intent: feature
 scale: Medium
 project: spacedock

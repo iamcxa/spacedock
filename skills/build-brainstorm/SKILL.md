@@ -124,6 +124,12 @@ Examples of NOT testable (reject these):
 - "Is fast"
 - "Handles edge cases"
 
+**Prefer given/when/then or arrange/act/assert phrasing** for behavioral criteria. This makes downstream `test_first` task generation in build-plan more natural -- criteria phrased as "Given X, when Y, then Z" translate directly to test assertions.
+
+Examples of TDD-friendly phrasing:
+- "Given a task with `test_first: true` and no test file in `files_modified`, when plan-checker runs dimension 6d, then it reports a blocker (how to verify: `grep 'blocker' plan-checker-output.yaml`)"
+- "Given an empty email input, when submitForm is called, then it returns error 'Email required' (how to verify: `bun test tests/form.test.ts`)"
+
 If a criterion is too vague to make testable: α-mark the individual criterion: `{vague criterion} (needs clarification -- deferred to explore)`
 
 ---
