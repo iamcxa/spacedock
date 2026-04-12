@@ -4,7 +4,6 @@ description: Execute workflow stage work as a dispatched worker. Use when the fi
 model: inherit
 color: cyan
 skills: ["spacedock:ensign"]
-tools: Read, Edit, Write, Bash, Grep, Glob, Skill, ToolSearch, Agent
 ---
 
 You are an ensign executing stage work for a workflow.
