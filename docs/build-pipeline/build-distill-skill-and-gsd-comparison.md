@@ -1,8 +1,8 @@
 ---
 id: 068
 title: Build-Distill Skill -- Systematic External Pattern Absorption + GSD First Pass
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: captain
 created: 2026-04-12T18:30:00+08:00
 started:
@@ -105,29 +105,35 @@ Compare these GSD capabilities against their build flow counterparts:
 
 ## Assumptions
 
-A-1: build-distill is non-interactive (same class as build-brainstorm). Reads sources, compares, outputs reports. Captain reviews output separately.
-Confidence: Confident (0.85)
-Evidence: skills/build-brainstorm/SKILL.md:1 -- "No interaction with the user at any point"; skills/build-explore/SKILL.md:1 -- "never ask the captain questions". 2+ consistent non-interactive build-* skills establish the pattern.
+A-1: build-distill is semi-interactive — Steps 1-4 (source read, target read, comparison, scoring) are non-interactive, but Step 5 (entity drafting) presents each gap to the captain via AskUserQuestion for create/skip/modify decisions before writing entity files. This prevents the skill from silently skipping valuable signals (e.g., entity 067 experience: numeric Confidence scoring was initially skipped but turned out to be highly valued by captain).
+Confidence: Confident (0.90)
+Evidence: skills/build-clarify/SKILL.md -- captain interaction model via AskUserQuestion; entity 067 session -- ad-hoc distillation missed the Confidence numeric scoring signal until captain corrected framing. Semi-interactive ensures captain sees every gap and decides.
+→ Corrected by captain, 2026-04-12 (batch): "半互動較好，因為也許 skill 會跳過某種訊號，例如上次你跳過了 GSD 的某個數學訊號評比，但事後我們發現那非常有價值"
 
 A-2: Skill is manually triggered by SO or captain, not auto-dispatched by FO. It's a meta-skill for pipeline evolution, not a pipeline stage.
 Confidence: Confident (0.90)
 Evidence: No existing build-* skill auto-dispatches another build-* skill for meta-analysis. build-distill is closer to /build (captain-initiated) than to explore (FO-dispatched stage).
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-3: "No equivalent" is a valid comparison result — scored 1.0 on the gap dimension. GSD roadmap vs build flow has no target skill; the comparison report documents the absence as a complete gap.
 Confidence: Confident (0.85)
 Evidence: Entity 068 Directive table already lists "No equivalent" for roadmap/new-milestone. The 0-1 scoring scale naturally accommodates absence (1.0) as the maximum gap.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-4: Comparison reports go to `docs/build-pipeline/_docs/distillations/`, entity drafts to `docs/build-pipeline/`. Follows existing _docs/ pattern for internal documentation.
 Confidence: Confident (0.90)
 Evidence: docs/build-pipeline/_docs/ already contains CONTEXT-LAKE-PROTOCOL.md and SO-FO-DISPATCH-SPLIT.md — internal reference docs that inform the pipeline but aren't pipeline entities.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-5: Comparison reports are point-in-time snapshots, dated and immutable. No migration needed when build-* skills change — new comparisons produce new reports.
 Confidence: Confident (0.95)
 Evidence: Same pattern as Stage Reports in entities — they capture state at a moment, not a living contract. Updating a comparison means re-running build-distill, not editing old reports.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-6: Entity drafts produced by build-distill follow the 067 exemplar — full Directive + Captain Context Snapshot + Acceptance Criteria, ready for brainstorm stage.
 Confidence: Confident (0.85)
 Evidence: docs/build-pipeline/build-flow-tdd-discipline.md -- entity 067 as the ad-hoc distillation exemplar that this skill formalizes. Same frontmatter schema, same section structure.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 ## Option Comparisons
 
@@ -140,6 +146,8 @@ Should the 7 comparison dimensions be fixed (every run uses the same 7) or exten
 | Fixed 7 dimensions for all comparisons | Comparable across runs -- every distillation report has the same axes; easier to build aggregate views; simpler skill logic | May miss domain-specific gaps that don't fit the 7 dimensions (e.g., a security-focused comparison might need an "Authorization Model" dimension) | Low | Recommended |
 | Extensible -- base 7 + optional domain-specific | Captures nuance per comparison pair; richer gap analysis | Reports not directly comparable; aggregate views harder; skill logic needs to handle variable dimensions; risk of dimension creep | Medium | Viable |
 
+→ Selected: Fixed 7 dimensions (captain, 2026-04-12, interactive)
+
 ## Open Questions
 
 Q-1: How should gap scores (0-1) be calculated from the three factors (frequency of use, downstream effect, captain pain points)?
@@ -150,6 +158,8 @@ Why it matters: Without a defined formula, gap scores are subjective and non-com
 
 Suggested options: (a) Simple max -- score = max(frequency, downstream, pain) on 0-1 each, (b) Weighted average -- score = 0.4*downstream + 0.3*frequency + 0.3*pain, (c) Qualitative bands -- Low/Medium/High mapped to 0.25/0.5/0.75, with manual override to 0.0 or 1.0 for extreme cases
 
+→ Answer: Qualitative bands + captain override. Low=0.25, Medium=0.5, High=0.75 per dimension. Skill assigns the qualitative level with evidence; captain can override to 0.0 or 1.0 during the semi-interactive Step 5. Purpose is entity creation threshold (≥0.5), not precise ranking. (captain, 2026-04-12, interactive)
+
 Q-2: After running 5 individual GSD comparisons, should build-distill produce an aggregate summary report?
 
 Domain: Readable / Textual
@@ -158,13 +168,19 @@ Why it matters: 5 individual reports are thorough but fragmented. A summary woul
 
 Suggested options: (a) Yes -- produce `distillations/gsd-summary.md` with ranked gap table, (b) No -- individual reports + entity drafts are sufficient, (c) Minimal -- a gap ranking table appended to each individual report's header for cross-reference
 
+→ Answer: Minimal -- each individual report includes a cross-comparison gap ranking table in its header. No separate summary file. Information stays co-located with its comparison context, captain can see relative rankings without maintaining an extra artifact. (captain, 2026-04-12, interactive)
+
 ## Decomposition Recommendation
 
 Scope flag present but decomposition not recommended: the skill (2 files) is meaningless without its first execution (5 comparison reports). The comparisons ARE the validation that the skill works. Splitting "create skill" from "run skill" creates an artificial dependency with no independent shippable value. 11-14 new files total is within Medium scale.
 
 ## Canonical References
 
-(clarify stage will populate)
+- `~/.claude/skills/gsd-discuss-phase/SKILL.md` -- GSD discuss-phase: adaptive questioning, --auto/--chain/--power modes, writes {N}-CONTEXT.md. 70 lines, thin orchestrator. (source for discuss vs build-clarify comparison)
+- `~/.claude/skills/gsd-research-phase/SKILL.md` -- GSD research-phase: fresh-context subagent dispatch, prescriptive output spec. 196 lines, heaviest GSD skill. (source for research comparison)
+- `~/.claude/skills/gsd-plan-phase/SKILL.md` -- GSD plan-phase: research→plan→verify loop with planner + checker subagents, supports --prd bypass. 53 lines. (source for plan comparison)
+- `~/.claude/skills/gsd-new-project/SKILL.md` -- GSD new-project/roadmap: questioning→research→requirements→ROADMAP.md, --auto flag. 47 lines. (source for roadmap gap — no build flow equivalent)
+- `docs/build-pipeline/build-flow-tdd-discipline.md` -- Entity 067 as the ad-hoc distillation exemplar. Demonstrates both the value (TDD gap found and addressed) and the weakness (O-1 misframe, Confidence scoring initially skipped) of unstructured distillation. (retroactive reference for comparison)
 
 ## Stage Report: explore
 
@@ -180,3 +196,22 @@ Scope flag present but decomposition not recommended: the skill (2 files) is mea
   No α markers in brainstorming spec
 - [x] Scale assessment: confirmed Medium
   11-14 new files (2 skill + 5 reports + 3-5 entity drafts + 1 optional summary), all NEW creation, no existing file modifications
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  Scope flag present but skill is meaningless without first execution; splitting create/run has no independent value
+- [x] Assumptions confirmed: 6 / 6 (1 corrected)
+  A-1 corrected: non-interactive → semi-interactive (captain: "skill 會跳過某種訊號"); A-2 through A-6 confirmed batch
+- [x] Options selected: 1 / 1
+  O-1 Fixed 7 dimensions -- comparable across runs, simpler skill logic
+- [x] Questions answered: 2 / 2
+  Q-1 qualitative bands (Low/Med/High = 0.25/0.5/0.75) + captain override; Q-2 minimal gap ranking table in each report header
+- [x] Canonical refs added: 5
+  GSD discuss/research/plan/new-project skill paths; entity 067 as ad-hoc exemplar
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected, all Qs answered, 4 ACs present, canonical refs populated
+- [x] Handoff mode: loose
+  auto_advance not set; captain must say "execute 068" for FO to advance
+- [x] Clarify duration: 4 interactions, session complete
+  1 batch confirmation (1 corrected) + 1 option + 2 AskUserQuestion calls (Q-1, Q-2)
