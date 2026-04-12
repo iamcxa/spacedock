@@ -877,3 +877,26 @@ Pre-scan clean: no CLAUDE.md violations, all memory references resolve, plan con
 ### Verdict: REJECTED
 
 Feedback-to: execute. Fix required: 6 prose description lines across SKILL.md (lines 145, 146, 244, 245) and recipe-format.md (lines 234, 255). Apply Option B from the MEDIUM finding detail above. No other changes needed.
+
+## Stage Report: review (cycle 2)
+
+- [x] SKILL.md Step 2 validation table — update-yaml-block row (line 145): no `## ` prepended
+  Line 145 reads "`section` heading exists in body (field value already includes `##`)" — correct; prose describes field semantics without constructing `## ## Schema`
+- [x] SKILL.md Step 2 validation table — update-section row (line 146): no `## ` prepended
+  Line 146 reads "`{heading}` exists in body (exact H2 match; field value already includes `##`)" — correct; `{heading}` expands to the full value including `##`, no double-prefix
+- [x] SKILL.md Step 4 Pass B — update-yaml-block apply logic (line 244): no extra `## ` prepended
+  Line 244 reads "Find `{section}` heading (field value already includes `## `)" — correct; no `## {section}` construction
+- [x] SKILL.md Step 4 Pass B — update-section apply logic (line 245): no extra `## ` prepended
+  Line 245 reads "Find `{heading}` (exact H2 match; field value already includes `## `)" — correct; no `## {heading}` construction
+- [x] recipe-format.md — update-yaml-block prose (line 234): no `## ` prepended
+  Line 234 reads "finding the line exactly matching `{section}` (the field value already includes `## `)" — correct
+- [x] recipe-format.md — update-section prose (line 255): no `## ` prepended
+  Line 255 reads "from the `{heading}` line... (field value already includes `## `; matched exactly)" — correct
+- [x] Cross-check: recipe examples retain full `##` prefix in field values (unchanged)
+  recipe-format.md line 226: `section: "## Schema"` — unchanged. Line 242: `heading: "## Prerequisites"` — unchanged. Field values were not incorrectly modified.
+
+### Summary
+
+All 6 prose lines identified in the MEDIUM/CODE finding have been corrected per Option B. SKILL.md lines 145, 146, 244, 245 and recipe-format.md lines 234, 255 now correctly describe that the field value already includes `##` and do not construct a `## ##`-prefixed search string. The YAML examples in recipe-format.md (`section: "## Schema"`, `heading: "## Prerequisites"`) are unchanged — the fix targeted only the prose descriptions. No new issues introduced.
+
+### Verdict: PASSED
