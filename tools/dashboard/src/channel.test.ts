@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { createChannelServer } from "./channel";
 import { getComments } from "./comments";
 import { parseEntity } from "./frontmatter-io";
+import type { EntitySnapshot } from "./types";
 import { readFileSync } from "node:fs";
 
 const TMP = join(import.meta.dir, "__test_channel__");
@@ -26,7 +27,7 @@ function makeWorkflow() {
 }
 
 function getAddr(dashboard: ReturnType<typeof createChannelServer>["dashboard"]): string {
-  return dashboard.url.toString();
+  return dashboard.url!.toString();
 }
 
 beforeEach(() => {
@@ -46,7 +47,7 @@ describe("createChannelServer — server creation", () => {
     });
     try {
       expect(dashboard).toBeDefined();
-      expect(dashboard.url.toString()).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/);
+      expect(dashboard.url!.toString()).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/);
       expect(mcp).toBeDefined();
     } finally {
       dashboard.stop();
@@ -197,7 +198,7 @@ describe("update_entity — frontmatter mode snapshot", () => {
         author: "fo",
         reason: "update score via MCP",
         source: "update",
-      });
+      }) as EntitySnapshot;
       expect(snap.version).toBe(1);
       expect(snap.author).toBe("fo");
       expect(snap.reason).toBe("update score via MCP");
@@ -225,7 +226,7 @@ describe("update_entity — sections mode snapshot versioning", () => {
         author: "fo",
         reason: "section replace",
         source: "update",
-      });
+      }) as EntitySnapshot;
       const snap2 = dashboard.snapshotStore.createSnapshot({
         entity: ENTITY_SLUG,
         body: parsed.body + "\n\n## New Section\n\nAdded.\n",
@@ -233,7 +234,7 @@ describe("update_entity — sections mode snapshot versioning", () => {
         author: "fo",
         reason: "section append",
         source: "update",
-      });
+      }) as EntitySnapshot;
       expect(snap1.version).toBe(1);
       expect(snap2.version).toBe(2);
       const versions = dashboard.snapshotStore.listVersions(ENTITY_SLUG);
@@ -620,7 +621,7 @@ describe("auto-resolve — resolved_reason and resolved_version (035 schema)", (
         author: "fo",
         reason: "section replace",
         source: "update",
-      });
+      }) as EntitySnapshot;
       expect(snap.version).toBe(1);
 
       // Mirror the exact call autoResolveComments makes
@@ -674,7 +675,7 @@ describe("auto-resolve — body-mode resolves all sections (W2)", () => {
         author: "fo",
         reason: "pre-update: full body replace",
         source: "update",
-      });
+      }) as EntitySnapshot;
 
       // Write the new body
       writeFileSync(ENTITY_FILE, replaceBody(readFileSync(ENTITY_FILE, "utf-8"), newBody));

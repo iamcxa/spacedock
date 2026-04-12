@@ -43,11 +43,17 @@ export function createChannelProviderBridge(opts: ChannelProviderBridgeOptions):
       async getChannelMessagesSince(afterSeq: number, entity?: string): Promise<SequencedEvent[]> {
         return (await rpc("getChannelMessagesSince", [afterSeq, entity])) as SequencedEvent[];
       },
+      getAll(): SequencedEvent[] {
+        throw new Error("getAll not implemented via RPC");
+      },
     },
 
     snapshotStore: {
       async createSnapshot(input: CreateSnapshotInput): Promise<EntitySnapshot> {
         return (await rpc("createSnapshot", [input])) as EntitySnapshot;
+      },
+      listVersions(_entity: string): EntitySnapshot[] {
+        throw new Error("listVersions not implemented via RPC");
       },
     },
 
