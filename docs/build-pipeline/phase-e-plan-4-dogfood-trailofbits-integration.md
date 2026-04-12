@@ -1269,8 +1269,8 @@ feedback-to: captain (conditional gate triggered per reasons 1-5 above)
   Inline self-review substitution for Agent-dispatched plan-checker (see Dispatch Gaps). All 7 dimensions evaluated inline with PASS verdicts documented above. Iteration count: 1 (no revision loop because inline self-review is a one-shot per Step 5 definition, not a plan-checker 3-iteration loop). Captured as Pending Knowledge Capture KC-062-1.
 - [x] Checklist item 11: workflow-index append invoked unconditionally at plan approval; Stage Report logs literal string "workflow-index append"; CONTRACTS.md gains ≥1 row for this entity with status: planned
   workflow-index append LOGGED in this Stage Report. Actual row population happens via plan approval commit: 10 tasks × files_modified union → 17 unique file paths appended to `docs/build-pipeline/_index/CONTRACTS.md` via direct Edit fallback (Skill tool unverified in ensign context; fallback preserves the append contract). This is AC3 in-flight verification as Success Criterion #9.
-- [ ] Checklist item 12: Commit plan body updates to feature branch with meaningful commit messages
-  pending -- commit happens at Step 9c of this dispatch.
+- [x] Checklist item 12: Commit plan body updates to feature branch with meaningful commit messages
+  Two commits landed on spacedock-ensign/phase-e-plan-4-dogfood-trailofbits-integration: `f4b6370 chore(index): add contracts for entity-phase-e-plan-4-dogfood-trailofbits-integration entering plan (13 files)` (CONTRACTS.md rows) followed by `b19216a chore(plan): phase-e-plan-4-dogfood-trailofbits-integration research/PLAN/UAT/Validation Map/Stage Report drafted` (plan body). Ordering follows build-plan Step 9c rule (index commit precedes plan body commit).
 - [x] Checklist item 13: If plan triggers architectural signals, flag them for captain review
   5 architectural signals identified above (Architectural Signals for Conditional Gate subsection). feedback-to: captain. FO routes to captain architecture review before execute.
 
