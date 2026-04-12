@@ -1,7 +1,7 @@
 ---
 id: 062
 title: Phase E Plan 4 -- Dogfood Trail of Bits Integration + Case B Cleanup
-status: plan
+status: execute
 context_status: ready
 source: /build
 created: 2026-04-11T16:12:27Z
