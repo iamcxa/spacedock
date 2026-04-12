@@ -286,6 +286,72 @@ Each section lists a file path with entities that have modified it, their stage,
 | overhaul-skill-implementation | plan | Update file index table with overhaul entry | planned | 2026-04-12 |
 | build-flow-tdd-discipline | execute | Update file index table with 3 TDD pressure test entries | in-flight | 2026-04-12 |
 
+### spacebridge/.claude-plugin/plugin.json
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Create spacebridge plugin manifest | 🔵 planned | 2026-04-12 |
+
+### spacebridge/bun.lock
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Lockfile from bun install for drizzle-orm deps | 🔵 planned | 2026-04-12 |
+
+### spacebridge/drizzle.config.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Drizzle-kit config pointing to schema and migration output | 🔵 planned | 2026-04-12 |
+
+### spacebridge/drizzle/0000_*.sql
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Generated LCD-compliant SQL migrations for 5 tables | 🔵 planned | 2026-04-12 |
+
+### spacebridge/drizzle/meta/_journal.json
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Drizzle migration metadata journal | 🔵 planned | 2026-04-12 |
+
+### spacebridge/package.json
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Package manifest with drizzle-orm and drizzle-kit deps | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/db.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Integration tests for createDb function | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/db.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Drizzle DB factory with bun:sqlite WAL and default path | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/schema.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Schema validation tests -- table creation, LCD compliance, CRUD, fmodel columns | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/schema.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Drizzle LCD schema -- 5 tables with fmodel-compatible columns | 🔵 planned | 2026-04-12 |
+
+### spacebridge/tsconfig.json
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | TypeScript config for spacebridge src | 🔵 planned | 2026-04-12 |
+
 ## Recently Retired (last 30 days)
 
 <!-- Empty until entities ship and their contracts age out. -->
