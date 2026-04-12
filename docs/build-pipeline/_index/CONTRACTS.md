@@ -46,13 +46,13 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| kc-pr-flow-mod-integration | plan | Delete old pr-merge activation, replaced by pr-review-loop | planned | 2026-04-12 |
+| kc-pr-flow-mod-integration | shipped | Delete old pr-merge activation, replaced by pr-review-loop | ✅ final | 2026-04-12 |
 
 ### docs/build-pipeline/_mods/pr-review-loop.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| kc-pr-flow-mod-integration | plan | Workflow-specific activation of pr-review-loop library mod | planned | 2026-04-12 |
+| kc-pr-flow-mod-integration | shipped | Workflow-specific activation of pr-review-loop library mod | ✅ final | 2026-04-12 |
 
 ### docs/build-pipeline/README.md
 
@@ -70,7 +70,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| kc-pr-flow-mod-integration | plan | Create pr-review-loop library mod with skill-delegating 3-hook design | planned | 2026-04-12 |
+| kc-pr-flow-mod-integration | shipped | Create pr-review-loop library mod with skill-delegating 3-hook design | ✅ final | 2026-04-12 |
 
 ### mods/workflow-index-maintainer.md
 
@@ -82,7 +82,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| kc-pr-flow-mod-integration | plan | Update FO shared core for layered mod scanning and pr-review-loop reference | planned | 2026-04-12 |
+| kc-pr-flow-mod-integration | shipped | Update FO shared core for layered mod scanning and pr-review-loop reference | ✅ final | 2026-04-12 |
 
 ### skills/build-explore/SKILL.md
 
@@ -106,31 +106,31 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| kc-pr-flow-mod-integration | plan | Fixture workflow README for pr-review-loop mod hook tests | planned | 2026-04-12 |
+| kc-pr-flow-mod-integration | shipped | Fixture workflow README for pr-review-loop mod hook tests | ✅ final | 2026-04-12 |
 
 ### tests/fixtures/pr-review-loop-pipeline/_mods/pr-review-loop.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| kc-pr-flow-mod-integration | plan | Test-instrumented pr-review-loop mod for fixture verification | planned | 2026-04-12 |
+| kc-pr-flow-mod-integration | shipped | Test-instrumented pr-review-loop mod for fixture verification | ✅ final | 2026-04-12 |
 
 ### tests/fixtures/pr-review-loop-pipeline/pr-review-loop-entity-with-pr.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| kc-pr-flow-mod-integration | plan | Test entity with pre-existing PR for startup/idle hook testing | planned | 2026-04-12 |
+| kc-pr-flow-mod-integration | shipped | Test entity with pre-existing PR for startup/idle hook testing | ✅ final | 2026-04-12 |
 
 ### tests/fixtures/pr-review-loop-pipeline/pr-review-loop-entity.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| kc-pr-flow-mod-integration | plan | Test entity for pr-review-loop mod hook verification | planned | 2026-04-12 |
+| kc-pr-flow-mod-integration | shipped | Test entity for pr-review-loop mod hook verification | ✅ final | 2026-04-12 |
 
 ### tests/fixtures/pr-review-loop-pipeline/status
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| kc-pr-flow-mod-integration | plan | Fixture status script for pr-review-loop pipeline | planned | 2026-04-12 |
+| kc-pr-flow-mod-integration | shipped | Fixture status script for pr-review-loop pipeline | ✅ final | 2026-04-12 |
 
 ### tests/pressure/build-review-trailofbits-integration.yaml
 
