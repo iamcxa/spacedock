@@ -10,7 +10,7 @@ verdict:
 score: 0.0
 worktree: .worktrees/spacedock-ensign-spacebridge-l2-daemon-lifecycle
 issue:
-pr:
+pr: "#34"
 intent: feature
 scale: Small
 project: spacedock
