@@ -2,13 +2,13 @@
 id: 068
 title: Build-Distill Skill -- Systematic External Pattern Absorption + GSD First Pass
 status: draft
-context_status:
+context_status: pending
 source: captain
 created: 2026-04-12T18:30:00+08:00
 started:
 completed:
 verdict:
-score:
+score: 0.70
 worktree:
 issue:
 pr:
@@ -69,7 +69,7 @@ Compare these GSD capabilities against their build flow counterparts:
 
 ## Captain Context Snapshot
 
-- **Repo**: main @ 9a9fe41 (spacedock)
+- **Repo**: main @ 7d5abad (spacedock)
 - **Session**: SO triage session — captain completed 067 (TDD) clarify, now wants to formalize the distillation process itself as a repeatable skill, with GSD as the first comparison target.
 - **Domain**: Runnable / Invokable (new skill creation), Readable / Textual (SKILL.md + comparison reports), Organizational / Data-transforming (entity drafting from gap analysis)
 - **Scope flag**: ⚠️ likely-decomposable
@@ -77,15 +77,31 @@ Compare these GSD capabilities against their build flow counterparts:
   - 067 -- Build Flow TDD Discipline (clarify/ready — exemplar of ad-hoc distillation)
   - 061 -- Phase E Plan 2 (stale — build-plan/build-research, prior distillation)
   - 066 -- Overhaul Skill Implementation (draft — concurrent, no overlap)
+- **Reference docs read**: GSD skills (discuss-phase 70 lines, research-phase 196 lines, plan-phase 53 lines, new-project 47 lines, new-milestone 45 lines, execute-phase 64 lines, verify-work 39 lines); all build-* skills read in entity 067 session
+- **GSD architectural pattern**: Thin orchestrators (39-196 lines) delegating to workflow files + subagents, zero inline reference docs. Build flow: thick contracts (200-400 lines) with No-Exceptions blocks and inline references.
 - **Created**: 2026-04-12T18:30:00+08:00
 
 ## Brainstorming Spec
 
-(brainstorm stage will populate)
+**APPROACH**: Create `skills/build-distill/SKILL.md` as a non-interactive comparison skill (same interaction class as build-brainstorm — reads, analyzes, outputs). The skill takes two arguments: `source` (external skill path or name) and `target` (build-* skill path). It executes a 6-step process: (1) **Source Read** — dispatch a `spacedock:code-explorer` subagent on the source skill directory to map its SKILL.md, references, workflow files, and dispatched subagent definitions; (2) **Target Read** — dispatch a second code-explorer on the build-* target with the same mapping template; (3) **Dimensional Comparison** — compare across 7 dimensions: Interaction Model (interactive vs non-interactive), Context Strategy (how prior context is loaded), Research Depth (sources, subagent delegation, fresh-context isolation), Decision Locking (how decisions persist for downstream), Verification Rigor (plan-checker dimensions, iteration caps), Execution Architecture (wave-parallel, subagent dispatch model), and Audit Trail (what institutional memory is produced); (4) **Gap Scoring** — each dimension gets a score: 0.0 = build flow is equivalent or stronger, 0.5 = meaningful gap, 1.0 = complete absence in build flow. Score factors: frequency of use (how often the captain invokes this capability), downstream effect (how many stages depend on this), and captain pain points (journal evidence of friction); (5) **Entity Drafting** — for each gap ≥ 0.5, produce a draft entity with Directive, Captain Context Snapshot, and 2+ Acceptance Criteria, following the same format as entity 067; (6) **Audit Report** — write `docs/build-pipeline/_docs/distillations/{source}-vs-{target}.md` with the full dimensional comparison table, gap scores, and entity draft references. For the GSD first pass, run the skill 5 times (one per comparison pair in the Directive table) and aggregate results into a summary report.
+
+**ALTERNATIVE**: Instead of a formal skill, maintain a comparison template as a reference doc (`references/distillation-template.md`) that the captain or SO follows manually during ad-hoc distillation sessions like entity 067. -- D-01 Rejected because the captain explicitly asked for a skill ("這個過程要有意識記錄下來作為一個新的 skill"), and the 067 experience showed that ad-hoc distillation misses structural comparisons (the O-1 RED/GREEN misframe would have been caught by a "compare interaction models" dimension). A template is better than nothing but lacks the repeatable execution and structured output that makes comparisons comparable across runs.
+
+**GUARDRAILS**:
+- Do NOT modify external skills (GSD, Superpowers) — build-distill is read-only on sources.
+- Comparison reports are additive documentation — no code changes to existing build-* skills. Entity drafts from gap analysis are PROPOSALS; they enter the pipeline at `status: draft` and go through normal brainstorm→explore→clarify before any code is touched.
+- The 7 comparison dimensions are the skill's core value — they must be explicitly defined in a reference doc (`skills/build-distill/references/comparison-dimensions.md`) so future runs use the same axes, not ad-hoc criteria.
+- Entity stops at clarify (bootstrap recursion — same pattern as 067 and 066).
+- Gap scores must cite evidence (journal entries, codebase patterns, captain feedback) — no subjective "feels like a gap" scoring. If no evidence exists for a dimension, score 0.0 with "no evidence of gap".
+
+**RATIONALE**: The formal skill approach ensures consistency across distillation runs and builds institutional memory. Each comparison report becomes a dated artifact showing what was compared, what was found, and what entities were produced — this is the "evolution audit trail" the captain requested. The 7 dimensions are derived from the structural differences observed between GSD and build flow during this session: GSD's thin-orchestrator model, fresh-context subagent delegation, --auto/--chain/--power modes, and conversational UAT are all capabilities that map to specific dimensions. Scoring with evidence prevents opinion-driven distillation and grounds every entity draft in observable gaps. The code-explorer dispatch for source/target reading ensures the comparison starts from the same structured file mapping that build-explore uses, keeping the distillation compatible with the pipeline's existing information architecture.
 
 ## Acceptance Criteria
 
-(brainstorm stage will populate)
+- `skills/build-distill/SKILL.md` exists with the 6-step process documented and at least one reference doc (`references/comparison-dimensions.md` defining the 7 dimensions). (how to verify: `test -f skills/build-distill/SKILL.md && test -f skills/build-distill/references/comparison-dimensions.md`)
+- At least one GSD comparison report exists under `docs/build-pipeline/_docs/distillations/` with the full dimensional comparison table and numeric gap scores. (how to verify: `ls docs/build-pipeline/_docs/distillations/gsd-*.md` returns ≥1 file; `grep -c "Score:" {file}` returns ≥7 matching the 7 dimensions)
+- The GSD first pass produces ≥3 draft entities in `docs/build-pipeline/` with `source: build-distill` in their frontmatter, each targeting a gap scored ≥0.5. (how to verify: `grep -rl "source: build-distill" docs/build-pipeline/*.md` returns ≥3 files)
+- Entity 067 (TDD discipline) is retroactively documented in a distillation report as the "pre-skill exemplar" — showing what an ad-hoc distillation looks like vs what the skill produces. (how to verify: `grep "067" docs/build-pipeline/_docs/distillations/*.md` returns ≥1 match)
 
 ## Open Questions
 
