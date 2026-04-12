@@ -1,8 +1,8 @@
 ---
 id: 075
 title: "Research dispatch architecture for discuss + plan pipeline"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: captain observation during 052 clarify session (2026-04-13)
 started:
 completed:
@@ -53,6 +53,15 @@ The gap was identified during entity 052 clarify (2026-04-13):
   - Integration patterns between confirmed technologies
 - Result: plan focuses on what it does best — translating validated specs into biteable tasks against the codebase
 
+### SO agent team for research (new scope, added during clarify)
+- SO creates a persistent research team (TeamCreate) at the start of the discuss phase pipeline
+- Team members: 2-3 researcher teammates, each a `spacedock:researcher` agent
+- SO messages the team (SendMessage) with research topics during brainstorm and explore
+- Team members accumulate context across the full discuss phase — second question can reference first answer
+- Team lifecycle: created when SO starts, dissolved when SO hands off to FO (or session ends)
+- Fallback: if TeamCreate fails (experimental gotchas), SO falls back to individual Agent dispatch
+- Recovery: if team becomes phantom (compaction, terminal disconnect), SO detects via TeamCreate error and recreates
+
 ### Shared infrastructure
 - Use existing `spacedock:researcher` agent (same as build-plan uses)
 - Add "research evidence" annotation format to `references/output-format.md`: `(✓ research: {source} -- {finding})`
@@ -70,6 +79,8 @@ The gap was identified during entity 052 clarify (2026-04-13):
 - [ ] Given a Small entity with all Confident assumptions and no external API claims, when brainstorm/explore run, then no researchers are dispatched (no unnecessary cost)
 - [ ] Given an entity that completed explore with research annotations, when build-plan runs Step 1, then it skips re-researching already-validated topics
 - [ ] Given a plan task that needs implementation-specific API patterns, when build-plan runs Step 1, then it dispatches a targeted researcher for that narrow topic only
+- [ ] Given SO starts a multi-entity discuss pipeline, when the first entity enters brainstorm, then SO creates a research team (TeamCreate) that persists across entities
+- [ ] Given a research team exists, when SO needs topic validation, then SO messages the team (SendMessage) instead of dispatching fresh Agent calls
 
 ## Directive
 
@@ -104,22 +115,27 @@ The gap was identified during entity 052 clarify (2026-04-13):
 A-1: The `spacedock:researcher` agent is reused unchanged. Same agents/researcher.md, same tools (Read/Grep/Glob/WebSearch/WebFetch), same skill (spacedock:build-research), same 5-domain finding output format.
 Confidence: Confident (0.95)
 Evidence: agents/researcher.md:1-21 -- fully defined agent. Entity 052 ad-hoc dispatch and entity 050 plan dispatch both used this exact agent successfully with no modifications.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: Research results are persisted in the entity body, not in external state files. Downstream stages consume results from entity file annotations. "Entity body IS the checkpoint" (build-clarify rule).
 Confidence: Confident (0.90)
 Evidence: build-plan SKILL.md:90-96 -- plan reads `## Research Findings` from entity body. build-clarify SKILL.md rules section -- "Entity body IS the checkpoint. Do not write external state files."
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-3: The SO-FO dispatch split applies to research dispatch: SO-direct mode uses Agent tool directly, ensign mode requires FO pre-dispatch. Same pattern as code-explorer Mode A/B.
 Confidence: Confident (0.90)
 Evidence: SO-FO-DISPATCH-SPLIT.md:14-16 -- brainstorm and explore are SO-owned with Agent tool. build-explore SKILL.md Step 2 already implements Mode A (Agent dispatch) vs Mode B (inline fallback).
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-4: Build-plan's existing research dispatch (Steps 1-2) can be made dedup-aware by reading entity body for research annotations. No structural change needed -- just an "if already researched, skip" guard per topic.
 Confidence: Confident (0.85)
 Evidence: build-plan SKILL.md:82 -- Step 1 extracts research topics. Adding a dedup check against `(✓ research: ...)` annotations is a conditional at the start of each topic extraction.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-5: The annotation format `(✓ research: {source} -- {finding})` is consistent with existing annotation conventions and grep-compatible.
 Confidence: Confident (0.90)
 Evidence: build-explore uses `(✓ confirmed by explore: ...)` and `(⚠ contradicted: ...)`. Same parenthetical pattern, same double-dash separator. Grep: `grep '✓ research:' entity.md` works.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 ## Option Comparisons
 
@@ -133,6 +149,8 @@ Build-brainstorm is explicitly a "leaf skill" with NO Agent tool (SKILL.md:248-2
 | Inside brainstorm (add Agent tool) | Self-contained; skill controls when research happens; no orchestrator changes | Breaks brainstorm's "leaf skill, no Agent" contract; ensign mode still can't dispatch; inconsistent with "non-interactive" design principle | Medium | Not recommended |
 | Hybrid: SO for brainstorm, inside-skill for explore | Least change to brainstorm's leaf contract; explore already handles Mode A Agent dispatch naturally; each skill keeps its existing tool contract | Two different dispatch patterns for the same concern; harder to document and maintain | Low | Viable |
 
+→ Selected: SO orchestrates (between skills) (captain, 2026-04-13, interactive)
+
 ### O-2: What triggers research during brainstorm output review?
 
 When SO reviews brainstorm output before running explore, how does it decide which technology claims need research?
@@ -143,6 +161,20 @@ When SO reviews brainstorm output before running explore, how does it decide whi
 | Brainstorm adds `## Research Candidates` section | Explicit signal from brainstorm; SO just reads the list; brainstorm is better positioned to identify its own uncertain claims | New section format to define; brainstorm must self-assess uncertainty (may not be reliable for a non-interactive skill) | Low | Viable |
 | Always dispatch single "tech claim validator" on full APPROACH | Zero heuristic logic needed; researcher decides what to check | Wastes a dispatch on simple entities with no external claims; researcher may not know what brainstorm considers uncertain | Low | Not recommended |
 
+→ Selected: SO heuristic scan (captain, 2026-04-13, interactive)
+
+### O-3: Research dispatch mechanism -- individual Agent dispatch vs persistent agent team
+
+SO currently dispatches researchers as individual Agent calls (fresh context each time). Agent teams (TeamCreate + SendMessage) would let researchers persist across the full discuss phase, accumulating context. Which mechanism should SO use?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Persistent agent team (TeamCreate at SO session start) | Context accumulates: 2nd research query references 1st findings; faster subsequent dispatches (no cold start); natural for multi-entity SO pipeline sessions | Experimental: phantom teams, compaction state loss, Warp terminal gotcha (MEMORY.md); team lifecycle must be managed; if team dies mid-session, recovery needed | Medium | |
+| Individual Agent dispatch (current ad-hoc pattern) | Simple; fresh context avoids pollution; each dispatch is independent and debuggable; no team lifecycle to manage | No context accumulation; each researcher starts from zero; slightly higher latency per dispatch | Low | |
+| Hybrid: team for multi-entity sessions, individual for single-entity | Best of both: team benefits for pipeline runs, simplicity for one-off clarify; SO detects session type at boot | Two code paths; SO must decide at session start which mode; more complex orchestration | Medium | Recommended |
+
+→ Selected: Other -- Agent teams by default when TeamCreate is available; fallback to individual Agent dispatch when teams are unavailable (experimental gotchas, terminal incompatibility) or scope is trivially small/simple. Not a session-type detection — always attempt team first, graceful degradation. (captain, 2026-04-13, interactive)
+
 ## Open Questions
 
 Q-1: Should the explore-phase research (Step 5.5) use the same `## Research Findings` section format as build-plan, or a different annotation format?
@@ -152,6 +184,8 @@ Domain: Readable/Textual
 Why it matters: Build-plan currently writes a `## Research Findings` section with 5 subsections (Upstream Constraints / Existing Patterns / Library/API Surface / Known Gotchas / Reference Examples). If explore uses the same format, plan can seamlessly consume it. But explore's research is targeted (per-assumption validation, not broad topic survey) — the 5-subsection format may be overkill. A lighter inline annotation `(✓ research: {source} -- {finding})` on each assumption's Evidence line is more natural for explore's per-item approach.
 
 Suggested options: (a) Inline annotation on Evidence lines -- `(✓ research: {source} -- {finding})` appended to the assumption. Lightweight, grep-compatible, naturally consumed by clarify. (b) Separate `## Research Findings` section same as plan format -- 5 subsections per topic. Heavy but consistent across stages. (c) Hybrid -- inline annotation for confirmed findings, `## Research Findings` section for contradictions (which need the full 5-domain treatment to explain the conflict).
+
+→ Answer: Hybrid -- inline annotation for confirmed findings, full Research Findings section for contradictions. Confirmed assumptions get `(✓ research: {source} -- {finding})` on their Evidence line. Contradicted assumptions get a `## Research Findings` subsection with the 5-domain treatment so the conflict context is preserved for clarify. (captain, 2026-04-13, interactive)
 
 ## References
 
@@ -182,3 +216,21 @@ Suggested options: (a) Inline annotation on Evidence lines -- `(✓ research: {s
   no α markers in brainstorm
 - [x] Scale assessment: confirmed Medium
   touches 3 skill SKILL.md files + 2 reference docs + SO agent.md + SO-FO-DISPATCH-SPLIT.md = 7-8 files
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- entity is Medium scope, no children proposed
+- [x] Assumptions confirmed: 5 / 5 (0 corrected)
+  A-1 through A-5 all confirmed batch; all Confident, no corrections needed
+- [x] Options selected: 3 / 3
+  O-1 SO orchestrates between skills (recommended); O-2 SO heuristic scan (recommended); O-3 agent teams by default, subagent fallback for unavailable/trivially small (captain custom)
+- [x] Questions answered: 1 / 1 (0 deferred)
+  Q-1 hybrid format -- inline annotation for confirms, Research Findings section for contradictions
+- [x] Canonical refs added: 0
+  no external docs cited by captain during clarify
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected, all Qs answered
+- [x] Handoff mode: loose
+  captain must say "execute 075" or launch FO in separate session
+- [x] Clarify duration: 5 questions asked, session complete
+  1 batch assumption + 3 option AskUserQuestion (O-1, O-2, O-3) + 1 Q-1 AskUserQuestion. Captain also surfaced agent team scope expansion mid-clarify (O-3 added during session).
