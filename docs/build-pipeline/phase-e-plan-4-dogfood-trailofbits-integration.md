@@ -1492,3 +1492,21 @@ knowledge capture: d1_written: 0, d2_pending: 2 (KC-062-1 and KC-062-2 staged in
 ### Summary
 
 First live dispatch of `spacedock:build-execute` under team mode fell back to inline serial execution because the Agent tool is not available in any ensign dispatch mode (bare OR team) -- the team-mode A/B hypothesis is falsified. All 11 plan tasks completed successfully via the inline fallback: 1 index transition commit + 10 per-task commits, zero BLOCKED, zero escalations, zero scope creep beyond declared files_modified. Wave barriers were honored (0 → 1 → 2 → 3) even without parallelism. AC3 and AC4 both live-verified from the actual CONTRACTS.md state, which gated Task 9's DELETE branch -- Case B band-aid removed from mods/workflow-index-maintainer.md with 2 downstream stale references cleaned up, replaced by a Retired 2026-04-12 marker that points future readers at the canonical append path in Plans 2/3. Pending Knowledge Captures section populated with 2 capture elements (KC-062-1 Agent tool gap across both bare and team modes with two live data points; KC-062-2 thin wrapper agent pattern validated by 5 concrete instances shipped in this entity). Phase 4 findings dominate the Dispatch Gaps subsection but NONE block advancing to quality -- the entity ran through all 11 tasks on first inline dispatch. feedback-to: none (execute advances cleanly to quality stage).
+
+## Stage Report: quality
+
+- [ ] FAIL: bun test (full suite, worktree root)
+  Exit code 1; 344 pass, 1 fail out of 345 tests across 25 files. Failing test: `parseStagesBlock > parses stages with defaults and states` in `tests/dashboard/parsing.test.ts:89`. Test expects stage record to omit `conditional`, `feedback_to`, and `model` fields when they have default values. Received object includes all three fields with empty/false defaults. Type mismatch in stage parsing logic.
+
+- [ ] FAIL: tsc --noEmit (TypeScript check, tools/dashboard)
+  Exit code 2; 9 errors in 1 file (`src/channel.test.ts`). Error types: 6x TS2339 "Property does not exist" (url, getAll, listVersions on type mocks) + 3x TS7006 "Parameter implicitly any". Test file has incorrect type signatures for mocked objects passed to functions under test.
+
+- [ ] PASS: bun build (tools/dashboard with --target=bun)
+  Exit code 0. Build completes successfully when `--target=bun` is specified. Source bundle generates without errors; Node.js builtins correctly resolved for Bun runtime.
+
+- [ ] SKIP: bun lint
+  No `lint` script defined in package.json or root bunfig.toml. Project has no configured linter. Skipping per stage definition guidance (lint is informational only if unavailable).
+
+### Summary
+
+Project-wide mechanical checks reveal two real failures: (1) test suite has 1 failing test in parsing logic (344 pass, 1 fail), and (2) TypeScript type-checking fails on test mocks in channel.test.ts (9 errors, 2 TS code families). Both failures are evidence-backed regressions in the execute stage's code output. Failures route back to execute stage per stage definition Rule: "any fail → feedback-to: execute with failing output attached; max 3 rounds then escalate to captain." Build succeeds. Lint unavailable; stage continues.
