@@ -174,6 +174,403 @@ Suggested options: (a) Copy the interface definition to spacebridge and keep in 
 - [x] Scale assessment: confirmed Medium
   9 reference files mapped; new plugin estimated at 10-15 files (plugin.json, schema files, tests, package.json, drizzle config, agent/skill stubs)
 
+## Research Findings
+
+### Upstream Constraints
+
+- **No CLAUDE.md in repo root**: The spacedock repo has no root-level CLAUDE.md constraining new directory creation. The `spacebridge/` directory is greenfield territory.
+- **DECISIONS.md**: Empty (no active decisions to constrain). Confirmed at `docs/build-pipeline/_index/DECISIONS.md:9`.
+- **CONTRACTS.md**: No existing entries reference any `spacebridge/` path. Zero cross-entity conflicts. All `spacebridge/*` files are new territory. Confirmed at `docs/build-pipeline/_index/CONTRACTS.md`.
+- **Plugin conventions**: `.claude-plugin/plugin.json` at repo root is the standard CC plugin manifest structure. Validated by existing spacedock plugin at `.claude-plugin/plugin.json:1-17`. Required fields: `name`, `version`, `description`, `author`, `repository`, `license`, `keywords`.
+- **Clarify-locked**: Q-1 locked spacebridge to `spacebridge/` directory inside spacedock repo. Q-2 locked NO skill/agent migration -- skeleton + schema only. Q-3 locked direct import of engine types from `tools/dashboard/src/channel-provider.ts`. O-1 locked fmodel-compatible columns from day 1. O-2 locked atomic namespace migration (deferred, not in scope).
+
+### Existing Patterns
+
+- **Database pattern** (`tools/dashboard/src/db.ts:1-56`): Raw SQL `CREATE TABLE IF NOT EXISTS` with `bun:sqlite` `Database` class. Uses TEXT timestamps (`created_at TEXT NOT NULL`), TEXT primary keys for share_links, INTEGER AUTOINCREMENT for events and entity_snapshots. This is the OLD pattern -- spacebridge deliberately breaks from TEXT timestamps to INTEGER epoch-ms per LCD discipline.
+- **Test pattern** (`tools/dashboard/src/db.test.ts:1-163`): `bun:test` with `describe`/`test`/`expect`. Uses `openDb(":memory:")` for isolation. PRAGMA table_info for schema validation. Explicit temp DB path for persistence round-trip tests: `const TMP_DB = join(import.meta.dir, "__test_persistence__.db")` with cleanup helper. This pattern should be adapted for Drizzle (use `drizzle()` wrapper over `:memory:` Database).
+- **Plugin.json shape** (`.claude-plugin/plugin.json:1-17`): `{name: "spacedock", version: "0.9.0", description, author: {name}, repository, license, keywords}`. Spacebridge plugin.json should mirror this structure with `name: "spacebridge"`.
+- **Package.json** (`tools/dashboard/package.json:1-12`): Minimal -- dependencies and devDependencies only. No scripts, no main field. Spacebridge needs `drizzle-orm` and `drizzle-kit` as deps.
+
+### Library/API Surface
+
+- **Drizzle ORM bun:sqlite**: Schema defined via `sqliteTable("name", { columns })` from `drizzle-orm/sqlite-core`. Column types: `text("col")`, `integer("col")`, `blob("col")`. Primary key: `integer("id").primaryKey({ autoIncrement: true })`. The `drizzle()` function from `drizzle-orm/bun-sqlite` wraps a `bun:sqlite` `Database` instance.
+- **Drizzle-kit**: `drizzle-kit generate` reads a `drizzle.config.ts` and produces SQL migration files in a `drizzle/` directory. Config needs `schema` (path to schema files), `out` (migration output dir), `dialect: "sqlite"`.
+- **LCD dual-driver pattern**: Use `sqliteTable` from `drizzle-orm/sqlite-core` for schema definition. For Postgres forward-compat, the same schema can be re-expressed with `pgTable` from `drizzle-orm/pg-core` -- but the LCD discipline (text, integer, no serial, no timestamptz) ensures the generated SQL is valid for both. The entity scope is SQLite-only; Postgres driver swap is a future entity.
+- **Drizzle CRUD API**: `db.insert(table).values({...})`, `db.select().from(table).where(eq(col, val))`, `db.update(table).set({...}).where(...)`, `db.delete(table).where(...)`. Uses `eq`, `and`, `or` from `drizzle-orm`.
+
+### Known Gotchas
+
+- **LCD discipline from design doc §3.3**: `text` for strings, `integer` PKs with autoincrement (NOT `serial`), `integer` timestamps as Unix epoch-ms (NOT `datetime`/`timestamptz`), no JSON for queryable data (JSON OK for opaque blobs like event payloads), no `returning` clauses (read after write instead), migrations reviewed for dual SQLite/Postgres validity.
+- **Test isolation (MEMORY.md)**: ALWAYS pass explicit test DB path. Default fallback to `~/.spacedock/spacebridge.db` causes silent test pollution. Use `join(tmpdir(), "test-spacebridge.db")` or `:memory:`.
+- **Zod `.passthrough()` gotcha (design doc §3.5)**: When Zod event schemas are added later (not in this entity), they MUST use `.passthrough()` not `.strip()` to prevent silent field loss during schema evolution.
+- **fmodel columns in non-fmodel entity**: O-1 includes fmodel-compatible columns (event_type, aggregate_id, sequence_number, payload) from day 1. These are structural placeholders -- no fmodel-ts dependency in this entity (A-5). The `payload` column is `text` (opaque JSON blob), not parsed or queried.
+- **CC plugin recognition**: For CC to recognize `spacebridge/` as a plugin, it needs `.claude-plugin/plugin.json` at the plugin root (i.e., `spacebridge/.claude-plugin/plugin.json`). The `name` field determines the namespace for skills/agents.
+
+### Reference Examples
+
+- **Design doc §4.3 Session type**: `{id: string, projectRoot: string, pid: number, connected_at: number, last_heartbeat: number}` -- maps to sessions table with text id, text project_root, integer pid, integer connected_at, integer last_heartbeat.
+- **Design doc §5.3 Lease type**: `{token: string, session_id: string, entity_slug: string, role: Role, acquired_at: number, expires_at: number}` -- maps to entity_leases table.
+- **Design doc §3.5 fmodel tier classification**: sessions (🟢 full CQRS), entity_leases (🟢 full CQRS), events (🟡 event-log), comments (🟢 full CQRS), share_tokens (🔴 plain Drizzle). All get fmodel-compatible columns per O-1 regardless of tier.
+- **Design doc §4.5 Database path**: Single daemon DB at `~/.spacedock/spacebridge.db`. Queries scoped by `workflow_dir` or `project_root`. Test isolation via dbPath override.
+- **Existing db.ts structure**: `openDb(dbPath?)` with default path resolution, WAL mode for file DBs, table creation. Spacebridge equivalent: `createDb(dbPath?)` wrapping Drizzle over bun:sqlite with similar WAL + default path logic.
+
+## PLAN
+
+### Goal
+
+Create the spacebridge plugin skeleton inside `spacebridge/` with valid CC plugin structure and Drizzle ORM LCD schema (5 tables with fmodel-compatible columns), plus bun:test suite validating table creation and basic CRUD.
+
+<task id="task-0" model="sonnet" wave="0">
+  <read_first>
+    - .claude-plugin/plugin.json
+    - tools/dashboard/package.json
+  </read_first>
+
+  <action>
+  Environment verification. Confirm:
+  1. `spacebridge/` directory does NOT exist yet: `test ! -d spacebridge/ && echo OK`
+  2. No existing CONTRACTS.md entries for spacebridge paths: `grep -c 'spacebridge/' docs/build-pipeline/_index/CONTRACTS.md` returns 0
+  3. Bun is available: `bun --version`
+  4. Current branch is `spacedock-ensign/spacebridge-plugin-skeleton-drizzle-schema`: `git branch --show-current`
+  5. `.claude-plugin/plugin.json` exists with `name: "spacedock"`: `cat .claude-plugin/plugin.json | grep '"name"'`
+  If any check fails, STOP and report before proceeding.
+  </action>
+
+  <acceptance_criteria>
+    - `test ! -d spacebridge/ && echo OK` prints OK
+    - `grep -c 'spacebridge/' docs/build-pipeline/_index/CONTRACTS.md` returns 0
+    - `bun --version` succeeds
+    - `git branch --show-current` prints `spacedock-ensign/spacebridge-plugin-skeleton-drizzle-schema`
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1">
+  <read_first>
+    - .claude-plugin/plugin.json
+  </read_first>
+
+  <action>
+  Create the spacebridge plugin directory structure and plugin manifest:
+
+  1. Create directories: `spacebridge/.claude-plugin/`, `spacebridge/src/`, `spacebridge/drizzle/`
+  2. Write `spacebridge/.claude-plugin/plugin.json`:
+     ```json
+     {
+       "name": "spacebridge",
+       "version": "0.1.0",
+       "description": "Coordination bridge for Spacedock — daemon, UI, role-aware work queue, and build studio skills",
+       "author": { "name": "Kent" },
+       "repository": "https://github.com/patchwork-body/spacedock",
+       "license": "Apache-2.0",
+       "keywords": ["coordination", "bridge", "daemon", "build-studio", "drizzle", "fmodel"]
+     }
+     ```
+  3. Write `spacebridge/package.json`:
+     ```json
+     {
+       "name": "spacebridge",
+       "version": "0.1.0",
+       "type": "module",
+       "dependencies": {
+         "drizzle-orm": "^0.40.0"
+       },
+       "devDependencies": {
+         "drizzle-kit": "^0.30.0",
+         "bun-types": "^1.3.11"
+       }
+     }
+     ```
+  4. Write `spacebridge/tsconfig.json`:
+     ```json
+     {
+       "compilerOptions": {
+         "target": "ESNext",
+         "module": "ESNext",
+         "moduleResolution": "bundler",
+         "strict": true,
+         "esModuleInterop": true,
+         "skipLibCheck": true,
+         "outDir": "dist",
+         "declaration": true,
+         "types": ["bun-types"]
+       },
+       "include": ["src/**/*.ts"],
+       "exclude": ["node_modules", "dist", "drizzle"]
+     }
+     ```
+  5. Write `spacebridge/drizzle.config.ts`:
+     ```typescript
+     import { defineConfig } from "drizzle-kit";
+     export default defineConfig({
+       schema: "./src/schema.ts",
+       out: "./drizzle",
+       dialect: "sqlite",
+     });
+     ```
+  6. Run `cd spacebridge && bun install` to install dependencies and generate lockfile.
+  </action>
+
+  <acceptance_criteria>
+    - `cat spacebridge/.claude-plugin/plugin.json | grep '"spacebridge"'` finds the name field
+    - `test -f spacebridge/package.json && echo OK` prints OK
+    - `test -f spacebridge/tsconfig.json && echo OK` prints OK
+    - `test -f spacebridge/drizzle.config.ts && echo OK` prints OK
+    - `test -f spacebridge/bun.lock && echo OK` prints OK (lockfile created by bun install)
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/.claude-plugin/plugin.json
+    - spacebridge/package.json
+    - spacebridge/tsconfig.json
+    - spacebridge/drizzle.config.ts
+    - spacebridge/bun.lock
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="2" test_first="true" skills="superpowers:test-driven-development">
+  <read_first>
+    - tools/dashboard/src/db.ts
+    - tools/dashboard/src/db.test.ts
+    - docs/superpowers/specs/2026-04-10-spacebridge-engine-bridge-split-design.md (lines 220-234, 326-347, 459-475)
+  </read_first>
+
+  <action>
+  Create the Drizzle ORM LCD schema with 5 tables and fmodel-compatible columns.
+
+  Write `spacebridge/src/schema.ts` with these table definitions using `sqliteTable` from `drizzle-orm/sqlite-core`:
+
+  **sessions** -- 🟢 fmodel full CQRS (design doc §4.3)
+  - `id` integer primaryKey autoIncrement
+  - `session_id` text notNull unique -- UUID
+  - `project_root` text notNull -- absolute path
+  - `pid` integer notNull
+  - `connected_at` integer notNull -- epoch-ms
+  - `last_heartbeat` integer notNull -- epoch-ms
+  - fmodel columns: `event_type` text, `aggregate_id` text, `sequence_number` integer, `payload` text
+
+  **entity_leases** -- 🟢 fmodel full CQRS (design doc §5.3)
+  - `id` integer primaryKey autoIncrement
+  - `token` text notNull unique -- opaque lease token
+  - `session_id` text notNull -- references sessions.session_id
+  - `entity_slug` text notNull
+  - `role` text notNull -- 'SO' | 'FO' | 'QO'
+  - `acquired_at` integer notNull -- epoch-ms
+  - `expires_at` integer notNull -- epoch-ms
+  - fmodel columns: `event_type` text, `aggregate_id` text, `sequence_number` integer, `payload` text
+
+  **events** -- 🟡 event-log only
+  - `id` integer primaryKey autoIncrement
+  - `type` text notNull -- event type string
+  - `entity` text notNull
+  - `stage` text notNull
+  - `agent` text notNull
+  - `timestamp` integer notNull -- epoch-ms
+  - `detail` text -- optional detail string
+  - `workflow_dir` text notNull -- scoping key
+  - fmodel columns: `event_type` text, `aggregate_id` text, `sequence_number` integer, `payload` text
+
+  **comments** -- 🟢 fmodel full CQRS
+  - `id` integer primaryKey autoIncrement
+  - `comment_id` text notNull unique -- UUID
+  - `entity_path` text notNull
+  - `selected_text` text notNull
+  - `section_heading` text notNull
+  - `content` text notNull
+  - `author` text notNull -- 'captain' | 'fo' | 'guest'
+  - `created_at` integer notNull -- epoch-ms
+  - `resolved` integer notNull default 0 -- boolean as integer
+  - `resolved_reason` text
+  - `resolved_version` integer
+  - `workflow_dir` text notNull -- scoping key
+  - fmodel columns: `event_type` text, `aggregate_id` text, `sequence_number` integer, `payload` text
+
+  **share_tokens** -- 🔴 plain Drizzle
+  - `id` integer primaryKey autoIncrement
+  - `token` text notNull unique
+  - `password_hash` text notNull
+  - `entity_paths` text notNull -- JSON array as text blob
+  - `stages` text notNull -- JSON array as text blob
+  - `label` text notNull
+  - `created_at` integer notNull -- epoch-ms
+  - `expires_at` integer notNull -- epoch-ms
+  - fmodel columns: `event_type` text, `aggregate_id` text, `sequence_number` integer, `payload` text
+
+  Also write `spacebridge/src/db.ts`:
+  - Export `createDb(dbPath?: string)` that:
+    1. Resolves default path to `~/.spacedock/spacebridge.db`
+    2. Creates parent directory if needed (mkdirSync recursive)
+    3. Opens bun:sqlite Database
+    4. Sets WAL mode for file DBs (not :memory:)
+    5. Wraps with `drizzle()` from `drizzle-orm/bun-sqlite`
+    6. Returns the drizzle instance
+
+  Write tests FIRST per TDD discipline in `spacebridge/src/schema.test.ts`:
+  - Test that all 5 tables exist after migration push
+  - Test each table has expected column count and names via PRAGMA table_info
+  - Test LCD compliance: no columns with affinity 'REAL' or 'DATETIME', timestamps are integer type
+  - Test basic CRUD (insert + select) for each table
+  - Test fmodel columns exist on all 5 tables (event_type, aggregate_id, sequence_number, payload)
+  - Use `:memory:` database for all tests
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/src/schema.test.ts` passes
+    - `grep -c 'sqliteTable' spacebridge/src/schema.ts` returns 5 (one per table)
+    - `grep -c 'integer.*epoch' spacebridge/src/schema.ts` returns 0 (epoch-ms is in comments, not column names)
+    - `grep -E 'serial|timestamptz|datetime|RETURNING' spacebridge/src/schema.ts` returns 0 matches
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/src/schema.ts
+    - spacebridge/src/db.ts
+    - spacebridge/src/schema.test.ts
+  </files_modified>
+</task>
+
+<task id="task-3" model="sonnet" wave="3">
+  <read_first>
+    - spacebridge/src/schema.ts
+    - spacebridge/drizzle.config.ts
+  </read_first>
+
+  <action>
+  Generate Drizzle SQL migrations and verify LCD compliance:
+
+  1. Run `cd spacebridge && bunx drizzle-kit generate` to produce SQL migration files in `spacebridge/drizzle/`
+  2. Verify the generated SQL contains no LCD violations:
+     - `grep -E 'serial|timestamptz|datetime|RETURNING' spacebridge/drizzle/*.sql` returns 0 matches
+     - `grep -c 'CREATE TABLE' spacebridge/drizzle/*.sql` returns 5 (one per table)
+  3. Verify migration metadata files exist (drizzle-kit generates `_journal.json` or `meta/` alongside SQL)
+  </action>
+
+  <acceptance_criteria>
+    - `ls spacebridge/drizzle/*.sql | wc -l` returns at least 1
+    - `grep -E 'serial|timestamptz|datetime|RETURNING' spacebridge/drizzle/*.sql` returns 0 matches
+    - `grep -c 'CREATE TABLE' spacebridge/drizzle/*.sql` returns 5
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/drizzle/0000_*.sql
+    - spacebridge/drizzle/meta/_journal.json
+  </files_modified>
+</task>
+
+<task id="task-4" model="sonnet" wave="3">
+  <read_first>
+    - spacebridge/src/db.ts
+    - spacebridge/src/schema.ts
+  </read_first>
+
+  <action>
+  Write integration test for db.ts createDb function:
+
+  Write `spacebridge/src/db.test.ts`:
+  - Test createDb with :memory: returns a drizzle instance that can query
+  - Test createDb with explicit temp file path creates the file and sets WAL mode
+  - Test that default path is NOT used in tests (verify no reference to `spacebridge.db` in test file)
+  - Test two :memory: databases are isolated
+  - Cleanup temp DB files after each test
+
+  Use `import { tmpdir } from "node:os"` and `join(tmpdir(), "test-spacebridge-" + Date.now() + ".db")` for temp paths.
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/src/db.test.ts` passes
+    - `grep -c 'spacebridge.db' spacebridge/src/db.test.ts` returns 0
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/src/db.test.ts
+  </files_modified>
+</task>
+
+<task id="task-5" model="sonnet" wave="4">
+  <read_first>
+    - spacebridge/.claude-plugin/plugin.json
+    - spacebridge/src/schema.ts
+    - spacebridge/src/schema.test.ts
+    - spacebridge/src/db.test.ts
+  </read_first>
+
+  <action>
+  Final validation sweep:
+
+  1. Run full test suite: `cd spacebridge && bun test`
+  2. Run TypeScript check: `cd spacebridge && bunx tsc --noEmit`
+  3. Verify plugin.json is valid JSON: `bun -e "JSON.parse(require('fs').readFileSync('spacebridge/.claude-plugin/plugin.json','utf8')); console.log('valid')"`
+  4. Verify all 5 tables in schema: `grep 'export const.*= sqliteTable' spacebridge/src/schema.ts | wc -l` returns 5
+  5. Verify no LCD violations in generated migrations: `grep -rE 'serial|timestamptz|datetime|RETURNING' spacebridge/drizzle/` returns 0
+  6. Verify test isolation: `grep -r 'spacebridge.db' spacebridge/src/*.test.ts` returns 0
+  </action>
+
+  <acceptance_criteria>
+    - `cd spacebridge && bun test` passes with 0 failures
+    - `cd spacebridge && bunx tsc --noEmit` exits 0
+    - `grep 'export const.*= sqliteTable' spacebridge/src/schema.ts | wc -l` returns 5
+    - `grep -rE 'serial|timestamptz|datetime|RETURNING' spacebridge/drizzle/` returns 0 matches
+    - `grep -r 'spacebridge.db' spacebridge/src/*.test.ts` returns 0 matches
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+
+None
+
+### CLI
+
+- [ ] `bun test spacebridge/src/schema.test.ts` passes -- all 5 tables created, fmodel columns present, LCD compliance verified, basic CRUD works
+- [ ] `bun test spacebridge/src/db.test.ts` passes -- createDb works with :memory: and temp file, WAL mode set, isolation verified
+- [ ] `cd spacebridge && bunx drizzle-kit generate` produces SQL migration files with no LCD violations
+- [ ] `cd spacebridge && bunx tsc --noEmit` passes with no type errors
+
+### API
+
+None
+
+### Interactive
+
+None
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1: plugin.json present, CC recognizes spacebridge | task-1, task-5 | `cat spacebridge/.claude-plugin/plugin.json \| grep '"spacebridge"'` | pending | -- |
+| AC-2: drizzle-kit generate produces SQL migrations | task-3 | `ls spacebridge/drizzle/*.sql \| wc -l` | pending | -- |
+| AC-3: generated SQL has no LCD violations | task-3, task-5 | `grep -rE 'serial\|timestamptz\|datetime\|RETURNING' spacebridge/drizzle/*.sql` returns 0 | pending | -- |
+| AC-4: 5 tables with basic CRUD via bun:sqlite | task-2 | `bun test spacebridge/src/schema.test.ts` | pending | -- |
+| AC-5: tests use explicit temp path, not production DB | task-4, task-5 | `grep -r 'spacebridge.db' spacebridge/src/*.test.ts` returns 0 | pending | -- |
+| AC-6: build-* skills accessible (DEFERRED -- Q-2 defers skill migration) | -- | DEFERRED: skill migration not in scope per Q-2 | skipped | -- |
+
+## Stage Report: plan
+
+status: passed
+plan-checker verdict: PASS (after 1 revision iteration)
+iteration count: 1
+knowledge capture: skipped -- no findings met D1/D2 threshold
+workflow-index append: 6 append calls (tasks 0-5), covering 4 tasks with files and 11 file entries total, all successful
+
+### Plan-checker final output
+```yaml
+issues: []
+```
+
+### Dispatch Gaps
+- Research: `## Research Findings` was absent; fell back to inline serial research (5 domains, all populated with file:line citations)
+- Plan-checker: Agent tool unavailable in ensign context; ran inline 7-dimension evaluation. All dimensions passed.
+
+### Commits
+- chore(index): add contracts for entity-spacebridge-plugin-skeleton-drizzle-schema entering plan (11 files)
+- chore(plan): spacebridge-plugin-skeleton-drizzle-schema -- plugin skeleton + Drizzle LCD schema
+
 ## Stage Report: clarify
 
 - [x] Decomposition: not-applicable -- entity is Medium scope, no children proposed
