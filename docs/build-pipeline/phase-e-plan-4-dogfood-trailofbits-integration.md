@@ -1626,3 +1626,62 @@ No agent returned findings (all skipped). Per `build-review/SKILL.md` Red Flags:
 no findings met D1/D2 threshold -- the 1 MEDIUM DOC finding (em dash drift in a reference scaffold) is a pre-existing pattern already captured by the build skill family convention rule and does not introduce a new D1 pattern or meet the MEDIUM 2+ recurrence D2 gate. The 5 LOW PLAN findings are plan-consistency notes about FO apply-mode and stage writes that expand scope beyond declared `files_modified`; this is a systemic pattern of the pipeline design, not an entity-062-specific insight worth adding to learned-patterns.md. No D1 write performed; no D2 candidate staged. Knowledge-capture skill invocation skipped per `build-review/SKILL.md` Step 4 "If no findings met either threshold, record `knowledge capture: no findings met D1/D2 threshold` explicitly."
 
 notes: Agent tool confirmed absent via ToolSearch at review start -- third consecutive live confirmation of KC-062-1 across plan (bare mode) + execute (team mode) + review (team mode). 10-agent parallel fan SKIPPED; pre-scan-only verdict is the complete review output. This matches the entity assignment's explicit expectation. No CRITICAL or HIGH CODE findings from pre-scan. Advancing to uat.
+
+## UAT Results
+
+| item | type | status | evidence | notes | re-attempt |
+| ---- | ---- | ------ | -------- | ----- | ---------- |
+| item-1 | cli | pass | JSON parsed OK | settings.json exists and parses (AC1) | 0 |
+| item-2 | cli | pass | both files found | code-explorer.md + SKILL.md exist (Q-5 Path C) | 0 |
+| item-3 | cli | pass | count=4 | 4 reviewer agents exist | 0 |
+| item-4 | cli | pass | grep returned 0 matches | no trailofbits "agent" refs in build-review (AC2) | 0 |
+| item-5 | cli | pass | count=14 | CONTRACTS.md has entity 062 rows (AC3) | 0 |
+| item-6 | cli | pass | count=20 | Plan Stage Report has workflow-index append (AC3 textual) | 0 |
+| item-7 | cli | pass | non-planned=14 | CONTRACTS.md rows transitioned from planned (AC4) | 0 |
+| item-8 | cli | pass | count=32 | Execute Stage Report has update-status-bulk (AC4 textual) | 0 |
+| item-9 | cli | pass | section found | Pending Knowledge Captures exists (AC7) | 0 |
+| item-10 | cli | pass | YAML parsed OK | pressure test exists and parses | 0 |
+| item-11 | cli | pass | pattern matches | README pr-review-toolkit claim corrected (Task 8) | 0 |
+| item-12 | interactive | pass | AC3+AC4 live verified, DELETE branch taken | captain sign-off: Task 9 Case B deletion correct | 0 |
+| item-13 | interactive | pass | N/A -- Case B deleted | Case B retention follow-up not applicable | 0 |
+| item-14 | interactive | pass | KC-062-1 already addressed by dispatch redesign, KC-062-2 written to MEMORY.md | captain reviewed both KC candidates | 0 |
+
+## Stage Report: uat
+
+**Verdict**: pass
+**Ran at**: 2026-04-12T04:15:00Z
+**HEAD**: 5459733
+**Mode**: normal
+
+### summary
+- total items: 14
+- pass: 14
+- fail: 0
+- skipped: 0
+- infra-level fails: 0
+- assertion fails: 0
+- uat_pending_count (post-run): 0
+
+### automated evidence
+- item-1 (cli): `test -f .claude/settings.json && python3 -c "import json; json.load(open('.claude/settings.json'))"` exit 0
+- item-2 (cli): `test -f agents/code-explorer.md && test -f skills/code-explorer/SKILL.md` exit 0
+- item-3 (cli): `ls agents/*reviewer.md | wc -l` output 4
+- item-4 (cli): `! grep -nE "[Tt]railofbits.*[Aa]gent\b|TBD.*trailofbits|architectural.unknown.*trailofbits" skills/build-review/SKILL.md` exit 0
+- item-5 (cli): `grep -c 'phase-e-plan-4-dogfood-trailofbits-integration' docs/build-pipeline/_index/CONTRACTS.md` output 14
+- item-6 (cli): `grep -c 'workflow-index append' {entity}` output 20
+- item-7 (cli): `grep {entity-slug} CONTRACTS.md | grep -v planned | wc -l` output 14
+- item-8 (cli): `grep -c 'update-status-bulk' {entity}` output 32
+- item-9 (cli): `grep -q '## Pending Knowledge Captures' {entity}` exit 0
+- item-10 (cli): `test -f tests/pressure/build-review-trailofbits-integration.yaml && python3 -c "import yaml; yaml.safe_load(...)"` exit 0
+- item-11 (cli): `! grep -q 'Bundled with superpowers' README.md && grep -q 'pr-review-toolkit@claude-plugins-official' README.md` exit 0
+
+### captain decisions
+- item-12: pass (interactive) -- captain confirmed DELETE branch judgment correct based on AC3+AC4 live evidence
+- item-13: pass (interactive) -- N/A, Case B deleted not retained
+- item-14: pass (interactive) -- KC-062-1 acknowledged as already-addressed by dispatch architecture redesign; KC-062-2 thin wrapper pattern written to MEMORY.md
+
+### knowledge capture
+KC-062-1 (Agent tool unavailability): already addressed by previous session's dispatch architecture redesign (agent-dispatch-guide.md, SO-FO-DISPATCH-SPLIT.md, 4 skill rewrites). No further action.
+KC-062-2 (Thin wrapper agent pattern): written to MEMORY.md as reusable pattern entry at `thin-wrapper-agent-pattern.md`.
+
+notes: UAT ran inline in captain session (no ensign dispatch) because all items are CLI commands + captain interactive sign-off, no browser/API surface. Entity 062 is the first live dogfood through the 10-stage pipeline. All 14 items pass on first attempt.
