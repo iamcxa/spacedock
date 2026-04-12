@@ -226,71 +226,71 @@ Each section lists a file path with entities that have modified it, their stage,
 | overhaul-skill-implementation | plan | Update file index table with overhaul entry | planned | 2026-04-12 |
 | build-flow-tdd-discipline | execute | Update file index table with 3 TDD pressure test entries | in-flight | 2026-04-12 |
 
-### docs/build-pipeline/_docs/distillations/067-tdd-pre-skill-exemplar.md
+### spacebridge/.claude-plugin/plugin.json
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-distill-skill-and-gsd-comparison | plan | Retroactive 067 documentation as pre-skill distillation exemplar | planned | 2026-04-12 |
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Create spacebridge plugin manifest | 🔵 planned | 2026-04-12 |
 
-### docs/build-pipeline/_docs/distillations/gsd-discuss-assumptions-vs-build-explore.md
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| build-distill-skill-and-gsd-comparison | plan | GSD discuss-phase assumptions model vs build-explore comparison report | planned | 2026-04-12 |
-
-### docs/build-pipeline/_docs/distillations/gsd-discuss-phase-vs-build-clarify.md
+### spacebridge/bun.lock
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-distill-skill-and-gsd-comparison | plan | GSD discuss-phase vs build-clarify comparison report | planned | 2026-04-12 |
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Lockfile from bun install for drizzle-orm deps | 🔵 planned | 2026-04-12 |
 
-### docs/build-pipeline/_docs/distillations/gsd-plan-phase-vs-build-plan.md
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| build-distill-skill-and-gsd-comparison | plan | GSD plan-phase vs build-plan comparison report | planned | 2026-04-12 |
-
-### docs/build-pipeline/_docs/distillations/gsd-research-phase-vs-build-research.md
+### spacebridge/drizzle.config.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-distill-skill-and-gsd-comparison | plan | GSD research-phase vs build-research comparison report | planned | 2026-04-12 |
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Drizzle-kit config pointing to schema and migration output | 🔵 planned | 2026-04-12 |
 
-### docs/build-pipeline/_docs/distillations/gsd-roadmap-vs-build-flow.md
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| build-distill-skill-and-gsd-comparison | plan | GSD roadmap capability vs build flow (no equivalent) comparison report | planned | 2026-04-12 |
-
-### docs/build-pipeline/build-clarify-interaction-modes.md
+### spacebridge/drizzle/0000_*.sql
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-distill-skill-and-gsd-comparison | plan | Draft entity for build-clarify interaction modes gap from GSD distillation | planned | 2026-04-12 |
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Generated LCD-compliant SQL migrations for 5 tables | 🔵 planned | 2026-04-12 |
 
-### docs/build-pipeline/build-explore-domain-aware-gray-areas.md
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| build-distill-skill-and-gsd-comparison | plan | Draft entity for domain-aware gray area generation gap from GSD distillation | planned | 2026-04-12 |
-
-### docs/build-pipeline/build-flow-roadmap-orchestration.md
+### spacebridge/drizzle/meta/_journal.json
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-distill-skill-and-gsd-comparison | plan | Draft entity for multi-entity roadmap orchestration gap from GSD distillation | planned | 2026-04-12 |
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Drizzle migration metadata journal | 🔵 planned | 2026-04-12 |
 
-### skills/build-distill/SKILL.md
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| build-distill-skill-and-gsd-comparison | plan | Create build-distill skill -- 6-step semi-interactive comparison process | planned | 2026-04-12 |
-
-### skills/build-distill/references/comparison-dimensions.md
+### spacebridge/package.json
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-distill-skill-and-gsd-comparison | plan | Define 7 fixed comparison dimensions for cross-run comparability | planned | 2026-04-12 |
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Package manifest with drizzle-orm and drizzle-kit deps | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/db.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Integration tests for createDb function | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/db.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Drizzle DB factory with bun:sqlite WAL and default path | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/schema.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Schema validation tests -- table creation, LCD compliance, CRUD, fmodel columns | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/schema.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | Drizzle LCD schema -- 5 tables with fmodel-compatible columns | 🔵 planned | 2026-04-12 |
+
+### spacebridge/tsconfig.json
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-plugin-skeleton-drizzle-schema | plan | TypeScript config for spacebridge src | 🔵 planned | 2026-04-12 |
 
 ## Recently Retired (last 30 days)
 
