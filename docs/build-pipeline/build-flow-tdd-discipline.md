@@ -1,7 +1,7 @@
 ---
 id: 067
 title: Build Flow TDD Discipline -- Distill superpowers:test-driven-development into Plan + Execute
-status: execute
+status: quality
 context_status: ready
 source: captain
 created: 2026-04-12T17:30:00+08:00
