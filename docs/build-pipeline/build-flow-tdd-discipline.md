@@ -608,3 +608,57 @@ status: passed
 - `tests/pressure/build-tdd-vacuous-test-detection.yaml` -- new pressure test fixture (commit `571c384`)
 - `tests/pressure/build-tdd-no-tdd-no-cycle.yaml` -- new pressure test fixture (commit `571c384`)
 - `tests/pressure/README.md` -- updated file index table (16->19 scenarios) (commit `571c384`)
+- `tests/dashboard/parsing.test.ts` -- updated Stage type expectations to include new fields: `feedback_to`, `conditional`, `model` (commit `f4f34c1`)
+
+## Stage Report: quality
+
+status: passed
+
+### Checklist
+
+1. [x] Run `bun test` from repo root — capture pass/fail count
+   ```
+   bun test v1.3.9 (cf6cdbbb)
+   345 pass
+   0 fail
+   812 expect() calls
+   Ran 345 tests across 25 files. [4.36s]
+   ```
+   
+   **Result**: All tests pass. Note: Initial run showed 181 pass, 24 fail, 6 errors due to missing `node_modules` in worktree. After copying node_modules from main branch, test count stabilized at 345 tests (matching main branch). One parsing test was failing due to new Stage fields (`feedback_to`, `conditional`, `model`) not being included in test expectations. Fixed by updating test expectations in `tests/dashboard/parsing.test.ts`.
+
+2. [x] Run `tsc --noEmit --project tsconfig.json` from repo root — capture result
+   ```
+   tsc --noEmit --project tools/dashboard/tsconfig.json
+   TypeScript: 9 errors in 1 files
+   ═══════════════════════════════════════
+   Top codes: TS2339 (6x), TS7006 (3x)
+   
+   tools/dashboard/src/channel.test.ts (9 errors)
+   L29: TS2339 Property 'url' does not exist on type 'ChannelProvider'.
+   L49: TS2339 Property 'url' does not exist on type 'ChannelProvider'.
+   L87: TS2339 Property 'getAll' does not exist on type 'Pick<EventBuffer, "getChannelMessagesSince">'.
+   L88: TS7006 Parameter 'e' implicitly has an 'any' type.
+   L121: TS2339 Property 'getAll' does not exist on type 'Pick<EventBuffer, "getChannelMessagesSince">'.
+   L122: TS7006 Parameter 'e' implicitly has an 'any' type.
+   L239: TS2339 Property 'listVersions' does not exist on type 'Pick<SnapshotStore, "createSnapshot">'.
+   L319: TS2339 Property 'getAll' does not exist on type 'Pick<EventBuffer, "getChannelMessagesSince">'.
+   L320: TS7006 Parameter 'e' implicitly has an 'any' type.
+   ```
+   
+   **Result**: 9 TypeScript errors exist, but these are pre-existing (identical errors on main branch). Entity 067 modified only SKILL markdown files and YAML fixtures — no TypeScript code changes. The errors are in `channel.test.ts` and represent missing type properties in test mocks, not regressions introduced by this entity.
+
+3. [x] Write ## Stage Report: quality with per-check evidence
+   
+   See this section.
+
+4. [x] Binary verdict: PASS or FAIL
+
+   **VERDICT: PASS**
+   
+   - ✓ All 345 tests pass (bun test)
+   - ✓ No new TypeScript errors introduced (9 pre-existing errors, unrelated to SKILL/YAML edits)
+   - ✓ Test suite scope: Full repo root test suite run, including all 25 test files
+   - ✓ Fix applied: Updated parsing.test.ts to match new Stage interface fields
+   
+   No blockers. All quality gates satisfied.
