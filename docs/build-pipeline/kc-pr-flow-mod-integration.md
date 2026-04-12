@@ -199,3 +199,510 @@ Suggested options: (a) Include fixture tests in entity 063 scope -- expands to ~
   auto_advance not set; captain must say "execute 063" to advance
 - [x] Clarify duration: 4 questions asked, session complete
   1 batch assumption confirmation + 1 option AskUserQuestion + 3 question AskUserQuestion (Q-2 rejected once, reframed)
+
+## Research Findings
+
+### Upstream Constraints
+
+- **Phase E spec SC#5** (line 968): "Both new mods exist and pass mod-hook fixture tests (distilled from tests/fixtures/merge-hook-pipeline)." Entity 063 must create `mods/pr-review-loop.md` and fixture tests. `mods/workflow-index-maintainer.md` already exists. (`docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md:968`)
+- **Phase E spec lines 517-535**: Defines the pr-review-loop mod with three hooks (merge, idle, startup). Merge hook drafts PR summary, asks captain approval, pushes + creates PR. Idle hook polls `gh pr view --json state,reviews,mergeable`. Startup hook mirrors idle (defense in depth). (`docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md:517-535`)
+- **Phase E spec line 450**: "Mod: `mods/pr-review-loop.md` (new, replaces `mods/pr-merge.md` behavior)" -- confirming the new mod is the canonical shipped-stage mod. (`docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md:450`)
+- **FO shared core step 4** (line 18): Currently scans only `{workflow_dir}/_mods/*.md`. Captain decision (Q-1) requires scanning both `mods/` (library) and `{workflow_dir}/_mods/` (workflow-specific). (`references/first-officer-shared-core.md:18`)
+- **FO shared core Mod Hook Convention** (line 334): "Mods live in `{workflow_dir}/_mods/` and use `## Hook: {point}` headings." -- must be updated to reflect layered architecture. (`references/first-officer-shared-core.md:334`)
+
+### Existing Patterns
+
+- **workflow-index-maintainer.md** (mods/): Uses YAML frontmatter (name, description, version), `## Hook: startup`, `## Hook: idle` sections with numbered instruction lists. Version 0.1.0. Error handling section with rate-limit / transient / parse error categories. Rules section with invariants. (`mods/workflow-index-maintainer.md:1-106`)
+- **pr-merge.md library copy** (mods/): Version 0.9.0. Three hooks (startup, idle, merge). Merge hook has PR APPROVAL GUARDRAIL pattern -- present summary, wait for explicit approval. Startup/idle hooks scan for non-empty `pr` field and check PR state via `gh pr view`. (`mods/pr-merge.md:1-47`)
+- **pr-merge.md workflow copy** (docs/build-pipeline/_mods/): Version 0.8.2. Identical structure to library copy but older version. This is the one activated for the build-pipeline workflow. Captain decision (Q-2): replace this with `_mods/pr-review-loop.md`. (`docs/build-pipeline/_mods/pr-merge.md:1-47`)
+- **Merge-hook test fixture** (tests/fixtures/merge-hook-pipeline/): Minimal pipeline with README.md (3-stage: backlog/work/done), `_mods/test-hook.md` (single merge hook that appends slug to `_merge-hook-fired.txt`), entity file, and status script. This is the pattern to distill from. (`tests/fixtures/merge-hook-pipeline/`)
+
+### Library/API Surface
+
+- **kc-pr-create skill**: Full PR lifecycle skill at `~/.claude/plugins/local/kc-pr-flow/skills/kc-pr-create/SKILL.md`. 14-step process: Analyze, E2E suggestion, Title (conventional commit), Body (template-aware), Confirm, Create (--draft), Annotate, Confirm comments, Post comments, Linear comment, Self-review loop, Mark ready, CI+AI gate, Announce. Supports `--draft-only` and `--max-rounds N` flags. Creates draft PR by default in ship mode. (`kc-pr-create/SKILL.md:1-452`)
+- **kc-pr-review-resolve skill**: PR review comment triage skill at `~/.claude/plugins/local/kc-pr-flow/skills/kc-pr-review-resolve/SKILL.md`. 9-step process: Detect PR, Fetch feedback (inline threads + PR-level reviews + reviewer metadata), Validate threads (dispatch review agents), Triage & report, Fix valid issues, Push & reply, Request re-review, AI response monitoring, Learning. Has user confirmation gate at Step 4. (`kc-pr-review-resolve/SKILL.md:1-360`)
+- Both skills are invoked via `Skill("kc-pr-flow:kc-pr-create")` and `Skill("kc-pr-flow:kc-pr-review-resolve")` -- standard Skill tool invocation pattern.
+
+### Known Gotchas
+
+- **Dual mod scan paths**: FO shared core currently hardcodes `{workflow_dir}/_mods/*.md` only. Adding `mods/` scan requires careful ordering -- library mods run first (alphabetical within `mods/`), then workflow-specific mods (alphabetical within `_mods/`). If both directories have a mod with the same `name:` frontmatter field, the workflow-specific version overrides.
+- **Captain approval guardrail timing**: The mod's merge hook must preserve the captain approval gate from pr-merge.md. The kc-pr-create skill has its own Step 4 "Confirm" gate. The mod should delegate approval to the skill rather than implementing its own pre-skill gate, avoiding double-confirmation. However, the FO merge hook contract (FO shared core lines 317-319) expects the mod to handle merge, so the mod must at minimum present context to the skill.
+- **Entity `pr` field lifecycle**: When merge hook sets `pr: #N`, FO shared core step 318-319 says "If a merge hook created or set a `pr` field, report the PR-pending state and do not local-merge." Idle/startup hooks must check this field to detect PR state changes. Field must be cleared on MERGED (along with archival) or on CLOSED (with captain direction).
+- **Skill availability**: kc-pr-flow is an external plugin. Mod must handle the case where the skill is not available (plugin not installed). Graceful fallback: warn captain and suggest manual PR creation or installing the plugin.
+
+### Reference Examples
+
+- **workflow-index-maintainer.md**: Primary structural reference for mod format, hook organization, error handling, and rules sections. (`mods/workflow-index-maintainer.md:1-106`)
+- **pr-merge.md**: Primary behavioral reference for PR lifecycle hooks -- startup/idle scanning, merge guardrail, entity `pr` field management. New mod inherits this behavior and extends it with skill delegation and review closed-loop. (`mods/pr-merge.md:1-47`)
+- **test fixture pattern**: `tests/fixtures/merge-hook-pipeline/` -- README.md with `commissioned-by: spacedock@test`, `_mods/` directory, entity file, status script. (`tests/fixtures/merge-hook-pipeline/`)
+
+## PLAN
+
+### Goal
+
+Create `mods/pr-review-loop.md` with skill-delegating design, update FO shared core for layered mod scanning, swap `docs/build-pipeline/_mods/pr-merge.md` for `_mods/pr-review-loop.md`, and write mod-hook fixture tests satisfying Phase E SC#5.
+
+<task id="task-0" model="sonnet" wave="0">
+  <read_first>
+    - mods/pr-merge.md
+    - mods/workflow-index-maintainer.md
+    - docs/build-pipeline/_mods/pr-merge.md
+    - references/first-officer-shared-core.md
+    - tests/fixtures/merge-hook-pipeline/README.md
+    - tests/fixtures/merge-hook-pipeline/_mods/test-hook.md
+  </read_first>
+
+  <action>
+  Environment verification. Confirm all preconditions hold:
+  1. `mods/pr-merge.md` exists (library mod, v0.9.0) -- will NOT be deprecated per Q-2
+  2. `mods/workflow-index-maintainer.md` exists (v0.1.0) -- peer mod for structural reference
+  3. `docs/build-pipeline/_mods/pr-merge.md` exists (v0.8.2) -- will be replaced by pr-review-loop.md
+  4. `references/first-officer-shared-core.md` line 18 scans only `{workflow_dir}/_mods/*.md`
+  5. `references/first-officer-shared-core.md` line 334 says "Mods live in `{workflow_dir}/_mods/`"
+  6. `tests/fixtures/merge-hook-pipeline/` exists with README.md, _mods/test-hook.md, entity, status
+  7. No file named `mods/pr-review-loop.md` exists yet
+  8. No file named `docs/build-pipeline/_mods/pr-review-loop.md` exists yet
+
+  Run:
+  ```bash
+  test -f mods/pr-merge.md && echo "OK: mods/pr-merge.md" || echo "FAIL: mods/pr-merge.md missing"
+  test -f mods/workflow-index-maintainer.md && echo "OK: mods/workflow-index-maintainer.md" || echo "FAIL"
+  test -f docs/build-pipeline/_mods/pr-merge.md && echo "OK: _mods/pr-merge.md" || echo "FAIL"
+  test -f references/first-officer-shared-core.md && echo "OK: FO shared core" || echo "FAIL"
+  grep -n '_mods/\*\.md' references/first-officer-shared-core.md
+  test -d tests/fixtures/merge-hook-pipeline && echo "OK: fixture dir" || echo "FAIL"
+  test ! -f mods/pr-review-loop.md && echo "OK: pr-review-loop.md does not exist yet" || echo "FAIL: already exists"
+  test ! -f docs/build-pipeline/_mods/pr-review-loop.md && echo "OK: _mods/pr-review-loop.md does not exist yet" || echo "FAIL: already exists"
+  ```
+
+  If any check fails, STOP and report before proceeding.
+  </action>
+
+  <acceptance_criteria>
+    - All 8 checks print "OK"
+    - `grep` output shows line 18 with `{workflow_dir}/_mods/*.md`
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1">
+  <read_first>
+    - mods/pr-merge.md
+    - mods/workflow-index-maintainer.md
+    - docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md (lines 517-535)
+  </read_first>
+
+  <action>
+  Create `mods/pr-review-loop.md` -- the library mod with three hooks (startup, idle, merge) that delegates PR creation to `kc-pr-flow:kc-pr-create` and review triage to `kc-pr-flow:kc-pr-review-resolve`.
+
+  **Frontmatter** (matching workflow-index-maintainer.md pattern):
+  ```yaml
+  ---
+  name: pr-review-loop
+  description: Skill-delegating PR lifecycle mod with review closed-loop. Creates PRs via kc-pr-create, triages review feedback via kc-pr-review-resolve, and polls PR state for merge/archive advancement.
+  version: 0.1.0
+  ---
+  ```
+
+  **Intro paragraph**: Explain the mod replaces the hardcoded PR logic in pr-merge.md with a thin-wrapper skill-delegating design following the entity 062 lesson (mods should be skill callers, not skill re-implementations).
+
+  **## Hook: startup**
+  Instructions for FO:
+  1. Scan entity files in `{workflow_dir}/` (not `_archive/`) for entities with non-empty `pr` field and non-terminal status.
+  2. For each, extract PR number and check: `gh pr view {number} --json state,reviewDecision --jq '.state + "|" + .reviewDecision'`
+  3. If `MERGED` -- advance entity to terminal stage (set status, completed, verdict: PASSED, clear worktree, archive, cleanup). Report to captain.
+  4. If `CLOSED` (without merge) -- report to captain with options: reopen, new PR, or clear `pr` and fall back to local merge. Wait for direction.
+  5. If state is `OPEN` and `reviewDecision` is `CHANGES_REQUESTED` -- invoke `Skill("kc-pr-flow:kc-pr-review-resolve")` to triage and address review comments. If skill unavailable, warn captain: "kc-pr-flow plugin not installed. Review comments need manual triage."
+  6. If `OPEN` with no action needed -- no action.
+  7. If `gh` is not available -- warn captain, skip PR checks.
+
+  **## Hook: idle**
+  Instructions for FO:
+  Same PR-state scanning logic as startup hook (defense in depth). Additionally:
+  1. Scan entities with non-empty `pr` and non-terminal status.
+  2. Run `gh pr view {number} --json state,reviewDecision,mergeable`
+  3. MERGED -- advance and archive (same as startup).
+  4. CLOSED -- report to captain (same as startup).
+  5. `CHANGES_REQUESTED` -- invoke `Skill("kc-pr-flow:kc-pr-review-resolve")` for automated triage. The skill handles: fetch unresolved threads, validate each thread, classify, present triage report, fix valid issues, push, reply to threads, request re-review.
+  6. APPROVED + mergeable -- merge and archive.
+  7. OPEN + pending -- no action.
+
+  **## Hook: merge**
+  Instructions for FO:
+  1. Gather entity context for PR creation:
+     - Entity title, slug, ID
+     - Branch name from worktree
+     - Stage Reports summary (key outcomes from each completed stage)
+     - Files changed (from most recent `## Files Modified` section)
+  2. Invoke `Skill("kc-pr-flow:kc-pr-create", args="--draft-only")` to create the PR. The skill handles: branch push, conventional commit title, PR body generation, captain confirmation gate (Step 4 of the skill), draft PR creation, self-review annotations, and Linear comment.
+     - Pass entity context to the skill invocation so it can build an informed PR body.
+     - The skill's own Step 4 confirmation gate serves as the captain approval guardrail -- the mod does NOT add a separate pre-skill approval gate (avoids double-confirmation).
+  3. If kc-pr-flow plugin is not available: fall back to the pr-merge.md manual flow -- present PR summary to captain, wait for explicit approval, `git push origin {branch}`, `gh pr create --base main --head {branch}`. This preserves the captain approval guardrail even without the skill.
+  4. After PR creation (by skill or fallback): set entity `pr` field to the PR number (e.g., `#57`). Report to captain.
+  5. Do NOT archive yet. Entity stays at current stage with `pr` set until PR is merged (detected by startup or idle hook).
+
+  **## Error Handling** (matching workflow-index-maintainer.md pattern):
+  - Rate limit (429): stop hook execution, log to captain, continue FO flow. Next idle tick retries.
+  - Skill unavailable: warn captain, fall back to manual flow (merge hook) or skip (startup/idle hooks).
+  - `gh` CLI unavailable: warn captain, skip PR operations.
+  - Parse errors on entity frontmatter: log entity slug, skip, continue.
+  - Eventually-consistent -- mod errors must not block FO startup or entity dispatch.
+
+  **## Rules**:
+  - Thin wrapper principle: mod describes when to call skills and what context to pass. Never re-implements skill logic.
+  - Captain approval preserved: either via kc-pr-create's built-in Step 4 gate, or via manual fallback's explicit approval prompt.
+  - Never modify entity frontmatter except `pr` field at merge time. All other frontmatter changes are FO's responsibility.
+  - Separate concerns: PR creation (merge hook) and PR monitoring (startup + idle hooks) are independent. A startup hook failure does not affect merge hook operation.
+  </action>
+
+  <acceptance_criteria>
+    - `test -f mods/pr-review-loop.md` succeeds
+    - `grep -c '## Hook:' mods/pr-review-loop.md` returns 3 (startup, idle, merge)
+    - `grep 'kc-pr-flow:kc-pr-create' mods/pr-review-loop.md` finds the skill invocation in merge hook
+    - `grep 'kc-pr-flow:kc-pr-review-resolve' mods/pr-review-loop.md` finds the skill invocation in idle hook
+    - `grep 'kc-pr-flow:kc-pr-review-resolve' mods/pr-review-loop.md` finds the skill invocation in startup hook
+    - `grep -c 'gh pr create' mods/pr-review-loop.md` returns at most 1 (only in fallback section, never as primary flow)
+    - `grep 'version: 0.1.0' mods/pr-review-loop.md` matches frontmatter
+  </acceptance_criteria>
+
+  <files_modified>
+    - mods/pr-review-loop.md
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="1">
+  <read_first>
+    - references/first-officer-shared-core.md
+    - mods/workflow-index-maintainer.md
+  </read_first>
+
+  <action>
+  Update `references/first-officer-shared-core.md` for layered mod architecture (Q-1 answer + AC5).
+
+  **Change 1 -- Startup step 4** (line 18):
+  Replace:
+  ```
+  4. Discover mod hooks by scanning `{workflow_dir}/_mods/*.md` for `## Hook:` sections. Register `startup`, `idle`, and `merge` hooks in alphabetical order by mod filename.
+  ```
+  With:
+  ```
+  4. Discover mod hooks by scanning two directories for `## Hook:` sections:
+     a. **Library mods**: `mods/*.md` (repo root) -- shared across all workflows in this project.
+     b. **Workflow mods**: `{workflow_dir}/_mods/*.md` -- workflow-specific activation and overrides.
+     Register `startup`, `idle`, and `merge` hooks. Within each directory, process files in alphabetical order. Library mods run before workflow mods. If a library mod and a workflow mod share the same `name:` frontmatter field, the workflow mod overrides (the library mod is skipped for that name).
+  ```
+
+  **Change 2 -- Mod Hook Convention section** (line 334):
+  Replace:
+  ```
+  ## Mod Hook Convention
+
+  Mods live in `{workflow_dir}/_mods/` and use `## Hook: {point}` headings.
+  ```
+  With:
+  ```
+  ## Mod Hook Convention
+
+  Mods use a layered architecture with two directories:
+
+  - **Library** (`mods/` at repo root): Shared mod definitions available to all workflows. Contains canonical implementations (e.g., `pr-review-loop.md`, `workflow-index-maintainer.md`, `pr-merge.md`).
+  - **Workflow-specific** (`{workflow_dir}/_mods/`): Per-workflow mod activation. A workflow activates a library mod by placing a copy or override in `_mods/`. Workflow mods with the same `name:` frontmatter as a library mod override the library version.
+
+  Both directories use `## Hook: {point}` headings.
+  ```
+
+  **Change 3 -- Merge and Cleanup section** (around line 317):
+  After the line "1. Run registered merge hooks before any local merge, archival, or status advancement." add a note:
+  ```
+  The `pr-review-loop` mod (library: `mods/pr-review-loop.md`) is the canonical merge hook for PR-based workflows. It delegates PR creation to `kc-pr-flow:kc-pr-create` and review triage to `kc-pr-flow:kc-pr-review-resolve`. When this mod is active, its merge hook handles branch push and PR creation -- FO skips the default local merge per step 2.
+  ```
+  </action>
+
+  <acceptance_criteria>
+    - `grep 'mods/\*\.md' references/first-officer-shared-core.md` finds the library scan path
+    - `grep '_mods/\*\.md' references/first-officer-shared-core.md` finds the workflow scan path
+    - `grep 'pr-review-loop' references/first-officer-shared-core.md` finds the Merge and Cleanup reference
+    - `grep 'layered' references/first-officer-shared-core.md` finds the layered architecture description
+    - `grep 'Library mods' references/first-officer-shared-core.md` finds the library-before-workflow ordering
+  </acceptance_criteria>
+
+  <files_modified>
+    - references/first-officer-shared-core.md
+  </files_modified>
+</task>
+
+<task id="task-3" model="haiku" wave="2">
+  <read_first>
+    - docs/build-pipeline/_mods/pr-merge.md
+    - mods/pr-review-loop.md
+  </read_first>
+
+  <action>
+  Replace `docs/build-pipeline/_mods/pr-merge.md` with `docs/build-pipeline/_mods/pr-review-loop.md` (Q-2 answer: activation swap, not deprecation).
+
+  1. Delete `docs/build-pipeline/_mods/pr-merge.md`.
+  2. Create `docs/build-pipeline/_mods/pr-review-loop.md` as a full copy of the library mod `mods/pr-review-loop.md` (created by task-1). Add a note at the top of the body text: "This is the build-pipeline activation of `mods/pr-review-loop.md`. Keep in sync with the library version."
+
+  Rationale for full copy: The FO layered scan (task-2) specifies that when a library mod and workflow mod share the same `name:` frontmatter, the workflow mod overrides the library mod entirely. A workflow mod with no `## Hook:` sections would override the library mod and result in no hooks executing. Therefore, the workflow `_mods/` file must include all three hook definitions. This mirrors the existing pattern where `_mods/pr-merge.md` (v0.8.2) was a copy of `mods/pr-merge.md` (v0.9.0).
+  </action>
+
+  <acceptance_criteria>
+    - `test ! -f docs/build-pipeline/_mods/pr-merge.md` succeeds (old file deleted)
+    - `test -f docs/build-pipeline/_mods/pr-review-loop.md` succeeds (new file created)
+    - `grep -c '## Hook:' docs/build-pipeline/_mods/pr-review-loop.md` returns 3
+    - `grep 'name: pr-review-loop' docs/build-pipeline/_mods/pr-review-loop.md` matches
+    - `grep 'kc-pr-flow:kc-pr-create' docs/build-pipeline/_mods/pr-review-loop.md` finds skill invocation
+  </acceptance_criteria>
+
+  <files_modified>
+    - docs/build-pipeline/_mods/pr-merge.md
+    - docs/build-pipeline/_mods/pr-review-loop.md
+  </files_modified>
+</task>
+
+<task id="task-4" model="sonnet" wave="2">
+  <read_first>
+    - tests/fixtures/merge-hook-pipeline/README.md
+    - tests/fixtures/merge-hook-pipeline/_mods/test-hook.md
+    - tests/fixtures/merge-hook-pipeline/merge-hook-entity.md
+    - tests/fixtures/merge-hook-pipeline/status
+    - mods/pr-review-loop.md
+  </read_first>
+
+  <action>
+  Create mod-hook fixture tests for pr-review-loop, distilled from `tests/fixtures/merge-hook-pipeline/`. This satisfies Phase E SC#5's "pass mod-hook fixture tests" requirement.
+
+  Create directory `tests/fixtures/pr-review-loop-pipeline/` with these files:
+
+  **1. `tests/fixtures/pr-review-loop-pipeline/README.md`**
+  Minimal workflow definition for testing pr-review-loop hooks:
+  ```yaml
+  ---
+  mission: PR review loop mod hook test
+  entity-label: task
+  entity-label-plural: tasks
+  id-style: sequential
+  commissioned-by: spacedock@test
+  stages:
+    defaults:
+      worktree: false
+      fresh: false
+      gate: false
+      concurrency: 2
+    states:
+      - name: execute
+        initial: true
+      - name: shipped
+        terminal: true
+  ---
+  ```
+  Body: brief description of the fixture -- "A minimal 2-stage workflow for testing that pr-review-loop mod hooks fire correctly at merge (shipped) stage, idle, and startup."
+
+  Stages section documenting execute and shipped stages. Commit discipline section.
+
+  **2. `tests/fixtures/pr-review-loop-pipeline/_mods/pr-review-loop.md`**
+  A test-instrumented version of the mod. Same `name: pr-review-loop` frontmatter. Three hooks:
+
+  - `## Hook: startup`: Write `startup:{slug}` to `{workflow_dir}/_hook-log.txt`. Then check if entity has `pr: #test-123` -- if so, write `startup:pr-check:{slug}` to the log.
+  - `## Hook: idle`: Write `idle:{slug}` to `{workflow_dir}/_hook-log.txt`. Then check if entity has `pr: #test-123` -- if so, write `idle:pr-check:{slug}` to the log.
+  - `## Hook: merge`: Write `merge:{slug}` to `{workflow_dir}/_hook-log.txt`. Then write `merge:skill-delegate:{slug}` to the log (simulating skill delegation -- actual kc-pr-flow is not available in test context). Set entity `pr: #test-456`.
+
+  This test mod verifies:
+  - All 3 hooks fire at the correct lifecycle points
+  - Startup and idle hooks detect entities with `pr` field
+  - Merge hook sets the `pr` field (simulating kc-pr-create output)
+
+  **3. `tests/fixtures/pr-review-loop-pipeline/pr-review-loop-entity.md`**
+  Test entity:
+  ```yaml
+  ---
+  id: "001"
+  title: PR review loop test entity
+  status: execute
+  score: 0.90
+  source: test
+  started:
+  completed:
+  verdict:
+  worktree:
+  pr:
+  ---
+  ```
+  Body: "Test entity for pr-review-loop mod hook verification."
+
+  **4. `tests/fixtures/pr-review-loop-pipeline/pr-review-loop-entity-with-pr.md`**
+  Test entity with existing PR (for startup/idle hook testing):
+  ```yaml
+  ---
+  id: "002"
+  title: PR review loop entity with existing PR
+  status: shipped
+  score: 0.90
+  source: test
+  started: 2026-04-12T00:00:00Z
+  completed:
+  verdict:
+  worktree:
+  pr: "#test-123"
+  ---
+  ```
+  Body: "Test entity with pre-existing PR for startup/idle hook detection testing."
+
+  **5. `tests/fixtures/pr-review-loop-pipeline/status`**
+  Bash status script following the merge-hook-pipeline pattern. 2-stage pipeline (execute, shipped). Supports `--next` for dispatch detection. Same structure as `tests/fixtures/merge-hook-pipeline/status` but with the 2-stage array.
+  Make executable: `chmod +x tests/fixtures/pr-review-loop-pipeline/status`
+  </action>
+
+  <acceptance_criteria>
+    - `test -d tests/fixtures/pr-review-loop-pipeline` succeeds
+    - `test -f tests/fixtures/pr-review-loop-pipeline/README.md` succeeds
+    - `grep 'commissioned-by: spacedock@test' tests/fixtures/pr-review-loop-pipeline/README.md` matches
+    - `test -f tests/fixtures/pr-review-loop-pipeline/_mods/pr-review-loop.md` succeeds
+    - `grep -c '## Hook:' tests/fixtures/pr-review-loop-pipeline/_mods/pr-review-loop.md` returns 3
+    - `test -f tests/fixtures/pr-review-loop-pipeline/pr-review-loop-entity.md` succeeds
+    - `test -f tests/fixtures/pr-review-loop-pipeline/pr-review-loop-entity-with-pr.md` succeeds
+    - `grep 'pr: "#test-123"' tests/fixtures/pr-review-loop-pipeline/pr-review-loop-entity-with-pr.md` matches
+    - `test -x tests/fixtures/pr-review-loop-pipeline/status` succeeds (executable)
+    - `bash tests/fixtures/pr-review-loop-pipeline/status` runs without error
+    - `bash tests/fixtures/pr-review-loop-pipeline/status --next` outputs the execute-stage entity as dispatchable
+  </acceptance_criteria>
+
+  <files_modified>
+    - tests/fixtures/pr-review-loop-pipeline/README.md
+    - tests/fixtures/pr-review-loop-pipeline/_mods/pr-review-loop.md
+    - tests/fixtures/pr-review-loop-pipeline/pr-review-loop-entity.md
+    - tests/fixtures/pr-review-loop-pipeline/pr-review-loop-entity-with-pr.md
+    - tests/fixtures/pr-review-loop-pipeline/status
+  </files_modified>
+</task>
+
+<task id="task-5" model="haiku" wave="3">
+  <read_first>
+    - mods/pr-review-loop.md
+    - docs/build-pipeline/_mods/pr-review-loop.md
+    - references/first-officer-shared-core.md
+    - tests/fixtures/pr-review-loop-pipeline/README.md
+    - tests/fixtures/pr-review-loop-pipeline/_mods/pr-review-loop.md
+  </read_first>
+
+  <action>
+  Final cross-file consistency verification. Check that all artifacts are consistent:
+
+  1. Verify mod name consistency:
+     ```bash
+     grep 'name: pr-review-loop' mods/pr-review-loop.md
+     grep 'name: pr-review-loop' docs/build-pipeline/_mods/pr-review-loop.md
+     grep 'name: pr-review-loop' tests/fixtures/pr-review-loop-pipeline/_mods/pr-review-loop.md
+     ```
+     All three must return exactly `name: pr-review-loop`.
+
+  2. Verify hook count consistency:
+     ```bash
+     grep -c '## Hook:' mods/pr-review-loop.md
+     grep -c '## Hook:' docs/build-pipeline/_mods/pr-review-loop.md
+     grep -c '## Hook:' tests/fixtures/pr-review-loop-pipeline/_mods/pr-review-loop.md
+     ```
+     Library and workflow mods must return 3. Test mod must return 3.
+
+  3. Verify FO shared core references both scan paths:
+     ```bash
+     grep 'mods/\*\.md' references/first-officer-shared-core.md
+     grep '_mods/\*\.md' references/first-officer-shared-core.md
+     ```
+
+  4. Verify FO shared core references pr-review-loop in Merge and Cleanup:
+     ```bash
+     grep 'pr-review-loop' references/first-officer-shared-core.md
+     ```
+
+  5. Verify old _mods/pr-merge.md is deleted:
+     ```bash
+     test ! -f docs/build-pipeline/_mods/pr-merge.md && echo "OK: pr-merge.md deleted" || echo "FAIL"
+     ```
+
+  6. Verify library pr-merge.md is untouched (not deprecated per Q-2):
+     ```bash
+     grep 'version: 0.9.0' mods/pr-merge.md && echo "OK: library pr-merge.md unchanged"
+     ```
+
+  7. Verify fixture test infrastructure:
+     ```bash
+     bash tests/fixtures/pr-review-loop-pipeline/status --next
+     ```
+
+  If any check fails, report the specific failure for correction.
+  </action>
+
+  <acceptance_criteria>
+    - All 7 verification groups pass
+    - `grep` commands return expected matches
+    - `test` commands return expected results
+    - Status script runs and shows dispatchable entity
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+
+None
+
+### CLI
+
+- [ ] `test -f mods/pr-review-loop.md` -- library mod exists
+- [ ] `grep -c '## Hook:' mods/pr-review-loop.md` returns 3 -- all three hooks present
+- [ ] `grep 'kc-pr-flow:kc-pr-create' mods/pr-review-loop.md` -- merge hook delegates to skill
+- [ ] `grep 'kc-pr-flow:kc-pr-review-resolve' mods/pr-review-loop.md` -- idle/startup hooks delegate to skill
+- [ ] `grep -c 'gh pr create' mods/pr-review-loop.md` returns at most 1 -- only in fallback path
+- [ ] `test -f docs/build-pipeline/_mods/pr-review-loop.md` -- workflow activation exists
+- [ ] `test ! -f docs/build-pipeline/_mods/pr-merge.md` -- old activation removed
+- [ ] `grep 'pr-review-loop' references/first-officer-shared-core.md` -- FO shared core updated
+- [ ] `grep 'mods/\*\.md' references/first-officer-shared-core.md` -- library scan path in FO
+- [ ] `bash tests/fixtures/pr-review-loop-pipeline/status` -- fixture status script runs
+- [ ] `bash tests/fixtures/pr-review-loop-pipeline/status --next` -- shows dispatchable entity
+- [ ] `grep -c '## Hook:' tests/fixtures/pr-review-loop-pipeline/_mods/pr-review-loop.md` returns 3
+
+### API
+
+None
+
+### Interactive
+
+- [ ] Captain verifies pr-review-loop.md merge hook describes the captain approval guardrail (either via kc-pr-create Step 4 or via manual fallback prompt)
+- [ ] Captain verifies FO shared core layered mod scan semantics are correct (library before workflow, name-based override)
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC1: mods/pr-review-loop.md exists with startup, idle, merge hooks | task-1 | `test -f mods/pr-review-loop.md && grep -c '## Hook:' mods/pr-review-loop.md` | pending | -- |
+| AC2: merge hook invokes kc-pr-create via Skill tool | task-1 | `grep 'kc-pr-flow:kc-pr-create' mods/pr-review-loop.md` | pending | -- |
+| AC3: idle hook detects changes_requested and routes to kc-pr-review-resolve | task-1 | `grep 'changes_requested' mods/pr-review-loop.md && grep 'kc-pr-flow:kc-pr-review-resolve' mods/pr-review-loop.md` | pending | -- |
+| AC4: _mods/pr-merge.md replaced with _mods/pr-review-loop.md | task-3 | `test ! -f docs/build-pipeline/_mods/pr-merge.md && test -f docs/build-pipeline/_mods/pr-review-loop.md` | pending | -- |
+| AC5: FO shared core references pr-review-loop + layered mod scan | task-2 | `grep 'pr-review-loop' references/first-officer-shared-core.md && grep 'mods/\*\.md' references/first-officer-shared-core.md` | pending | -- |
+| SC#5: fixture tests exist (distilled from merge-hook-pipeline) | task-4 | `test -d tests/fixtures/pr-review-loop-pipeline && bash tests/fixtures/pr-review-loop-pipeline/status --next` | pending | -- |
+| Cross-file consistency | task-5 | All 7 verification groups pass | pending | -- |
+
+## Stage Report: plan
+
+- [x] Research: identify and investigate topics needing research before planning
+  5 research domains covered inline (Upstream Constraints, Existing Patterns, Library/API Surface, Known Gotchas, Reference Examples) with file:line citations
+- [x] Write PLAN with task breakdown (wave-parallel where possible)
+  6 tasks across 4 waves: wave 0 (env verification), wave 1 (mod creation + FO update in parallel), wave 2 (activation swap + fixture tests in parallel), wave 3 (cross-file consistency)
+- [x] Write UAT Spec with test items covering all 5 ACs + fixture tests
+  12 CLI items, 2 interactive items, covering AC1-AC5 + SC#5
+- [x] Write Validation Map linking plan tasks to ACs
+  7 rows mapping all ACs + SC#5 + cross-file consistency to tasks and commands
+- [x] Self-review the plan for completeness
+  Inline 7-dimension plan-checker pass: 0 blockers, 0 warnings. Task-3 action cleaned up (removed deliberation text). All ACs covered, wave dependencies correct, no placeholders.
+- [x] Call workflow-index append for CONTRACTS.md tracking
+  9 append entries covering all files_modified across 4 tasks (task-1: 1 file, task-2: 1 file, task-3: 2 files, task-4: 5 files). Commit: 5fa33bd
+
+### Summary
+
+Plan produces 6 tasks in 4 waves for implementing the pr-review-loop mod with layered mod architecture. Wave 1 creates the library mod and updates FO shared core in parallel. Wave 2 swaps the workflow activation and creates fixture tests in parallel. Wave 3 runs cross-file consistency verification. Knowledge capture skipped -- no findings met D1/D2 threshold (layered mod architecture is new, needs execution validation before capture). Plan-checker verdict: PASS after 1 iteration (inline evaluation, no blockers).
