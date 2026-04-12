@@ -1,14 +1,14 @@
 ---
 id: 051
 title: "Unix socket IPC + ChannelProvider client/server"
-status: clarify
+status: plan
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
-started:
+started: 2026-04-12T16:25:00Z
 completed:
 verdict:
 score: 0.0
-worktree:
+worktree: .worktrees/spacedock-ensign-spacebridge-unix-socket-ipc-channel-provider
 issue:
 pr:
 intent: feature
