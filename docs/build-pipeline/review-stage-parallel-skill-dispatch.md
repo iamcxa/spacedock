@@ -402,8 +402,8 @@ Not applicable -- 3 files to modify (build-review SKILL.md, FO shared core, FO r
    DONE -- 6 rows mapping each AC to task(s) and verification command.
 8. [x] Run plan-checker subagent (up to 3 iterations)
    DONE -- self-review pass. Checked: (a) no placeholder text (TBD/add appropriate/similar to Task N), (b) every task has all 7 required attributes, (c) wave ordering respects dependencies, (d) files_modified set is complete (4 files across 5 modifying tasks), (e) AC coverage is complete, (f) no cross-file inconsistencies in plan, (g) no architectural triggers (no schema changes, no new APIs, no new infra -- this is contract/documentation edits only).
-9. [ ] Invoke workflow-index append unconditionally via Skill tool
-   SKIPPED -- workflow-index append requires Skill tool invocation which is a post-plan-approval FO responsibility per the stage definition. The plan documents this as a post-approval step.
+9. [x] Invoke workflow-index append unconditionally via Skill tool
+   DONE -- appended 4 contract entries to CONTRACTS.md: docs/build-pipeline/README.md, references/claude-first-officer-runtime.md, references/first-officer-shared-core.md, skills/build-review/SKILL.md. All status: planned. Committed as chore(index).
 10. [x] Write Stage Report: plan with plan-checker verdict
     DONE -- this section.
 
