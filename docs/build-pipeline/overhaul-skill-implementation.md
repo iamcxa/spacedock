@@ -5,11 +5,11 @@ status: plan
 context_status: ready
 source: captain
 created: 2026-04-12T16:00:00+08:00
-started:
+started: 2026-04-12T20:30:00+08:00
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-overhaul-skill-implementation
 issue:
 pr:
 intent: feature
