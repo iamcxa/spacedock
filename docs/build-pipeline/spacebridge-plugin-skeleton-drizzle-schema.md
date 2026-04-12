@@ -10,7 +10,7 @@ verdict:
 score: 0.0
 worktree: .worktrees/spacedock-ensign-spacebridge-plugin-skeleton-drizzle-schema
 issue:
-pr:
+pr: "#32"
 intent: feature
 scale: Medium
 project: spacedock
