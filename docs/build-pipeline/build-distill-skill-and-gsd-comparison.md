@@ -11,7 +11,7 @@ verdict:
 score: 0.70
 worktree: .worktrees/spacedock-ensign-build-distill-skill-and-gsd-comparison
 issue:
-pr:
+pr: "#31"
 intent: feature
 scale: Medium
 project: spacedock
