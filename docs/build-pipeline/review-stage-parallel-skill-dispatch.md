@@ -772,3 +772,52 @@ No CRITICAL or HIGH CODE findings. Two documentation findings (LOW + NIT) do not
 - The NIT finding (Phase 2 label asymmetry) does not affect FO or ensign execution.
 
 All 345 tests pass. CLAUDE.md compliance confirmed. Cross-file consistency confirmed for themed reviewer definitions. Plan consistency confirmed (no scope creep).
+
+## UAT Results
+
+| ID | Item | Type | Status | Evidence |
+|----|------|------|--------|----------|
+| C-1 | Review stage has dispatch: debate-driven in YAML | cli | PASS | `dispatch: debate-driven` found at line 109 of README.md, under `name: review` (line 105). Note: original command used `-A3` which is too short (dispatch is 4 lines after name); verified with `-A5` and direct `grep -n "dispatch:"` showing only review stage has the property. |
+| C-2 | Single-entity mode shows -p conditional | cli | PASS | `references/claude-first-officer-runtime.md:25` documents `-p pipe mode` skips team creation; line 27 documents `interactive single-entity mode` creates teams normally. The two conditionals are clearly separated. |
+| C-3 | FO Guidance section exists in SKILL.md | cli | PASS | `grep "## FO Guidance" skills/build-review/SKILL.md` → `## FO Guidance: Phase 1 -- Reviewer Dispatch` at line 57. |
+| C-4 | 3 themed reviewers defined | cli | PASS | `grep -c "security-reviewer\|correctness-reviewer\|style-reviewer" skills/build-review/SKILL.md` → 7 matches (3 definition rows at lines 81-83, 3 recap lines at 175-177, 1 additional context mention). Meets `>= 3` threshold. |
+| C-5 | Bare-mode fallback documented | cli | PASS | `grep -c "bare.*mode\|bare-mode" skills/build-review/SKILL.md` → 1 match at line 122: `bare-mode review catches mechanical issues...`. Meets `>= 1` threshold. |
+| C-6 | No dispatch: on other stages | cli | PASS | `grep -B1 "dispatch:" docs/build-pipeline/README.md` shows `dispatch:` as a YAML property only under `skill: spacedock:build-review` (review stage). Other two matches are prose uses (`Per-task model dispatch:`, `dispatch: debate-driven` in description paragraph), not stage YAML properties. Only review stage has `dispatch:` as a structured field. |
+| C-7 | Codex runtime not modified | cli | PASS | `git diff HEAD -- references/codex-first-officer-runtime.md` → empty output. File has no uncommitted or staged changes. |
+| I-1 | SKILL.md FO Guidance is actionable | interactive | PENDING | Captain must read the FO Guidance section (skills/build-review/SKILL.md:57-130) and confirm it contains enough detail for FO to execute the debate-driven dispatch protocol without ambiguity. |
+| I-2 | Themed reviewer skill assignments are correct | interactive | PENDING | Captain must verify: security-reviewer gets `differential-review:diff-review`, `sharp-edges:sharp-edges`, `variant-analysis:variant-analysis`, `insecure-defaults:insecure-defaults`; correctness-reviewer gets `pr-review-toolkit:code-reviewer`, `pr-review-toolkit:silent-failure-hunter`; style-reviewer gets `pr-review-toolkit:comment-analyzer`, `pr-review-toolkit:type-design-analyzer`, `pr-review-toolkit:code-simplifier`, `pr-review-toolkit:pr-test-analyzer`. |
+| I-3 | Single-entity mode change makes semantic sense | interactive | PENDING | Captain must confirm the -p conditional logic at references/claude-first-officer-runtime.md:25-27: pipe mode = no teams (premature exit prevention), interactive = teams allowed. |
+
+## Stage Report: uat
+
+**Verdict**: PARTIAL — all CLI items PASS, interactive items pending captain sign-off
+**Ran at**: 2026-04-13T00:00:00Z
+
+### Checklist
+
+1. [x] Execute CLI items C-1 through C-7, capture evidence
+   DONE — all 7 CLI items executed from worktree root. All 7 PASS.
+   - C-1: PASS (dispatch: debate-driven confirmed at README.md:109, review stage only; original -A3 flag is too short, -A5 required)
+   - C-2: PASS (-p pipe mode and interactive single-entity mode conditionals confirmed at FO runtime:25-27)
+   - C-3: PASS (## FO Guidance section found at SKILL.md:57)
+   - C-4: PASS (7 matches >= 3 threshold for 3 themed reviewer names)
+   - C-5: PASS (1 match >= 1 threshold for bare-mode documentation)
+   - C-6: PASS (dispatch: as YAML property only on review stage; prose mentions are not stage properties)
+   - C-7: PASS (codex-first-officer-runtime.md has no diff vs HEAD)
+
+2. [x] List interactive items I-1 through I-3 as PENDING for captain
+   DONE — I-1, I-2, I-3 listed as PENDING in UAT Results table above with full descriptions for captain review.
+
+3. [x] Write ## UAT Results with per-item table (item / status / evidence)
+   DONE — 10-row table above covering C-1 through C-7 (PASS) and I-1 through I-3 (PENDING).
+
+4. [x] Write ## Stage Report: uat with verdict (PASS if all CLI pass, PARTIAL if interactive pending)
+   DONE — this section. Verdict: PARTIAL.
+
+### Notes
+
+**C-1 command precision**: The UAT Spec command `grep -A3 "name: review" ... | grep "dispatch: debate-driven"` returns empty output because `dispatch:` is 4 lines after `name: review`, not 3. The feature IS correctly implemented (verified with `-A5` and direct line number grep). This is a spec-command authoring issue, not an implementation defect.
+
+**All other CLI items**: Commands executed as specified and returned expected output.
+
+**Interactive items**: I-1 (FO Guidance actionability), I-2 (themed reviewer assignments), I-3 (single-entity mode semantics) require captain review. FO will present these for sign-off.
