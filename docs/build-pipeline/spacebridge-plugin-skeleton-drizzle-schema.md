@@ -1,7 +1,7 @@
 ---
 id: 050
 title: "Spacebridge plugin skeleton + Drizzle LCD schema"
-status: plan
+status: execute
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started: 2026-04-12T15:40:00Z
