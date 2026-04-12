@@ -1495,18 +1495,81 @@ First live dispatch of `spacedock:build-execute` under team mode fell back to in
 
 ## Stage Report: quality
 
-- [ ] FAIL: bun test (full suite, worktree root)
-  Exit code 1; 344 pass, 1 fail out of 345 tests across 25 files. Failing test: `parseStagesBlock > parses stages with defaults and states` in `tests/dashboard/parsing.test.ts:89`. Test expects stage record to omit `conditional`, `feedback_to`, and `model` fields when they have default values. Received object includes all three fields with empty/false defaults. Type mismatch in stage parsing logic.
+**Verdict**: pass (pre-existing failures noted)
+**Ran at**: 2026-04-12T02:32:15Z
+**HEAD**: e54d01d
 
-- [ ] FAIL: tsc --noEmit (TypeScript check, tools/dashboard)
-  Exit code 2; 9 errors in 1 file (`src/channel.test.ts`). Error types: 6x TS2339 "Property does not exist" (url, getAll, listVersions on type mocks) + 3x TS7006 "Parameter implicitly any". Test file has incorrect type signatures for mocked objects passed to functions under test.
+### test
+verdict: fail
+scope: pre-existing (tests/dashboard/parsing.test.ts not in entity diff ad08e5d..HEAD)
+command: bun test
+evidence:
+```
+(fail) parseStagesBlock > parses stages with defaults and states [0.50ms]
 
-- [ ] PASS: bun build (tools/dashboard with --target=bun)
-  Exit code 0. Build completes successfully when `--target=bun` is specified. Source bundle generates without errors; Node.js builtins correctly resolved for Bun runtime.
+error: expect(received).toEqual(expected)
 
-- [ ] SKIP: bun lint
-  No `lint` script defined in package.json or root bunfig.toml. Project has no configured linter. Skipping per stage definition guidance (lint is informational only if unavailable).
+@@ -2,6 +2,7 @@
+    "concurrency": 3,
++   "conditional": false,
++   "feedback_to": "",
+    "gate": true,
+    "initial": false,
++   "model": "",
+    "name": "plan",
+
+- Expected  - 0
++ Received  + 3
+
+      at <anonymous> (/Users/kent/Project/spacedock/.worktrees/spacedock-ensign-phase-e-plan-4-dogfood-trailofbits-integration/tests/dashboard/parsing.test.ts:89:24)
+
+ 344 pass
+ 1 fail
+ 810 expect() calls
+Ran 345 tests across 25 files. [4.53s]
+```
+
+### lint
+verdict: skipped
+command: bun lint
+evidence:
+```
+No `lint` script defined in package.json. Project has no configured linter per workflow ops config.
+```
+
+### typecheck
+verdict: fail
+scope: pre-existing (tools/dashboard/src/channel.test.ts not in entity diff ad08e5d..HEAD)
+command: bunx tsc --noEmit
+evidence:
+```
+src/channel.test.ts(29,20): error TS2339: Property 'url' does not exist on type 'ChannelProvider'.
+src/channel.test.ts(49,24): error TS2339: Property 'url' does not exist on type 'ChannelProvider'.
+src/channel.test.ts(87,44): error TS2339: Property 'getAll' does not exist on type 'Pick<EventBuffer, "getChannelMessagesSince">'.
+src/channel.test.ts(88,31): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/channel.test.ts(121,44): error TS2339: Property 'getAll' does not exist on type 'Pick<EventBuffer, "getChannelMessagesSince">'.
+src/channel.test.ts(122,44): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/channel.test.ts(239,48): error TS2339: Property 'listVersions' does not exist on type 'Pick<SnapshotStore, "createSnapshot">'.
+src/channel.test.ts(319,46): error TS2339: Property 'getAll' does not exist on type 'Pick<EventBuffer, "getChannelMessagesSince">'.
+src/channel.test.ts(320,35): error TS7006: Parameter 'e' implicitly has an 'any' type.
+```
+
+### build
+verdict: pass
+command: bun build src/server.ts --target=bun
+evidence:
+```
+Build completes successfully. Source bundle generates without errors; Node.js builtins correctly resolved for Bun runtime. Exit code 0.
+```
+
+### coverage
+verdict: skipped
+command: n/a
+evidence:
+```
+No threshold configured in workflow ops config. Coverage check skipped.
+```
 
 ### Summary
 
-Project-wide mechanical checks reveal two real failures: (1) test suite has 1 failing test in parsing logic (344 pass, 1 fail), and (2) TypeScript type-checking fails on test mocks in channel.test.ts (9 errors, 2 TS code families). Both failures are evidence-backed regressions in the execute stage's code output. Failures route back to execute stage per stage definition Rule: "any fail → feedback-to: execute with failing output attached; max 3 rounds then escalate to captain." Build succeeds. Lint unavailable; stage continues.
+Re-run confirms: test suite has 1 failing test and typecheck has 9 TS errors, both in files NOT touched by entity 062 (execute diff ad08e5d..HEAD contains only agent/reference/skill/doc changes). Step 6.5 classification: both failures are pre-existing drift from earlier entities (033/035). Build passes. Per Step 7 Routing Rule, overall verdict is `pass (pre-existing failures noted)` -- no feedback-to routing, FO advances.
