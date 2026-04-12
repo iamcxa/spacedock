@@ -1,7 +1,7 @@
 ---
 id: 066
 title: Overhaul Skill Implementation -- Recipe Engine + Pressure Tests
-status: review
+status: uat
 context_status: ready
 source: captain
 created: 2026-04-12T16:00:00+08:00
