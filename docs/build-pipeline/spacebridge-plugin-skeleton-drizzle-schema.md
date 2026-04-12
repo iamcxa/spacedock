@@ -731,3 +731,40 @@ error: Script not found "build"
 **Quality stage verdict:** ✅ AUTO-ADVANCE
 
 Entity 050 (spacebridge plugin skeleton) has zero failures. New code (spacebridge/) is type-safe and fully tested (30 tests passing). Pre-existing tools/dashboard type errors are not regressions from this entity. No mechanical failures block progression to the next stage.
+
+### Review Findings: security-reviewer
+
+| Severity | File:Line | Description |
+|----------|-----------|-------------|
+| Low | `spacebridge/src/db.ts:114` | `defaultDbPath()` builds the DB path from `process.env.HOME` without validation. If `HOME` is attacker-controlled (e.g., in a compromised environment), path traversal to an arbitrary directory is possible. Mitigant: this is a local-only developer tool, not a server. No immediate fix required, but callers should pass an explicit `dbPath` in all non-interactive contexts (already enforced by the test isolation comment in the ABOUTME header). |
+| Low | `spacebridge/src/schema.ts:22,39,57,79,97` | Every table carries an opaque `payload TEXT` column intended for future fmodel use. No format constraint is applied at the schema layer. Drizzle's parameterized queries prevent SQL injection at the ORM boundary, but any future code that interpolates `payload` content directly into raw SQL strings (e.g., `sqlite.exec(...)`) would introduce an injection path. Flag for enforcement when fmodel domains land in entities 054/056/057. |
+| Info | `spacebridge/src/schema.ts:87` | `share_tokens.password_hash` stores a hash with no companion `hash_algorithm` column. If the hashing algorithm must be migrated later, existing rows cannot be identified as belonging to the old algorithm. Not exploitable now (schema-only entity; no hashing logic present), but worth recording before the authentication layer is implemented. |
+| Info | `spacebridge/src/schema.ts:88-89` | `share_tokens.entity_paths` and `stages` are JSON arrays stored as TEXT blobs. The schema layer is safe (Drizzle parameterizes writes), but downstream consumers that parse these blobs and use the values in dynamic SQL or shell commands must validate/sanitize the content. Flag for review in entity 053 (share/tunnel rebuild). |
+
+**Post-debate notes**: No other reviewers' findings to reconcile at this time. All findings above are schema/design-level observations — no runtime injection vectors exist in the current diff, as all DB operations go through Drizzle's parameterized query API.
+
+### Review Findings: style-reviewer
+
+| Severity | File:Line | Description |
+|----------|-----------|-------------|
+| MEDIUM | `spacebridge/src/db.ts:29-111` | `applySchema()` 內的 DDL 與 `schema.test.ts:19-104` 的 `createMemoryDb()` 完全重複，且與 `drizzle/0000_parallel_thing.sql` 是第三份同源拷貝。三者一旦不同步，測試可能通過但遷移失敗。`createMemoryDb()` 直接呼叫 `createDb(":memory:")` 即可消滅一份重複，成本極低。 |
+| MEDIUM | `spacebridge/src/db.test.ts:56,72` | `(db as any).$client` 是對 Drizzle 內部 API 的硬編碼假設。`$client` 不是公開合約，未來版本升級可能靜默失效。WAL 驗證測試與持久性測試都依賴此路徑。建議加注解：`// intentional: drizzle-orm/bun-sqlite exposes $client as the underlying bun:sqlite Database` 明確標記意圖，避免未來維護者誤刪。 |
+| LOW | `spacebridge/src/schema.ts:33` | `role` 欄位注解寫 `'SO' \| 'FO' \| 'QO'`，但 DB 層無 check constraint 或 enum 約束，純 `text()`。注解傳達的契約比程式碼強，容易讓讀者誤認 DB 層有驗證。建議改為 `// 'SO' \| 'FO' \| 'QO' — validated at application layer` 以消除歧義。 |
+| LOW | `spacebridge/src/schema.test.ts:4` | `import { sql } from "drizzle-orm"` 引入但整個測試檔案中未使用 `sql`。dead import 應移除。 |
+| LOW | `spacebridge/src/schema.ts:9,25,43,61,79` | 分隔線注解使用 emoji（`🟢`, `🟡`, `🔴`）表達 fmodel 整合等級。若需符合 CLAUDE.md 的「不加 emoji」規則，改為文字標記（`full CQRS`, `event-log only`, `plain drizzle`）。這是風格一致性問題，不影響正確性。 |
+| INFO | `spacebridge/src/db.ts:113-116` | `defaultDbPath()` 的 `HOME ?? USERPROFILE ?? "."` fallback 鏈，`USERPROFILE` 是 Windows 特有環境變數，在 macOS/Linux 等同 `HOME ?? "."`。ABOUTME 注解只提 `~/.spacedock/spacebridge.db`（macOS 路徑），若跨平台意圖是刻意為之，加一行說明即可。 |
+
+**Post-debate notes**: 最高優先改善項是 DDL 三重重複（MEDIUM #1）。`createMemoryDb()` 直接改用 `createDb(":memory:")` 可消滅一份重複，且能讓 schema.test.ts 真正驗證 `createDb` 本身而非自建 DDL。unused `sql` import 是小清理項。`(db as any).$client` 加注解比改掉更實際——Drizzle 官方文件承認此為測試慣用寫法。
+
+### Review Findings: correctness-reviewer
+
+| Severity | File:Line | Description |
+|----------|-----------|-------------|
+| MEDIUM | `spacebridge/src/schema.test.ts:1,4` | `beforeAll`, `afterAll` 從 `bun:test` 導入但從未使用；`sql` 從 `drizzle-orm` 導入但從未使用。Dead imports。不影響測試運行（bun 不報錯），但在嚴格 lint 環境下會失敗，且誤導維護者以為有全局 setup/teardown。 |
+| MEDIUM | `spacebridge/src/schema.test.ts:19-104` | `createMemoryDb()` 手寫了與 `db.ts:applySchema()` 和 `drizzle/0000_parallel_thing.sql` 相同的 DDL（第三份拷貝）。正確性風險：若未來修改 `applySchema()` 加入新欄位，測試仍用舊 DDL，可能掩蓋欄位缺失。修正方向：改為呼叫 `createDb(":memory:")` 以使用同一份 DDL（已有 style-reviewer 指出；correctness 視角也確認此為缺陷，非僅風格問題）。 |
+| LOW | `spacebridge/.claude-plugin/plugin.json:6` | `repository` URL 為 `https://github.com/patchwork-body/spacedock`，這是一個不相關的 GitHub 帳號。Q-1 決定 spacebridge 在 kent's spacedock fork（即 kent/spacedock 或 clkao/spacedock 下游），`patchwork-body` 是錯誤的。CC plugin 系統若驗證此欄位，可能影響 marketplace 或 install 流程。 |
+| LOW | `spacebridge/src/db.ts:113-115` | `defaultDbPath()` 使用 `process.env.HOME ?? process.env.USERPROFILE ?? "."` 解析 home 目錄。當 HOME 和 USERPROFILE 均未設定時（如某些 CI 環境或 root 容器），fallback 為 `"."` 即當前目錄，導致 DB 寫入 `./。spacedock/spacebridge.db`，而非真實 home 目錄。`node:os` 的 `homedir()` 是平台原生 API，在相同情境下仍能正確解析（使用 `getpwuid_r` 而非環境變數），更可靠。 |
+| LOW | `spacebridge/src/db.ts:65,82,89` | `(db as any).$client` 以 `as any` 抑制型別。已驗證 `$client` 是 drizzle-orm/bun-sqlite 0.40.1 公開的 `TClient` 屬性（`driver.d.ts:43`），型別為 `Database`（bun:sqlite）。可改為 `(db as { $client: Database }).$client` 消除 `any`，保留型別安全。（此問題在 db.test.ts L65,82,89 三處）。 |
+| INFO | `spacebridge/src/schema.ts:30` | `entity_leases.sessionId` 注解為 `// references sessions.session_id`，但 Drizzle schema 無外鍵約束（`references()` 未呼叫）。SQLite 預設不強制 FK（需 `PRAGMA foreign_keys = ON`），注解暗示了一個不存在的 DB 層約束，可能誤導未來維護者認為 DB 會拒絕孤立的 lease 記錄。建議改注解為 `// logically references sessions.session_id — enforced at application layer`。 |
+
+**Post-debate notes**: MEDIUM #1 (dead imports) 和 MEDIUM #2 (DDL 三重拷貝的正確性風險) 是最重要的發現——前者是純清理，後者是真實的欄位漂移風險。`plugin.json` 的 repository URL (LOW #1) 需在 PR 前修正，因為這是可驗證的錯誤值。`defaultDbPath()` 的 `homedir()` 替換 (LOW #2) 是防禦性改善，優先度中等。`$client` 的型別安全 (LOW #3) 可用 `{ $client: Database }` 斷言改善，但 style-reviewer 已建議加注解，兩種方案均可。
