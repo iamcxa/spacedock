@@ -34,17 +34,29 @@ children:
 
 ## Directive
 
-> Redesign the review stage dispatch from "single ensign loads build-review skill which tries to fan-out agents internally" to "FO analyzes diff scope and dispatches 1-10 ensigns in parallel, each loading a single pr-review-toolkit skill."
+> Redesign the review stage dispatch from "single ensign loads build-review skill which tries to fan-out agents internally" to "FO analyzes diff scope and dispatches 1-10 ensigns in parallel, each loading a single pr-review-toolkit skill." Additionally, fix single-entity mode's unnecessary team creation skip, and properly wire the `dispatch:` property on the review stage.
 
-Current problem: build-review skill wants to dispatch parallel review agents (code-reviewer, silent-failure-hunter, comment-analyzer, etc.) but ensigns are subagents without the Agent tool. The fan-out is structurally unreachable.
+### Problem 1: Review fan-out is structurally unreachable
+build-review SKILL.md describes a debate-driven model (3 themed reviewer teammates: security / correctness / style with SendMessage cross-challenge), but:
+- README review stage has NO `dispatch:` property → FO defaults to `simple` → dispatches ONE ensign
+- Ensign tries internal Agent() fan-out → no Agent tool (leaf worker) → falls back to inline pre-scan only
+- The debate-driven design in SKILL.md is **aspirational, never executed**
 
-New design:
-- FO (which HAS Agent tool) analyzes the diff to determine relevant review facets
-- FO dispatches 1-10 ensigns in parallel via Agent(), each loading one pr-review-toolkit skill
-- Number of ensigns scales with diff scope (small diff = 2-3, large diff = 6-10)
-- FO collects all ensign results and synthesizes into classified findings table + Stage Report
-- Pre-scan (CLAUDE.md compliance, stale refs, plan consistency) stays inline in FO or as a dedicated ensign
-- knowledge-capture stays as FO post-completion step
+### Problem 2: Single-entity mode unnecessarily kills teams
+`claude-first-officer-runtime.md` says: "In single-entity mode, skip team creation entirely."
+- Rationale: "prevents premature session termination in `-p` mode"
+- But this also kills teams in interactive mode (`--agent`, direct conversation) where premature exit isn't a concern
+- Without teams → no SendMessage → debate-driven is impossible even when the dispatch mode is correctly set
+
+### Problem 3: No dispatch property on review stage
+README review stage definition lacks `dispatch:` → defaults to `simple`. Even if problems 1 and 2 are fixed, FO still won't use the correct dispatch protocol unless the property is explicitly declared.
+
+### Deliverables
+
+1. **Review stage README**: Add `dispatch: debate-driven` (or chosen mode from O-1) to the review stage definition in `docs/build-pipeline/README.md`
+2. **Single-entity mode unbinding**: Update `references/claude-first-officer-runtime.md` to only skip team creation in `-p` (pipe) mode, not in all single-entity mode invocations. Interactive single-entity sessions should create teams normally.
+3. **build-review SKILL.md**: Transform from ensign-executed orchestrator into FO guidance document. Phase 1 (reviewer dispatch + debate) runs in FO context (which has Agent tool). Phase 2 (synthesis) by ensign or FO inline.
+4. **FO dispatch 1-10 ensigns**: Each loads one pr-review-toolkit or trailofbits skill. Count scales with diff scope.
 
 Skills to dispatch as individual ensigns:
 - pr-review-toolkit:code-reviewer
@@ -59,10 +71,11 @@ Trailofbits skills (when installed + applicable):
 - sharp-edges:sharp-edges
 - variant-analysis:variant-analysis
 
-Changes required:
-1. Update `skills/build-review/SKILL.md` to document the new dispatch pattern
-2. Update `docs/build-pipeline/README.md` review stage comments if needed
-3. Update `references/first-officer-shared-core.md` or `references/claude-first-officer-runtime.md` if the FO dispatch adapter needs changes for multi-ensign parallel dispatch at review time
+### Changes required
+1. Update `docs/build-pipeline/README.md` review stage — add `dispatch:` property
+2. Update `skills/build-review/SKILL.md` — transform to FO guidance
+3. Update `references/claude-first-officer-runtime.md` — unbind single-entity from bare mode (only skip teams in `-p` mode)
+4. Update `references/first-officer-shared-core.md` — if single-entity mode definition needs clarification re: teams
 
 ## Brainstorming Spec
 
@@ -81,10 +94,12 @@ Changes required:
 
 ## Acceptance Criteria
 
-- FO dispatches N ensigns in parallel for review (N based on diff analysis). (how to verify: `grep -n "Agent(" skills/build-review/SKILL.md` or FO shared core shows parallel dispatch pattern for review stage)
+- Review stage in README has explicit `dispatch:` property (debate-driven or task-list-driven per O-1 decision). (how to verify: `grep "dispatch:" docs/build-pipeline/README.md` in the review stage block)
+- FO dispatches N ensigns in parallel for review (N based on diff analysis). (how to verify: build-review SKILL.md documents FO dispatch table with skill-to-scope mapping)
 - Each ensign loads exactly one pr-review-toolkit skill via Skill tool. (how to verify: each dispatched ensign's prompt contains exactly one `skill:` reference, not a list)
 - FO synthesizes all ensign findings into a single classified Stage Report with severity levels (CRITICAL/HIGH/MEDIUM/LOW). (how to verify: `grep "Stage Report: review" {entity}` shows classified findings table)
-- Works in both bare mode (sequential fallback when teams unavailable) and teams mode (parallel). (how to verify: build-review SKILL.md documents both code paths)
+- Single-entity mode creates teams in interactive sessions (only skips teams in `-p` pipe mode). (how to verify: `grep -A5 "single-entity" references/claude-first-officer-runtime.md` shows `-p` conditional, not blanket skip)
+- Works in both bare mode (sequential fallback when `-p` mode) and teams mode (parallel in interactive). (how to verify: build-review SKILL.md documents both code paths)
 
 ## Assumptions
 
