@@ -346,6 +346,63 @@ Not applicable -- 3 files to modify (build-review SKILL.md, FO shared core, FO r
 - **acceptance_criteria**: All 10 checks pass. No cross-file inconsistencies. No accidental modifications to unrelated stages or files.
 - **files_modified**: (none -- read-only verification)
 
+## Stage Report: execute
+
+**Verdict**: pass
+**Ran at**: 2026-04-12T23:15:00Z
+
+### Checklist
+
+1. [x] Invoke workflow-index update-status (planned → in-flight) at stage entry
+   DONE -- Updated all 4 CONTRACTS.md entries for entity review-stage-parallel-skill-dispatch from `🔵 planned` to `🟡 in-flight` (stage: execute). Commit: `a9e15ba`.
+
+2. [x] Build wave graph from ## PLAN
+   DONE -- Wave 1: Tasks 1, 2, 3 (independent); Wave 2: Tasks 4, 5 (depend on Task 1 for dispatch context); Wave 3: Task 6 (depends on Tasks 1-5).
+
+3. [x] Execute Wave 1 tasks
+   - Task 1 (haiku→sonnet): Add `dispatch: debate-driven` to review stage YAML in README. Commit: `c294644`. DONE.
+   - Task 2 (sonnet): Unbind single-entity mode from bare mode in `references/claude-first-officer-runtime.md`. `-p` pipe mode skips teams; interactive single-entity creates teams normally. Commit: `d5fb1bb`. DONE.
+   - Task 3 (sonnet): Clarify team creation policy in `references/first-officer-shared-core.md` Single-Entity Mode section. Added note deferring to runtime adapter. Commit: `cebf63f`. DONE.
+
+4. [x] Execute Wave 2 tasks
+   - Task 4 (sonnet): Added `## FO Guidance: Phase 1 -- Reviewer Dispatch` section to `skills/build-review/SKILL.md` with: themed reviewer table (security/correctness/style), dispatch table by diff scope, debate protocol, findings format, bare-mode fallback, and post-dispatch handoff to ensign. Commit: `bf6b206`. DONE.
+   - Task 5 (haiku→sonnet): Updated `### review` prose in README with two-phase protocol description, themed reviewer groups, diff-scope scaling, and bare-mode fallback. Commit: `87c83ac`. DONE.
+
+5. [x] Execute Wave 3 -- Task 6
+   DONE -- All 10 consistency checks passed:
+   1. `dispatch: debate-driven` in README YAML review stage ✓
+   2. `-p` pipe conditional in FO runtime (not blanket skip) ✓
+   3. shared core Single-Entity Mode section: no team-skip language, defers to runtime adapter ✓
+   4. `## FO Guidance: Phase 1 -- Reviewer Dispatch` section exists in SKILL.md ✓
+   5. `grep -c "security-reviewer\|correctness-reviewer\|style-reviewer" SKILL.md` = 7 (≥ 3) ✓
+   6. bare-mode fallback documented (1 match) ✓
+   7. reviewer names consistent with SO-FO-DISPATCH-SPLIT.md lines 166-168 ✓
+   8. skills per reviewer match entity spec Deliverable 4 skill list exactly ✓
+   9. `dispatch:` YAML property only on review stage (grep `^      dispatch:` = 1 result) ✓
+   10. `references/codex-first-officer-runtime.md` not modified (git diff empty) ✓
+
+6. [x] Each task committed separately with conventional commit message on feature branch
+   DONE -- 5 feature commits + 1 chore(index) commit, all on `spacedock-ensign/review-stage-parallel-skill-dispatch`.
+
+7. [x] Write ## Stage Report: execute with per-task commit SHAs, deviations, and ## Files Modified section
+   DONE -- this section.
+
+### Deviations
+
+- Tasks 1 and 5 were planned as haiku but executed at sonnet level (this agent). No impact on output quality -- sonnet produces correct results at same or higher fidelity.
+- No scope creep. No files modified beyond `files_modified` list in PLAN.
+
+### Files Modified
+
+| File | Task | Commit |
+|------|------|--------|
+| `docs/build-pipeline/_index/CONTRACTS.md` | workflow-index | a9e15ba |
+| `docs/build-pipeline/README.md` (YAML) | Task 1 | c294644 |
+| `references/claude-first-officer-runtime.md` | Task 2 | d5fb1bb |
+| `references/first-officer-shared-core.md` | Task 3 | cebf63f |
+| `skills/build-review/SKILL.md` | Task 4 | bf6b206 |
+| `docs/build-pipeline/README.md` (prose) | Task 5 | 87c83ac |
+
 ## UAT Spec
 
 ### CLI Items
@@ -372,12 +429,12 @@ Not applicable -- 3 files to modify (build-review SKILL.md, FO shared core, FO r
 
 | Requirement (AC) | Task(s) | Verification Command | Status |
 |-------------------|---------|---------------------|--------|
-| Review stage has explicit dispatch: property | Task 1 | `grep -A3 "name: review" docs/build-pipeline/README.md \| grep "dispatch:"` | pending |
-| FO dispatches N ensigns in parallel for review | Task 4 | `grep "FO Guidance" skills/build-review/SKILL.md` + `grep "themed reviewer" skills/build-review/SKILL.md` | pending |
-| Each ensign loads exactly one pr-review-toolkit skill | Task 4 | Verify themed reviewer definitions: each reviewer is a teammate loading specific skills per theme (not a list of all skills) | pending |
-| FO synthesizes findings into classified Stage Report | Task 4 | `grep "Stage Report" skills/build-review/SKILL.md` -- ensign writes classified Stage Report from reviewer findings | pending |
-| Single-entity mode creates teams in interactive sessions | Task 2, Task 3 | `grep -A8 "single-entity" references/claude-first-officer-runtime.md` shows -p conditional | pending |
-| Works in both bare mode and teams mode | Task 4 | `grep "bare.*mode" skills/build-review/SKILL.md` -- bare-mode fallback documented | pending |
+| Review stage has explicit dispatch: property | Task 1 | `grep -A3 "name: review" docs/build-pipeline/README.md \| grep "dispatch:"` | done |
+| FO dispatches N ensigns in parallel for review | Task 4 | `grep "FO Guidance" skills/build-review/SKILL.md` + `grep "themed reviewer" skills/build-review/SKILL.md` | done |
+| Each ensign loads exactly one pr-review-toolkit skill | Task 4 | Verify themed reviewer definitions: each reviewer is a teammate loading specific skills per theme (not a list of all skills) | done |
+| FO synthesizes findings into classified Stage Report | Task 4 | `grep "Stage Report" skills/build-review/SKILL.md` -- ensign writes classified Stage Report from reviewer findings | done |
+| Single-entity mode creates teams in interactive sessions | Task 2, Task 3 | `grep -A8 "single-entity" references/claude-first-officer-runtime.md` shows -p conditional | done |
+| Works in both bare mode and teams mode | Task 4 | `grep "bare.*mode" skills/build-review/SKILL.md` -- bare-mode fallback documented | done |
 
 ## Stage Report: plan
 
