@@ -2,15 +2,12 @@
 id: 063
 title: PR Review Loop Mod -- kc-pr-create Integration + Shipped Stage Closed-Loop
 status: shipped
-started: 2026-04-12T04:30:00Z
-completed: 2026-04-12T12:00:00Z
-verdict: pass
 context_status: ready
 source: captain
 created: 2026-04-12T04:30:00Z
-started:
-completed:
-verdict:
+started: 2026-04-12T04:30:00Z
+completed: 2026-04-12T12:00:00Z
+verdict: PASSED
 score:
 worktree:
 issue:

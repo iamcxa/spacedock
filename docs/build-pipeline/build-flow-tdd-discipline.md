@@ -1,15 +1,15 @@
 ---
 id: 067
 title: Build Flow TDD Discipline -- Distill superpowers:test-driven-development into Plan + Execute
-status: draft
-context_status: awaiting-clarify
+status: plan
+context_status: ready
 source: captain
 created: 2026-04-12T17:30:00+08:00
-started:
+started: 2026-04-12T22:00:00Z
 completed:
 verdict:
 score: 0.75
-worktree:
+worktree: .worktrees/spacedock-ensign-build-flow-tdd-discipline
 issue:
 pr:
 intent: feature
@@ -98,24 +98,29 @@ Current testing in the pipeline is structural and post-hoc:
 ## Assumptions
 
 A-1: RED phase is validated by non-zero exit code from the test runner. Any non-zero exit (assertion failure, compile error, runtime error) counts as RED-verified. Only exit code 0 triggers vacuous_test detection.
-Confidence: Confident
+Confidence: Confident (0.95)
 Evidence: skills/task-execution/SKILL.md:73 -- "DONE when every acceptance_criteria command passes (exit 0 for commands)"; inverse (non-zero = fail) is the standard test runner contract used consistently across task-execution Step 3 and build-execute Step 4b.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-2: `test_first` is troops-agnostic -- the flag is a task schema attribute consumed by whatever executes the task (task-executor today, troops per entity 065 tomorrow). No dispatch-layer changes needed.
-Confidence: Confident
+Confidence: Confident (0.85)
 Evidence: skills/task-execution/SKILL.md:36 -- Input Contract defines the task block shape independently of dispatch mechanism; agents/task-executor.md:1 loads the skill by flat path regardless of how FO dispatched it.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-3: REFACTOR phase is bounded by the same `files_modified` scope discipline. Task-executor may restructure code within `files_modified` after GREEN, then re-run GREEN-phase acceptance_criteria to verify no regression. No new permissions or scope expansion.
-Confidence: Confident
+Confidence: Confident (0.95)
 Evidence: skills/task-execution/SKILL.md:101-137 -- "Scope Discipline -- files_modified Is The Writable Boundary" No-Exceptions block applies to all edits including refactor; no carve-out for post-GREEN changes.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-4: Existing plans without `test_first` are treated as `test_first: false` -- no migration needed. The attribute is optional with default `false`, matching the existing pattern for `serial` (optional boolean, default false).
-Confidence: Confident
+Confidence: Confident (0.90)
 Evidence: skills/build-plan/SKILL.md:174 -- "`serial`: optional boolean, forces serial execution even when overlap-free"; same optional-boolean-default-false pattern for additive schema attributes.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-5: New pressure test fixtures follow the existing YAML schema established in `tests/pressure/` (18 existing fixtures). Schema fields: `skill`, `target_path`, `captured`, `session`, `test_cases[]` with `id`, `summary`, `pressure[]`, `options`, `expected_answer`, `correct_because`.
-Confidence: Confident
+Confidence: Confident (0.95)
 Evidence: tests/pressure/README.md:48 -- schema definition; tests/pressure/task-execution.yaml:14 -- 3 scenarios as exemplar of the format.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 ## Option Comparisons
 
@@ -129,6 +134,8 @@ How does plan-checker and task-execution distinguish which `acceptance_criteria`
 | Separate fields: `red_criteria` and `green_criteria` as sibling XML tags alongside `acceptance_criteria` | Explicit, no ambiguity; plan-checker validates field presence directly; task-execution reads two distinct fields | Schema change is larger (2 new fields instead of 1 flag); every downstream consumer (build-execute, plan-checker, task-execution) must be updated to parse new fields; breaks the "single flat list" contract that acceptance_criteria discipline relies on | High | Not recommended |
 | Inline markers: prefix each command with `[RED]` or `[GREEN]` | Flexible ordering; works within existing flat list; easy to grep | Markers pollute the command string (must be stripped before execution); introduces a parsing step in task-execution that doesn't exist today | Medium | Viable |
 
+→ Selected: Other -- All three options rejected. The question itself was misframed: RED/GREEN differentiation does not belong in acceptance_criteria. When `test_first: true`, task-executor loads `superpowers:test-driven-development` as an additional skill via `task.skills`. The TDD skill governs the RED→GREEN→REFACTOR cycle internally -- the same test command (vitest/bun test/pytest/cargo test) naturally returns RED before implementation and GREEN after. acceptance_criteria remains a single flat list of post-GREEN verification commands, unchanged from today. This is how GSD's subagent-driven-development already works: subagents are told "follow TDD" and load the TDD skill, not given RED/GREEN YAML annotations. Framework-agnostic TDD consciousness, not mechanical YAML tracking. (captain, 2026-04-12, interactive)
+
 ## Open Questions
 
 Q-1: Should entity 067 address the `<automated>MISSING</automated>` documentation gap in build-plan SKILL.md while touching dimension 6d?
@@ -139,6 +146,8 @@ Why it matters: Code-explorer found that the `<automated>MISSING</automated>` se
 
 Suggested options: (a) Address it in entity 067 as a "while we're here" fix to the authoring guidance in build-plan step 4a, (b) Leave it for a separate entity -- the gap predates 067 and is not TDD-specific, (c) Document the gap in 067's Stage Report as a finding for future work
 
+→ Answer: While-we're-here fix -- add authoring guidance for `<automated>MISSING</automated>` sentinel to build-plan step 4a alongside the test_first changes. Same file already in scope, marginal cost near zero, pure additive documentation. (captain, 2026-04-12, interactive)
+
 Q-2: Is build-brainstorm acceptance criteria shape enhancement (Directive deliverable 4) in scope or explicitly deferred?
 
 Domain: Runnable / Invokable
@@ -147,13 +156,17 @@ Why it matters: Deliverable 4 is marked "(optional)" in the Directive. If in sco
 
 Suggested options: (a) In scope -- add given/when/then guidance to build-brainstorm step 4, making the full spec→plan→execute TDD chain coherent, (b) Deferred -- keep 067 focused on plan+execute, create a follow-up entity for brainstorm AC shape, (c) Partial -- add a non-binding "prefer testable phrasing" note to build-brainstorm without changing the AC generation algorithm
 
+→ Answer: Full -- in scope. Add given/when/then guidance to build-brainstorm step 4, making the complete brainstorm→plan→execute TDD chain coherent. This aligns with captain's "繼續蒸餾" intent: TDD consciousness should permeate the entire pipeline from spec generation through execution, not just the execute side. build-brainstorm/SKILL.md step 4 becomes an additional file in scope. (captain, 2026-04-12, interactive)
+
 ## Decomposition Recommendation
 
 Scope flag present but decomposition not recommended: all changes flow linearly through a single `test_first` attribute (plan schema → plan-checker validation → task-execution consumption). No independent sub-scopes exist -- you cannot ship plan schema changes without plan-checker validation, and task-execution changes are meaningless without the schema definition. 11 files across 3 layers is well within Medium scale.
 
 ## Canonical References
 
-(clarify stage will populate)
+- `~/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.7/skills/test-driven-development/` -- Superpowers TDD skill: rigid RED→GREEN→REFACTOR discipline, framework-agnostic, "NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST" iron law. Key design input: TDD cycle is governed by the skill's execution flow, not by YAML markers in acceptance_criteria. (captain cited during O-1 resolution)
+- `~/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.7/skills/subagent-driven-development/SKILL.md` -- GSD subagent-driven-development: line 274 says "Subagents should use: superpowers:test-driven-development". Implementer prompt says "follow TDD if task says to". Key pattern: subagents load TDD skill, orchestrator doesn't track RED/GREEN. (captain cited during O-1 resolution)
+- Captain clarification (2026-04-12): "不只是用 subagent 做 red-flag test 也包含各種語言與框架的測試，例如 vitest 等，但應該不是去限制用哪個語言或框架，而是一開始就要帶有 TDD 意識去執行" -- TDD discipline must be framework-agnostic (vitest/jest/pytest/cargo test/bun:test). The pipeline should instill TDD consciousness, not mandate specific tools. (captain, Step 2 batch confirmation context)
 
 ## Stage Report: explore
 
@@ -169,3 +182,22 @@ Scope flag present but decomposition not recommended: all changes flow linearly 
   No α markers in brainstorming spec
 - [x] Scale assessment: confirmed Medium
   11 files mapped, 5-8 files_modified estimated, consistent with Medium (5-15 files)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  Scope flag present but explore determined single-attribute linear flow, no independent sub-scopes
+- [x] Assumptions confirmed: 5 / 5 (0 corrected)
+  A-1 through A-5 confirmed via batch with numeric confidence scores (0.85-0.95)
+- [x] Options selected: 1 / 1
+  O-1 RED/GREEN differentiation -- all 3 options rejected; captain redirected to load superpowers:test-driven-development skill instead of YAML tracking
+- [x] Questions answered: 2 / 2
+  Q-1 while-we're-here fix for <automated>MISSING</automated> gap; Q-2 full scope for brainstorm AC shape (given/when/then)
+- [x] Canonical refs added: 3
+  superpowers TDD skill path; GSD subagent-driven-development; captain TDD-consciousness clarification (framework-agnostic)
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected, all Qs answered, 4 ACs present, canonical refs populated
+- [x] Handoff mode: loose
+  auto_advance not set; captain must say "execute 067" for FO to advance status to plan
+- [x] Clarify duration: 4 interactions, session complete
+  1 batch confirmation + 1 option (rejected→Other) + 2 AskUserQuestion calls (Q-1, Q-2)

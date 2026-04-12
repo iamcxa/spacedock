@@ -93,6 +93,9 @@ describe("parseStagesBlock", () => {
       gate: true,
       terminal: false,
       initial: false,
+      feedback_to: "",
+      conditional: false,
+      model: "",
     });
     expect(stages![1]).toEqual({
       name: "execute",
@@ -101,6 +104,9 @@ describe("parseStagesBlock", () => {
       gate: false,
       terminal: false,
       initial: false,
+      feedback_to: "",
+      conditional: false,
+      model: "",
     });
     expect(stages![2]).toEqual({
       name: "shipped",
@@ -109,6 +115,9 @@ describe("parseStagesBlock", () => {
       gate: false,
       terminal: true,
       initial: false,
+      feedback_to: "",
+      conditional: false,
+      model: "",
     });
   });
 

@@ -18,19 +18,19 @@ Track A items from the hybrid classification.
 ## Assumptions
 
 A-1: Use Bun.serve() with the existing middleware chain for the new endpoint.
-Confidence: Confident
+Confidence: Confident (0.95)
 Evidence: src/server.ts:42 -- all 6 existing endpoints use this pattern
 
 A-2: Store stage duration as computed value, not a separate column.
-Confidence: Likely
+Confidence: Likely (0.70)
 Evidence: scripts/status.sh:118 -- duration computed from entered_at diffs
 
 A-3: Apply existing Zod frontmatter validation to new entity fields.
-Confidence: Unclear
+Confidence: Unclear (0.40)
 Evidence: src/entity-loader.ts:27 -- validates 3 of 8 fields with Zod
 ```
 
-Each assumption is a single block: declarative statement, confidence level, and evidence with file path and line number.
+Each assumption is a single block: declarative statement, confidence level with numeric score (0-1), and evidence with file path and line number. The numeric score makes confidence actionable -- the captain can see at a glance which assumptions carry risk. Ranges: Confident 0.80-1.0, Likely 0.50-0.79, Unclear 0.20-0.49.
 
 ---
 
