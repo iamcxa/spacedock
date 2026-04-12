@@ -708,3 +708,67 @@ One test failure must be resolved before this entity can advance to the next sta
 **Root cause**: The stage schema was extended (likely during execute or a prior commit) but the corresponding test snapshot was not updated.
 
 **Action required**: Route feedback to execute stage with failing test details above for fixing the test expectation.
+
+## Stage Report: review
+
+**Verdict**: pass
+**Ran at**: 2026-04-12T23:45:00Z
+
+### Checklist
+
+1. **Pre-scan: CLAUDE.md compliance**
+   - **Status**: DONE
+   - **Findings**: No violations. Changed files do not introduce command injection, hardcoded credentials, or other OWASP-class issues. Documentation-only changes. No fabricated version numbers. No speculative comments. Confirmed no `--no-verify` bypass, no force-push language, no unauthorized destructive ops.
+
+2. **Pre-scan: stale references grep**
+   - **Status**: DONE
+   - **Findings**: One DOC finding.
+     - `docs/build-pipeline/README.md:366` and `skills/build-review/SKILL.md:81` reference `insecure-defaults:insecure-defaults` with annotation "(trailofbits when installed)" — but the README plugin prerequisites table (line 202) lists `trailofbits/skills` as covering only `differential-review`, `sharp-edges`, `variant-analysis`. `insecure-defaults` is a *separate* trailofbits package (`insecure-defaults@trailofbits`), not bundled in `trailofbits/skills`. The table does not list it as a prerequisite, creating a gap: a captain who installs only `trailofbits/skills` will be missing `insecure-defaults` and receive no warning.
+     - All other file/section references in new content (`references/claude-first-officer-runtime.md`, `references/first-officer-shared-core.md`, `docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md`) resolve to existing files. No broken cross-references found.
+
+3. **Pre-scan: plan consistency (diff matches PLAN's files_modified)**
+   - **Status**: DONE
+   - **Findings**: Plan listed 4 files for modification (README.md, FO runtime, FO shared core, build-review SKILL.md). Actual diff shows 7 files: the 4 planned + CONTRACTS.md (chore/index commit, expected), entity file itself (stage reports, expected), and `tests/dashboard/parsing.test.ts` (quality-feedback fix, expected — quality stage routed feedback to execute). The execute Stage Report explicitly calls out the test fix as in-scope. No scope creep.
+
+4. **Review: README.md — dispatch: debate-driven placement and accuracy**
+   - **Status**: DONE
+   - **Findings**: `dispatch: debate-driven` is correctly placed in the review stage YAML block alongside `model:`, `feedback-to:`, and `skill:` (line 109). The YAML comment block accurately describes the two-phase protocol. The prose section (lines 355-376) consistently describes the debate-driven protocol, themed reviewer groups, diff-scope scaling, and bare-mode fallback. No other stage received an unintended `dispatch:` property (verified: `grep "^      dispatch:" README.md` = 1 result, review stage only).
+
+5. **Review: FO runtime — single-entity unbind is correct and safe**
+   - **Status**: DONE
+   - **Findings**: The change correctly splits the old blanket "single-entity mode → skip teams" into two distinct conditionals: (1) `-p` pipe mode skips teams (premature exit prevention), (2) interactive single-entity creates teams normally. The existing bare-mode fallback for TeamCreate probe failure (lines 14-23) is preserved and untouched — it remains a separate concern from the mode-based skip. The new paragraph at line 27 accurately captures the rationale gap (premature exit is pipe-specific, not single-entity-specific). No unintended side effects on the event loop or gate resolution logic.
+
+6. **Review: FO shared core — team creation policy deferred properly**
+   - **Status**: DONE
+   - **Findings**: The added paragraph (line 78) correctly defers team creation authority to `claude-first-officer-runtime.md` rather than restating the rule. The 6 existing single-entity mode behaviors (scope, resolve, auto-gates, orphan recovery, termination, output format) remain intact. The addition is additive and non-breaking.
+
+7. **Review: build-review SKILL.md — FO Guidance section accuracy, themed reviewers, bare-mode fallback**
+   - **Status**: DONE
+   - **Findings (NIT)**: The `## FO Guidance` section header uses "Phase 1 -- Reviewer Dispatch" but no corresponding "Phase 2" header appears in the ensign body (Steps 1-6). This is a minor asymmetry — the prose says "Phase 2 (synthesis) by ensign" but Steps 1-6 are not labelled as "Phase 2". Does not affect correctness or executability.
+   - Themed reviewer table is accurate and complete. Dispatch table (small/medium/large diff scope thresholds) is consistent with README prose. Debate protocol (steps 1-5) is clear and actionable. Findings format template is well-specified. Bare-mode fallback correctly routes to simple mode with pre-scan only. Post-dispatch handoff to ensign is correctly documented. The `---` separator between FO Guidance and "Step 1: Pre-Scan" clearly delineates the audience boundary.
+
+8. **Review: parsing.test.ts — test fix is correct**
+   - **Status**: DONE
+   - **Findings**: The fix adds `feedback_to: ""`, `conditional: false`, `model: ""` to 3 test expectations (plan, execute, shipped stages). These match exactly what `parsing.ts:125-127` returns for stages without those YAML properties (empty string / false defaults). Full test suite passes (345/345). The fix is minimal and correct — no test logic changed, only expected values updated.
+
+9. **Cross-file consistency: themed reviewer definitions**
+   - **Status**: DONE
+   - **Findings**: Reviewer groups are consistent across SKILL.md (line 81), README prose (line 365-368), and entity spec (lines 62-73). Security-reviewer: `differential-review:diff-review`, `sharp-edges:sharp-edges`, `variant-analysis:variant-analysis`, `insecure-defaults:insecure-defaults`. Correctness-reviewer: `pr-review-toolkit:code-reviewer`, `pr-review-toolkit:silent-failure-hunter`. Style-reviewer: `pr-review-toolkit:comment-analyzer`, `pr-review-toolkit:type-design-analyzer`, `pr-review-toolkit:code-simplifier`, `pr-review-toolkit:pr-test-analyzer`. All three sources agree exactly.
+
+10. **Classified findings table**
+    - **Status**: DONE
+
+| Severity | Root | File:Line | Description |
+|----------|------|-----------|-------------|
+| LOW | DOC | README.md:366, SKILL.md:81 | `insecure-defaults` labelled "(trailofbits when installed)" but README plugin table (line 202) lists only `trailofbits/skills` covering 3 skills — `insecure-defaults` is a separate package (`insecure-defaults@trailofbits`) not listed as a prerequisite. Captain may install only `trailofbits/skills` and be missing `insecure-defaults` with no warning. |
+| NIT | DOC | SKILL.md:56 | "Phase 1" label in FO Guidance section has no matching "Phase 2" label in ensign Steps 1-6. Minor asymmetry in section labelling — does not affect executability. |
+
+### Verdict
+
+**PASS — advance to uat**
+
+No CRITICAL or HIGH CODE findings. Two documentation findings (LOW + NIT) do not block advancement:
+- The LOW finding (insecure-defaults prerequisite gap) is a documentation improvement — the feature still works correctly since `insecure-defaults` is already installed in this environment. The fix (updating the plugin table) is a NIT-level doc improvement deferred to a future entity.
+- The NIT finding (Phase 2 label asymmetry) does not affect FO or ensign execution.
+
+All 345 tests pass. CLAUDE.md compliance confirmed. Cross-file consistency confirmed for themed reviewer definitions. Plan consistency confirmed (no scope creep).
