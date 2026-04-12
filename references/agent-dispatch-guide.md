@@ -83,13 +83,16 @@ FO dispatches one ensign as a subagent or teammate. Ensign does all work inline 
 FO creates a team with shared task list. Workers self-claim tasks and coordinate via SendMessage. Task dependencies enforce ordering. FO spawns workers and monitors; workers self-organize.
 
 - **Stages:** plan, execute, explore (Large entities)
+- **Task count is topic-driven, not fixed.** For plan: FO extracts N research topics from the entity body (cap 5 per build-plan SKILL.md), creates N research tasks + 1 synthesis task. For execute: tasks come from the PLAN's task list with wave dependencies. For explore: FO identifies K exploration domains from the brainstorming spec layers.
+- **Teammate count <= task count.** FO spawns M teammates where M <= N (typically 3 for research, wave-size for execute). Teammates self-claim tasks -- if N=5 and M=3, each researcher claims one task, finishes, then claims the next unclaimed one.
 - **Pattern:**
-  1. FO creates team + tasks (with dependencies)
-  2. FO spawns N worker teammates (general-purpose with role in prompt)
-  3. Workers self-claim unblocked tasks
-  4. Workers write results to entity file / worktree files
-  5. Dependency-gated synthesis task auto-unblocks when prerequisites done
-  6. Synthesis teammate (or ensign) reads file results, produces output
+  1. FO extracts topics/tasks from entity body (topic-driven, not hardcoded)
+  2. FO creates team + tasks with dependencies (synthesis task depends on all worker tasks)
+  3. FO spawns M worker teammates (M <= task count, general-purpose with role in prompt)
+  4. Workers self-claim unblocked tasks
+  5. Workers write results to entity file / worktree files
+  6. Dependency-gated synthesis task auto-unblocks when prerequisites done
+  7. Synthesis teammate (or ensign) reads file results, produces output
 
 ### Debate-Driven (Agent Team)
 FO creates a team of 3-4 reviewers with different focus areas. Reviewers work independently, then challenge each other's findings via SendMessage. The inter-teammate debate produces higher-quality findings than independent parallel review.
@@ -113,10 +116,10 @@ Terminal stage handled by workflow mods (merge hooks, idle hooks). FO does not d
 |---|---|---|---|---|
 | draft | Manual | -- | nothing | -- |
 | brainstorm | FO-inline | Large or <=3/5 executability | agent team (3 perspectives) | nothing (teammates debate) |
-| explore | Simple teammate | Large entity (>15 files) | code-explorer + ensign (two-phase) | nothing |
+| explore | Simple teammate | Large entity (>15 files) | K explorer teammates (topic-driven, K = exploration domains) + ensign synthesis | nothing (explorers self-claim) |
 | clarify | Captain-interactive | -- | nothing (SO runs in captain session) | -- |
-| plan | Task list-driven | always | 3-5 researcher teammates + 1 planner | nothing (researchers self-claim) |
-| execute | Task list-driven | always | N task-executor teammates | nothing (self-claim per wave) |
+| plan | Task list-driven | always | N research tasks (topic-driven, N = topics, cap 5) claimed by M researcher teammates (M <= N, typically 3) + 1 planner synthesis task | nothing (researchers self-claim) |
+| execute | Task list-driven | always | T task-executor teammates (T = wave size or fewer; tasks self-claimed per wave) | nothing (self-claim per wave) |
 | quality | Simple teammate | Slow test suite (>5 min) | 4 parallel command runners | nothing |
 | review | Debate-driven | always | 3 themed reviewer teammates | nothing (reviewers debate) |
 | uat | Simple teammate | -- | ensign + FO AskUserQuestion | nothing |
