@@ -302,6 +302,76 @@ Not applicable -- 3 files to modify (build-review SKILL.md, FO shared core, FO r
 - [x] Clarify duration: 3 interactions, session complete
   1 batch confirmation (1 corrected) + 1 option + Q-1 answered by Directive update + Q-2 implied by O-1
 
+## Stage Report: quality
+
+### Test Results
+
+**Status: FAILED** — TypeScript compilation error found. Test execution passed; type checking failed.
+
+#### 1. bun test (from repo root)
+
+**Result: DONE — PASS**
+
+```
+bun test v1.3.9 (cf6cdbbb)
+
+ 345 pass
+ 0 fail
+ 812 expect() calls
+Ran 345 tests across 25 files. [4.53s]
+```
+
+All tests pass after `bun install` in tools/dashboard/.
+
+#### 2. tsc --noEmit (from tools/dashboard/)
+
+**Result: DONE — FAIL**
+
+```
+tsc v5.9.3
+tools/dashboard/src/channel.test.ts (9 errors)
+  L29: TS2339 Property 'url' does not exist on type 'ChannelProvider'.
+  L49: TS2339 Property 'url' does not exist on type 'ChannelProvider'.
+  L87: TS2339 Property 'getAll' does not exist on type 'Pick<EventBuffer, "getChannelMessagesSince">'.
+  L88: TS7006 Parameter 'e' implicitly has an 'any' type.
+  L121: TS2339 Property 'getAll' does not exist on type 'Pick<EventBuffer, "getChannelMessagesSince">'.
+  L122: TS7006 Parameter 'e' implicitly has an 'any' type.
+  L239: TS2339 Property 'listVersions' does not exist on type 'Pick<SnapshotStore, "createSnapshot">'.
+  L319: TS2339 Property 'getAll' does not exist on type 'Pick<EventBuffer, "getChannelMessagesSince">'.
+  L320: TS7006 Parameter 'e' implicitly has an 'any' type.
+```
+
+**Root cause:** Contract drift between `channel.test.ts` and `channel-provider.ts`. The `ChannelProvider` interface (added in or after commit d1c6e8d) explicitly restricts `eventBuffer` to `Pick<EventBuffer, "getChannelMessagesSince">` (line 40 of channel-provider.ts). The test file tries to call `.getAll()` which exists on the full `EventBuffer` class but is not exposed by the `ChannelProvider` contract. Additionally, tests expect `dashboard.url` property, but `ChannelProvider` only exposes `port`.
+
+**Test scope**: Lines 29, 49, 87-88, 121-122, 239, 319-320 in `tools/dashboard/src/channel.test.ts` violate the `ChannelProvider` type contract.
+
+#### 3. bun lint
+
+**Result: SKIPPED** — No root-level package.json or lint script defined. Spacedock uses a multi-root structure with package.json only in tools/dashboard/.
+
+#### 4. bun build
+
+**Result: SKIPPED** — No root-level package.json. Build entry points would need to be specified explicitly; this spacedock project does not have a bundled build step.
+
+### Verdict: FAIL
+
+**Execute stage fix (commit 835be4d) updated only `tests/dashboard/parsing.test.ts` and did not address the `channel.test.ts` TypeScript errors.** The contract between `channel.ts` return type and `channel-provider.ts` interface requires test code to be updated to match the narrower `ChannelProvider` contract, or the contract must be broadened to match the test expectations.
+
+### Required feedback to execute
+
+1. **Resolve `channel.test.ts` type violations:**
+   - Lines 29, 49: Change `dashboard.url` to `dashboard.port` (property exists per contract).
+   - Lines 87-88, 121-122, 319-320: Change `dashboard.eventBuffer.getAll()` to use allowed method `getChannelMessagesSince()`, or widen the `ChannelProvider.eventBuffer` contract to include `getAll()`.
+   - Line 239: Verify `snapshotStore` contract includes `listVersions()` or use only `createSnapshot()`.
+   - Line 88, 122, 320: Add explicit type annotation for parameter `e` (currently implicit any).
+
+2. **Testing path forward:**
+   - If the test needs full `EventBuffer` access, expand `ChannelProvider.eventBuffer` from `Pick<EventBuffer, "getChannelMessagesSince">` to include `getAll()` and other methods used by tests.
+   - If the test should only use the contract interface, refactor test assertions to work with `getChannelMessagesSince()` only.
+   - Same decision needed for `snapshotStore`: confirm what methods the test requires vs. what the contract exposes.
+
+3. **Feedback type:** feedback-to: execute (type code quality) — contract not implemented by test code
+
 ## Research Findings
 
 ### Upstream Constraints
