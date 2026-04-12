@@ -1,6 +1,6 @@
 ---
 name: build-distill
-description: "Semi-interactive comparison skill for absorbing external system patterns into the build pipeline. Reads source and target skills, compares across 7 fixed dimensions, scores gaps with qualitative bands, and produces entity drafts for significant gaps. Manually triggered by SO or captain."
+description: "Use when Science Officer or captain needs to compare an external skill system (e.g., GSD) against a build-* skill to identify capability gaps worth importing. Use when evaluating whether a new workflow pattern should generate entity drafts for the build pipeline."
 user-invocable: true
 argument-hint: "[source-path] [target-path]"
 ---

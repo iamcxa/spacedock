@@ -955,4 +955,81 @@ Mechanical verification conducted from repo root. Entity 068 created 11 new mark
 - **Build**: Not configured for this project
 - **Coverage**: Not configured for this project
 
+## Writing-Skills Verification
+
+**Triggered by**: captain request post-ship, before PR merge. Entity 068 created `skills/build-distill/SKILL.md` and `skills/build-distill/references/comparison-dimensions.md` without following `superpowers:writing-skills` TDD discipline.
+
+**Skill loaded**: `superpowers:writing-skills` (version 5.0.7)
+
+---
+
+### What Was Checked
+
+1. **Frontmatter conventions** (name, description fields; character limits; format rules)
+2. **Description CSO rule** ("Use when..." trigger-only format; no workflow summary)
+3. **SKILL.md structure** (H1 title, role paragraph, step count declaration, Tools Available, Input Contract, Output Contract, Rules section)
+4. **Sibling pattern conformance** (build-brainstorm / build-explore double-dash convention, step header format)
+5. **Reference file integrity** (comparison-dimensions.md exists; 7 dimensions declared; scoring guidance present)
+6. **Step count consistency** (declared "Six steps" matches 6 `## Step N:` headers)
+
+---
+
+### What Was Fixed
+
+**Issue: description violated CSO rule** (critical)
+
+Original description:
+```
+"Semi-interactive comparison skill for absorbing external system patterns into the build pipeline. Reads source and target skills, compares across 7 fixed dimensions, scores gaps with qualitative bands, and produces entity drafts for significant gaps. Manually triggered by SO or captain."
+```
+
+Problems:
+- Did not start with "Use when..."
+- Summarized internal workflow ("Reads source and target skills, compares across 7 fixed dimensions") -- this is exactly the anti-pattern writing-skills warns against. An agent reading this description could follow the description summary instead of reading the full skill.
+
+Fixed description:
+```
+"Use when Science Officer or captain needs to compare an external skill system (e.g., GSD) against a build-* skill to identify capability gaps worth importing. Use when evaluating whether a new workflow pattern should generate entity drafts for the build pipeline."
+```
+
+---
+
+### Smoke Tests Written
+
+`skills/build-distill/tests/smoke.test.ts` -- 26 tests across 4 describe blocks:
+
+- `build-distill SKILL.md existence` (2 tests): SKILL.md and comparison-dimensions.md exist
+- `build-distill frontmatter` (7 tests): YAML block present, name/description fields, name charset, description starts with "Use when", description does not summarize workflow, total frontmatter ≤ 1024 chars
+- `build-distill SKILL.md structure` (9 tests): H1 title, role paragraph, step count declaration, 6 step headers, Tools Available section, Can use / NOT available subsections, Input Contract, Output Contract, Rules with NEVER markers (≥3) and ALWAYS markers (≥1)
+- `build-distill reference file content` (4 tests): 7 dimensions in comparison-dimensions.md, correct file reference in SKILL.md, step count consistency, scoring guidance present for all 7 dimensions
+- `build-distill siblings pattern conformance` (4 tests): no em dash in headers, step headers follow `## Step N:` pattern, sequential numbering
+
+---
+
+### Test Results
+
+```
+bun test v1.3.9 (cf6cdbbb)
+
+ 26 pass
+ 0 fail
+ 53 expect() calls
+Ran 26 tests across 1 file. [16.00ms]
+```
+
+**All 26 tests pass.**
+
+---
+
+### What Passed Without Changes
+
+- `name` field: `build-distill` -- valid charset (letters + hyphens only)
+- H1 title: `# Build-Distill -- External Pattern Absorption` -- uses double dash, not em dash
+- Step count: "Six steps" declared, 6 `## Step N:` headers present -- consistent
+- Tools Available: Can use / NOT available subsections present
+- Input Contract and Output Contract sections present
+- Rules section: 4 NEVER markers, 1 ALWAYS marker
+- comparison-dimensions.md: exactly 7 dimensions, each with Scoring guidance block
+- Sibling convention: double dash in annotations matches build-brainstorm and build-explore
+
 Entity 068 output (11 markdown + SKILL files) contains no executable code; all mechanical checks pass. Auto-advance to next stage.
