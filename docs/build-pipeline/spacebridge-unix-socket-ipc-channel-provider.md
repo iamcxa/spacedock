@@ -747,3 +747,46 @@ issues: []
   captain must say "execute 051" or launch FO in separate session
 - [x] Clarify duration: 6 questions asked, session complete
   1 batch assumption + 3 rounds O-1 (deepest clarify in this session) + 1 O-2 + 1 Q-1 auto-resolved
+
+## Stage Report: execute
+
+status: passed
+commit: 7d4bb28
+
+### Per-task results
+
+| Task | Wave | Status | Notes |
+|------|------|--------|-------|
+| task-0 (framing codec) | 0 | DONE | `bun test spacebridge/src/ipc/framing.test.ts` — 10/10 pass |
+| task-1 (IPC types) | 0 | DONE | `bun test spacebridge/src/ipc/types.test.ts` — 13/13 pass |
+| task-2 (socket-server) | 1 | DONE | `bun test spacebridge/src/ipc/socket-server.test.ts` — 7/7 pass |
+| task-3 (socket-client + reconnect) | 1 | DONE | `bun test spacebridge/src/ipc/socket-client.test.ts` — 7/7 pass |
+| task-4 (channel-provider-bridge) | 2 | DONE | `bun test spacebridge/src/ipc/channel-provider-bridge.test.ts` — 6/6 pass |
+| task-5 (coordination-client-stub) | 2 | DONE | `bun test spacebridge/src/ipc/coordination-client-stub.test.ts` — 5/5 pass |
+| task-6 (ChannelProvider async interface) | 2 | DONE | channel-provider.ts updated to `T \| Promise<T>`; channel.ts 4 call sites add `await`; `bun test tools/dashboard/src/` — 205/205 pass |
+| task-7 (integration test) | 3 | DONE | `bun test spacebridge/src/ipc/integration.test.ts` — 7/7 pass |
+| task-8 (barrel export) | 3 | DONE | `bun build spacebridge/src/ipc/index.ts --target bun --outdir /tmp/ipc-check` — exit 0; 15 export lines |
+
+### Deviations
+
+1. **ChannelProviderBridgeOptions** — plan specified interface in task-4 but not exported separately. Added `ChannelProviderBridgeOptions` export to barrel for completeness (not a plan deviation, additive only).
+2. **Integration test socket paths** — macOS unix socket path limit is ~104 chars. `test-integration-` prefix + full UUID exceeded limit. Fixed by using `ti-{8-char-hash}` prefix (65 chars total). Socket-server/client tests used `test-server-`/`test-client-` (102 chars, within limit). Deviation: test path format differs from plan spec `join(tmpdir, "test.sock")` style.
+3. **Pre-existing test failure** — `spacebridge/src/db.test.ts` and `spacebridge/src/schema.test.ts` fail with `Cannot find module 'drizzle-orm/bun-sqlite'` — this failure predates this entity (confirmed via git stash check). Not introduced by our changes.
+
+### Validation results
+
+| Acceptance Criteria | Command | Result |
+|--------------------|---------|--------|
+| AC-1 Session registration | `bun test spacebridge/src/ipc/socket-server.test.ts` | PASS |
+| AC-2 publishEvent bridge | `bun test spacebridge/src/ipc/channel-provider-bridge.test.ts` | PASS |
+| AC-3 Reconnect with exponential backoff | `bun test spacebridge/src/ipc/socket-client.test.ts` | PASS |
+| AC-4 Message framing (4-byte BE + UTF-8 JSON) | `bun test spacebridge/src/ipc/framing.test.ts` | PASS |
+| AC-5 CoordinationClient stub returns [] | `bun test spacebridge/src/ipc/coordination-client-stub.test.ts` | PASS |
+| AC-6 Session cleanup on disconnect | `bun test spacebridge/src/ipc/socket-server.test.ts` | PASS |
+
+### UAT pre-check
+
+- `bun test spacebridge/src/ipc/` — 55/55 pass
+- `bun test tools/dashboard/src/` — 205/205 pass (no regressions)
+- `bun test` (repo root) — 400/402 pass (2 pre-existing spacebridge drizzle-orm failures)
+- `bun build spacebridge/src/ipc/index.ts --target bun --outdir /tmp/ipc-check` — exit 0
