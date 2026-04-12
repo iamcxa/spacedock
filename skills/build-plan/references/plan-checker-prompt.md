@@ -89,6 +89,10 @@ Within each wave, slide a 3-consecutive-task window across tasks sorted by `id`.
 
 If any task references `<automated>MISSING</automated>` in its `acceptance_criteria` (meaning "the test file doesn't exist yet, a Wave 0 task will create it"), there must be a matching Wave 0 task with that exact file path in its `files_modified`. Missing Wave 0 match -- **blocker**.
 
+Additionally, for tasks with `test_first="true"`:
+- The task's `files_modified` MUST include at least one test file (file path containing `.test.`, `.spec.`, `tests/`, or `__tests__/`). Missing test file in `files_modified` for a `test_first` task -- **blocker**.
+- The task's `skills` attribute MUST include `superpowers:test-driven-development`. Missing TDD skill in `skills` for a `test_first` task -- **blocker**.
+
 ### 7. Cross-Entity Coherence
 
 Call `spacedock:workflow-index` read mode (via Skill tool) with the plan's complete `files_modified` list. For each file:
