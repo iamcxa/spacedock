@@ -1,11 +1,11 @@
 ---
 id: 048
 title: Multi-Session Dashboard — Daemon + MCP Shim Architecture
-status: draft
+status: archived
 source: session discussion (recce-cloud-infra, 2026-04-10)
 started:
 completed:
-verdict:
+verdict: "Absorbed into spacebridge design doc. Daemon+shim concept expanded with role-aware coordination, 2-plugin split, SSE transport, and multi-repo scope."
 score: 0.7
 worktree:
 issue:
@@ -14,6 +14,8 @@ intent: feature
 scale: Large
 project: spacedock
 note: Scope absorbed into docs/superpowers/specs/2026-04-10-spacebridge-engine-bridge-split-design.md (2026-04-10). This entity remains as historical record of the initial problem framing; the authoritative design is the spacebridge doc, which extends the daemon+shim proposal with role-aware coordination, 2-plugin split, and SSE transport. Technical references to channel.ts line numbers verified against current code at commit-time.
+archived: 2026-04-12
+archived_reason: "absorbed into spacebridge design doc §1.4, entities 050-052"
 ---
 
 ## Problem
