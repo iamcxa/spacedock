@@ -159,6 +159,66 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add TDD Mode RED-GREEN-REFACTOR sub-cycle activated by test_first flag | in-flight | 2026-04-12 |
 
+### spacebridge/bin/daemon.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-l2-daemon-lifecycle | plan | Daemon entry point with start/stop/status subcommands | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/daemon/auto-fork.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-l2-daemon-lifecycle | plan | TDD tests for shim-side auto-fork logic | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/daemon/auto-fork.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-l2-daemon-lifecycle | plan | Shim-side auto-fork daemon logic with lock + socket probe | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/daemon/index.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-l2-daemon-lifecycle | plan | Barrel export for daemon module | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/daemon/integration.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-l2-daemon-lifecycle | plan | Full lifecycle integration tests for daemon start/stop/auto-fork | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/daemon/lock.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-l2-daemon-lifecycle | plan | TDD tests for mkdir-based lock file | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/daemon/lock.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-l2-daemon-lifecycle | plan | mkdir-based atomic lock file for double-fork prevention | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/daemon/pid.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-l2-daemon-lifecycle | plan | TDD tests for PID file management utilities | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/daemon/pid.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-l2-daemon-lifecycle | plan | PID file management -- write, read, alive check, stale cleanup | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/ipc/types.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-l2-daemon-lifecycle | plan | Add __status RPC response type for daemon status query | 🔵 planned | 2026-04-12 |
+
 ### tests/fixtures/pr-review-loop-pipeline/README.md
 
 | Entity | Stage | Intent | Status | Last Updated |
