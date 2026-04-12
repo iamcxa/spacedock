@@ -6,7 +6,7 @@
 
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
-// ─── sessions — 🟢 fmodel full CQRS (design doc §4.3) ────────────────────────
+// ─── sessions — [full CQRS] fmodel full CQRS (design doc §4.3) ───────────────
 
 export const sessions = sqliteTable("sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -22,14 +22,14 @@ export const sessions = sqliteTable("sessions", {
   payload: text("payload"),                          // opaque JSON blob
 });
 
-// ─── entity_leases — 🟢 fmodel full CQRS (design doc §5.3) ───────────────────
+// ─── entity_leases — [full CQRS] fmodel full CQRS (design doc §5.3) ──────────
 
 export const entityLeases = sqliteTable("entity_leases", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   token: text("token").notNull().unique(),           // opaque lease token
-  sessionId: text("session_id").notNull(),           // references sessions.session_id
+  sessionId: text("session_id").notNull(),           // logically references sessions.session_id — no FK constraint, validated at application layer
   entitySlug: text("entity_slug").notNull(),
-  role: text("role").notNull(),                      // 'SO' | 'FO' | 'QO'
+  role: text("role").notNull(),                      // 'SO' | 'FO' | 'QO' — validated at application layer, not DB-constrained
   acquiredAt: integer("acquired_at").notNull(),      // epoch-ms
   expiresAt: integer("expires_at").notNull(),        // epoch-ms
   // fmodel-compatible columns
@@ -39,7 +39,7 @@ export const entityLeases = sqliteTable("entity_leases", {
   payload: text("payload"),                          // opaque JSON blob
 });
 
-// ─── events — 🟡 event-log only ──────────────────────────────────────────────
+// ─── events — [event-log only] ───────────────────────────────────────────────
 
 export const events = sqliteTable("events", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -57,7 +57,7 @@ export const events = sqliteTable("events", {
   payload: text("payload"),                          // opaque JSON blob
 });
 
-// ─── comments — 🟢 fmodel full CQRS ──────────────────────────────────────────
+// ─── comments — [full CQRS] fmodel full CQRS ─────────────────────────────────
 
 export const comments = sqliteTable("comments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -79,12 +79,13 @@ export const comments = sqliteTable("comments", {
   payload: text("payload"),                          // opaque JSON blob
 });
 
-// ─── share_tokens — 🔴 plain Drizzle ──────────────────────────────────────────
+// ─── share_tokens — [plain drizzle] ──────────────────────────────────────────
 
 export const shareTokens = sqliteTable("share_tokens", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   token: text("token").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  hashAlgorithm: text("hash_algorithm").default("argon2id"), // prepares for future algorithm migration
   entityPaths: text("entity_paths").notNull(),       // JSON array as text blob
   stages: text("stages").notNull(),                  // JSON array as text blob
   label: text("label").notNull(),
