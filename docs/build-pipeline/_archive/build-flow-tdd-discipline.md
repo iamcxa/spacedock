@@ -6,10 +6,10 @@ context_status: ready
 source: captain
 created: 2026-04-12T17:30:00+08:00
 started: 2026-04-12T22:00:00Z
-completed:
-verdict:
+completed: 2026-04-12T14:00:00Z
+verdict: PASSED
 score: 0.75
-worktree: .worktrees/spacedock-ensign-build-flow-tdd-discipline
+worktree:
 issue:
 pr:
 intent: feature
