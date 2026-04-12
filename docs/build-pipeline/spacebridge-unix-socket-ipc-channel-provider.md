@@ -10,7 +10,7 @@ verdict:
 score: 0.0
 worktree: .worktrees/spacedock-ensign-spacebridge-unix-socket-ipc-channel-provider
 issue:
-pr:
+pr: "#33"
 intent: feature
 scale: Medium
 project: spacedock
