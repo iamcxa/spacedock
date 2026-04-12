@@ -65,7 +65,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Correct pr-review-toolkit bundling claim at line 183 | ✅ final | 2026-04-12 |
-| review-stage-parallel-skill-dispatch | plan | Add dispatch: debate-driven to review stage YAML + update prose | 🔵 planned | 2026-04-12 |
+| review-stage-parallel-skill-dispatch | execute | Add dispatch: debate-driven to review stage YAML + update prose | 🟡 in-flight | 2026-04-12 |
 
 ### docs/overhaul/recipes/phase-e-plan-3-build-pipeline.yaml
 
@@ -95,14 +95,14 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| review-stage-parallel-skill-dispatch | plan | Unbind single-entity mode from bare mode -- only skip teams in -p pipe mode | 🔵 planned | 2026-04-12 |
+| review-stage-parallel-skill-dispatch | execute | Unbind single-entity mode from bare mode -- only skip teams in -p pipe mode | 🟡 in-flight | 2026-04-12 |
 
 ### references/first-officer-shared-core.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | kc-pr-flow-mod-integration | shipped | Update FO shared core for layered mod scanning and pr-review-loop reference | ✅ final | 2026-04-12 |
-| review-stage-parallel-skill-dispatch | plan | Clarify team creation policy in single-entity mode section | 🔵 planned | 2026-04-12 |
+| review-stage-parallel-skill-dispatch | execute | Clarify team creation policy in single-entity mode section | 🟡 in-flight | 2026-04-12 |
 
 ### skills/build-explore/SKILL.md
 
@@ -115,7 +115,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Replace trailofbits-as-agents with 4 wrapper agent dispatches; remove TBD block | ✅ final | 2026-04-12 |
-| review-stage-parallel-skill-dispatch | plan | Add FO Guidance section for debate-driven reviewer dispatch; restructure for two-phase model | 🔵 planned | 2026-04-12 |
+| review-stage-parallel-skill-dispatch | execute | Add FO Guidance section for debate-driven reviewer dispatch; restructure for two-phase model | 🟡 in-flight | 2026-04-12 |
 
 ### skills/code-explorer/SKILL.md
 
