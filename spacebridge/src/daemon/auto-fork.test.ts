@@ -186,9 +186,9 @@ process.on("SIGTERM", async () => {
       autoForkDaemon({ ...spawnOpts, lockPath: join(tmpDir, "spacebridge.lock") }),
     ]);
 
-    // At least one must succeed
+    // Both must succeed: one forks the daemon, the other waits for its socket
     const successes = [r1, r2].filter(r => r.status === "fulfilled");
-    expect(successes.length).toBeGreaterThanOrEqual(1);
+    expect(successes.length).toBe(2);
 
     // Exactly one PID file should exist with a single PID
     const pid = readPidFile(spawnOpts.pidPath);

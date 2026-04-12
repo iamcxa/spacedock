@@ -8,6 +8,7 @@ import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { createConnection } from "node:net";
 import { createSocketClient } from "../ipc/socket-client";
 import { autoForkDaemon } from "./auto-fork";
 import { readPidFile } from "./pid";
@@ -39,7 +40,6 @@ async function waitForSocket(path: string, timeoutMs = 5000): Promise<void> {
   while (Date.now() < deadline) {
     const alive = await new Promise<boolean>((res) => {
       if (!existsSync(path)) { res(false); return; }
-      const { createConnection } = require("node:net");
       const s = createConnection({ path });
       s.on("connect", () => { s.destroy(); res(true); });
       s.on("error", () => res(false));

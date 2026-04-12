@@ -49,7 +49,7 @@ function waitForSocket(socketPath: string, timeoutMs: number): Promise<void> {
         } else {
           setTimeout(poll, 100);
         }
-      });
+      }).catch(() => {});
     };
     poll();
   });

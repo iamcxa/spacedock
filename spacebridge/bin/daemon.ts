@@ -11,7 +11,8 @@ import * as net from "node:net";
 import { randomUUID } from "node:crypto";
 import { createSocketServer } from "../src/ipc/socket-server";
 import { createCoordinationClientStub } from "../src/ipc/coordination-client-stub";
-import { writePidFile, readPidFile, isProcessAlive, cleanStalePidFile } from "../src/daemon/pid";
+import { writePidFile, readPidFile, isProcessAlive } from "../src/daemon/pid";
+import { releaseLock } from "../src/daemon/lock";
 
 // ─── State directory resolution ──────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ function resolveStateDir(): string {
 
 // ─── Startup timestamp for uptime tracking ───────────────────────────────────
 
+// Module-level: runs once when daemon.ts is executed (always as daemon process)
 const startedAt = Date.now();
 
 // ─── start subcommand ────────────────────────────────────────────────────────
@@ -144,7 +146,7 @@ function cmdStop(): void {
     // Stale files from a crashed daemon
     try { if (existsSync(pidPath)) unlinkSync(pidPath); } catch {}
     try { if (existsSync(socketPath)) unlinkSync(socketPath); } catch {}
-    try { if (existsSync(lockPath)) { /* rmdirSync-like cleanup */ } } catch {}
+    releaseLock(lockPath);
     process.stderr.write(`cleaned stale daemon files (pid ${pid} was dead)\n`);
     return;
   }
