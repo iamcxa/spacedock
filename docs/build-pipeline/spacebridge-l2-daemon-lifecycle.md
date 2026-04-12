@@ -1,8 +1,8 @@
 ---
 id: 052
 title: "L2 auto-fork daemon lifecycle"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started:
 completed:
@@ -60,22 +60,27 @@ depends-on: [051]
 A-1: Stale file recovery uses socket probe as source of truth. When the shim finds an existing socket file but gets ECONNREFUSED on connect, it treats the socket as stale (daemon crashed without cleanup). Recovery: delete stale socket file, proceed with normal auto-fork. PID file staleness checked via `kill(pid, 0)` (signal 0 = existence check). If PID file exists but process is dead, delete PID + socket + lock files before forking.
 Confidence: Confident (0.90)
 Evidence: channel.ts:617-623 -- existing SIGTERM/SIGINT/exit cleanup pattern shows the project handles graceful shutdown; stale recovery handles the ungraceful case. Standard daemon pattern: Docker, PostgreSQL pg_ctl, Redis sentinel all use socket/PID probe.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: CLI subcommand ownership boundary -- entity 052 implements daemon-internal start/stop/status logic in `spacebridge/bin/daemon.ts`. Entity 059 implements the user-facing `spacebridge` CLI wrapper that dispatches to daemon.ts for start/stop/status and adds mcp/share subcommands. The shim calls daemon.ts directly (via `spawn()`); the user calls `spacebridge` (the wrapper).
 Confidence: Confident (0.85)
 Evidence: design doc §4.2 lines 301-302 -- shim invokes `['bun', 'path/to/spacebridge/bin/daemon.ts', 'start']` (internal path). Entity 059 scope: "Thin spacebridge CLI wrapper (bun script) that dispatches subcommands: start, stop, status, mcp, share".
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-3: Sticky daemon is the default shutdown policy. Daemon stays up after the last shim disconnects, avoiding repeated cold-start latency for subsequent CC sessions. `SPACEBRIDGE_AUTO_STOP=1` env var enables auto-stop-on-last-disconnect for CI/test environments only.
 Confidence: Confident (0.90)
 Evidence: design doc §4.1 line 274 -- "Daemon outlives the shim that birthed it". The entity scope says "configurable: sticky vs auto-stop" -- brainstorm chose sticky default with env var override.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-4: 5-second startup timeout is sufficient because the daemon binds the socket as its first action, before heavy initialization (DB open, Next.js boot). The shim's `wait_for_socket()` only needs the socket to accept connections, not the full daemon stack to be ready.
-Confidence: Likely (0.75)
-Evidence: design doc §4.2 line 309 -- `wait_for_socket(socket_path, timeout: 5s)`. Depends on implementation ordering: if daemon opens DB or runs migrations before binding socket, first-run latency could exceed 5s. Socket-first ordering is the safer design.
+Confidence: Confident (0.90, upgraded from Likely 0.75 via research)
+Evidence: design doc §4.2 line 309 -- `wait_for_socket(socket_path, timeout: 5s)`. Research confirmed: Node.js net.createServer().listen() socket bind is sub-millisecond (synchronous kernel bind+listen syscalls via libuv). Bun node:net is "Fully implemented" (green status). The 5s timeout guards fork()+exec()+Bun runtime startup, not socket bind. Condition: daemon MUST bind socket as first action before DB/Next.js init.
+→ Confirmed: captain, 2026-04-13 (batch)
 
-A-5: Entity 052's daemon.ts provides a process lifecycle shell with a hookable startup sequence. It starts the unix socket server (entity 051) and registers signal handlers, but does NOT start the Next.js HTTP server (entity 053) or the coordination stack (entity 056). Other entities wire their services into the daemon's startup via a registration pattern (e.g., `daemon.register(service)` or module-level side effects).
-Confidence: Likely (0.75)
-Evidence: entity scope says "this entity manages the daemon process lifecycle around [051's server]". Entity 053 (Next.js warroom SSE) depends-on 052, suggesting it adds functionality to the daemon 052 creates. No codebase precedent yet for the registration pattern -- spacebridge/ dir doesn't exist.
+A-5: Entity 052's daemon.ts provides a mixed startup -- direct import for importable services (unix socket server from entity 051, coordination from entity 056) + child process spawn for Next.js standalone (entity 053). It registers signal handlers and manages teardown for both imported services and child processes.
+Confidence: Confident (0.85, upgraded from Likely 0.75 via research + corrected)
+Evidence: entity scope says "this entity manages the daemon process lifecycle around [051's server]". Research confirmed: Next.js standalone server.js is a self-executing script, NOT importable (Next.js docs, GitHub Discussion #22127). Custom server API exists but is mutually exclusive with standalone mode. Socket IPC (051) and coordination (056) are plain TS modules -- directly importable. Design doc §5.4 mod registration pattern provides codebase precedent for registry approach.
+→ Corrected by captain, 2026-04-13 (batch): "Not all services use uniform registration. Next.js standalone is NOT importable -- use child process spawn for 053, direct import for 051/056. Mixed startup pattern."
 
 ## Option Comparisons
 
@@ -90,6 +95,8 @@ The design doc §4.2 says "acquire lock file with flock", but Node.js has no nat
 | Bun FFI to call flock() directly | True POSIX advisory locking; kernel handles blocking wait; auto-releases on process crash | Platform-specific (no Windows); adds FFI complexity; Bun FFI stability uncertain for this use case; harder to test | Medium | Not recommended |
 | `proper-lockfile` npm package | Battle-tested; handles stale detection, retries, backoff; used by npm/yarn | External dependency; adds ~15KB; may have Bun compatibility issues | Low | Viable |
 
+→ Selected: mkdir atomicity (captain, 2026-04-13, interactive)
+
 ### O-2: Daemon invocation resolution (how shim finds daemon to fork)
 
 When the shim needs to fork a daemon, it must construct the spawn command. The command differs between development (bun + source path) and installed (wrapper CLI on PATH) modes. How does the shim resolve which invocation to use?
@@ -100,6 +107,8 @@ When the shim needs to fork a daemon, it must construct the spawn command. The c
 | Auto-detect: check PATH for `spacebridge` first, fallback to relative daemon.ts | No env var needed; "just works" in both modes | `which`/`command -v` adds ~50ms latency per shim startup; silent fallback may mask misconfiguration | Low | Viable |
 | Single `SPACEBRIDGE_DAEMON_CMD` env var (full command) | Maximum flexibility; works for any invocation mode | Verbose; user must set the full command string; error-prone | Low | Not recommended |
 
+→ Selected: SPACEBRIDGE_DEV env var + __dirname relative path (captain, 2026-04-13, interactive)
+
 ## Open Questions
 
 Q-1: What daemon startup composition pattern should 052 use so that entities 053 (Next.js), 056 (CoordinationClient), and future services can plug into the daemon process?
@@ -109,6 +118,15 @@ Domain: Organizational/Data-transforming
 Why it matters: The daemon hosts multiple services (socket server from 051, HTTP/SSE from 053, coordination from 056). Entity 052 creates the daemon process, but the startup sequence must be extensible without modifying daemon.ts for every new service. The pattern chosen here determines whether 053/056 can develop independently or must coordinate daemon.ts changes.
 
 Suggested options: (a) Module-level registration -- daemon.ts imports a service registry; each entity exports a `start(ctx)` function registered at import time. daemon.ts calls `registry.startAll()` after socket is up. (b) Direct import chain -- daemon.ts directly imports and calls each service module. Simple but requires daemon.ts edits per entity. (c) Plugin-style dynamic loading -- daemon.ts scans a `services/` directory for modules with a `start` export. Maximum decoupling but adds discovery complexity.
+
+→ Answer: Direct import + child process hybrid. daemon.ts directly imports socket server (051) and coordination (056) as in-process modules, calling their start()/stop() functions. Next.js standalone server.js (053) is spawned as a managed child process (Bun.spawn) since standalone is NOT importable (research confirmed: Next.js docs + GitHub Discussion #22127). Teardown: .close() for imported services, SIGTERM for child process. Simple, explicit, matches A-5 corrected assumption. (captain, 2026-04-13, interactive)
+
+## Canonical References
+
+- Next.js standalone output docs (nextjs.org/docs/pages/api-reference/config/next-config-js/output) -- standalone server.js is self-executing, not importable (research, 2026-04-13, Q-1)
+- Next.js custom server API (nextjs.org/docs/pages/guides/custom-server) -- programmatic alternative, mutually exclusive with standalone (research, 2026-04-13, Q-1)
+- GitHub Discussion #22127 (github.com/vercel/next.js/discussions/22127) -- "no official public API to start Next.js server programmatically" (research, 2026-04-13, Q-1)
+- Design doc §5.4 mod registration pattern -- `bridge.mods.register({...})` as codebase precedent for registry approach (research, 2026-04-13, A-5)
 
 ## References
 
@@ -137,3 +155,21 @@ Suggested options: (a) Module-level registration -- daemon.ts imports a service 
   no α markers in brainstorm
 - [x] Scale assessment: confirmed Small
   spacebridge/ dir does not exist yet (entity 050 creates it); estimated 3-4 new files (auto-fork, daemon entry, PID utils, tests)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- entity is Small scope, no children proposed
+- [x] Assumptions confirmed: 5 / 5 (1 corrected)
+  A-1 through A-4 confirmed batch; A-5 corrected: uniform hookable startup → mixed startup (direct import + child process) after research found Next.js standalone not importable
+- [x] Options selected: 2 / 2
+  O-1 mkdir atomicity for lock file (recommended); O-2 SPACEBRIDGE_DEV env var + __dirname (recommended)
+- [x] Questions answered: 1 / 1 (0 deferred)
+  Q-1 direct import + child process hybrid for daemon composition (research-informed: Next.js standalone limitation)
+- [x] Canonical refs added: 4
+  Next.js standalone docs, custom server API, GitHub Discussion #22127, design doc §5.4 mod pattern
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected, all Qs answered
+- [x] Handoff mode: loose
+  captain must say "execute 052" or launch FO in separate session
+- [x] Clarify duration: 5 questions asked, session complete
+  1 batch assumption (with ad-hoc researcher dispatch for A-4/A-5) + 2 option AskUserQuestion + 1 Q-1 AskUserQuestion + 1 pipeline improvement (entity 075)
