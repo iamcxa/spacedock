@@ -62,7 +62,8 @@ describe("createDb(tempFilePath)", () => {
     const path = makeTempPath();
     const db = createDb(path);
     // Access underlying sqlite via the drizzle session — use raw query
-    const result = (db as any).$client.query("PRAGMA journal_mode").get() as { journal_mode: string };
+    // drizzle-orm/bun-sqlite exposes $client as underlying bun:sqlite Database
+    const result = (db as { $client: import("bun:sqlite").Database }).$client.query("PRAGMA journal_mode").get() as { journal_mode: string };
     expect(result.journal_mode).toBe("wal");
   });
 
@@ -79,14 +80,14 @@ describe("createDb(tempFilePath)", () => {
       connectedAt: now,
       lastHeartbeat: now,
     }).run();
-    (db1 as any).$client.close();
+    (db1 as { $client: import("bun:sqlite").Database }).$client.close();
 
     // Second open: verify row survives
     const db2 = createDb(path);
     const rows = db2.select().from(sessions).all();
     expect(rows.length).toBe(1);
     expect(rows[0].sessionId).toBe("persist-test");
-    (db2 as any).$client.close();
+    (db2 as { $client: import("bun:sqlite").Database }).$client.close();
   });
 });
 
