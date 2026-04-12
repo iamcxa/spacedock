@@ -10,79 +10,79 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| phase-e-plan-4-dogfood-trailofbits-integration | plan | Declare trailofbits + iamcxa-plugins marketplaces and enable 7 plugins | 🔵 planned | 2026-04-12 |
+| phase-e-plan-4-dogfood-trailofbits-integration | plan | Declare trailofbits + iamcxa-plugins marketplaces and enable 7 plugins | 🟡 in-flight | 2026-04-12 |
 
 ### agents/code-explorer.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent preloading spacedock:code-explorer skill | 🔵 planned | 2026-04-12 |
+| phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent preloading spacedock:code-explorer skill | 🟡 in-flight | 2026-04-12 |
 
 ### agents/differential-review-reviewer.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent for differential-review trailofbits skill | 🔵 planned | 2026-04-12 |
+| phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent for differential-review trailofbits skill | 🟡 in-flight | 2026-04-12 |
 
 ### agents/insecure-defaults-reviewer.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent for insecure-defaults trailofbits skill | 🔵 planned | 2026-04-12 |
+| phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent for insecure-defaults trailofbits skill | 🟡 in-flight | 2026-04-12 |
 
 ### agents/sharp-edges-reviewer.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent for sharp-edges trailofbits skill | 🔵 planned | 2026-04-12 |
+| phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent for sharp-edges trailofbits skill | 🟡 in-flight | 2026-04-12 |
 
 ### agents/variant-analysis-reviewer.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent for variant-analysis trailofbits skill | 🔵 planned | 2026-04-12 |
+| phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent for variant-analysis trailofbits skill | 🟡 in-flight | 2026-04-12 |
 
 ### docs/build-pipeline/README.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| phase-e-plan-4-dogfood-trailofbits-integration | plan | Correct pr-review-toolkit bundling claim at line 183 | 🔵 planned | 2026-04-12 |
+| phase-e-plan-4-dogfood-trailofbits-integration | plan | Correct pr-review-toolkit bundling claim at line 183 | 🟡 in-flight | 2026-04-12 |
 
 ### docs/build-pipeline/phase-e-plan-4-dogfood-trailofbits-integration.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| phase-e-plan-4-dogfood-trailofbits-integration | plan | Entity body writes Research Findings PLAN UAT Validation Map Stage Reports | 🔵 planned | 2026-04-12 |
+| phase-e-plan-4-dogfood-trailofbits-integration | plan | Entity body writes Research Findings PLAN UAT Validation Map Stage Reports | 🟡 in-flight | 2026-04-12 |
 
 ### mods/workflow-index-maintainer.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| phase-e-plan-4-dogfood-trailofbits-integration | plan | Conditional Case B deletion gated on AC3 AC4 live verification | 🔵 planned | 2026-04-12 |
+| phase-e-plan-4-dogfood-trailofbits-integration | plan | Conditional Case B deletion gated on AC3 AC4 live verification | 🟡 in-flight | 2026-04-12 |
 
 ### skills/build-explore/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| phase-e-plan-4-dogfood-trailofbits-integration | plan | Refactor Step 2 to dispatch spacedock:code-explorer for fresh-context mapping | 🔵 planned | 2026-04-12 |
+| phase-e-plan-4-dogfood-trailofbits-integration | plan | Refactor Step 2 to dispatch spacedock:code-explorer for fresh-context mapping | 🟡 in-flight | 2026-04-12 |
 
 ### skills/build-review/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| phase-e-plan-4-dogfood-trailofbits-integration | plan | Replace trailofbits-as-agents with 4 wrapper agent dispatches; remove TBD block | 🔵 planned | 2026-04-12 |
+| phase-e-plan-4-dogfood-trailofbits-integration | plan | Replace trailofbits-as-agents with 4 wrapper agent dispatches; remove TBD block | 🟡 in-flight | 2026-04-12 |
 
 ### skills/code-explorer/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| phase-e-plan-4-dogfood-trailofbits-integration | plan | New subroutine skill for codebase mapping symmetric to build-research | 🔵 planned | 2026-04-12 |
+| phase-e-plan-4-dogfood-trailofbits-integration | plan | New subroutine skill for codebase mapping symmetric to build-research | 🟡 in-flight | 2026-04-12 |
 
 ### tests/pressure/build-review-trailofbits-integration.yaml
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| phase-e-plan-4-dogfood-trailofbits-integration | plan | Pressure test YAML for 3 trailofbits integration contract scenarios | 🔵 planned | 2026-04-12 |
+| phase-e-plan-4-dogfood-trailofbits-integration | plan | Pressure test YAML for 3 trailofbits integration contract scenarios | 🟡 in-flight | 2026-04-12 |
 
 ## Recently Retired (last 30 days)
 
