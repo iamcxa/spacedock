@@ -1,8 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { Database } from "bun:sqlite";
-import { drizzle } from "drizzle-orm/bun-sqlite";
-import { sql } from "drizzle-orm";
-import * as schema from "./schema";
+import { describe, test, expect } from "bun:test";
 import {
   sessions,
   entityLeases,
@@ -10,6 +6,7 @@ import {
   comments,
   shareTokens,
 } from "./schema";
+import { createDb } from "./db";
 
 // ABOUTME: TDD-first schema tests for spacebridge Drizzle LCD schema.
 // Tests run against :memory: SQLite — no production DB contamination.
@@ -17,90 +14,9 @@ import {
 // no REAL/DATETIME affinity), fmodel columns on all 5 tables, and basic CRUD.
 
 function createMemoryDb() {
-  const sqlite = new Database(":memory:");
-  const db = drizzle(sqlite, { schema });
-  // Push schema to :memory: using raw SQL from the table definitions
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS sessions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id TEXT NOT NULL UNIQUE,
-      project_root TEXT NOT NULL,
-      pid INTEGER NOT NULL,
-      connected_at INTEGER NOT NULL,
-      last_heartbeat INTEGER NOT NULL,
-      event_type TEXT,
-      aggregate_id TEXT,
-      sequence_number INTEGER,
-      payload TEXT
-    )
-  `);
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS entity_leases (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      token TEXT NOT NULL UNIQUE,
-      session_id TEXT NOT NULL,
-      entity_slug TEXT NOT NULL,
-      role TEXT NOT NULL,
-      acquired_at INTEGER NOT NULL,
-      expires_at INTEGER NOT NULL,
-      event_type TEXT,
-      aggregate_id TEXT,
-      sequence_number INTEGER,
-      payload TEXT
-    )
-  `);
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      type TEXT NOT NULL,
-      entity TEXT NOT NULL,
-      stage TEXT NOT NULL,
-      agent TEXT NOT NULL,
-      timestamp INTEGER NOT NULL,
-      detail TEXT,
-      workflow_dir TEXT NOT NULL,
-      event_type TEXT,
-      aggregate_id TEXT,
-      sequence_number INTEGER,
-      payload TEXT
-    )
-  `);
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS comments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      comment_id TEXT NOT NULL UNIQUE,
-      entity_path TEXT NOT NULL,
-      selected_text TEXT NOT NULL,
-      section_heading TEXT NOT NULL,
-      content TEXT NOT NULL,
-      author TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      resolved INTEGER NOT NULL DEFAULT 0,
-      resolved_reason TEXT,
-      resolved_version INTEGER,
-      workflow_dir TEXT NOT NULL,
-      event_type TEXT,
-      aggregate_id TEXT,
-      sequence_number INTEGER,
-      payload TEXT
-    )
-  `);
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS share_tokens (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      token TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      entity_paths TEXT NOT NULL,
-      stages TEXT NOT NULL,
-      label TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      expires_at INTEGER NOT NULL,
-      event_type TEXT,
-      aggregate_id TEXT,
-      sequence_number INTEGER,
-      payload TEXT
-    )
-  `);
+  const db = createDb(":memory:");
+  // drizzle-orm/bun-sqlite exposes $client as underlying bun:sqlite Database
+  const sqlite = (db as { $client: import("bun:sqlite").Database }).$client;
   return { sqlite, db };
 }
 
