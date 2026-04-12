@@ -772,3 +772,39 @@ issues: []
 
 - chore(index): add contracts for entity-build-distill-skill-and-gsd-comparison entering plan (11 files)
 - chore(plan): build-distill-skill-and-gsd-comparison create skill + 5 GSD comparisons + entity drafts
+
+## Stage Report: execute
+
+- [x] Load and execute the spacedock:build-execute skill
+  Loaded dispatch instructions from team-lead message; executed wave graph inline (ensign context, no Agent tool)
+- [x] Build wave graph from ## PLAN (5 waves, 10 tasks)
+  W0: task-0 (env check) → W1: task-1 + task-2 parallel → W2: task-3 through task-7 parallel → W3: task-8 → W4: task-9
+- [x] Execute Wave 0: task-0 (env verification)
+  All 6 preconditions passed: no existing build-distill dir, no distillations dir, 5 GSD skills readable, 4 build-* targets exist, entity 067 in archive, _docs dir exists. Commit: N/A (no files created)
+- [x] Execute Wave 1: task-1 + task-2 in parallel (SKILL.md + comparison-dimensions.md)
+  task-1: skills/build-distill/SKILL.md created (6-step semi-interactive skill, all 5 ACs pass). task-2: skills/build-distill/references/comparison-dimensions.md created (7 dimensions with scoring guidance, all 5 ACs pass). Commit: cf00b17
+- [x] Execute Wave 2: task-3 through task-7 in parallel (5 GSD comparisons)
+  All 5 comparison reports written to docs/build-pipeline/_docs/distillations/. Score: count >= 9 in each. Deviations: task-3 (gsd-discuss-phase-vs-build-clarify.md) required 5 inline edits to add Score: annotations in correct plain-text format (initial Write used **Score**: bold format that grep did not match). All 5 task ACs pass after fix. Commit: c0dbfe3
+- [x] Execute Wave 3: task-8 (aggregation + 067 retroactive doc)
+  Created 067-tdd-pre-skill-exemplar.md (Part A). Proposed Entity Drafts already present in Wave 2 reports (Part B -- already written inline). Added All-Comparisons Aggregate table to all 5 report headers (Part C). All 5 task-8 ACs pass. Commit: 4d42219
+- [x] Execute Wave 4: task-9 (entity draft creation, >= 3 drafts with source: build-distill)
+  Created 3 entity drafts: 069 build-flow-roadmap-orchestration.md (gap 1.0), 070 build-clarify-interaction-modes.md (gap 0.75), 071 build-explore-domain-aware-gray-areas.md (gap 0.75). grep -rl "source: build-distill" docs/build-pipeline/*.md returns 4 files (3 drafts + entity 068 body text match). All task-9 ACs pass. Commit: 5fa7738
+- [x] Call workflow-index update-status (planned -> in-flight) at stage entry
+  SKIPPED: workflow-index Skill not available in ensign leaf context (no Skill tool invocation path from team-lead dispatch). Logged as deviation. All file creation completed without this status update -- entity status tracking is not on critical path for file output.
+- [x] Write ## Stage Report: execute with per-task commit SHAs, deviations, and validation results
+  This section. Commit SHAs: W1=cf00b17, W2=c0dbfe3, W3=4d42219, W4=5fa7738. Validation: all 4 ACs pass, all 8 UAT CLI items pass.
+
+### Deviations
+
+1. **task-3 Score: format fix**: Initial gsd-discuss-phase-vs-build-clarify.md wrote `**Score**:` (bold) instead of plain `Score:`. Required 5 sequential Edit calls to convert. No content change -- format only.
+2. **workflow-index update-status skipped**: build-execute SKILL.md Step 8 calls `spacedock:workflow-index update-status planned -> in-flight`. Ensign leaf context has no Skill tool. Status not updated in workflow-index. Low impact: entity file is the authoritative status source.
+3. **Step 5 AskUserQuestion skipped**: build-distill Step 5 is semi-interactive (AskUserQuestion per qualifying gap). Ensign execute context cannot present AskUserQuestion to captain. Entity drafts (task-9) were written using the proposed content from comparison reports without captain confirmation. Captain should review all 3 draft entities at UAT stage.
+
+### Validation Results
+
+| AC | Command | Status |
+|----|---------|--------|
+| AC-1 | `test -f skills/build-distill/SKILL.md && test -f skills/build-distill/references/comparison-dimensions.md` | PASS |
+| AC-2 | `ls docs/build-pipeline/_docs/distillations/gsd-*.md` (5 files); `grep -c "Score:" gsd-discuss-phase-vs-build-clarify.md` (9) | PASS |
+| AC-3 | `grep -rl "source: build-distill" docs/build-pipeline/*.md \| wc -l` (4 >= 3) | PASS |
+| AC-4 | `grep "067" docs/build-pipeline/_docs/distillations/067-tdd-pre-skill-exemplar.md` | PASS |
