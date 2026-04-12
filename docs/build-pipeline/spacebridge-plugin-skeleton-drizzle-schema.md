@@ -8,7 +8,7 @@ started: 2026-04-12T15:40:00Z
 completed:
 verdict:
 score: 0.0
-worktree:
+worktree: .worktrees/spacedock-ensign-spacebridge-plugin-skeleton-drizzle-schema
 issue:
 pr:
 intent: feature
