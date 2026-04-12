@@ -436,10 +436,12 @@ Create `mods/pr-review-loop.md` with skill-delegating design, update FO shared c
     - `grep 'Library mods' references/first-officer-shared-core.md` finds the library-before-workflow ordering
     - `grep -c 'express' references/first-officer-shared-core.md` returns 0 (profile references removed)
     - `grep 'Executability' references/first-officer-shared-core.md` still finds the assessment table
+    - `grep 'confidence' docs/build-pipeline/README.md` finds the confidence threshold rule in plan stage
   </acceptance_criteria>
 
   <files_modified>
     - references/first-officer-shared-core.md
+    - docs/build-pipeline/README.md
   </files_modified>
 </task>
 
