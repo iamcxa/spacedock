@@ -1,8 +1,8 @@
 ---
 id: 062
 title: Phase E Plan 4 -- Dogfood Trail of Bits Integration + Case B Cleanup
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: /build
 created: 2026-04-11T16:12:27Z
 started:
@@ -65,7 +65,7 @@ children:
 
 ## Acceptance Criteria
 
-1. `.claude/settings.json` exists at repo root, is git-tracked, parses as valid JSON, and declares trailofbits/skills marketplace + pr-review-toolkit + e2e-pipeline + feature-dev as plugin dependencies using Claude Code's canonical declarative schema. Exact field names verified against live CC docs or existing settings.json precedent at explore stage. (verify: `test -f .claude/settings.json` AND `python3 -c "import json; json.load(open('.claude/settings.json'))"` exits 0 AND `grep -E "trailofbits|pr-review-toolkit|e2e-pipeline|feature-dev" .claude/settings.json` returns ≥4 matches)
+1. `.claude/settings.json` exists at repo root, is git-tracked, parses as valid JSON, and declares (a) `trailofbits` marketplace (github source `trailofbits/skills`) + `iamcxa-plugins` marketplace (github source `iamcxa/kc-claude-plugins`) in `extraKnownMarketplaces`, AND (b) enables these plugins in `enabledPlugins`: `pr-review-toolkit@claude-plugins-official`, `sharp-edges@trailofbits`, `variant-analysis@trailofbits`, `insecure-defaults@trailofbits`, `mutation-testing@trailofbits`, `differential-review@trailofbits`, `e2e-pipeline@iamcxa-plugins`. Schema verified at clarify stage against `~/.claude/settings.json:277-309` precedent. **`feature-dev` NOT declared** -- Q-5 resolution picked Path 1 (new in-plugin `spacedock:code-explorer` agent+skill), so spacedock ships its own code-explorer primitive and does not couple target projects to feature-dev. (verify: `test -f .claude/settings.json` AND `python3 -c "import json; json.load(open('.claude/settings.json'))"` exits 0 AND `grep -E "trailofbits|pr-review-toolkit|iamcxa-plugins|e2e-pipeline" .claude/settings.json` returns ≥4 matches AND `! grep -q feature-dev .claude/settings.json`)
 
 2. `skills/build-review/SKILL.md` no longer describes trailofbits plugins as agents dispatched via Agent tool. Integration model for trailofbits inside build-review is explicit and clarify-locked. No `TBD` / `architectural-unknown` / "verify at implementation time" markers remain for trailofbits identifiers. (verify: `! grep -nE "[Tt]railofbits.*[Aa]gent\b|\bAgent.*trailofbits|TBD.*trailofbits|architectural.unknown.*trailofbits" skills/build-review/SKILL.md`)
 
@@ -84,26 +84,32 @@ children:
 A-1: `mods/workflow-index-maintainer.md` Case B deletion has no cross-entity impact -- all `docs/build-pipeline/_index/*.md` files are empty stubs at HEAD `a1829c1`, so no other entity relies on retroactive Case B tracking.
 Confidence: Confident
 Evidence: `docs/build-pipeline/_index/CONTRACTS.md:1-14` (14-line stub with `<!-- No active contracts yet -->`), `DECISIONS.md:1-9` (9-line stub), `INDEX.md:1-8` (8-line stub) -- none contain active rows
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-2: build-review already has established Skill() tool precedent for in-orchestrator nested skill invocation at Step 4 (`spacedock:knowledge-capture`), supporting Option A for the trailofbits integration model.
 Confidence: Confident
 Evidence: `skills/build-review/SKILL.md:26` (Tools Available: `Skill -- invoke spacedock:knowledge-capture in Step 4`), `skills/build-review/SKILL.md:139-147` (Step 4 invocation site)
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-3: Entity ID `062` poses no YAML octal parse risk -- spacedock tooling uses a hand-rolled frontmatter parser, not `yaml.safe_load`.
 Confidence: Confident
-Evidence: `scripts/codex_prepare_dispatch.py` (`parse_frontmatter_map` function), `scripts/codex_finalize_terminal_entity.py` -- neither imports `yaml`; entity ID stored as raw string via `line.partition(":")`
+Evidence: `scripts/codex_prepare_dispatch.py` (`parse_frontmatter_map` function), `scripts/codex_finalize_terminal_entity.py` -- neither imports `yaml`; entity ID stored as raw string via `line.partition(":")`. Parser authorship: clkao commit `a2d70b9c` (2026-04-01), not a spacedock-user addition -- spacedock engine is stdlib-only by original design choice, so PyYAML's octal interpretation was never in the runtime path.
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-4: Namespace `spacedock:*` is consistently used across all Phase E `skills/build-*` files after the Phase 2 sweep commit `15772ac`; no residual `spacebridge:*` dispatch references exist.
 Confidence: Confident
 Evidence: commit `15772ac` (49 refs updated); grep across `skills/build-*/SKILL.md` returns zero dispatch-call matches for `spacebridge:`; one forward reference to `/spacebridge:uat-audit` in `build-uat/SKILL.md:188` is a future slash command, not a dispatch target
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-5: The 6 `pr-review-toolkit:*` agents (code-reviewer, silent-failure-hunter, comment-analyzer, pr-test-analyzer, type-design-analyzer, code-simplifier) are real Agent-tool dispatch targets, distinct from trailofbits skills.
 Confidence: Confident
 Evidence: current CC session tool list exposes all 6 under `pr-review-toolkit:*` namespace as Agent `subagent_type` values; `docs/build-pipeline/README.md:183` lists them under "Required for full pipeline -- review and UAT stages"
+→ Confirmed: captain, 2026-04-12 (batch)
 
 A-6: The 4 observably-installed trailofbits plugins (`sharp-edges`, `variant-analysis`, `insecure-defaults`, `mutation-testing`) are Skill-tool-invocable skills, NOT Agent-tool-dispatchable agents -- confirming the spec §1033 category error.
 Confidence: Confident
 Evidence: current CC session skill list shows `sharp-edges:sharp-edges`, `variant-analysis:variant-analysis` (+`variants`), `insecure-defaults:insecure-defaults`, `mutation-testing:mutation-testing` as Skill-tool skills; no `trailofbits:*` or equivalent entries in the Agent `subagent_type` namespace
+→ Confirmed: captain, 2026-04-12 (batch)
 
 ## Option Comparisons
 
@@ -111,9 +117,11 @@ Evidence: current CC session skill list shows `sharp-edges:sharp-edges`, `varian
 
 | Option | Pros | Cons | Complexity | Recommendation |
 |---|---|---|---|---|
-| A. Orchestrator direct `Skill()` calls from build-review ensign context | Matches existing Step 4 precedent (knowledge-capture Skill() call); zero new agent files; trailofbits skills execute inline in orchestrator context | Sequential execution of trailofbits skills (no parallelism within that subset; pr-review-toolkit agents still dispatched in parallel); orchestrator context accumulates trailofbits output | Low | Recommended |
+| A. Orchestrator direct `Skill()` calls from build-review ensign context | Matches existing Step 4 precedent (knowledge-capture Skill() call); zero new agent files; trailofbits skills execute inline in orchestrator context | Sequential execution of trailofbits skills (no parallelism within that subset; pr-review-toolkit agents still dispatched in parallel); orchestrator context accumulates trailofbits output; violates Phase E GP#5 for review work (bookkeeping exception applies to knowledge-capture only) | Low | Viable |
 | B. Nested `Skill()` invocation from inside a dispatched pr-review-toolkit agent | Keeps all review work in parallel subagent contexts | Requires modifying external pr-review-toolkit agent definitions (out of scope); pr-review-toolkit agents do not load trailofbits skills via frontmatter; indirect invocation path | High | Not recommended |
-| C. Create thin Agent-tool wrapper agents around each trailofbits skill | Enables parallel Agent dispatch of trailofbits findings alongside pr-review-toolkit agents | Creates 2-4 new `agents/*.md` files solely as wrappers; duplicates what the Skill tool already provides; expands scope beyond the "category error fix" framing | Medium | Viable |
+| C. Create thin Agent-tool wrapper agents around each trailofbits skill | Enables parallel Agent dispatch of trailofbits findings alongside pr-review-toolkit agents; fresh context isolation per trailofbits skill; matches Phase E GP#5 (fresh context via subagent dispatch) for review work; symmetric to `agents/researcher.md` pattern (thin agent preloads skill via frontmatter) | Creates 3 new `agents/*.md` thin wrapper files (~15 lines each); expands scope beyond the "category error fix" framing but justified by architectural consistency | Medium | ✅ Recommended |
+
+→ Selected: C. Create thin Agent-tool wrapper agents around each trailofbits skill (captain, 2026-04-12, interactive)
 
 ### `update-status-bulk` return schema gap in `skills/workflow-index/references/write-mode.md`
 
@@ -123,6 +131,8 @@ Evidence: current CC session skill list shows `sharp-edges:sharp-edges`, `varian
 | B. Spawn a follow-up entity specifically for workflow-index return schema formalization | Preserves entity 062 scope; gives the fix its own clarify/plan cycle | Delays closure; risks forgetting until it bites | Low | Recommended |
 | C. Ignore until it bites | Zero immediate cost | Repeats the build-execute step 2 BLOCKER class of failure that shipped `d10c66c` during Captain Gate | Low | Not recommended |
 
+→ Selected: B. Spawn a follow-up entity specifically for workflow-index return schema formalization (captain, 2026-04-12, interactive)
+
 ### build-review failure mode when a trailofbits `Skill()` invocation fails
 
 | Option | Pros | Cons | Complexity | Recommendation |
@@ -130,6 +140,8 @@ Evidence: current CC session skill list shows `sharp-edges:sharp-edges`, `varian
 | A. Abort review with `feedback-to: captain` | Fail-loud surface; captain decides retry | Every trailofbits failure stops review even for transient issues | Low | Not recommended |
 | B. Record failure in `### Dispatch Gaps` subsection and proceed with remaining review output | Matches existing Step 2 dispatch-gap handling at `skills/build-review/SKILL.md:105`; graceful degradation | Risks shipping review without security-specific findings; captain may miss Dispatch Gap entry | Low | Recommended |
 | C. Classify the failure itself as a CRITICAL CODE finding with `feedback-to: execute` | Surfaces failure in routing path | Incorrectly blames execute for a skill-invocation issue; breaks routing contract | Low | Not recommended |
+
+→ Selected: B. Record failure in `### Dispatch Gaps` subsection and proceed with remaining review output (captain, 2026-04-12, interactive). Framing shift post-B-1: now applies to trailofbits wrapper agent dispatch failures (Option C wrappers), not raw Skill() invocation failures. Handling pattern unchanged -- same as existing pr-review-toolkit agent failure path at `skills/build-review/SKILL.md:105`.
 
 ## Open Questions
 
@@ -141,6 +153,8 @@ Why it matters: Deliverable 1 corrects build-review to stop treating trailofbits
 
 Suggested options: (a) Live plugin enumeration from current CC session; (b) Fetch `trailofbits/skills` GitHub marketplace manifest; (c) Accept that `differential-review` does not exist and drop it from the dispatch list
 
+→ Answer: Fetch trailofbits/skills marketplace manifest (captain, 2026-04-12, interactive). Verification: differential-review IS published per WebFetch on `https://github.com/trailofbits/skills` earlier this session -- the 5 key security plugins listed include differential-review alongside sharp-edges / variant-analysis / insecure-defaults / mutation-testing. Absence from current CC session skill list means "not enabled in this clone", not "unpublished". **Resolution**: include `differential-review-reviewer` as the 4th wrapper agent in Deliverable 1; ensure Deliverable 2's `.claude/settings.json` enables the plugin so future clones prompt install.
+
 Q-2: What is Claude Code's canonical `.claude/settings.json` schema for declaring plugin marketplace dependencies so a fresh spacedock clone auto-prompts install?
 
 Domain: Readable/Textual
@@ -148,6 +162,14 @@ Domain: Readable/Textual
 Why it matters: Deliverable 2 requires creating `.claude/settings.json` with a declarative plugin dependency structure. Zero codebase precedent exists for `extraKnownMarketplaces` or `enabledPlugins` field names. The entity Guardrail explicitly says: if schema cannot be verified, Deliverable 2 is deferred to a follow-up entity and this entity ships only Deliverables 1 and 3.
 
 Suggested options: (a) Fetch live Claude Code plugin documentation; (b) Inspect user-global `~/.claude/settings.json` for existing marketplace declarations as precedent; (c) Defer Deliverable 2 to follow-up entity per Guardrail, ship D1+D3 only
+
+→ Answer: Inspect `~/.claude/settings.json` for precedent (captain, 2026-04-12, interactive). **Schema verified** against live user-global settings at `~/.claude/settings.json:277-309`:
+- `enabledPlugins`: `{"plugin-name@marketplace-name": true}` (line 277-287 in user-global; 9 plugins currently enabled there)
+- `extraKnownMarketplaces`: `{"marketplace-name": {"source": {"source": "github", "repo": "owner/repo"}, "autoUpdate": true}}` (line 288-309)
+- Built-in marketplaces (`claude-plugins-official`, `superpowers-marketplace`) need NO declaration in `extraKnownMarketplaces`; custom github sources DO need it.
+- User-global settings already declares `"trailofbits"` marketplace pointing to `trailofbits/skills` github repo at lines 302-308 -- this is the authoritative naming convention spacedock's repo-level settings.json should mirror.
+
+**Resolution**: Deliverable 2 can now be drafted with **zero fabrication**. Plan stage uses these exact field names. Guardrail ("defer if schema unverifiable") no longer applies -- schema is verified and concrete.
 
 Q-3: Is `pr-review-toolkit` actually bundled with the `superpowers` plugin, or does it require a separate `claude plugin marketplace add pr-review-toolkit`?
 
@@ -157,6 +179,8 @@ Why it matters: `docs/build-pipeline/README.md:183` claims pr-review-toolkit is 
 
 Suggested options: (a) Inspect the superpowers plugin manifest to confirm bundling; (b) Ask captain directly; (c) Declare pr-review-toolkit in settings.json regardless (harmless if already bundled)
 
+→ Answer: Declare pr-review-toolkit explicitly in Deliverable 2 + fix README:183 claim as small plan task within entity 062 (captain, 2026-04-12, interactive). **Pre-verified**: `~/.claude/settings.json:286` shows `"pr-review-toolkit@claude-plugins-official": true` -- pr-review-toolkit is a SEPARATE plugin from `claude-plugins-official` marketplace, NOT bundled with superpowers. `docs/build-pipeline/README.md:183` "Bundled with superpowers" claim is **incorrect** and must be corrected as a plan task within this entity.
+
 Q-4: Is `feature-dev` the correct Claude Code plugin name for the plugin containing the `code-explorer` agent?
 
 Domain: Readable/Textual
@@ -164,6 +188,10 @@ Domain: Readable/Textual
 Why it matters: The entity body names `feature-dev` as the plugin to declare. `feature-dev` does not appear anywhere else in the spacedock codebase as an installed plugin reference (only in `docs/comparison.md:50` as unrelated competing-tool text). Live verification is required to avoid Guardrail violation ("No fabricated version numbers").
 
 Suggested options: (a) Enumerate current CC session agent list to confirm `feature-dev:code-explorer` namespace; (b) Check user-global plugins manifest for the canonical plugin name; (c) Accept that the plugin is already installed in current session and declare it directly
+
+→ Answer: `feature-dev@claude-plugins-official` confirmed (captain, 2026-04-12, interactive). Pre-verified via `~/.claude/plugins/cache/claude-plugins-official/feature-dev/7ed523140f50/.claude-plugin/plugin.json` -- plugin is named `feature-dev`, marketplace is the built-in `claude-plugins-official`, bundles `code-explorer` / `code-reviewer` / `code-architect` agents. No `extraKnownMarketplaces` declaration needed (built-in marketplace).
+
+**Sub-finding + revision for e2e-pipeline**: original clarify answer was "defer to follow-up entity" based on incorrect assumption that upstream was `iamcxa/claude-e2e-pipeline` (single-plugin repo). Captain correction: the real upstream is `https://github.com/iamcxa/kc-claude-plugins`, a multi-plugin marketplace repo structurally identical to `trailofbits/skills`. Kent's local dev loads via `plugin-dir` directory source, but spacedock's repo-level settings.json can declare it as a github marketplace using the exact same `extraKnownMarketplaces` pattern. **Revised resolution**: include e2e-pipeline in Deliverable 2 via `iamcxa-plugins` marketplace (github source `iamcxa/kc-claude-plugins`), enable as `e2e-pipeline@iamcxa-plugins`. No follow-up entity needed.
 
 Q-5: Where should the SO/build-explore dispatch-routing logic live, and what is the refactor path for build-explore to adopt fresh-context dispatch?
 
@@ -173,6 +201,8 @@ Why it matters: The Fresh-context dispatch GUARDRAIL (entity body line 62) expli
 
 Suggested options: (a) Path A -- mode-aware build-explore; (b) Path B -- extract mapping to caller; (c) Path C -- new code-explorer subroutine skill; (d) Defer as follow-up entity rather than expanding entity 062's plan
 
+→ Answer: Path C -- new `spacedock:code-explorer` agent + skill (captain, 2026-04-12, interactive). **Revised framing**: the `subagent-cannot-nest-agent-dispatch` memory only constrains general-purpose teammates, NOT custom-named agents like ensign (verified via `agents/ensign.md` which has no `tools` restriction + `skills/build-execute/SKILL.md` already dispatches `task-executor` from ensign context). So build-explore CAN dispatch code-explorer in all canonical invocation paths (team mode + bare mode + SO-direct) -- no mode fallback needed. **Decision rationale**: spacedock is a CC plugin that installs build flow into target projects (carlove, etc.) via a future install-skill; shipping an in-plugin `spacedock:code-explorer` means target projects need zero additional plugin dependency for codebase mapping. Path 2 (reuse `feature-dev:code-explorer`) was rejected because it would force every target project to install `feature-dev` as a transitive dependency purely for one bundled agent -- extra moving parts with no user-facing benefit. **Implementation sketch**: `skills/code-explorer/SKILL.md` (~200 lines, Phase-E-specialized structured prompt distilled from this entity's experimental override dispatch prompt) + `agents/code-explorer.md` (~15 lines, thin wrapper with `skills: ["spacedock:code-explorer"]` frontmatter). Symmetric to existing `skills/build-research/` + `agents/researcher.md` pattern. Tool allowlist: Read, Grep, Glob, Bash -- plain four-piece, no exotic capability. **Future `feature-dev` dep removal**: Deliverable 2 AC1 updated to drop feature-dev from enabledPlugins list.
+
 Q-6: Should `skills/build-review/SKILL.md` dispatch the full set of observably-installed trailofbits skills or only the 2 named in spec §348-349 (`differential-review` + `sharp-edges`)?
 
 Domain: Runnable/Invokable
@@ -181,13 +211,30 @@ Why it matters: The spec names only 2 trailofbits plugins for build-review. The 
 
 Suggested options: (a) Stick to spec §348-349 (drop `differential-review` if absent); (b) Expand to all observably-installed trailofbits skills with Stage Report note explaining the scope expansion; (c) Make the selection configurable at Deliverable 1 via a skill frontmatter field; (d) Captain scope decision at clarify
 
+→ Answer: 4 review-appropriate trailofbits skills dispatched by build-review (captain, 2026-04-12, interactive). Wrapper agents for `differential-review` + `sharp-edges` + `variant-analysis` + `insecure-defaults`. **Drop `mutation-testing` from build-review dispatch** because it is a test campaign CONFIG helper (per its own skill description: "Configures mewt or muton mutation testing campaigns -- scopes targets, tunes timeouts"), NOT a reviewer that produces findings about a diff. Including it would spam build-review's Stage Report Findings table with irrelevant config suggestions.
+
+**Scope split clarification (Deliverable 2 vs Deliverable 1)**: `mutation-testing` REMAINS in Deliverable 2's `enabledPlugins` list because (a) it comes bundled with the trailofbits marketplace we're already declaring, (b) users may want to invoke it directly (e.g., `Skill("mutation-testing:mutation-testing", ...)`) outside the build-review pipeline, (c) dropping it from enabledPlugins provides no cleanliness benefit while adding friction for non-review use cases. Deliverable 2 = "plugins made available", Deliverable 1 = "plugins that build-review auto-dispatches" -- the two scopes don't have to match.
+
 ## Decomposition Recommendation
 
 (skipped: no `⚠️ likely-decomposable` scope flag in Captain Context Snapshot, and Step 2 mapped 18 files which is below the 20-file decomposition trigger -- `references/gray-area-templates.md` rule: "more than 20 files across 3+ layers" not met)
 
 ## Canonical References
 
-(clarify stage will populate)
+- `https://github.com/trailofbits/skills` -- Trail of Bits Claude Code plugin marketplace, referenced during Q-1 resolution. WebFetch verified 5 key security plugins published including `differential-review` (Q-1)
+- `~/.claude/settings.json:277-309` -- user-global `enabledPlugins` + `extraKnownMarketplaces` schema precedent, cited during Q-2 resolution. Declares `trailofbits` marketplace (github source `trailofbits/skills`, lines 302-308) and 9 enabled plugins including `pr-review-toolkit@claude-plugins-official` (line 286) (Q-2, Q-3)
+- `~/.claude/plugins/cache/claude-plugins-official/feature-dev/7ed523140f50/.claude-plugin/plugin.json` -- feature-dev plugin manifest, cited during Q-4 resolution. Confirms plugin name `feature-dev` in `claude-plugins-official` marketplace, bundles code-explorer/code-reviewer/code-architect agents (Q-4)
+- `https://github.com/iamcxa/kc-claude-plugins` -- Kent Chen's multi-plugin marketplace repo (structurally identical to trailofbits/skills), cited during Q-4 e2e-pipeline sub-finding. Contains e2e-pipeline and other `kc-*` plugins. Spacedock's Deliverable 2 declares this as `iamcxa-plugins` marketplace via extraKnownMarketplaces github source (Q-4)
+- `agents/ensign.md` (spacedock repo) -- Ensign agent definition, cited during Q-5 revised framing. No `tools` allowlist restriction; inherits full tool set including Agent. Proves that ensign (custom-named agent) is NOT subject to the `subagent-cannot-nest-agent-dispatch` constraint, unlike general-purpose teammates. Together with `skills/build-execute/SKILL.md`'s existing dispatch of task-executor from ensign context, confirms nested dispatch is legal in ensign mode (Q-5)
+
+---
+
+## Follow-up Entity Candidates (surfaced during clarify, not in entity 062's scope)
+
+- **`spacedock:install-build-flow` skill** (new): install/scaffold skill that injects Phase E build pipeline into a target repo (e.g., carlove). Creates `docs/build-pipeline/README.md` with stage definitions, initializes `.claude/settings.json` with required plugin dependencies (trailofbits + pr-review-toolkit + e2e-pipeline + iamcxa-plugins marketplaces), copies `mods/workflow-index-maintainer.md`, provides example entity template. This skill is how users turn any git repo into a spacedock-orchestrated project after installing the spacedock plugin. Surfaced during Q-5 discussion (captain reframed distribution model). Defer to Phase E+1.
+- **`spacedock:code-explorer` skill + agent** (new, Q-5 answer): subroutine skill + thin agent symmetric to `build-research` + `researcher`. Dispatched by `build-explore` Step 2 for fresh-context codebase mapping. Removes `feature-dev` plugin dependency. ~215 lines total. Part of Deliverable 1's scope expansion during plan stage (not a separate follow-up -- plan task within entity 062).
+- **`mods/workflow-index-maintainer.md` return schema formalization** (Q-O-2 resolution): `update-status-bulk` return payload undefined in `skills/workflow-index/references/write-mode.md`; build-execute Step 2 relies on unspecified row count. Spawn as follow-up entity after entity 062 ships.
+- **`docs/build-pipeline/README.md:183` pr-review-toolkit bundling claim correction** (Q-3 resolution): small plan task within entity 062, not a separate entity.
 
 ## Stage Report: explore
 
@@ -205,3 +252,24 @@ Suggested options: (a) Stick to spec §348-349 (drop `differential-review` if ab
   18 files mapped; write surface is 3-4 files (`skills/build-review/SKILL.md` + new `.claude/settings.json` + `mods/workflow-index-maintainer.md` + possibly `_index/CONTRACTS.md` populated by mod), read surface is 14 files for context grounding. Write-scope view supports Small; impact-surface view supports Medium. Medium is the conservative middle ground; clarify may re-classify.
 
 **Notes**: Build-explore Step 2 executed via **experimental override** per entity GUARDRAIL (line 62) -- `feature-dev:code-explorer` agent dispatched from SO-direct context instead of inline grep/Read/store. Override captured Q-5 as the follow-up architectural decision. Dispatch produced structured 18-file report in one Agent call with `file:line` evidence for each Deliverable; SO main context consumed the report and wrote these sections without context pollution. Matches Phase E Guiding Principle #5 ("Fresh context via subagent dispatch, not stage split"). First live validation of the SO + code-explorer dispatch pattern -- the structural question of where this routing lives permanently is Q-5 for clarify. Additional gotcha surfaced: entity body contains ~19 em-dashes (`—`) in prose, violating build skill family convention (`--` double dash); minor drift, noted for follow-up sweep if clarify decides to enforce.
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  entity 062 is Small scope; no decomposition recommendation surfaced during explore (18 files < 20-file trigger, no `⚠️ likely-decomposable` scope flag)
+- [x] Assumptions confirmed: 6 / 6 (0 corrected)
+  A-1 through A-6 all confirmed via batch 2026-04-12; A-3 enriched with clkao authorship finding (parser is original `a2d70b9c` 2026-04-01 commit, not user-added, consistent with stdlib-only engine design)
+- [x] Options selected: 3 / 3
+  O-1 Path C thin agent wrappers (trailofbits integration); O-2 Path B spawn follow-up entity (workflow-index return schema gap); O-3 Path B Dispatch Gaps graceful degradation (build-review wrapper dispatch failure)
+- [x] Questions answered: 6 / 6 (0 deferred)
+  Q-1 differential-review IS published in trailofbits/skills marketplace (WebFetch-verified, absent from current session = not-enabled not unpublished); Q-2 settings.json schema verified at `~/.claude/settings.json:277-309` (enabledPlugins + extraKnownMarketplaces with github source type); Q-3 pr-review-toolkit NOT bundled with superpowers -- it's `@claude-plugins-official` (line 286), README:183 claim incorrect, fix as plan task; Q-4 feature-dev confirmed as `feature-dev@claude-plugins-official` + e2e-pipeline resolved via `iamcxa/kc-claude-plugins` marketplace (Kent's multi-plugin repo, structurally identical to trailofbits/skills); Q-5 revised framing (subagent-cannot-nest only constrains general-purpose teammates not custom ensign agents) → Path C new in-plugin `spacedock:code-explorer` agent+skill (user-facing rationale: spacedock ships its own code-explorer primitive so target projects need zero extra plugin dep); Q-6 4 review-appropriate trailofbits (differential-review + sharp-edges + variant-analysis + insecure-defaults, drop mutation-testing from dispatch because it's a test campaign config helper not a reviewer)
+- [x] Canonical refs added: 4
+  `https://github.com/trailofbits/skills` (Q-1 marketplace source); `~/.claude/settings.json:277-309` (Q-2/Q-3 schema + pr-review-toolkit bundling precedent); `~/.claude/plugins/cache/claude-plugins-official/feature-dev/7ed523140f50/.claude-plugin/plugin.json` (Q-4 feature-dev manifest); `https://github.com/iamcxa/kc-claude-plugins` (Q-4 e2e-pipeline upstream marketplace); `agents/ensign.md` (Q-5 custom agent tool inheritance precedent)
+- [x] Context status: ready
+  gate passed: all 6 assumptions confirmed + all 3 options selected + all 6 questions answered + 7 ACs present with no α markers + Canonical References populated with 4 (+1 = 5 counting Follow-up candidates block)
+- [x] Handoff mode: loose
+  `auto_advance` frontmatter field empty → captain must explicitly say "execute 062" to advance status to plan; FO handles that transition separately
+- [x] Clarify duration: 10 AskUserQuestion calls total
+  Step 3: 3 calls (B-1 integration model, B-2 return schema gap, B-3 failure mode); Step 4: 7 calls (Q-1 differential-review, Q-2 settings.json schema, Q-3 pr-review-toolkit bundling, Q-4 feature-dev + e2e-pipeline, Q-4 revise for kc-claude-plugins correction, Q-5 revised after subagent-nest clarification, Q-6 trailofbits dispatch scope); 1 initial Q-5 rejected by captain for clarification, then re-presented
+
+**Notes**: Captain added live scope corrections during clarify that reframed the distribution model (spacedock is a CC plugin installed globally, targets are external projects like carlove -- NOT "someone clones spacedock to hack on spacedock"). This reframing strengthened Path 1 for Q-5 with a user-facing rationale (in-plugin self-containment means target projects need zero extra plugin dep for code-explorer). Also surfaced `spacedock:install-build-flow` as a new follow-up entity candidate (captured in the ## Follow-up Entity Candidates block below Canonical References). Four downstream plan-task expansions recorded: (1) spacedock:code-explorer skill+agent creation, (2) Deliverable 2 drops feature-dev, (3) `docs/build-pipeline/README.md:183` pr-review-toolkit bundling claim correction, (4) 4 trailofbits wrapper agents in Deliverable 1. All clarify decisions are captured in annotations in the respective sections above -- plan stage reads annotations, not Directive, for scope grounding.
