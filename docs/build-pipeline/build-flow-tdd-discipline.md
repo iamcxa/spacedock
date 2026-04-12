@@ -1,15 +1,15 @@
 ---
 id: 067
 title: Build Flow TDD Discipline -- Distill superpowers:test-driven-development into Plan + Execute
-status: clarify
+status: plan
 context_status: ready
 source: captain
 created: 2026-04-12T17:30:00+08:00
-started:
+started: 2026-04-12T22:00:00Z
 completed:
 verdict:
 score: 0.75
-worktree:
+worktree: .worktrees/spacedock-ensign-build-flow-tdd-discipline
 issue:
 pr:
 intent: feature
