@@ -33,7 +33,7 @@ function connectAndRegister(
     const decoder = createFrameDecoder((msg) => received.push(msg as IpcMessage));
 
     socket.on("data", (chunk) => {
-      decoder(chunk);
+      decoder(chunk as Buffer);
       const ack = received.find((m) => m.type === "register-ack");
       if (ack) resolve({ socket, ack: ack.payload as RegisterAckPayload });
     });
@@ -274,7 +274,7 @@ describe("SocketServer", () => {
     // Create a stale socket file
     const staleServer = net.createServer();
     await new Promise<void>((r) => staleServer.listen(sockPath, r));
-    await new Promise<void>((r) => staleServer.close(r));
+    await new Promise<void>((r) => staleServer.close(() => r()));
     // File now exists (stale)
     expect(existsSync(sockPath)).toBe(true);
 

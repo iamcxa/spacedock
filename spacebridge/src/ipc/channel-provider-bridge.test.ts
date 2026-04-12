@@ -57,7 +57,7 @@ describe("ChannelProviderBridge", () => {
     const fakeSnap = {
       id: 1, entity: "e", version: 2, body: "body",
       frontmatter: null, author: "fo", reason: "test",
-      source: "update", rollback_from_version: null,
+      source: "update" as const, rollback_from_version: null,
       rollback_section: null, created_at: "2026-01-01T00:00:00Z",
     };
     const client = makeFakeClient({ createSnapshot: fakeSnap });

@@ -790,3 +790,79 @@ commit: 7d4bb28
 - `bun test tools/dashboard/src/` — 205/205 pass (no regressions)
 - `bun test` (repo root) — 400/402 pass (2 pre-existing spacebridge drizzle-orm failures)
 - `bun build spacebridge/src/ipc/index.ts --target bun --outdir /tmp/ipc-check` — exit 0
+
+## Stage Report: quality
+
+### test
+verdict: pass
+command: bun test
+evidence:
+```
+bun test v1.3.9 (cf6cdbbb)
+
+ 345 pass
+ 0 fail
+ 812 expect() calls
+Ran 345 tests across 25 files. [4.55s]
+```
+
+### lint
+verdict: fail
+command: bun lint
+evidence:
+```
+error: Script not found "lint"
+```
+notes: no lint script configured in the project
+
+### typecheck
+verdict: fail
+command: tsc --noEmit -p tools/dashboard/tsconfig.json
+evidence:
+```
+TypeScript: 18 errors in 1 files
+═══════════════════════════════════════
+Top codes: TS2339 (15x), TS7006 (3x)
+
+tools/dashboard/src/channel.test.ts (18 errors)
+  L29: TS2339 Property 'url' does not exist on type 'ChannelProvider'.
+  L49: TS2339 Property 'url' does not exist on type 'ChannelProvider'.
+  L87: TS2339 Property 'getAll' does not exist on type 'Pick<EventBuffer, "getChannelMessagesSince"> | { getChannelMessagesSince(af...
+  L88: TS7006 Parameter 'e' implicitly has an 'any' type.
+  L121: TS2339 Property 'getAll' does not exist on type 'Pick<EventBuffer, "getChannelMessagesSince"> | { getChannelMessagesSince(af...
+  L122: TS7006 Parameter 'e' implicitly has an 'any' type.
+  L201: TS2339 Property 'version' does not exist on type 'EntitySnapshot | Promise<EntitySnapshot>'.
+  L202: TS2339 Property 'author' does not exist on type 'EntitySnapshot | Promise<EntitySnapshot>'.
+  L203: TS2339 Property 'reason' does not exist on type 'EntitySnapshot | Promise<EntitySnapshot>'.
+  L204: TS2339 Property 'frontmatter' does not exist on type 'EntitySnapshot | Promise<EntitySnapshot>'.
+  L237: TS2339 Property 'version' does not exist on type 'EntitySnapshot | Promise<EntitySnapshot>'.
+  L238: TS2339 Property 'version' does not exist on type 'EntitySnapshot | Promise<EntitySnapshot>'.
+  L239: TS2339 Property 'listVersions' does not exist on type 'Pick<SnapshotStore, "createSnapshot"> | { getSnapshot(...'.
+  L319: TS2339 Property 'getAll' does not exist on type 'Pick<EventBuffer, "getChannelMessagesSince"> | { getChannelMessagesSince(af...
+  L320: TS7006 Parameter 'e' implicitly has an 'any' type.
+  L624: TS2339 Property 'version' does not exist on type 'EntitySnapshot | Promise<EntitySnapshot>'.
+  L630: TS2339 Property 'version' does not exist on type 'EntitySnapshot | Promise<EntitySnapshot>'.
+  L695: TS2339 Property 'version' does not exist on type 'EntitySnapshot | Promise<EntitySnapshot>'.
+```
+notes: spacebridge tsc check passed; dashboard channel.test.ts has 18 TypeScript errors (type contract drift). See feedback-to execute for fixes.
+
+### build
+verdict: fail
+command: bun build
+evidence:
+```
+bun build v1.3.9 (cf6cdbbb)
+error: Missing entrypoints. What would you like to bundle?
+
+Usage:
+  $ bun build <entrypoint> [...<entrypoints>] [...flags]  
+
+To see full documentation:
+  $ bun build --help
+```
+notes: no bun build script configured in project; manual entrypoints required
+
+### coverage
+verdict: skipped
+command: n/a
+evidence: no threshold configured in workflow ops config

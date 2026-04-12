@@ -122,7 +122,7 @@ export function createChannelServer(opts: ChannelServerOptions) {
     }
   };
 
-  const dashboard: ChannelProvider = opts.provider ?? createServer({
+  const dashboard = opts.provider ?? createServer({
     port: opts.port,
     hostname: "127.0.0.1",
     projectRoot: opts.projectRoot,

@@ -273,7 +273,7 @@ describe("SocketClient", () => {
 
       await expect(pendingPromise).rejects.toThrow();
     } finally {
-      await new Promise<void>((r) => netServer.close(r));
+      await new Promise<void>((r) => netServer.close(() => r()));
       if (existsSync(sockPath)) try { unlinkSync(sockPath); } catch {}
     }
   });
