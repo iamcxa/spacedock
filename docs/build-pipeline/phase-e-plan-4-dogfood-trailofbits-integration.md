@@ -1573,3 +1573,56 @@ No threshold configured in workflow ops config. Coverage check skipped.
 ### Summary
 
 Re-run confirms: test suite has 1 failing test and typecheck has 9 TS errors, both in files NOT touched by entity 062 (execute diff ad08e5d..HEAD contains only agent/reference/skill/doc changes). Step 6.5 classification: both failures are pre-existing drift from earlier entities (033/035). Build passes. Per Step 7 Routing Rule, overall verdict is `pass (pre-existing failures noted)` -- no feedback-to routing, FO advances.
+
+## Stage Report: review
+
+**Verdict**: pass
+**Ran at**: 2026-04-12T02:38:09Z
+**HEAD**: ada2b38
+**Execute base**: 9d8e836
+
+### Pre-scan
+
+claude-md-compliance: 1 finding (em dashes in `references/claude-ensign-runtime.md` new section, DOC-level, see Findings)
+stale-references: 0 findings (store_insight properly removed from build-explore Tools Available; no other removed symbols have outstanding callers)
+dependency-chain: 0 findings (no import statements in SKILL.md/agent markdown files; all `spacedock:code-explorer` and `spacedock:*-reviewer` dispatch references resolve to actual files in `agents/`)
+plan-consistency: 5 files in diff NOT in any task `files_modified` (see Findings -- all are legitimate post-plan writes by FO apply-mode and quality stage ensign, not unplanned scope creep)
+
+### Dispatch summary
+
+| Agent | Status | Finding Count |
+|-------|--------|---------------|
+| pr-review-toolkit:code-reviewer | NOT DISPATCHED -- Agent tool absent | 0 |
+| pr-review-toolkit:silent-failure-hunter | NOT DISPATCHED -- Agent tool absent | 0 |
+| pr-review-toolkit:comment-analyzer | NOT DISPATCHED -- Agent tool absent | 0 |
+| pr-review-toolkit:pr-test-analyzer | NOT DISPATCHED -- Agent tool absent | 0 |
+| pr-review-toolkit:type-design-analyzer | NOT DISPATCHED -- Agent tool absent | 0 |
+| pr-review-toolkit:code-simplifier | NOT DISPATCHED -- Agent tool absent | 0 |
+| spacedock:sharp-edges-reviewer | NOT DISPATCHED -- Agent tool absent | 0 |
+| spacedock:variant-analysis-reviewer | NOT DISPATCHED -- Agent tool absent | 0 |
+| spacedock:insecure-defaults-reviewer | NOT DISPATCHED -- Agent tool absent | 0 |
+| spacedock:differential-review-reviewer | NOT DISPATCHED -- Agent tool absent | 0 |
+
+### Dispatch Gaps
+
+Agent tool availability probed via `ToolSearch(query="select:Agent", max_results=1)` at review start. **Result: "No matching deferred tools found"** -- Agent tool is absent from this ensign subagent's context in both bare and team dispatch modes. This is the third consecutive live confirmation of KC-062-1 (bare mode plan, team mode execute, team mode review). The full 10-agent fan (6 pr-review-toolkit + 4 trailofbits wrapper agents) was SKIPPED. This is expected Phase 4 data per the entity assignment context: "When Agent is absent, the review stage runs the inline pre-scan only. The 10-agent parallel fan is SKIPPED and logged in Dispatch Gaps." Pre-scan findings below are the full review output.
+
+No agent returned findings (all skipped). Per `build-review/SKILL.md` Red Flags: "Every dispatched agent timed out or returned empty" would normally require escalation -- however this scenario is pre-authorized by the entity assignment's explicit "Agent is NOT available in ensign subagent context" note and "When Agent is absent, the review stage runs the inline pre-scan only" instruction. The Red Flag escalation condition was designed for unexpected failures, not for an explicitly documented structural limitation. Proceeding with pre-scan-only verdict.
+
+### Findings
+
+| Severity | Root | File:Line | Description | Source |
+|----------|------|-----------|-------------|--------|
+| MEDIUM | DOC | references/claude-ensign-runtime.md:29,35,63,70-73 | New "Third-Party Plugin Integration -- Thin Wrapper Pattern" section uses em dashes (`—`) in 7 locations, violating the build skill family `--` (double dash) convention. Section was added by KC-062-2 apply commit `89490ad`. Pre-existing content (lines 1-27) already contained one em dash at line 25 ("routes fixes through a fresh dispatch —"). | pre-scan:claude-md |
+| LOW | PLAN | references/claude-ensign-runtime.md | File changed in diff but appears in no task `files_modified` -- this is a legitimate FO apply-mode write (KC-062-2 captured the thin wrapper pattern and FO applied it here). Plan did not anticipate FO apply-mode writes to scaffold references; not a code defect. | pre-scan:plan-consistency |
+| LOW | PLAN | skills/build-execute/SKILL.md | File changed in diff (KC-062-1 runtime probe fallback at Step 4) but appears in no task `files_modified` -- FO apply-mode write post-execute. Legitimate. | pre-scan:plan-consistency |
+| LOW | PLAN | skills/build-plan/SKILL.md | File changed in diff (KC-062-1 runtime probe fallback at Step 2) but appears in no task `files_modified` -- FO apply-mode write post-execute. Legitimate. | pre-scan:plan-consistency |
+| LOW | PLAN | skills/build-quality/SKILL.md | File changed in diff (Step 6.5 diff-scope classification added by quality ensign) but appears in no task `files_modified` -- quality stage's own fix-forward correction. Legitimate stage work. | pre-scan:plan-consistency |
+| LOW | PLAN | docs/build-pipeline/_index/CONTRACTS.md | File changed in diff (workflow-index updates) but appears in no task `files_modified` -- index mechanism writes are by convention not listed in task files_modified. | pre-scan:plan-consistency |
+| NIT | DOC | references/claude-ensign-runtime.md:25 | Pre-existing em dash in "routes fixes through a fresh dispatch — the ensign does not" (line 25 at HEAD before this diff). Not introduced by this entity's execute iteration. | pre-scan:claude-md |
+
+### Knowledge Capture
+
+no findings met D1/D2 threshold -- the 1 MEDIUM DOC finding (em dash drift in a reference scaffold) is a pre-existing pattern already captured by the build skill family convention rule and does not introduce a new D1 pattern or meet the MEDIUM 2+ recurrence D2 gate. The 5 LOW PLAN findings are plan-consistency notes about FO apply-mode and stage writes that expand scope beyond declared `files_modified`; this is a systemic pattern of the pipeline design, not an entity-062-specific insight worth adding to learned-patterns.md. No D1 write performed; no D2 candidate staged. Knowledge-capture skill invocation skipped per `build-review/SKILL.md` Step 4 "If no findings met either threshold, record `knowledge capture: no findings met D1/D2 threshold` explicitly."
+
+notes: Agent tool confirmed absent via ToolSearch at review start -- third consecutive live confirmation of KC-062-1 across plan (bare mode) + execute (team mode) + review (team mode). 10-agent parallel fan SKIPPED; pre-scan-only verdict is the complete review output. This matches the entity assignment's explicit expectation. No CRITICAL or HIGH CODE findings from pre-scan. Advancing to uat.
