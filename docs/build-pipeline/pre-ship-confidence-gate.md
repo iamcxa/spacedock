@@ -1,7 +1,7 @@
 ---
 id: 087
 title: "Pre-ship confidence gate -- 5-factor scoring with auto-fix loop"
-status: review
+status: uat
 source: decomposition of entity 085 (stage report evidence and confidence)
 started: 2026-04-13T09:05:00Z
 worktree: .worktrees/spacedock-ensign-pre-ship-confidence-gate
