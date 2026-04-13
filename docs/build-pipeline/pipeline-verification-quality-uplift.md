@@ -75,41 +75,84 @@ children:
 
 **Changes:** This is an advanced capability. Build-uat SKILL.md could support a `type: simulation` UAT item that dispatches debate-driven agents. Alternatively, this could be a separate post-UAT stage or a forge enhancement. Design decision needed during clarify.
 
-### Gap 6: Coverage Ratchet — type-check and test count never regress
+### Gap 6: Multi-Language Coverage Ratchet — type-check and test count never regress
 
-**Current:** Quality stage runs `bun test` and `tsc --noEmit` mechanically but doesn't enforce coverage baselines. Entity 052 created `spacebridge/bin/daemon.ts` outside tsconfig's `include: ["src/**/*.ts"]` — the file was never type-checked and quality stage reported PASS. Test count can also regress without detection.
+**Current:** Quality stage runs `bun test` and `tsc --noEmit` mechanically but doesn't enforce coverage baselines. Entity 052 created `spacebridge/bin/daemon.ts` outside tsconfig's `include: ["src/**/*.ts"]` — the file was never type-checked and quality stage reported PASS. Test count can also regress without detection. No Python type-checking at all.
 
-**Root cause:** Type-check and test coverage are mechanical/baseline requirements (基本功), not heuristic discoveries. They should be enforced as never-regress invariants, not optional quality improvements.
+**Root cause:** Type-check and test coverage are mechanical/baseline requirements (基本功), not heuristic discoveries. They should be enforced as never-regress invariants across ALL languages in the project, not optional quality improvements.
 
-**Target — two ratchets:**
+**Design principle:** The ratchet is language-agnostic — same rule (never regress), different tools per language. Quality stage auto-detects which languages are present and runs the appropriate ratchet checks.
 
-1. **Type Coverage Ratchet**: Every `.ts` file in the project (excluding node_modules, dist, .d.ts) must be covered by at least one tsconfig's `include` glob. Quality stage computes `uncovered = all_ts_files - tsconfig_covered_files`. If uncovered > 0, FAIL with list of uncovered files.
+**Target — two ratchets per language:**
 
-2. **Test Count Ratchet**: Test count on feature branch must be >= test count on main branch baseline. Quality stage runs `bun test` on current branch, compares count against main. If count decreased, FAIL with `"test count regressed: {current} < {baseline}"`.
+#### Ratchet 1: Type Coverage (zero uncovered source files)
 
-**Implementation across stages:**
+| Language | Tool | Check | Enhanced behavior |
+|----------|------|-------|-------------------|
+| **TypeScript** (primary) | `tsc --listFiles` vs `find *.ts` | Every .ts file covered by at least one tsconfig include | **TS-enhanced:** also verify `strict: true` in all tsconfigs; flag any `// @ts-ignore` or `as any` count increases (ratchet on cast count) |
+| **Python** | `pyright --outputjson` or `ruff check --select ANN` | Type error count never increases; annotation coverage never decreases | Start with `ruff check --select ANN --statistics` (zero-config); graduate to `pyright` when project has `py.typed` |
+| **Go** | `go vet ./...` | Vet error count never increases | Built-in, no extra config |
+| **Rust** | `cargo check` | Warning count never increases | Built-in, no extra config |
+
+**TS enhanced ratchet (high priority for recce-like projects):**
+```bash
+# Standard: zero uncovered files
+ALL_TS=$(find . -name '*.ts' -not -path '*/node_modules/*' -not -name '*.d.ts')
+COVERED=$(tsc --listFiles -p tsconfig.json)
+UNCOVERED=$(comm -23 <(sort <<< "$ALL_TS") <(sort <<< "$COVERED"))
+# UNCOVERED must be 0
+
+# Enhanced: as-any cast count ratchet
+BASELINE_CASTS=$(git stash -q && grep -r "as any" --include='*.ts' -l | wc -l && git stash pop -q)
+CURRENT_CASTS=$(grep -r "as any" --include='*.ts' -l | wc -l)
+# CURRENT_CASTS <= BASELINE_CASTS (can reduce, can't add)
+
+# Enhanced: ts-ignore count ratchet
+BASELINE_IGNORES=$(git stash -q && grep -r "@ts-ignore\|@ts-expect-error" --include='*.ts' | wc -l && git stash pop -q)
+CURRENT_IGNORES=$(grep -r "@ts-ignore\|@ts-expect-error" --include='*.ts' | wc -l)
+# CURRENT_IGNORES <= BASELINE_IGNORES
+```
+
+#### Ratchet 2: Test Count (never decrease)
+
+| Language | Tool | Check |
+|----------|------|-------|
+| **TypeScript** | `bun test` / `vitest` / `jest` | Test count on branch >= main baseline |
+| **Python** | `pytest --co -q` | Collected test count >= main baseline |
+| **Go** | `go test -count=1 -v ./... 2>&1 \| grep "=== RUN"` | Test count >= main |
+| **Rust** | `cargo test -- --list` | Test count >= main |
+
+```bash
+# Language-agnostic test ratchet
+detect_languages()  # scan for package.json (TS), pyproject.toml/setup.py (Python), go.mod (Go), Cargo.toml (Rust)
+for lang in detected_languages:
+  BASELINE = run_test_count(lang, "main")
+  CURRENT = run_test_count(lang, "HEAD")
+  if CURRENT < BASELINE:
+    FAIL "$lang test count regressed: $CURRENT < $BASELINE"
+```
+
+#### Implementation across stages
 
 | Stage | What to add |
 |-------|-------------|
-| **Plan** (plan-checker dimension 8) | For every task with `.ts` in `files_modified`: (a) is there a test file in `files_modified` or `acceptance_criteria`? (b) is the path within an existing tsconfig include glob? (c) if outside, is there a task to update tsconfig? |
-| **Quality** (build-quality) | Two new mechanical checks: `tsconfig-coverage` (zero uncovered .ts files) + `test-ratchet` (count >= main baseline) |
-| **Execute** (task-execution) | When creating .ts files outside `src/`, verify the file's parent directory is in some tsconfig include — warn in acceptance_criteria output if not |
+| **Plan** (plan-checker dimension 8) | For every task with source files in `files_modified`: (a) is there a test file paired? (b) is the source path within a type-check config (tsconfig/pyproject/go.mod)? (c) if outside, is there a task to update config? Language-agnostic check. |
+| **Quality** (build-quality) | Auto-detect languages → run per-language ratchets. TS gets enhanced checks (as-any count, ts-ignore count, strict mode). FAIL on any regression. |
+| **Execute** (task-execution) | When creating source files outside existing type-check scope, warn in acceptance_criteria output. |
 
-**Quality stage implementation sketch:**
-```bash
-# tsconfig-coverage: find uncovered .ts files
-ALL_TS=$(find . -name '*.ts' -not -path '*/node_modules/*' -not -name '*.d.ts' | sort)
-COVERED=$(tsc --listFiles -p tsconfig.json 2>/dev/null | sort)
-UNCOVERED=$(comm -23 <(echo "$ALL_TS") <(echo "$COVERED"))
-# UNCOVERED count must be 0
+#### Cross-project applicability
 
-# test-ratchet: compare against main baseline
-BASELINE_COUNT=$(git stash -q && bun test 2>&1 | grep -o '[0-9]* pass' | awk '{print $1}' && git stash pop -q)
-CURRENT_COUNT=$(bun test 2>&1 | grep -o '[0-9]* pass' | awk '{print $1}')
-# CURRENT_COUNT >= BASELINE_COUNT
-```
+This pipeline serves multiple projects with different language mixes:
 
-**Captain framing:** "覆蓋率是機械性操作，不是啟發式的發現，這種基本功類型的要求應該要盡可能達成。不追求高度 coverage，但不可以比上一次少。"
+| Project | Languages | Ratchet priority |
+|---------|-----------|-----------------|
+| **Spacedock** | TypeScript (primary) + Python (scripts) | TS full + Python basic |
+| **Recce** | TypeScript + Python (50/50, high frequency) | **TS full + Python full** — both need pyright + pytest ratchet |
+| **Carlove** | TypeScript (Expo) | TS full |
+
+For Recce specifically: since it's TS+Python at equal weight with high dev frequency, the Python ratchet should be at the same maturity as TS from day 1 — not "start with ruff, graduate later." Pyright + pytest --cov from the start.
+
+**Captain framing:** "覆蓋率是機械性操作，不是啟發式的發現，這種基本功類型的要求應該要盡可能達成。不追求高度 coverage，但不可以比上一次少。" + "ts 部分要特別增強，因為 recce 是 ts+python 各半且開發頻率很高"
 
 ### Gap 7: Pre-ship Confidence Gate (< 90% auto-iterate)
 
@@ -136,15 +179,18 @@ If composite < 90%, auto-iterate: identify which factors pull score down, dispat
 - All 4 stage reports (execute, quality, review, uat) have minimum evidence requirements documented in their respective SKILL.md Rules sections (how to verify: grep "evidence minimum" or equivalent in each SKILL.md)
 - When diff contains `skills/*/SKILL.md`, review stage runs forge audit AND uat stage runs skill invocation test (how to verify: create test entity with a SKILL.md change, observe forge + invocation in pipeline output)
 - At least one example of debate-driven skill simulation exists as a UAT item type or forge test mode (how to verify: SKILL.md documents `type: simulation` or equivalent, with dispatch protocol)
-- Quality stage includes tsconfig-coverage check: 0 uncovered .ts files outside node_modules (how to verify: create a .ts file outside tsconfig include, run quality, observe FAIL)
-- Quality stage includes test-ratchet check: test count >= main baseline (how to verify: delete a test, run quality, observe FAIL)
-- Plan-checker includes dimension 8 (coverage ratchet compliance): warns when new .ts files lack test pairing or tsconfig coverage (how to verify: write a plan with a .ts task and no test, run plan-checker, observe WARN)
+- Quality stage auto-detects project languages and runs per-language ratchets (how to verify: project with TS+Python, quality runs both tsc + pyright checks)
+- TS ratchet: 0 uncovered .ts files + `as any` count never increases + `@ts-ignore` count never increases (how to verify: add `as any` cast, run quality, observe FAIL)
+- Python ratchet: pyright error count never increases + pytest count never decreases (how to verify: add untyped function in .py file, run quality, observe regression warning)
+- Test count ratchet: per-language test count >= main baseline (how to verify: delete a test, run quality, observe FAIL)
+- Plan-checker dimension 8: warns when new source files (any language) lack test pairing or type-check config coverage (how to verify: plan with .ts task and no test, run plan-checker, observe WARN)
 - Pre-ship confidence gate blocks shipping below 90% and auto-dispatches fix ensigns for identified gaps (how to verify: ship an entity with low type coverage, observe auto-fix cycle before PR creation)
+- Recce project gets TS full + Python full ratchets from day 1 (pyright + pytest --cov, not ruff-only) (how to verify: run pipeline on recce, both ratchets fire)
 
 ## Notes
 
 - Entity 073 (review-skill-creation-discipline) is a subset of Gap 4. If 074 ships first, 073 can be archived as absorbed.
 - Gap 5 (debate-driven simulation) may be deferred to a separate entity if design complexity warrants it.
-- Gap 6 (coverage ratchet) is the highest-priority gap — it prevents the class of errors seen in entity 052 (daemon.ts not type-checked).
+- Gap 6 (coverage ratchet) is the highest-priority gap — it prevents the class of errors seen in entity 052 (daemon.ts not type-checked). Multi-language design ensures the pipeline works for recce (TS+Python 50/50) and future Go/Rust projects.
 - Gap 7 (confidence gate) is the architectural container — gaps 1-6 are the specific checks; gap 7 is the aggregation + auto-iteration mechanism.
-- Captain framing: "跑過 e2e 的要給我看證據" + "skill 要跑 forge 做測試" + "覆蓋率是基本功，不可以比上一次少"
+- Captain framing: "跑過 e2e 的要給我看證據" + "skill 要跑 forge 做測試" + "覆蓋率是基本功，不可以比上一次少" + "ts 部分要特別增強，recce 是 ts+python 各半且開發頻率很高"
