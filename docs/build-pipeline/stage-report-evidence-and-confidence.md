@@ -15,7 +15,7 @@ scale: Medium
 project: spacedock
 depends-on: [082, 083]
 parent: 074
-context_status: pending
+context_status: explored
 ---
 
 ## Directive
@@ -52,6 +52,83 @@ context_status: pending
 - [ ] Given all 4 stage skills, when their Rules sections are read, then each has a documented "evidence minimum" requirement (how to verify: grep "evidence minimum" in execute/quality/review/uat SKILL.md Rules)
 - [ ] Given a completed UAT with composite confidence < 90%, when the confidence gate fires, then it identifies which factors pull score down and dispatches targeted fix ensigns (how to verify: ship entity with low type coverage, observe auto-fix cycle before PR)
 - [ ] Given the confidence gate auto-fix has iterated 3 times without reaching 90%, when the 3rd attempt completes, then the gate escalates to captain with a per-factor breakdown instead of retrying (how to verify: create scenario with persistent gap, observe escalation after 3 attempts)
+
+## Assumptions
+
+A-1: Evidence minimums are additive Rules section bullets in each of the 4 stage SKILL.md files. Each file has a `## Rules` section at the end. Adding "evidence minimum" requirements follows the exact same pattern as existing Rules bullets.
+Confidence: Confident (0.92)
+Evidence: build-execute SKILL.md Rules section exists. build-quality SKILL.md Rules section exists (line ~200+). build-review SKILL.md Rules section (line 326+). build-uat SKILL.md Rules section (line 253+). All use identical format.
+
+A-2: Each stage skill's Stage Report already has a structured format that FO parses. Evidence minimums extend these formats with additional required fields per stage, not new sections.
+Confidence: Confident (0.85)
+Evidence: build-quality SKILL.md:159 -- "structured verdict per check category." build-execute SKILL.md:52 -- "wave-by-wave dispatch log." build-review SKILL.md:279 -- Stage Report format with pre-scan/dispatch/findings sections.
+
+A-3: Confidence gate consumes entity 082's inline evidence format (markdown images for browser, transcript blocks for CLI) and entity 083's ratchet data (ops.config.json baselines). Both formats are machine-parseable.
+Confidence: Likely (0.75)
+Evidence: Entity 082 GUARDRAILS: "ensure inline format is machine-parseable for confidence scoring." Entity 083 A-4: ops.config.json stores baseline counts with per-language keying. Both entities in clarify/ready -- formats defined but not yet implemented.
+
+A-4: FO owns the UAT→shipped transition. After UAT verdict pass, FO advances entity to shipped. The confidence gate intercepts this transition.
+Confidence: Confident (0.88)
+Evidence: build-uat SKILL.md:186-188 -- "All items pass -> verdict pass, no feedback-to, FO advances entity to shipped." README.md:397 -- shipped stage documentation.
+
+## Option Comparisons
+
+### O-1: Confidence gate placement
+
+Where should the 5-factor confidence check run, between UAT pass and shipped advance?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| FO routing logic (post-UAT check) | No new stage; minimal blast radius; FO already owns the UAT→shipped transition; reads existing Stage Reports | Logic scattered in FO routing; harder to test independently; no dedicated Stage Report | Low | Recommended |
+| New "confidence" pipeline stage | Clean separation; own ensign + Stage Report; independently testable | Adds stage to every profile; FO routing changes; stage graph modification; high blast radius | High | Not recommended |
+| Pipeline mod (like pr-review-loop) | Modular; fires on transition event; does not modify existing stages or FO routing directly | Mod infrastructure complexity; untested pattern for scoring logic; mods are better suited for optional behaviors | Medium | Viable |
+
+## Open Questions
+
+Q-1: How should debate-driven skill simulation work? No codebase precedent exists for role-play ensign dispatch. The closest analogy is build-review's debate-driven reviewer pattern (themed reviewers dispatch + SendMessage debate), but reviewer debate verifies code, not skill interaction.
+
+Domain: Runnable/Invokable
+
+Why it matters: Skill entities (e.g., build-distill, build-clarify) currently ship without any interaction testing beyond structural validation. The simulation would catch skills that load correctly but fail in real interaction flows. However, the design complexity (fixture answers, role assignment, interaction log capture) may warrant deferral.
+
+Suggested options: (a) Adapt build-review debate pattern -- dispatch 2 ensigns as teammates, one loads skill as SO, other plays captain with fixture answers from the entity's own clarify Q&A history, (b) Defer entirely to a future entity -- the design complexity is high and evidence minimums + confidence gate already close the most critical gaps, (c) Design-only in this entity -- produce a spec for skill simulation but do not implement, let a future entity execute
+
+Q-2: How should the confidence gate's auto-fix dispatch work when composite score < 90%? The gate identifies which factors pull the score down, but what does "targeted fix" mean concretely?
+
+Domain: Behavioral/Callable
+
+Why it matters: Without a concrete fix mechanism, the gate is just a scoring display. The auto-fix iteration is what makes the gate active rather than informational.
+
+Suggested options: (a) Re-dispatch to execute with factor-specific tasks (e.g., low test coverage → task "add tests for uncovered AC"), (b) Captain-assisted -- gate presents the per-factor breakdown, captain writes the fix task, gate re-scores, (c) Factor-specific playbooks -- each factor has a predefined fix action (test coverage → run missing test generator, type coverage → add tsconfig include paths)
+
+## Decomposition Recommendation
+
+⚠️ This entity spans 3 sub-scopes with different complexity, different dependency chains, and different deferral risk. The current `depends-on: [082, 083]` only applies to Gap 7 (confidence gate), not Gap 3 (evidence minimums). Consider splitting:
+
+1. `stage-report-evidence-minimums` -- Add evidence minimum Rules to 4 stage SKILL.md files (Readable/Textual, Small, depends-on: none)
+2. `pre-ship-confidence-gate` -- 5-factor scoring between UAT and shipped with auto-fix loop (Behavioral/Callable + Runnable/Invokable, Medium, depends-on: [082, 083])
+3. `debate-driven-skill-simulation` -- Design + implement role-play ensign dispatch for skill entities (Runnable/Invokable, Medium, depends-on: none, may defer)
+
+Dependencies:
+- Child 1 can ship independently (no upstream dependency)
+- Child 2 depends on 082 (evidence format) and 083 (ratchet data)
+- Child 3 is independent but may be deferred entirely per Gap 5 directive
+
+## Stage Report: explore
+
+- [x] Files mapped: 6 across skill, config, entity layers
+  build-execute SKILL.md, build-quality SKILL.md, build-review SKILL.md, build-uat SKILL.md (evidence minimum targets), README.md (shipped stage), entity 082 + 083 (dependency decisions)
+- [x] Assumptions formed: 4 (Confident: 3, Likely: 1)
+  A-1 evidence minimum Rules pattern (0.92), A-2 Stage Report structure (0.85), A-3 082/083 format consumption (0.75), A-4 FO UAT→shipped transition (0.88)
+- [x] Options surfaced: 1
+  O-1 confidence gate placement (FO routing vs new stage vs mod)
+- [x] Questions generated: 2
+  Q-1 debate-driven simulation design (from α marker); Q-2 auto-fix dispatch mechanism
+- [x] α markers resolved: 0 / 1
+  α-1 (debate simulation) escalated to Q-1 -- no codebase precedent for role-play ensign dispatch
+- [x] Scale assessment: confirmed Medium
+  6 files mapped across 3 sub-scopes; decomposition recommended to split into Small + Medium + Medium
+- [x] Research dispatched: 0 researchers (skipped -- all assumptions on internal architecture, no external tech claims)
 
 ## Problem
 
