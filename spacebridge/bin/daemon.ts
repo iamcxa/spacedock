@@ -10,9 +10,11 @@ import { mkdirSync, existsSync, unlinkSync } from "node:fs";
 import * as net from "node:net";
 import { randomUUID } from "node:crypto";
 import { createSocketServer } from "../src/ipc/socket-server";
-import { createCoordinationClientStub } from "../src/ipc/coordination-client-stub";
+import { createCoordinationClientBridge } from "../src/ipc/coordination-client-bridge";
+import { createDb } from "../src/db";
 import { writePidFile, readPidFile, isProcessAlive } from "../src/daemon/pid";
 import { releaseLock } from "../src/daemon/lock";
+import { LeaseCommandSchema } from "../src/domain/lease/schemas";
 import { spawnNextjsChild, shutdownNextjsChild, resolveNextjsServerScript } from "../src/daemon/nextjs-child";
 import type { ChildProcess } from "node:child_process";
 
@@ -55,7 +57,17 @@ async function cmdStart(): Promise<void> {
     }, 200);
   }
 
-  const stub = createCoordinationClientStub();
+  const leaseDurationMs = Number(process.env.SPACEBRIDGE_LEASE_DURATION_MS) || 300_000;
+  const janitorIntervalMs = Number(process.env.SPACEBRIDGE_JANITOR_INTERVAL_MS) || 30_000;
+
+  const db = createDb(join(stateDir, "spacebridge.db"));
+
+  // entityScanner: trivial stub returning [] for 056; entity 057 supplies DB-backed scanner
+  const entityScanner = async () => [];
+
+  const bridge = await createCoordinationClientBridge({ db, entityScanner, leaseDurationMs });
+
+  let janitorTimer: ReturnType<typeof setInterval> | null = null;
 
   const server = createSocketServer({
     socketPath,
@@ -79,9 +91,30 @@ async function cmdStart(): Promise<void> {
       return { error: `RPC method ${req.method} not implemented in daemon stub` };
     },
     onCoordinationRequest: async (_sessionId, req) => {
+      // Build a LeaseCommand from the positional args and validate at the IPC boundary
+      // before dispatching to the bridge. getAvailableWork is not a LeaseCommand — skip.
+      if (req.method !== "getAvailableWork") {
+        const args = req.args as unknown[];
+        let rawCmd: unknown;
+        if (req.method === "acquireEntity") {
+          rawCmd = { type: "acquire", entitySlug: args[0], role: args[1], sessionId: args[2], leaseDurationMs };
+        } else if (req.method === "releaseEntity") {
+          const tok = args[0] as { token?: string };
+          rawCmd = { type: "release", token: tok?.token, outcome: args[1] };
+        } else if (req.method === "extendLease") {
+          const tok = args[0] as { token?: string };
+          rawCmd = { type: "extend", token: tok?.token, leaseDurationMs };
+        }
+        if (rawCmd !== undefined) {
+          const parsed = LeaseCommandSchema.safeParse(rawCmd);
+          if (!parsed.success) {
+            return { error: `Invalid coordination args: ${parsed.error.message}` };
+          }
+        }
+      }
       try {
-        const method = req.method as keyof typeof stub;
-        const fn = stub[method];
+        const method = req.method as keyof typeof bridge;
+        const fn = bridge[method];
         if (typeof fn !== "function") return { error: `Unknown coordination method: ${req.method}` };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = await (fn as any)(...(req.args as unknown[]));
@@ -101,6 +134,13 @@ async function cmdStart(): Promise<void> {
 
   // Write PID file after socket is live
   writePidFile(pidPath, process.pid);
+
+  // Start janitor after socket is live
+  janitorTimer = setInterval(() => {
+    bridge.expireDue(Date.now()).catch((err: unknown) => {
+      process.stderr.write(`[${ts()}] janitor error: ${(err as Error).message}\n`);
+    });
+  }, janitorIntervalMs);
 
   process.stderr.write(`[${ts()}] spacebridge daemon started (pid: ${process.pid}, socket: ${socketPath})\n`);
 
@@ -123,6 +163,7 @@ async function cmdStart(): Promise<void> {
 
   // Signal handlers for graceful shutdown
   const doShutdown = async () => {
+    if (janitorTimer) clearInterval(janitorTimer);
     await shutdown(server, pidPath, socketPath, nextjsChild);
     process.exit(0);
   };

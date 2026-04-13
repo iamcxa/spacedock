@@ -79,6 +79,17 @@ export const comments = sqliteTable("comments", {
   payload: text("payload"),                          // opaque JSON blob
 });
 
+// ─── lease_events — [full CQRS] fmodel event log for lease aggregate (design doc §5.3) ──
+
+export const leaseEvents = sqliteTable("lease_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  aggregateId: text("aggregate_id").notNull(),       // "${entitySlug}::${role}"
+  sequenceNumber: integer("sequence_number").notNull(),
+  eventType: text("event_type").notNull(),           // acquired | released | extended | expired
+  payload: text("payload").notNull(),                // JSON-serialized event body
+  timestamp: integer("timestamp").notNull(),         // epoch-ms
+});
+
 // ─── share_tokens — [plain drizzle] ──────────────────────────────────────────
 
 export const shareTokens = sqliteTable("share_tokens", {

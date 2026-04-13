@@ -226,6 +226,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | Daemon entry point with start/stop/status subcommands | 🔵 planned | 2026-04-12 |
+| spacebridge-role-aware-lease-manager | plan | Swap stub→bridge client, mount lease janitor, add lease/janitor env config | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/src/daemon/auto-fork.test.ts
 
@@ -238,6 +239,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | Shim-side auto-fork daemon logic with lock + socket probe | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/daemon/daemon-coordination.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Integration test: janitor expires lease with short duration via env config | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/src/daemon/index.ts
 
@@ -288,6 +295,96 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | PID file management -- write, read, alive check, stale cleanup | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/domain/lease/decider.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Pure decider unit tests: acquire conflict, release outcomes, extend, expire idempotency | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/decider.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Pure decider(cmd, state, now) for lease CQRS aggregate, zero I/O | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/errors.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Named error classes: LeaseConflict, LeaseNotFound, LeaseExpired | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/evolve.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Pure evolve + replay unit tests: events apply to state correctly | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/evolve.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Pure evolve(state, event) + replay(events) reducer for LeaseState | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/persistence.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Round-trip tests: appendEvents → loadAllEvents → replay equivalence; snapshot upsert | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/persistence.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Lease event log append + load; entity_leases snapshot projection maintenance | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/replay.integration.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Integration: fresh bridge over existing DB replays events into equivalent state (AC-6) | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/schemas.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Spot-check Zod command/event schemas reject malformed input | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/schemas.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Zod schemas for LeaseCommand and LeaseEvent variants with .passthrough() | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/types.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Domain types: Role, EntityRef, LeaseToken, LeaseState, LeaseCommand, LeaseEvent unions | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/ipc/coordination-client-bridge.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Bridge client unit tests: acquire/release/extend/getAvailableWork against :memory: DB | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/ipc/coordination-client-bridge.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Real CoordinationClient wiring decider + persistence + entityScanner; replaces stub | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/ipc/coordination-concurrent.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Concurrent acquire integration test: exactly one winner, one LeaseConflict (AC-3) | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/ipc/fo-simulator.integration.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | FO simulator over unix socket: getAvailableWork → acquire → release cycle (AC-7, AC-8) | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/src/ipc/types.ts
 
@@ -622,6 +719,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Lockfile from bun install for drizzle-orm deps | 🔵 planned | 2026-04-12 |
+| spacebridge-role-aware-lease-manager | plan | Lockfile refresh after bun add zod | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/drizzle.config.ts
 
@@ -635,6 +733,12 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Generated LCD-compliant SQL migrations for 5 tables | 🔵 planned | 2026-04-12 |
 
+### spacebridge/drizzle/0001_*.sql
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | drizzle-kit generated migration for new lease_events table | 🔵 planned | 2026-04-13 |
+
 ### spacebridge/drizzle/meta/_journal.json
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -646,6 +750,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Package manifest with drizzle-orm and drizzle-kit deps | 🔵 planned | 2026-04-12 |
+| spacebridge-role-aware-lease-manager | plan | Add zod runtime dependency for lease command/event schemas | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/src/db.test.ts
 
@@ -658,18 +763,21 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Drizzle DB factory with bun:sqlite WAL and default path | 🔵 planned | 2026-04-12 |
+| spacebridge-role-aware-lease-manager | plan | Add lease_events CREATE TABLE IF NOT EXISTS mirror in applySchema | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/src/schema.test.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Schema validation tests -- table creation, LCD compliance, CRUD, fmodel columns | 🔵 planned | 2026-04-12 |
+| spacebridge-role-aware-lease-manager | plan | Add lease_events insert/query case + LCD grep pass | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/src/schema.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Drizzle LCD schema -- 5 tables with fmodel-compatible columns | 🔵 planned | 2026-04-12 |
+| spacebridge-role-aware-lease-manager | plan | Add leaseEvents table (append-only event log for lease CQRS aggregate) | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/tsconfig.json
 

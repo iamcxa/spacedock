@@ -5,6 +5,7 @@ import {
   events,
   comments,
   shareTokens,
+  leaseEvents,
 } from "./schema";
 import { createDb } from "./db";
 
@@ -370,5 +371,46 @@ describe("test isolation", () => {
 
     s1.close();
     s2.close();
+  });
+});
+
+// ─── lease_events table ────────────────────────────────────────────────────────
+
+describe("lease_events table", () => {
+  test("exists with expected columns", () => {
+    const { sqlite } = createMemoryDb();
+    const info = sqlite.query("PRAGMA table_info(lease_events)").all() as Array<{ name: string; type: string }>;
+    const cols = info.map((c) => c.name);
+    expect(cols).toContain("id");
+    expect(cols).toContain("aggregate_id");
+    expect(cols).toContain("sequence_number");
+    expect(cols).toContain("event_type");
+    expect(cols).toContain("payload");
+    expect(cols).toContain("timestamp");
+  });
+
+  test("insert and query round-trip", () => {
+    const { db } = createMemoryDb();
+    const now = Date.now();
+    db.insert(leaseEvents).values({
+      aggregateId: "my-entity::FO",
+      sequenceNumber: 1,
+      eventType: "acquired",
+      payload: JSON.stringify({ token: "tok-1", entitySlug: "my-entity", role: "FO" }),
+      timestamp: now,
+    }).run();
+
+    const rows = db.select().from(leaseEvents).all();
+    expect(rows.length).toBe(1);
+    expect(rows[0].aggregateId).toBe("my-entity::FO");
+    expect(rows[0].eventType).toBe("acquired");
+    expect(rows[0].timestamp).toBe(now);
+  });
+
+  test("LCD compliance — integer timestamps", () => {
+    const { sqlite } = createMemoryDb();
+    const info = sqlite.query("PRAGMA table_info(lease_events)").all() as Array<{ name: string; type: string }>;
+    const tsCol = info.find((c) => c.name === "timestamp");
+    expect(tsCol?.type.toUpperCase()).toBe("INTEGER");
   });
 });
