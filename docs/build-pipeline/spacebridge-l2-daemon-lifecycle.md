@@ -173,3 +173,464 @@ Suggested options: (a) Module-level registration -- daemon.ts imports a service 
   captain must say "execute 052" or launch FO in separate session
 - [x] Clarify duration: 5 questions asked, session complete
   1 batch assumption (with ad-hoc researcher dispatch for A-4/A-5) + 2 option AskUserQuestion + 1 Q-1 AskUserQuestion + 1 pipeline improvement (entity 075)
+
+## Research Findings
+
+### Upstream Constraints
+
+- **Design doc §4.2 pseudocode is authoritative** for the auto-fork sequence: `connect → ECONNREFUSED/ENOENT → acquire lock → re-check under lock → spawn detached → wait_for_socket(5s) → release lock → connect` (design doc lines 288-318)
+- **Socket path fixed at `~/.spacedock/spacebridge.sock`** -- design doc §4.2, inherited by entity 051's `SocketServerOptions.socketPath`
+- **`SPACEBRIDGE_NO_AUTOFORK=1` disables auto-fork** -- design doc §4.1 "Debuggable: shim's auto-fork can be disabled via env var"
+- **Sticky daemon default** -- design doc §4.1 line 274 "Daemon outlives the shim that birthed it"; `SPACEBRIDGE_AUTO_STOP=1` for CI override
+- **No fmodel in this entity** -- entity scope says "no fmodel", pure process lifecycle management
+- **MEMORY.md test isolation**: tests must use explicit temp paths, never production `~/.spacedock/` paths
+
+### Existing Patterns
+
+- **channel.ts:617-623 cleanup pattern**: `process.on("SIGTERM", () => { cleanup(); process.exit(0); })` + `SIGINT` + `exit` -- three-signal handler pattern is the project convention for graceful shutdown (channel.ts:617-623)
+- **channel.ts:32-35 `computeStateDir()`**: `join(homedir(), ".spacedock", "dashboard", hash)` -- state directory convention uses `~/.spacedock/` root (channel.ts:32-35)
+- **Entity 051 `createSocketServer`**: `listen()` returns `Promise<void>`, `close()` returns `Promise<void>`, stale socket cleanup via `existsSync → unlinkSync` at listen time (socket-server.ts:127-132). This is the server the daemon boots.
+- **Entity 051 `createSocketClient`**: `connect()` returns `Promise<RegisterAckPayload>`, built-in exponential backoff reconnect (100ms→5000ms, 5 retries). This is what the shim uses to connect (socket-client.ts)
+- **Entity 051 `SocketServer.getConnectedSessions()`**: returns `string[]` of session IDs -- daemon can use this for status reporting (socket-server.ts:152)
+
+### Library/API Surface
+
+- **`child_process.spawn` with `detached: true` + `.unref()`**: Node.js API for creating detached child processes. Under Bun, `Bun.spawn` supports `{ detached: true }` (Bun docs). However, for consistency with entity 051's use of `node:net`, the shim should use `node:child_process` `spawn` which Bun also supports as a compatibility layer.
+- **`mkdirSync` atomicity for lock file**: `mkdirSync(path)` throws `EEXIST` if directory already exists -- atomic on all POSIX + Windows filesystems. Pattern: create dir = acquire lock, `rmdirSync` = release lock. Used by npm CLI (proper-lockfile). Stale detection: check `mtime` of lock dir, if older than threshold (e.g., 60s), treat as stale and remove.
+- **`process.kill(pid, 0)`**: Signal 0 is an existence check -- returns `true` if process exists, throws `ESRCH` if not. Standard POSIX pattern for PID file validation. Used for stale PID file detection.
+- **`writeFileSync` / `readFileSync` for PID file**: Write daemon PID to `~/.spacedock/spacebridge.pid` at startup, read for `stop`/`status` commands. Integer content, simple parse.
+- **`net.createConnection({path})` for socket probe**: Can be used to check if daemon is alive -- attempt connect, handle ECONNREFUSED/ENOENT. Already implemented in entity 051's `createSocketClient.connect()`.
+
+### Known Gotchas
+
+- **Stale socket file after crash**: If daemon crashes without cleanup, `~/.spacedock/spacebridge.sock` remains but no process listens. Entity 051's `createSocketServer.listen()` already handles this by `unlinkSync`-ing existing socket files before bind (socket-server.ts:128-130). The shim's auto-fork must also detect staleness: connect attempt returns ECONNREFUSED → stale.
+- **Stale PID file after crash**: PID file contains old PID. Process may no longer exist, or PID may have been recycled by OS. Must verify with `process.kill(pid, 0)` before trusting. If process dead → delete PID + socket + lock files.
+- **Stale lock directory**: If shim crashes while holding the mkdir lock, the lock dir remains. Stale detection: check lock dir `mtime`, if older than startup timeout (5s + safety margin, e.g., 10s), treat as stale and `rmdirSync`.
+- **Race between two shims both detecting stale daemon**: Two shims detect stale socket simultaneously, both try to clean up and fork. The mkdir lock prevents this -- cleanup and fork happen under lock.
+- **`spawn` detached child inherits stdio**: Must explicitly set `stdio: 'ignore'` to prevent daemon stdout/stderr from interfering with shim's MCP stdio transport. Design doc §4.2 line 307 explicitly specifies `stdio: 'ignore'`.
+- **Socket file path length limit**: Unix socket paths have a ~104 byte limit on macOS. `~/.spacedock/spacebridge.sock` is well under this (~40 bytes expanded).
+
+### Reference Examples
+
+- **Entity 051 `createSocketServer` + `createSocketClient`** -- the exact IPC layer the daemon will use. daemon.ts will call `createSocketServer({ socketPath, onRegister, onRpcRequest, onCoordinationRequest, onDisconnect })` and then `server.listen()`. The shim auto-fork code will use `createSocketClient` to probe the socket (socket-client.ts:connect).
+- **Entity 051 `createCoordinationClientStub`** -- daemon.ts will import this for its `onCoordinationRequest` handler, forwarding to the stub until entity 056 provides a real implementation (coordination-client-stub.ts).
+- **Entity 051 `createChannelProviderBridge`** -- daemon-side RPC handler uses this to map incoming ChannelProvider calls to the dashboard (channel-provider-bridge.ts).
+- **channel.ts:569-631 CLI entry point** -- the `if (import.meta.main)` block shows: parseArgs, resolve projectRoot, create server, connect transport, write state, register signal handlers. daemon.ts follows a similar pattern but with subcommand routing (start/stop/status) instead of direct server boot.
+
+## PLAN
+
+**Goal**: Implement L2 auto-fork daemon lifecycle -- shim-side auto-fork logic, daemon entry point with start/stop/status subcommands, PID file and lock file management, and tests.
+
+**Depends on**: Entity 051 (unix socket IPC). Files in `spacebridge/src/ipc/` are read_first references from entity 051's branch. Entity 052's code lives in `spacebridge/src/daemon/` (new directory) and `spacebridge/bin/daemon.ts` (new file).
+
+<task id="task-0" model="sonnet" wave="0">
+  <read_first>
+    - spacebridge/src/ipc/socket-server.ts
+    - spacebridge/src/ipc/socket-client.ts
+    - spacebridge/src/ipc/types.ts
+    - spacebridge/src/ipc/index.ts
+    - spacebridge/package.json
+    - tools/dashboard/src/channel.ts
+  </read_first>
+
+  <action>
+  Environment verification task. Verify:
+  1. `spacebridge/` directory exists on the current branch (entity 050+051 created it)
+  2. `spacebridge/src/ipc/socket-server.ts` exports `createSocketServer` and `SocketServerOptions`
+  3. `spacebridge/src/ipc/socket-client.ts` exports `createSocketClient` and `SocketClientOptions`
+  4. `spacebridge/src/ipc/types.ts` exports `RegisterPayload`, `RegisterAckPayload`
+  5. `spacebridge/src/ipc/coordination-client-stub.ts` exports `createCoordinationClientStub`
+  6. `spacebridge/src/ipc/channel-provider-bridge.ts` exports `createChannelProviderBridge`
+  7. `tools/dashboard/src/channel.ts` contains `computeStateDir` and signal handler pattern at lines 617-623
+  8. `spacebridge/src/daemon/` does NOT exist yet (fresh directory for this entity)
+  9. `spacebridge/bin/` does NOT exist yet (fresh directory for this entity)
+
+  Run: `ls spacebridge/src/ipc/`, `grep -l "createSocketServer" spacebridge/src/ipc/socket-server.ts`, `grep -l "createSocketClient" spacebridge/src/ipc/socket-client.ts`, `grep -l "createCoordinationClientStub" spacebridge/src/ipc/coordination-client-stub.ts`, `grep -l "createChannelProviderBridge" spacebridge/src/ipc/channel-provider-bridge.ts`, `test -d spacebridge/src/daemon && echo EXISTS || echo ABSENT`, `test -d spacebridge/bin && echo EXISTS || echo ABSENT`
+
+  If any check fails, STOP and revise the plan.
+  </action>
+
+  <acceptance_criteria>
+    - `ls spacebridge/src/ipc/` shows socket-server.ts, socket-client.ts, types.ts, index.ts, coordination-client-stub.ts, channel-provider-bridge.ts
+    - `grep "createSocketServer" spacebridge/src/ipc/socket-server.ts` finds the export
+    - `grep "createSocketClient" spacebridge/src/ipc/socket-client.ts` finds the export
+    - `test -d spacebridge/src/daemon` reports ABSENT
+    - `test -d spacebridge/bin` reports ABSENT
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1" test_first="true" skills="superpowers:test-driven-development">
+  <read_first>
+    - tools/dashboard/src/channel.ts
+    - spacebridge/src/ipc/types.ts
+  </read_first>
+
+  <action>
+  Create `spacebridge/src/daemon/pid.ts` -- PID file management utilities:
+  - `writePidFile(pidPath: string, pid: number): void` -- write PID to file (mkdir -p parent dir, writeFileSync)
+  - `readPidFile(pidPath: string): number | null` -- read PID from file, return null if file missing or unparseable
+  - `isProcessAlive(pid: number): boolean` -- `process.kill(pid, 0)` wrapped in try/catch, returns true if alive, false if ESRCH
+  - `cleanStalePidFile(pidPath: string): boolean` -- read PID, check if alive, if dead: delete PID file and return true (cleaned), if alive: return false (not stale)
+
+  Create `spacebridge/src/daemon/lock.ts` -- mkdir-based lock file:
+  - `acquireLock(lockPath: string, opts?: { staleThresholdMs?: number }): boolean` -- attempt `mkdirSync(lockPath)`, on EEXIST check mtime for staleness (default threshold 10000ms), if stale: rmdir + retry mkdir. Returns true if acquired, false if lock held by another live process.
+  - `releaseLock(lockPath: string): void` -- `rmdirSync(lockPath)`
+
+  Create corresponding test files:
+  - `spacebridge/src/daemon/pid.test.ts` -- tests for all 4 functions using temp directories
+  - `spacebridge/src/daemon/lock.test.ts` -- tests for acquire (fresh, contended, stale), release, edge cases
+
+  All tests use `mkdtempSync(join(tmpdir(), "sb-test-"))` for isolation, never production paths.
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/src/daemon/pid.test.ts` passes
+    - `bun test spacebridge/src/daemon/lock.test.ts` passes
+    - `grep "writePidFile" spacebridge/src/daemon/pid.ts` finds the export
+    - `grep "acquireLock" spacebridge/src/daemon/lock.ts` finds the export
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/src/daemon/pid.ts
+    - spacebridge/src/daemon/pid.test.ts
+    - spacebridge/src/daemon/lock.ts
+    - spacebridge/src/daemon/lock.test.ts
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="2" test_first="true" skills="superpowers:test-driven-development">
+  <read_first>
+    - spacebridge/src/ipc/socket-client.ts
+    - spacebridge/src/ipc/socket-server.ts
+    - spacebridge/src/ipc/types.ts
+    - spacebridge/src/daemon/pid.ts
+    - spacebridge/src/daemon/lock.ts
+  </read_first>
+
+  <action>
+  Create `spacebridge/src/daemon/auto-fork.ts` -- shim-side auto-fork logic:
+  - `autoForkDaemon(opts: AutoForkOptions): Promise<void>` where `AutoForkOptions` = `{ socketPath: string, lockPath: string, pidPath: string, stateDir: string, daemonCmd: string[], startupTimeoutMs?: number (default 5000), lockStaleMs?: number (default 10000) }`
+  - Implementation follows design doc §4.2 pseudocode exactly:
+    1. Check `SPACEBRIDGE_NO_AUTOFORK=1` env var -- if set, throw `Error("auto-fork disabled via SPACEBRIDGE_NO_AUTOFORK=1")`
+    2. Probe socket: attempt `net.createConnection({path: socketPath})`, if connects → return (daemon already running)
+    3. On ECONNREFUSED/ENOENT: run stale recovery -- `cleanStalePidFile(pidPath)`, if stale also unlink socket file and lock dir
+    4. Acquire lock via `acquireLock(lockPath)`
+    5. Re-check socket under lock (double-check pattern)
+    6. If still no daemon: `spawn(daemonCmd, { detached: true, stdio: 'ignore' }).unref()`
+    7. `waitForSocket(socketPath, startupTimeoutMs)` -- poll with 100ms interval, resolve when socket accepts connection, reject on timeout
+    8. Release lock via `releaseLock(lockPath)`
+  - Export `resolveDaemonCommand(): string[]` -- returns `SPACEBRIDGE_DEV ? ['bun', resolve(__dirname, '../../bin/daemon.ts'), 'start'] : ['spacebridge', 'start']`
+
+  Create `spacebridge/src/daemon/auto-fork.test.ts` -- tests:
+  - Test 1: No daemon running → auto-fork spawns daemon, waits for socket, succeeds
+  - Test 2: Daemon already running → auto-fork connects immediately, no spawn
+  - Test 3: Two concurrent auto-forks → lock ensures only one spawn (race condition test)
+  - Test 4: SPACEBRIDGE_NO_AUTOFORK=1 → throws error, no spawn attempt
+  - Test 5: Stale socket file (ECONNREFUSED) → cleanup + fork
+  - Test 6: Startup timeout → throws after 5s (use short timeout in test, e.g., 500ms)
+
+  Tests use a real socket server (from entity 051's `createSocketServer`) and temp directories for full integration, NOT mocks.
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/src/daemon/auto-fork.test.ts` passes
+    - `grep "autoForkDaemon" spacebridge/src/daemon/auto-fork.ts` finds the export
+    - `grep "resolveDaemonCommand" spacebridge/src/daemon/auto-fork.ts` finds the export
+    - `grep "SPACEBRIDGE_NO_AUTOFORK" spacebridge/src/daemon/auto-fork.ts` finds the env var check
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/src/daemon/auto-fork.ts
+    - spacebridge/src/daemon/auto-fork.test.ts
+  </files_modified>
+</task>
+
+<task id="task-3" model="sonnet" wave="3">
+  <read_first>
+    - spacebridge/src/ipc/socket-server.ts
+    - spacebridge/src/ipc/channel-provider-bridge.ts
+    - spacebridge/src/ipc/coordination-client-stub.ts
+    - spacebridge/src/daemon/pid.ts
+  </read_first>
+
+  <action>
+  Create `spacebridge/bin/daemon.ts` -- daemon entry point with subcommand routing:
+
+  The file uses `import.meta.main` guard and `parseArgs` for subcommand routing (matching channel.ts:569-582 pattern).
+
+  **`start` subcommand**:
+  1. Resolve state dir: `join(homedir(), ".spacedock")`
+  2. Ensure state dir exists: `mkdirSync(stateDir, { recursive: true })`
+  3. Write PID file: `writePidFile(join(stateDir, "spacebridge.pid"), process.pid)`
+  4. Create socket server via `createSocketServer({ socketPath: join(stateDir, "spacebridge.sock"), onRegister: ..., onRpcRequest: ..., onCoordinationRequest: ..., onDisconnect: ... })`
+    - `onRegister`: store session in internal map, return `{ sessionToken: randomUUID(), serverVersion: "0.1.0" }`
+    - `onRpcRequest`: forward to ChannelProviderBridge (stubbed for now -- entity 053 provides real dashboard)
+    - `onCoordinationRequest`: forward to CoordinationClientStub (entity 056 replaces later)
+    - `onDisconnect`: remove session from map; if `SPACEBRIDGE_AUTO_STOP=1` and no sessions remain, schedule shutdown
+  5. Call `server.listen()` -- socket binds as first action (per A-4, before any heavy init)
+  6. Register signal handlers: SIGTERM/SIGINT → `server.close()`, clean PID file, clean socket file, `process.exit(0)`
+  7. Log startup to stderr: `[timestamp] spacebridge daemon started (pid: {pid}, socket: {socketPath})`
+
+  **`stop` subcommand**:
+  1. Read PID file from `~/.spacedock/spacebridge.pid`
+  2. If PID file missing → print "daemon not running" and exit 1
+  3. If PID alive → `process.kill(pid, "SIGTERM")`, print "stopping daemon (pid: {pid})"
+  4. If PID dead → clean up stale files (pid + socket + lock), print "cleaned stale daemon files"
+
+  **`status` subcommand**:
+  1. Read PID file
+  2. If PID file missing or process dead → print "daemon not running" and exit 1
+  3. If PID alive → probe socket via `net.createConnection`, send a status query
+  4. Print: `daemon running (pid: {pid}, uptime: {uptime}, sessions: {count})`
+  5. Session count comes from `server.getConnectedSessions().length` -- for status command running out-of-process, this requires a socket RPC query. Add an `ipc-status` message type to types or use a simple approach: connect as temporary client, send `{ type: "rpc-request", payload: { method: "__status" } }`, daemon returns `{ sessions: N, uptime: X }`.
+
+  No separate test file for daemon.ts -- it's an entry point. Integration tested in task-4.
+  </action>
+
+  <acceptance_criteria>
+    - `grep "start\|stop\|status" spacebridge/bin/daemon.ts` finds all three subcommands
+    - `grep "writePidFile" spacebridge/bin/daemon.ts` confirms PID file write on start
+    - `grep "SPACEBRIDGE_AUTO_STOP" spacebridge/bin/daemon.ts` confirms auto-stop env var check
+    - `grep "SIGTERM\|SIGINT" spacebridge/bin/daemon.ts` confirms signal handlers registered
+    - `bun run spacebridge/bin/daemon.ts start &` successfully starts daemon (socket file appears at temp path), `bun run spacebridge/bin/daemon.ts stop` stops it
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/bin/daemon.ts
+  </files_modified>
+</task>
+
+<task id="task-4" model="sonnet" wave="4" test_first="true" skills="superpowers:test-driven-development">
+  <read_first>
+    - spacebridge/bin/daemon.ts
+    - spacebridge/src/daemon/auto-fork.ts
+    - spacebridge/src/daemon/pid.ts
+    - spacebridge/src/daemon/lock.ts
+    - spacebridge/src/ipc/integration.test.ts
+  </read_first>
+
+  <action>
+  Create `spacebridge/src/daemon/integration.test.ts` -- full lifecycle integration tests:
+
+  All tests use temp directories (`mkdtempSync`) for socket, PID, and lock file paths. Each test gets isolated state.
+
+  - **Test: start + connect + stop lifecycle** -- spawn daemon via `Bun.spawn(['bun', 'spacebridge/bin/daemon.ts', 'start'], { env: { ...process.env, SPACEBRIDGE_STATE_DIR: tmpDir } })`, wait for socket, connect via `createSocketClient`, verify registration succeeds, then send SIGTERM, verify socket file and PID file cleaned up
+  - **Test: auto-fork creates daemon** -- call `autoForkDaemon({ socketPath, lockPath, pidPath, stateDir, daemonCmd: ['bun', resolve('spacebridge/bin/daemon.ts'), 'start'] })` with no pre-existing daemon, assert PID file created, socket file exists, shim can connect
+  - **Test: second shim connects without re-forking** -- auto-fork first shim (creates daemon), auto-fork second shim (daemon already exists), assert only one PID file (same PID), both shims connected
+  - **Test: sticky daemon survives shim disconnect** -- auto-fork, connect shim, disconnect shim, assert daemon still running (PID alive), new shim can connect
+  - **Test: SPACEBRIDGE_AUTO_STOP=1 daemon stops on last disconnect** -- spawn daemon with env var, connect two shims, disconnect first (daemon still running), disconnect second (daemon stops within 5s, check PID file removed)
+  - **Test: stop subcommand sends SIGTERM** -- spawn daemon, verify running, run stop subcommand via Bun.spawn, assert daemon process exited, PID + socket files cleaned
+  - **Test: status subcommand reports running daemon** -- spawn daemon, connect 2 shims, run status subcommand, parse output for PID, uptime > 0, sessions = 2
+
+  Note: daemon.ts must accept a `SPACEBRIDGE_STATE_DIR` env var override for test isolation (default: `join(homedir(), ".spacedock")`). Add this env var check to daemon.ts at the top of the start subcommand.
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/src/daemon/integration.test.ts` passes
+    - `grep "auto-fork\|auto_fork\|autoFork" spacebridge/src/daemon/integration.test.ts` confirms auto-fork lifecycle tested
+    - `grep "SPACEBRIDGE_AUTO_STOP" spacebridge/src/daemon/integration.test.ts` confirms auto-stop tested
+    - `grep "SPACEBRIDGE_STATE_DIR" spacebridge/bin/daemon.ts` confirms test isolation env var added
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/src/daemon/integration.test.ts
+    - spacebridge/bin/daemon.ts
+  </files_modified>
+</task>
+
+<task id="task-5" model="haiku" wave="4">
+  <read_first>
+    - spacebridge/src/daemon/pid.ts
+    - spacebridge/src/daemon/lock.ts
+    - spacebridge/src/daemon/auto-fork.ts
+    - spacebridge/src/ipc/index.ts
+  </read_first>
+
+  <action>
+  Create `spacebridge/src/daemon/index.ts` -- barrel export for the daemon module:
+  - Re-export `writePidFile`, `readPidFile`, `isProcessAlive`, `cleanStalePidFile` from `./pid`
+  - Re-export `acquireLock`, `releaseLock` from `./lock`
+  - Re-export `autoForkDaemon`, `resolveDaemonCommand` and `AutoForkOptions` type from `./auto-fork`
+
+  Update `spacebridge/src/ipc/types.ts` (if needed) to add the `__status` RPC method response type used by daemon status subcommand. Only if task-3 introduced a new message pattern that needs a type.
+  </action>
+
+  <acceptance_criteria>
+    - `grep "autoForkDaemon" spacebridge/src/daemon/index.ts` finds the re-export
+    - `grep "acquireLock" spacebridge/src/daemon/index.ts` finds the re-export
+    - `grep "writePidFile" spacebridge/src/daemon/index.ts` finds the re-export
+    - `bun test spacebridge/src/daemon/` passes (all daemon tests still pass)
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/src/daemon/index.ts
+    - spacebridge/src/ipc/types.ts
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+
+None
+
+### CLI
+
+- [ ] `bun run spacebridge/bin/daemon.ts start` in a temp dir spawns a daemon that creates PID file and socket file
+- [ ] `bun run spacebridge/bin/daemon.ts stop` sends SIGTERM and cleans up PID + socket files
+- [ ] `bun run spacebridge/bin/daemon.ts status` reports PID, uptime, and session count when daemon is running
+- [ ] `SPACEBRIDGE_NO_AUTOFORK=1` prevents auto-fork and surfaces an error
+
+### API
+
+None
+
+### Interactive
+
+- [ ] Captain verifies `bun test spacebridge/src/daemon/` runs all daemon tests (pid, lock, auto-fork, integration) with 0 failures
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1: First shim auto-forks daemon, waits for socket, connects | task-2, task-4 | `bun test spacebridge/src/daemon/auto-fork.test.ts` + `bun test spacebridge/src/daemon/integration.test.ts` | pending | -- |
+| AC-2: Second shim blocks on lock, connects without spawning second daemon | task-2, task-4 | `bun test spacebridge/src/daemon/auto-fork.test.ts` (race test) + `bun test spacebridge/src/daemon/integration.test.ts` (second shim test) | pending | -- |
+| AC-3: Sticky daemon survives shim disconnect | task-4 | `bun test spacebridge/src/daemon/integration.test.ts` (sticky test) | pending | -- |
+| AC-4: `spacebridge status` reports PID, uptime, sessions | task-3, task-4 | `bun test spacebridge/src/daemon/integration.test.ts` (status test) | pending | -- |
+| AC-5: `spacebridge stop` sends SIGTERM, cleans up files | task-3, task-4 | `bun test spacebridge/src/daemon/integration.test.ts` (stop test) | pending | -- |
+| AC-6: SPACEBRIDGE_NO_AUTOFORK=1 skips auto-fork, reports error | task-2 | `bun test spacebridge/src/daemon/auto-fork.test.ts` (no-autofork test) | pending | -- |
+| AC-7: SPACEBRIDGE_AUTO_STOP=1 daemon stops on last disconnect | task-3, task-4 | `bun test spacebridge/src/daemon/integration.test.ts` (auto-stop test) | pending | -- |
+
+## Stage Report: execute
+
+- [x] Build wave graph from ## PLAN
+  Waves: 0 (env verification), 1 (pid + lock TDD), 2 (auto-fork TDD), 3 (daemon entry), 4 (integration tests + barrel export). 6 tasks total across 5 waves.
+- [x] Execute Wave 0: env verification (051 IPC layer exists)
+  Verified: spacebridge/src/ipc/ contains all 6 expected files (socket-server.ts, socket-client.ts, types.ts, index.ts, coordination-client-stub.ts, channel-provider-bridge.ts). spacebridge/src/daemon/ ABSENT, spacebridge/bin/ ABSENT — fresh directories as expected.
+- [x] Execute Wave 1: PID file utils + mkdir-based lock (TDD)
+  pid.ts: writePidFile, readPidFile, isProcessAlive, cleanStalePidFile — 14 tests pass. lock.ts: acquireLock (fresh/contended/stale), releaseLock — 6 tests pass. Fix: tmpdir import moved from node:path → node:os.
+- [x] Execute Wave 2: shim auto-fork logic (TDD)
+  auto-fork.ts: autoForkDaemon + resolveDaemonCommand — 8 tests pass. Tests use real socket server (createSocketServer from entity 051), real child process spawn, real temp dirs. No mocks.
+- [x] Execute Wave 3: daemon.ts entry with start/stop/status
+  spacebridge/bin/daemon.ts: start (socket bind first, PID write, SIGTERM/SIGINT/exit handlers, SPACEBRIDGE_AUTO_STOP support), stop (SIGTERM or stale cleanup), status (__status RPC over socket, reports pid/uptime/sessions). SPACEBRIDGE_STATE_DIR env var for test isolation. Manual smoke: start creates files, stop cleans them.
+- [x] Execute Wave 4: lifecycle integration tests + barrel export
+  integration.test.ts: 7 tests covering start+connect+stop lifecycle, auto-fork creates daemon, second shim no re-fork, sticky daemon, SPACEBRIDGE_AUTO_STOP=1 auto-stop, stop subcommand, status subcommand — all pass. index.ts barrel exports all public symbols. Full suite: 35 tests pass, 0 fail.
+- [x] Write ## Stage Report: execute
+  Written. Commit: 1927705 feat(052): L2 auto-fork daemon lifecycle — pid, lock, auto-fork, daemon entry, integration tests (9 files, 1247 insertions).
+
+**Files created**:
+- spacebridge/src/daemon/pid.ts — PID file read/write/alive-check/stale-cleanup
+- spacebridge/src/daemon/pid.test.ts — 14 tests
+- spacebridge/src/daemon/lock.ts — mkdir-based atomic lock acquire/release
+- spacebridge/src/daemon/lock.test.ts — 6 tests
+- spacebridge/src/daemon/auto-fork.ts — shim auto-fork logic + resolveDaemonCommand
+- spacebridge/src/daemon/auto-fork.test.ts — 8 tests (real socket server, no mocks)
+- spacebridge/src/daemon/integration.test.ts — 7 full lifecycle integration tests
+- spacebridge/src/daemon/index.ts — barrel export for daemon module
+- spacebridge/bin/daemon.ts — daemon entry point (start/stop/status subcommands)
+
+**Validation Map update**:
+| AC | Status |
+|----|--------|
+| AC-1: First shim auto-forks, waits for socket, connects | PASS |
+| AC-2: Second shim blocks on lock, no second spawn | PASS |
+| AC-3: Sticky daemon survives shim disconnect | PASS |
+| AC-4: status reports PID, uptime, sessions | PASS |
+| AC-5: stop sends SIGTERM, cleans files | PASS |
+| AC-6: SPACEBRIDGE_NO_AUTOFORK=1 skips fork, errors | PASS |
+| AC-7: SPACEBRIDGE_AUTO_STOP=1 stops on last disconnect | PASS |
+
+## Stage Report: plan
+
+- [x] Load and execute the spacedock:build-plan skill
+  Loaded SKILL.md, followed 9-step process
+- [x] Research: (a) Node.js child_process.spawn detach patterns in Bun, (b) mkdir-based lock file implementations, (c) PID file management patterns
+  Inline serial research (no pre-populated Research Findings section). 5 research domains covered: Upstream Constraints (6 findings), Existing Patterns (5 findings), Library/API Surface (5 findings), Known Gotchas (6 findings), Reference Examples (4 findings). All findings cite file:line or design doc section.
+- [x] Synthesize research into ## Research Findings
+  Written with 5 canonical subsections. No contradictions found across research domains.
+- [x] Write ## PLAN with per-task attributes
+  6 tasks (task-0 through task-5), waves 0-4, 3 TDD tasks (task-1, task-2, task-4), 10 files across spacebridge/src/daemon/ and spacebridge/bin/
+- [x] Write ## UAT Spec with items classified by type
+  4 CLI items, 1 interactive item, Browser and API sections present (None)
+- [x] Write ## Validation Map
+  7 rows covering all 7 acceptance criteria, all status=pending
+- [x] Run self-review + plan-checker through up to 3 revision iterations
+  Self-review caught 1 issue: wave dependency violation (task-2 was wave 1 but depends on task-1 wave 1 output). Fixed: task-2→wave 2, task-3→wave 3, task-4/5→wave 4. Plan-checker (inline, Agent tool unavailable): 7 dimensions evaluated, 0 blockers, 2 warnings (task-0 empty files_modified, types.ts cross-entity with 051). PASS after 1 iteration.
+- [x] Call workflow-index append unconditionally
+  10 append entries (10 files, 6 tasks deduplicated), all successful. Commit: a286292 chore(index): add contracts for entity-spacebridge-l2-daemon-lifecycle entering plan (10 files)
+- [x] Write ## Stage Report: plan with plan-checker verdict
+  This section.
+
+status: passed
+plan-checker verdict: PASS (after 1 revision iteration)
+iteration count: 1
+knowledge capture: skipped -- no findings met D1/D2 threshold (all patterns are well-known POSIX daemon conventions, not novel to this project)
+workflow-index append: 10 append calls covering 6 tasks and 10 files, all successful
+
+### Plan-checker final output
+```yaml
+issues:
+  - dimension: task_completeness
+    task: task-0
+    severity: warning
+    description: "task-0 has empty files_modified (environment verification task produces no files)"
+    fix_hint: "Acceptable for Wave 0 verification tasks -- no fix needed"
+  - dimension: cross_entity_coherence
+    task: task-5
+    severity: warning
+    description: "spacebridge/src/ipc/types.ts is owned by entity 051 (currently in execute stage); task-5 modification is conditional and additive"
+    fix_hint: "Task-5 action already says 'if needed' -- execute stage should verify 051 has completed before modifying types.ts"
+```
+
+### Dispatch Gaps
+- Agent tool unavailable in ensign context -- plan-checker ran inline (all 7 dimensions evaluated manually)
+- Research ran inline serial (no pre-populated ## Research Findings from FO-dispatched researchers)
+
+### Commits
+- a286292 chore(index): add contracts for entity-spacebridge-l2-daemon-lifecycle entering plan (10 files)
+- (pending) chore(plan): spacebridge-l2-daemon-lifecycle L2 auto-fork daemon lifecycle plan
+
+## Stage Report: quality
+
+1. **`cd spacebridge && bun install`** — PASS
+   Installed 27 packages (bun-types, drizzle-kit, drizzle-orm, others). node_modules created successfully.
+
+2. **`bun test` from REPO ROOT** — FAIL (302 pass, 23 fail, 6 errors)
+   ```
+   Ran 325 tests across 38 files
+   302 pass
+   23 fail
+   6 errors
+   752 expect() calls
+   ```
+   
+   **Root causes**:
+   - Missing `@modelcontextprotocol/sdk` dependency (tests/dashboard/channel.test.ts cannot import from SDK)
+   - Missing `diff` package (tools/dashboard/src/snapshots.ts line 5)
+   - These are pre-existing issues in dashboard dependencies, not introduced by 052 code
+
+3. **`tsc --noEmit -p spacebridge/tsconfig.json`** — FAIL (as expected)
+   ```
+   TypeScript: 5 errors in 2 files
+   
+   src/daemon/integration.test.ts (4 errors TS2345):
+   - L219: Session IDs "session-1", "session-2", "s1", "s2" do not match UUID pattern
+   
+   ../tools/dashboard/src/snapshots.ts (1 error TS2307):
+   - L5: Cannot find module 'diff' or its corresponding type declarations
+   ```
+   
+   **Analysis**: 
+   - The 4 TS2345 errors in integration.test.ts are test fixtures using shortened session IDs for readability (not production code). These are benign for testing.
+   - The `diff` import error is a pre-existing dashboard issue, unrelated to 052.
+   - **Missing @types/node**: The daemon code uses node:fs, node:net, node:os, node:path, node:child_process, and process global. tsconfig.json declares only `"types": ["bun-types"]`, which does not provide Node.js types. This needs `@types/node` added to spacebridge/package.json.
+
+4. **`tsc --noEmit -p tools/dashboard/tsconfig.json`** — PASS
+   Dashboard TypeScript compilation completed without errors (has proper @types dependencies).
+
+**Verdict**: FAIL — spacebridge/tsconfig.json requires @types/node to properly type Node.js modules used by daemon code. The 023 dashboard test failures are pre-existing and out of scope for this entity.
+
+**Recommendation**: Add `@types/node` to spacebridge/package.json dependencies before shipping 052.
