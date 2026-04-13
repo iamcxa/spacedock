@@ -35,6 +35,26 @@ You own the full 討論 (Discuss) phase: `brainstorm -> explore -> clarify`. You
 1. **From captain's message**: extract slug or ID (e.g., "/science 046", "science 047", "clarify the filter entity").
 2. **If no slug given**: list entities with `context_status` in {`none`, `pending`, `awaiting-clarify`} and ask the captain which to advance.
 
+### Step 1.5: Research Team Creation (Optional)
+
+Attempt to create a persistent research team for the discuss phase before reading the entity:
+
+```
+TeamCreate(name="research-team", members=[
+  {name: "researcher-1", agent: "spacedock:researcher"},
+  {name: "researcher-2", agent: "spacedock:researcher"},
+  {name: "researcher-3", agent: "spacedock:researcher"}
+])
+```
+
+**If TeamCreate succeeds:** the team persists across brainstorm, explore, and clarify for this session. Team members accumulate context -- the second research query can reference the first answer. The team is dissolved when SO hands off to FO or the session ends.
+
+**If TeamCreate fails** (phantom team from prior session, Warp terminal incompatibility -- see MEMORY.md agent-teams-experimental-gotchas, or agent teams unavailable): log the failure, set `research_team_available = false`, and fall back to individual Agent dispatch in Steps 3.5 and 3.7. This is NOT a blocker -- research dispatch works in both modes.
+
+**Recovery:** If a team becomes phantom mid-session (compaction, terminal disconnect), SO detects via SendMessage timeout or error. On detection: attempt TeamCreate again to recreate the team. If re-creation also fails, fall back to individual Agent dispatch for remaining research.
+
+**Skip criteria:** If the entity is Small scale AND all APPROACH technology claims are validated by existing codebase usage, skip TeamCreate entirely and set `research_team_available = false`. No research team is needed for trivially validated entities.
+
 ### Step 2: Read entity frontmatter and route by context_status
 
 Read the entity file and parse the frontmatter fields `status` and `context_status`. Use the following routing table to determine which skill to run first:
@@ -77,6 +97,56 @@ Without this step, the routing table cannot advance -- `build-explore` leaves `c
 **When running `build-explore`**: follow the skill's standard flow. On completion, the entity body should have `## Assumptions`, `## Option Comparisons`, `## Open Questions`, and `## Stage Report: explore` (checklist format per Phase D Task 1). The skill does NOT write `context_status` -- you must set `context_status: awaiting-clarify` yourself per Step 2.5.
 
 **When running `build-clarify`**: follow the skill's 7-step flow. Captain interacts via AskUserQuestion (loaded via ToolSearch). On completion, entity body has annotations on every assumption/option/question plus `## Stage Report: clarify`. The skill's Step 5 writes `context_status: ready` during the sufficiency gate -- you do NOT need to set it in SO-direct mode, just verify the skill did.
+
+### Step 3.5: Post-Brainstorm Research Dispatch
+
+After `build-brainstorm` returns and before running `build-explore`, scan the APPROACH section for external technology claims that are NOT validated by existing codebase usage.
+
+**Heuristic scan (O-2 selected):** Grep the APPROACH text for library names, API names, platform feature names, and protocol names. For each candidate, grep the codebase for existing usage (`grep -r "{library}" src/`). If the library or API has 0 codebase hits and is not a standard Node.js / Bun / Python stdlib API, it qualifies for research dispatch.
+
+**Dispatch criteria:**
+- APPROACH mentions a specific library, API, platform feature, or protocol
+- The claim is NOT already validated by codebase usage (0 grep hits)
+- Cap: **max 2 researchers per brainstorm**
+
+**Skip criteria (no research dispatched):**
+- Entity is Small scale AND all technology claims are validated by codebase usage
+- APPROACH contains no external technology claims (pure codebase refactoring)
+
+**Agent team dispatch (O-3 selected):**
+If `research_team_available = true` (Step 1.5 succeeded), use `SendMessage` to route topics to existing team members by name. If `research_team_available = false` (TeamCreate failed or skipped), fall back to individual `Agent(subagent_type="spacedock:researcher", model="sonnet", ...)` dispatch per topic.
+
+**Dispatch template (individual Agent fallback):**
+
+```
+Agent(
+  subagent_type="spacedock:researcher",
+  model="sonnet",
+  prompt="""
+  ## Topic
+  {1-line technology claim from APPROACH}
+
+  ## Description
+  Validate whether {technology/API/library} works as claimed. Specific question: {claim statement}.
+
+  ## Entity Context
+  {relevant paths from APPROACH -- library imports, config files, similar usage in codebase}
+
+  ## Scope Constraint
+  Focus on: {specific library/API behavior}. Do NOT investigate unrelated codebase areas.
+  """
+)
+```
+
+**Synthesis after return:**
+After researchers return, run a synthesis step before annotating the entity body:
+1. Validate all expected findings are present (one per dispatched topic)
+2. Check for contradictions between parallel results
+3. **Confirmed:** annotate APPROACH inline with `(✓ research: {source} -- {finding})`
+4. **Contradicted:** annotate with `(⚠ research contradicted: {source} -- {finding})` and add an α marker on the claim for explore to pick up
+5. **Two researchers contradict each other:** write both as an Open Question with cited findings (do NOT silently resolve)
+
+Commit brainstorm research annotations before proceeding to `build-explore`.
 
 ### Step 4: Handoff
 
