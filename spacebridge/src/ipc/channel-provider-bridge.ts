@@ -44,6 +44,8 @@ export function createChannelProviderBridge(opts: ChannelProviderBridgeOptions):
         return (await rpc("getChannelMessagesSince", [afterSeq, entity])) as SequencedEvent[];
       },
       getAll(): SequencedEvent[] {
+        // Not forwarded via RPC in this entity — only getChannelMessagesSince is needed
+        // for the shim use case. Full getAll support is deferred to entity 056.
         throw new Error("getAll not implemented via RPC");
       },
     },
@@ -53,6 +55,8 @@ export function createChannelProviderBridge(opts: ChannelProviderBridgeOptions):
         return (await rpc("createSnapshot", [input])) as EntitySnapshot;
       },
       listVersions(_entity: string): EntitySnapshot[] {
+        // Not forwarded via RPC in this entity — snapshot listing is a dashboard-only
+        // read path not needed by the shim. Full listVersions support deferred to entity 056.
         throw new Error("listVersions not implemented via RPC");
       },
     },

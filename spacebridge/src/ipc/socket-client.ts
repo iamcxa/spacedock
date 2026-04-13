@@ -165,7 +165,7 @@ export function createSocketClient(opts: SocketClientOptions): SocketClient {
         await connectOnce();
         // Re-register succeeded — reconnect complete
       } catch {
-        // Will schedule next attempt via handleDisconnect → scheduleReconnect
+        // intentional: reconnect errors handled by handleDisconnect chain
       }
     }, delay);
   }

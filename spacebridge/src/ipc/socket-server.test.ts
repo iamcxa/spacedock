@@ -30,7 +30,7 @@ function connectAndRegister(
   return new Promise((resolve, reject) => {
     const socket = net.createConnection({ path: socketPath });
     const received: IpcMessage[] = [];
-    const decoder = createFrameDecoder((msg) => received.push(msg as IpcMessage));
+    const decoder = createFrameDecoder((msg) => { received.push(msg as IpcMessage); });
 
     socket.on("data", (chunk) => {
       decoder(chunk as Buffer);
@@ -207,7 +207,7 @@ describe("SocketServer", () => {
       await new Promise((r) => setTimeout(r, 20));
 
       const pushReceived: IpcMessage[] = [];
-      const dec = createFrameDecoder((msg) => pushReceived.push(msg as IpcMessage));
+      const dec = createFrameDecoder((msg) => { pushReceived.push(msg as IpcMessage); });
       sockA.on("data", dec);
 
       const pushed = server.pushToSession("sess-push-A", {
@@ -250,8 +250,8 @@ describe("SocketServer", () => {
 
       const receivedA: IpcMessage[] = [];
       const receivedB: IpcMessage[] = [];
-      sockA.on("data", createFrameDecoder((m) => receivedA.push(m as IpcMessage)));
-      sockB.on("data", createFrameDecoder((m) => receivedB.push(m as IpcMessage)));
+      sockA.on("data", createFrameDecoder((m) => { receivedA.push(m as IpcMessage); }));
+      sockB.on("data", createFrameDecoder((m) => { receivedB.push(m as IpcMessage); }));
 
       server.pushToAll({ id: randomUUID(), type: "event-push", payload: { broadcast: true } });
 
@@ -262,6 +262,47 @@ describe("SocketServer", () => {
       sockA.destroy();
       sockB.destroy();
       await new Promise((r) => setTimeout(r, 50));
+    } finally {
+      await server.close();
+    }
+  });
+
+  test("re-registration race: stale socket close does not evict live session", async () => {
+    const sockPath = tempSock();
+    cleanupSocks.push(sockPath);
+    const disconnected: string[] = [];
+
+    const server = createSocketServer({
+      socketPath: sockPath,
+      onRegister: (sess) => ({ sessionToken: "tok-" + sess.sessionId, serverVersion: "1" }),
+      onRpcRequest: async () => ({ result: null }),
+      onCoordinationRequest: async () => ({ result: null }),
+      onDisconnect: (id) => disconnected.push(id),
+    });
+
+    await server.listen();
+    try {
+      // First connection for "sess-race"
+      const { socket: oldSock } = await connectAndRegister(sockPath, "sess-race");
+      await new Promise((r) => setTimeout(r, 20));
+      expect(server.getConnectedSessions()).toContain("sess-race");
+
+      // Second connection re-registers the same sessionId (new live socket)
+      const { socket: newSock } = await connectAndRegister(sockPath, "sess-race");
+      await new Promise((r) => setTimeout(r, 20));
+      // Both sockets are in socketSessions, but sessionSockets now points to newSock.
+      // Destroying the old socket must NOT evict the new live session.
+      oldSock.destroy();
+      await new Promise((r) => setTimeout(r, 100));
+
+      // Session should still be alive (new socket is live)
+      expect(server.getConnectedSessions()).toContain("sess-race");
+      expect(disconnected).not.toContain("sess-race");
+
+      newSock.destroy();
+      await new Promise((r) => setTimeout(r, 100));
+      // Now the real disconnect fires
+      expect(disconnected).toContain("sess-race");
     } finally {
       await server.close();
     }

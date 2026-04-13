@@ -2,7 +2,7 @@
 // ABOUTME: Tests for the 4-byte big-endian length-prefix + UTF-8 JSON framing codec.
 
 import { describe, test, expect } from "bun:test";
-import { encodeMessage, createFrameDecoder } from "./framing";
+import { encodeMessage, createFrameDecoder, MAX_PAYLOAD_BYTES } from "./framing";
 
 describe("encodeMessage", () => {
   test("encodes a simple object with 4-byte header", () => {
@@ -38,7 +38,7 @@ describe("encodeMessage", () => {
 describe("createFrameDecoder", () => {
   test("single message encode/decode round-trip", () => {
     const received: unknown[] = [];
-    const decoder = createFrameDecoder((msg) => received.push(msg));
+    const decoder = createFrameDecoder((msg) => { received.push(msg); });
 
     const msg = { type: "heartbeat", id: "1", payload: { ts: 123 } };
     decoder(encodeMessage(msg));
@@ -49,7 +49,7 @@ describe("createFrameDecoder", () => {
 
   test("multiple messages in one chunk", () => {
     const received: unknown[] = [];
-    const decoder = createFrameDecoder((msg) => received.push(msg));
+    const decoder = createFrameDecoder((msg) => { received.push(msg); });
 
     const msg1 = { type: "a", id: "1", payload: 1 };
     const msg2 = { type: "b", id: "2", payload: 2 };
@@ -70,7 +70,7 @@ describe("createFrameDecoder", () => {
 
   test("partial message split across two chunks", () => {
     const received: unknown[] = [];
-    const decoder = createFrameDecoder((msg) => received.push(msg));
+    const decoder = createFrameDecoder((msg) => { received.push(msg); });
 
     const msg = { type: "test", id: "x", payload: { hello: "world" } };
     const encoded = encodeMessage(msg);
@@ -86,7 +86,7 @@ describe("createFrameDecoder", () => {
 
   test("partial header split across two chunks", () => {
     const received: unknown[] = [];
-    const decoder = createFrameDecoder((msg) => received.push(msg));
+    const decoder = createFrameDecoder((msg) => { received.push(msg); });
 
     const msg = { type: "test", id: "y", payload: null };
     const encoded = encodeMessage(msg);
@@ -102,7 +102,7 @@ describe("createFrameDecoder", () => {
 
   test("empty payload {}", () => {
     const received: unknown[] = [];
-    const decoder = createFrameDecoder((msg) => received.push(msg));
+    const decoder = createFrameDecoder((msg) => { received.push(msg); });
     decoder(encodeMessage({}));
     expect(received.length).toBe(1);
     expect(received[0]).toEqual({});
@@ -110,12 +110,28 @@ describe("createFrameDecoder", () => {
 
   test("large payload round-trip", () => {
     const received: unknown[] = [];
-    const decoder = createFrameDecoder((msg) => received.push(msg));
+    const decoder = createFrameDecoder((msg) => { received.push(msg); });
     const big = "x".repeat(100_000);
     const msg = { type: "large", id: "big", payload: { data: big } };
     decoder(encodeMessage(msg));
     expect(received.length).toBe(1);
     expect((received[0] as any).payload.data.length).toBe(100_000);
+  });
+
+  test("rejects message exceeding MAX_PAYLOAD_BYTES", () => {
+    const decoder = createFrameDecoder(() => {});
+    // Craft a frame whose length header claims MAX_PAYLOAD_BYTES + 1
+    const header = Buffer.alloc(4);
+    header.writeUInt32BE(MAX_PAYLOAD_BYTES + 1, 0);
+    expect(() => decoder(header)).toThrow("message exceeds max size");
+  });
+
+  test("rejects buffer overflow from slow-drain accumulation", () => {
+    const decoder = createFrameDecoder(() => {});
+    // A single chunk larger than MAX_PAYLOAD_BYTES * 2 triggers the overflow guard
+    // immediately after concat, before the while loop runs.
+    const oversized = Buffer.alloc(MAX_PAYLOAD_BYTES * 2 + 1);
+    expect(() => decoder(oversized)).toThrow("buffer overflow");
   });
 
   test("invalid JSON throws or calls error handler", () => {

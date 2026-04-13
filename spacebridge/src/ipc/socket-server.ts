@@ -5,7 +5,6 @@
 
 import * as net from "node:net";
 import { unlinkSync, existsSync } from "node:fs";
-import { randomUUID } from "node:crypto";
 import { encodeMessage, createFrameDecoder } from "./framing";
 import type {
   IpcMessage,
@@ -40,63 +39,68 @@ export function createSocketServer(opts: SocketServerOptions): SocketServer {
 
   const server = net.createServer((socket) => {
     const decoder = createFrameDecoder(
-      async (raw) => {
-        const msg = raw as IpcMessage;
-        if (msg.type === "register") {
-          const payload = msg.payload as RegisterPayload;
-          const sessionId = payload.sessionId;
-          sessionSockets.set(sessionId, socket);
-          socketSessions.set(socket, sessionId);
+      (raw): void => {
+        (async () => {
+          const msg = raw as IpcMessage;
+          if (msg.type === "register") {
+            const payload = msg.payload as RegisterPayload;
+            const sessionId = payload.sessionId;
+            sessionSockets.set(sessionId, socket);
+            socketSessions.set(socket, sessionId);
 
-          const send = (m: IpcMessage) => {
-            if (!socket.destroyed) socket.write(encodeMessage(m));
-          };
+            const send = (m: IpcMessage) => {
+              if (!socket.destroyed) socket.write(encodeMessage(m));
+            };
 
-          const ack = opts.onRegister(payload, send);
-          send({ id: msg.id, type: "register-ack", payload: ack });
-          return;
-        }
-
-        const sessionId = socketSessions.get(socket);
-        if (!sessionId) return; // unregistered socket, ignore
-
-        if (msg.type === "rpc-request") {
-          const req = msg.payload as RpcRequestPayload;
-          try {
-            const result = await opts.onRpcRequest(sessionId, req);
-            if (!socket.destroyed) {
-              socket.write(encodeMessage({ id: msg.id, type: "rpc-response", payload: result }));
-            }
-          } catch (err) {
-            if (!socket.destroyed) {
-              socket.write(encodeMessage({
-                id: msg.id,
-                type: "rpc-response",
-                payload: { error: (err as Error).message } satisfies RpcResponsePayload,
-              }));
-            }
+            const ack = opts.onRegister(payload, send);
+            send({ id: msg.id, type: "register-ack", payload: ack });
+            return;
           }
-          return;
-        }
 
-        if (msg.type === "coordination-request") {
-          const req = msg.payload as CoordinationRequestPayload;
-          try {
-            const result = await opts.onCoordinationRequest(sessionId, req);
-            if (!socket.destroyed) {
-              socket.write(encodeMessage({ id: msg.id, type: "coordination-response", payload: result }));
+          const sessionId = socketSessions.get(socket);
+          if (!sessionId) return; // unregistered socket, ignore
+
+          if (msg.type === "rpc-request") {
+            const req = msg.payload as RpcRequestPayload;
+            try {
+              const result = await opts.onRpcRequest(sessionId, req);
+              if (!socket.destroyed) {
+                socket.write(encodeMessage({ id: msg.id, type: "rpc-response", payload: result }));
+              }
+            } catch (err) {
+              if (!socket.destroyed) {
+                socket.write(encodeMessage({
+                  id: msg.id,
+                  type: "rpc-response",
+                  payload: { error: (err as Error).message } satisfies RpcResponsePayload,
+                }));
+              }
             }
-          } catch (err) {
-            if (!socket.destroyed) {
-              socket.write(encodeMessage({
-                id: msg.id,
-                type: "coordination-response",
-                payload: { error: (err as Error).message } satisfies CoordinationResponsePayload,
-              }));
-            }
+            return;
           }
-          return;
-        }
+
+          if (msg.type === "coordination-request") {
+            const req = msg.payload as CoordinationRequestPayload;
+            try {
+              const result = await opts.onCoordinationRequest(sessionId, req);
+              if (!socket.destroyed) {
+                socket.write(encodeMessage({ id: msg.id, type: "coordination-response", payload: result }));
+              }
+            } catch (err) {
+              if (!socket.destroyed) {
+                socket.write(encodeMessage({
+                  id: msg.id,
+                  type: "coordination-response",
+                  payload: { error: (err as Error).message } satisfies CoordinationResponsePayload,
+                }));
+              }
+            }
+            return;
+          }
+        })().catch((err) => {
+          // Async handler errors are logged; the socket remains open for subsequent messages
+          console.error("[socket-server] onMessage error:", err);
+        });
       },
     );
 
@@ -105,6 +109,9 @@ export function createSocketServer(opts: SocketServerOptions): SocketServer {
     const handleClose = () => {
       const sessionId = socketSessions.get(socket);
       if (sessionId) {
+        // Guard: only evict if this socket is still the live session socket.
+        // Prevents a stale socket close from evicting a newly registered live session.
+        if (sessionSockets.get(sessionId) !== socket) return;
         sessionSockets.delete(sessionId);
         socketSessions.delete(socket);
         opts.onDisconnect(sessionId);
