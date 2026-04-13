@@ -1,8 +1,8 @@
 ---
 id: 089
 title: "Inline edit suggestions (comments parity part 2)"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: entity 054 O-2 deferral (2026-04-13)
 started:
 completed:
@@ -70,22 +70,42 @@ note: "Deferred from entity 054 O-2. Captain decided suggestions are v2 scope --
 A-1: Suggestion decider follows 054/056 pattern -- pure function at `spacebridge/src/domain/comment/suggestion-decider.ts`, same structure (commands → decide → events, evolve → state). Separate from comment decider but in the same domain directory.
 Confidence: 🟢 Confident (0.95)
 Evidence: 054 A-1 establishes decider pattern for comment domain. 056 APPROACH establishes it for lease domain. Design doc §3.5 lists both as 🟢 full CQRS. Two consistent precedents → Confident. NOTE: `spacebridge/src/domain/` dir does not exist yet (created by 054/056 in-flight); path is speculative-but-authoritative based on parent entity designs.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-2: SuggestionApplier replicates `applyBodyEdit` logic -- frontmatter boundary parsing (find second `---`), body-only text replacement (first occurrence of `diff_from`), throw Error on missing `diff_from`.
 Confidence: 🟢 Confident (0.95)
 Evidence: `tools/dashboard/src/comments.ts:84-109` is the reference implementation. Line 93: `if (!bodyPart.includes(diffFrom)) throw new Error("Text not found in entity body: diff_from text not found")`. Line 106: `// Intentionally replaces only the first occurrence`. Proven production code; CQRS version ports the same logic to a separate module.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-3: Suggestion type has 6 fields: `{ id, comment_id, diff_from, diff_to, status: "pending"|"accepted"|"rejected", timestamp }` -- matching the existing `Suggestion` interface.
 Confidence: 🟢 Confident (0.95)
 Evidence: `tools/dashboard/src/types.ts:136-143` defines the interface verbatim. `comments.ts:70-77` constructs suggestions with exactly these fields. The CQRS version converts these to Zod schemas but preserves the same shape.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-4: Suggestions are linked to comments via `comment_id` (not standalone). A suggestion is always a reply-to-comment that proposes a text change.
 Confidence: 🟢 Confident (0.95)
 Evidence: `types.ts:138` `comment_id: string`. `comments.ts:67` `input: { comment_id: string; ... }`. `CommentThread` at types.ts:145-148 holds both `comments[]` and `suggestions[]` -- parallel arrays linked by `comment_id`. UI renders suggestions inline within the comment thread that owns them.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-5: Status machine is `{ pending → accepted, pending → rejected }` with no other transitions. Once accepted or rejected, the suggestion is terminal.
 Confidence: 🟢 Confident (0.90)
 Evidence: `comments.ts:121` sets `"accepted"`, `comments.ts:130` sets `"rejected"`. No code path transitions from accepted to rejected or vice versa. The decider's `decide()` function should reject commands on non-pending suggestions.
+→ Confirmed: captain, 2026-04-14 (batch)
+
+A-6: Permission model for v1 -- all roles (captain/fo/guest) can `add_suggestion`; only captain/fo can `accept_suggestion` and `reject_suggestion`. No per-user reject-own logic in v1. Guest as external reviewer can propose changes but cannot apply them (file write boundary). Permission refinement deferred to when spacebridge auth layer matures (058 tunnel share integration).
+Confidence: 🟢 Confident (0.90)
+Evidence: Captain intent: "希望訪客也可以作為外部審查者來看，但不一定要這一次就做到位". Current dashboard has zero permission checks (comments.ts:111-132). 054 A-7 (if present) established author field supports captain/fo/guest. The decider can gate on author role in `decide()` — reject `accept_suggestion` commands from guest role.
+→ Confirmed: captain, 2026-04-14 (interactive) -- v1 simple, v2 refine with auth maturity
+
+A-7: Multi-suggestion conflict resolution is thread-based, not automatic invalidation. Multiple suggestions on the same text region are grouped into the same comment thread (Notion-like model: second reviewer replies to the first reviewer's comment, adding their own suggestion). Captain sees all proposals in one thread and accepts the best one. After accepting, stale suggestions whose `diff_from` is gone will naturally fail via `applyBodyEdit` throw — no auto-invalidation logic needed in v1. This aligns with 054 O-3 (section-based anchoring) — suggestions are anchored to the same section heading, so they thread together.
+Confidence: 🟢 Confident (0.90)
+Evidence: 054 O-3 selected section-based anchoring. 054 O-1 selected single-level replies. Together these give: comment anchored to section → replies within thread → each reply can carry a suggestion. `applyBodyEdit` at comments.ts:93 already throws on missing `diff_from` — the natural fail path is proven production code.
+→ Confirmed: captain, 2026-04-14 (interactive) -- Notion-like threading model, natural fail for stale suggestions
+
+A-8: Suggestion SSE events follow the existing events table format (schema.ts:44-58). Event types: `suggestion_added`, `suggestion_accepted`, `suggestion_rejected`. The `detail` field carries a human-readable summary with 30-char truncated preview of diff_from/diff_to and section heading. The `agent` field carries the author role. No new event table or format needed -- 053's SSE poll picks them up from the existing events table via the standard poll mechanism.
+Confidence: 🟢 Confident (0.95)
+Evidence: schema.ts:44-58 `events` table has `type`, `entity`, `stage`, `agent`, `timestamp`, `detail` columns. Existing event types (`stage_transition`, `share_created`, `comment_added` from 054) establish the pattern. Suggestion events are a natural extension with same structure.
+→ Confirmed: captain, 2026-04-14 (interactive) -- follows existing events table pattern, 30-char truncation for detail
 
 ## Option Comparisons
 
@@ -100,6 +120,8 @@ Return value trace: 053's SSE endpoint polls the `events` table for new events. 
 
 Design doc invariant check: §3.5 says "comments" is 🟢 full CQRS. Suggestions are conceptually part of the comment domain (reviewer proposes a text change as part of a discussion). Sharing the event table reflects this conceptual unity. §3.3 LCD discipline applies equally to both options. No invariant blocks either choice.
 
+→ Selected: Shared `comment_events` table with `category` discriminator -- SSE poll + replay only need one SELECT; category column separates aggregates within the shared table (captain, 2026-04-14, interactive -- confirmed after Q&A on event consumer paths)
+
 ## Open Questions
 
 Q-1: Should the suggestion diff view use a visual diff component (green/red highlighting like GitHub PRs) or a simpler before/after text block?
@@ -112,6 +134,8 @@ Suggested options:
 - (a) Simple before/after: show `diff_from` in a red-tinted block, `diff_to` in a green-tinted block, stacked vertically. No external deps. Matches the simplicity of the existing dashboard.
 - (b) Inline diff highlighting: use `react-diff-viewer-continued` (active fork) or roll a lightweight char-level diff with `diff` npm package. GitHub PR-style green/red highlighting.
 - (c) Minimal: just show `diff_to` with a "replaces: {diff_from}" tooltip/expandable. Least visual noise, most compact.
+
+→ Answer: (a) Simple before/after -- diff_from 紅底、diff_to 綠底，上下疊放。零外部依賴，與現有 dashboard 風格一致。 (captain, 2026-04-14, interactive)
 
 ## Stage Report: explore
 
@@ -139,3 +163,27 @@ Suggested options:
 - Entity 054 O-2: deferral decision -- "suggestions cross domain boundary" rationale (GUARDRAILS foundation)
 - Entity 054 A-1: comment decider pattern (precedent for A-1)
 - Entity 056 O-1: dual-table persistence (precedent for O-1)
+- `spacebridge/src/schema.ts:44-58` -- events table format (precedent for A-8 SSE event shape)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  Medium entity, no decomposition recommendation from explore
+- [x] Re-validation: 5 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  All evidence cites verified in same session; no intervening commits
+- [x] Assumptions confirmed: 8 / 8 (0 corrected)
+  A-1..A-5 batch-confirmed; A-6 (permission model) surfaced in exploration loop; A-7 (thread-based conflict) surfaced in exploration loop; A-8 (SSE event format) surfaced in exploration loop
+- [x] Options selected: 1 / 1
+  O-1: shared comment_events table with category discriminator (SSE poll + replay simplicity)
+- [x] Questions answered: 1 / 1 (0 deferred)
+  Q-1: simple before/after diff view (red block / green block, zero external deps)
+- [x] Open exploration: 3 gray areas surfaced (0 from templates, 0 from CONTRACTS, 0 from directive, 3 via captain interaction)
+  A-6 permission model (captain+fo can accept/reject, guest can only add); A-7 multi-suggestion conflict (Notion-like thread model, natural fail for stale); A-8 SSE event format (follows events table pattern)
+- [x] Canonical refs added: 1
+  schema.ts:44-58 events table (A-8 SSE event format precedent)
+- [x] Context status: ready
+  Gate passed: 8 assumptions confirmed, 1 option selected, 1 question answered, 6 acceptance criteria α-clean
+- [x] Handoff mode: loose
+  No auto_advance in frontmatter; captain must say "execute 089" to FO
+- [x] Clarify duration: 7 AskUserQuestion calls + 1 assumption batch + 2 freeform explanations
+  Batch(1) + O-1(2, captain asked "用在哪裡？" before deciding) + Q-1(1) + exploration(3 iterations: permission, conflict, SSE event format + Complete)
