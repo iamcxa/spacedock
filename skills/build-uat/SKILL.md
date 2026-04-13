@@ -94,17 +94,17 @@ For each browser item:
 
 ### 2b -- CLI Items
 
-Run the declared command via Bash. Capture stdout, stderr, and exit code. Record the last 40 lines of combined output (or the entire output if shorter) as text evidence.
+Two execution paths depending on e2e-pipeline availability (from Step 1.5):
 
-**If `e2e_recording_available` (from Step 1.5)**: before running the Bash command, invoke e2e-pipeline to record the execution:
+**If `e2e_recording_available`**: e2e-pipeline executes the command inside an asciinema recording session. Do NOT run a separate Bash call -- e2e-test already runs the command.
 
 1. Invoke `Skill` tool with `e2e-pipeline:e2e-flow` passing `cli_only: true` and the item's declared command as the source description. This generates a CLI-only flow YAML with `Execute external` steps.
-2. Invoke `Skill` tool with `e2e-pipeline:e2e-test` to execute the flow. The e2e-pipeline Phase 2.5 runs `asciinema rec` to produce a `.cast` recording file. Capture the `.cast` file path and any derived media paths (gif, mp4) from the skill return.
-3. Record the `.cast` path alongside the text evidence in the provisional result row. Both artifacts are kept -- text evidence is the primary (for pass/fail evaluation), `.cast` is supplementary (for captain review).
+2. Invoke `Skill` tool with `e2e-pipeline:e2e-test` to execute the flow. The e2e-pipeline Phase 2.5 runs `asciinema rec` which executes the command and produces a `.cast` recording file. Capture stdout, stderr, exit code from the e2e-test result, plus the `.cast` file path and any derived media paths (gif, mp4).
+3. Record both text evidence (stdout/stderr, last 40 lines) and `.cast` path in the provisional result row. Text evidence is the primary (for pass/fail evaluation), `.cast` is supplementary (for captain review). Pass/fail is determined by the command's exit code and stdout/stderr assertions from the e2e-test execution.
 
-**If NOT `e2e_recording_available`**: run the Bash command directly (current behavior). Text-only evidence. No warning, no error -- this is the baseline path.
+**If NOT `e2e_recording_available`**: run the declared command via Bash directly. Capture stdout, stderr, and exit code. Record the last 40 lines of combined output (or the entire output if shorter) as text evidence. No warning, no error -- this is the baseline path.
 
-**Recording failure is non-blocking.** If e2e-pipeline invocation fails (skill error, asciinema not installed, .cast file not produced), log the failure as a note in the provisional result row and proceed with text-only evidence. A recording failure does NOT change the item's pass/fail status -- pass/fail is determined solely by the Bash command's exit code and stdout/stderr assertions.
+**Recording failure is non-blocking.** If e2e-pipeline invocation fails (skill error, asciinema not installed, .cast file not produced), fall back to the NOT-available path: run the command via Bash directly and proceed with text-only evidence. A recording failure does NOT change the item's pass/fail status.
 
 ### 2c -- API Items
 
