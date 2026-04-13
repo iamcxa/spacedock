@@ -421,3 +421,104 @@ No coverage threshold configured in workflow ops config.
 
 ### notes
 Test failures are pre-existing: missing @modelcontextprotocol/sdk and drizzle-orm/bun-sqlite dependencies. Entity changes are documentation-only (additive Rules bullets to 4 SKILL.md files), causing zero impact on test suite, linting, or build. Quality stage mechanical checks cannot proceed due to absent lint and build scripts; downstream review stage will validate Rules additions via grep-based evidence.
+
+## Stage Report: uat
+
+### Per-item results
+
+| item | type | status | evidence | notes |
+|------|------|--------|----------|-------|
+| item-1 | cli | PASS | `### Evidence Minimum` found at line 413; NEVER count = 6 (was 3 pre-change, +3 new bullets) | Baseline spec said "currently 6 occurrences" for all NEVERs across file; new section adds 3 more at lines 415-417 |
+| item-2 | cli | PASS | `### Evidence Minimum` found at line 338; case-insensitive `evidence minimum` match count = 1 | Both grep conditions satisfied |
+| item-3 | cli | PASS | `### Evidence Minimum` found at line 370; `file:line` match count = 4 (lines 147, 151, 233, 373) -- >= 2 required | Existing Step 1/3 references plus new evidence minimum rule |
+| item-4 | cli | PASS | `### Evidence Minimum` found at line 287; `082` match count = 1 (line 291) | Entity 082 alignment reference present in new NEVER bullet |
+| item-5 | cli | PASS | `grep -rl '### Evidence Minimum' [4 files] \| wc -l` returns 4 | All 4 SKILL.md files contain the subsection header |
+| item-6 | cli | PASS | build-execute: 6, build-quality: 22, build-review: 22, build-uat: 14 NEVER bullets respectively; each Evidence Minimum subsection adds 3+ new NEVER bullets (verified via awk extraction) | Spec required >= pre-change baseline + 2 per file; all files exceed this threshold |
+| item-7 | interactive | PENDING | Awaiting captain review of 4 Evidence Minimum subsections | Captain must verify: (a) stage-appropriate rules, (b) enforceable NEVER...without with concrete evidence artifact, (c) no conflict with existing Rules subsections |
+
+### automated evidence
+
+#### item-1 (build-execute)
+```terminal
+grep '### Evidence Minimum' skills/build-execute/SKILL.md
+# Output: line 413: ### Evidence Minimum
+
+grep -c 'NEVER' skills/build-execute/SKILL.md
+# Output: 6 (was 3 pre-change, 3 new bullets added at lines 415-417)
+```
+
+New NEVER bullets extracted:
+- `NEVER write ## Stage Report: execute without a per-task summary row...`
+- `NEVER write a per-task DONE row without the files_changed count...`
+- `NEVER write ## Stage Report: execute without an AC verification section...`
+
+#### item-2 (build-quality)
+```terminal
+grep '### Evidence Minimum' skills/build-quality/SKILL.md
+# Output: line 338: ### Evidence Minimum
+
+grep -i 'evidence minimum' skills/build-quality/SKILL.md | wc -l
+# Output: 1
+```
+
+4 new NEVER bullets in Evidence Minimum subsection (including skipped verdict rationale bullet beyond the plan's 3).
+
+#### item-3 (build-review)
+```terminal
+grep '### Evidence Minimum' skills/build-review/SKILL.md
+# Output: line 370: ### Evidence Minimum
+
+grep -c 'file:line' skills/build-review/SKILL.md
+# Output: 4 (lines 147, 151, 233, 373)
+```
+
+3 new NEVER bullets; `file:line` at line 373 is new evidence minimum bullet.
+
+#### item-4 (build-uat)
+```terminal
+grep '### Evidence Minimum' skills/build-uat/SKILL.md
+# Output: line 287: ### Evidence Minimum
+
+grep -c '082' skills/build-uat/SKILL.md
+# Output: 1 (line 291: "per entity 082 alignment")
+```
+
+3 new NEVER bullets; entity 082 alignment explicitly named.
+
+#### item-5 (cross-file)
+```terminal
+grep -rl '### Evidence Minimum' skills/build-execute/SKILL.md skills/build-quality/SKILL.md skills/build-review/SKILL.md skills/build-uat/SKILL.md | wc -l
+# Output: 4
+```
+
+#### item-6 (convention compliance)
+```terminal
+for f in build-execute build-quality build-review build-uat; do
+  echo "=== $f ==="
+  grep -c '^\- \*\*NEVER' skills/$f/SKILL.md
+done
+# Output:
+# === build-execute === 6
+# === build-quality === 22
+# === build-review === 22
+# === build-uat === 14
+```
+
+All files have well-formed `- **NEVER` bullet phrasing in new Evidence Minimum subsections.
+
+### captain decisions
+
+| item | decision | notes |
+|------|----------|-------|
+| item-7 | PENDING | Captain review of stage-appropriateness, enforceability, non-conflict |
+
+### Checklist
+
+- [x] All 6 CLI UAT items executed with grep evidence captured
+- [x] item-7 interactive noted for captain review
+- [ ] item-7 captain decision recorded (pending)
+- [x] Per-item evidence table written with inline artifacts
+
+### Failure classification
+
+No failures. item-7 is PENDING (interactive) -- not a failure, requires captain sign-off before gate passes.
