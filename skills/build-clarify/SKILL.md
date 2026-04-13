@@ -12,7 +12,7 @@ now has populated Assumptions, Option Comparisons, and Open Questions (or a Deco
 Recommendation). Your job is to walk the captain through resolution, one gray area at a
 time, until the entity's context is complete and ready for planning.
 
-**Seven steps, in strict order. Steps 2-4 interact with the captain; Steps 0, 1, 5, 6 are
+**Eight steps, in strict order. Steps 2-4 interact with the captain; Steps 0, 1, 1.5, 5, 6 are
 internal.**
 
 This skill is loaded by:
@@ -107,6 +107,38 @@ Questions` sections at all → report to captain:
 > Entity `{slug}` has no explore output. Did build-explore run? Check `## Stage Report: explore`.
 
 Then stop. Do not invent sections.
+
+---
+
+## Step 1.5: Explore Re-Validation
+
+**Skip condition:** If Step 1 detected the empty case (no explore output), skip Step 1.5 entirely -- there are no assumptions to re-validate. If Step 1 detected the resume case (all counts zero), also skip Step 1.5 -- all items were already resolved in a prior session.
+
+After Step 1 loads the entity state and counts unresolved items, Step 1.5 runs five automated sub-checks to verify explore's output is still valid. Step 1.5 is internal -- it does NOT use AskUserQuestion. Its findings are written to the entity body so Step 2 presents pre-validated assumptions.
+
+**1a -- Evidence Freshness.** For each assumption in `## Assumptions` that has an `Evidence: {file}:{line}` citation, Read the cited file region using the `Read` tool. Compare the current content against the assumption's claim using LLM judgment (same pattern as build-explore Step 3.7). Three outcomes:
+- **Hold**: evidence still supports the claim. No annotation (silence = valid).
+- **Stale**: file changed but claim is still plausible (e.g., line numbers shifted, semantics preserved). Append `(⚠ stale-evidence: {detail})` inline after the Evidence line.
+- **Contradicted**: file now demonstrates the opposite of the claim. Add a new `Q-{next_n}` entry to `## Open Questions` with Domain, Why it matters, and Suggested options. Append `(⚠ contradicted: {detail} -- see Q-{next_n})` inline after the Evidence line.
+
+Evidence lines without parseable `{file}:{line}` citations (e.g., "captain domain knowledge") are skipped.
+
+**1b -- Internal Consistency.** Read all A-n entries in `## Assumptions`. For each pair of assumptions, evaluate whether they semantically contradict each other using LLM judgment. If A-i and A-j contradict, add a new `Q-{next_n}` entry to `## Open Questions`: "Assumptions A-{i} and A-{j} appear to contradict each other: A-{i} says {claim_i}, A-{j} implies {claim_j}. Which is correct?" New contradiction Q-n entries are prepended to Step 4's processing queue (contradictions have high priority).
+
+**1c -- Option Validity.** Read each `### {name}` subsection in `## Option Comparisons`. For each table, compare option rows for semantic duplication using LLM judgment. If two options are rephrased versions of the same approach, merge them: keep the first occurrence's row, append `(merged from O-{n}: {original label})` to the surviving row's Option cell, and delete the duplicate row. Write a `(⚠ dedup: merged {label_a} and {label_b} -- see dedup note)` annotation below the table.
+
+**1d -- Coverage Check.** Read `skills/build-explore/references/gray-area-templates.md`. For each domain matching the entity's `## Captain Context Snapshot` Domain field, scan the template table rows. Cross-reference each template gray area against the entity's existing `## Assumptions` and `## Open Questions` (same seen-topics semantic overlap check as Step 4.5 source 1). For each uncovered gray area:
+- If codebase precedent exists (Read/Grep to check): add as a new `A-{next_n}` entry in `## Assumptions` with Confidence and Evidence.
+- If genuinely open: add as a new `Q-{next_n}` entry in `## Open Questions`.
+
+Apply gray-area-templates.md skip rules: already decided, clear precedent (2+ consistent usages), or solved by a related entity.
+
+**1e -- Research Re-Validation.** Scan `## Assumptions` for entries with `(✓ research: {source} -- {finding})` annotations (entity 075 format). For each research-annotated assumption, re-read the cited evidence source using Read. Compare the current content against the research finding using LLM judgment. Outcomes:
+- **Holds**: research finding still valid. No annotation.
+- **Stale**: source changed but finding is plausible. Append `(⚠ stale-research: {detail})` after the research annotation.
+- **Contradicted**: source now refutes the research finding. Add a new `Q-{next_n}` to `## Open Questions` and append `(⚠ research-contradicted: {detail} -- see Q-{next_n})` after the research annotation.
+
+**After all sub-checks complete**, write all annotations and new entries to the entity body before proceeding to Step 2. Record a summary for the Stage Report (Step 6): count of assumptions checked, stale annotations added, contradictions found (new Q-n entries), options deduped, coverage gaps filled, research findings re-validated.
 
 ---
 
