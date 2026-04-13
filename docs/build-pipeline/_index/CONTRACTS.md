@@ -140,12 +140,19 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add dimension 6d test_first validation sub-rule for test file and TDD skill checks | in-flight | 2026-04-12 |
 
+### skills/build-quality/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| quality-goal-backward-regression | plan | Insert Step 4.5 regression gate with CONTRACTS.md cross-entity classification | 🔵 planned | 2026-04-13 |
+
 ### skills/build-review/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Replace trailofbits-as-agents with 4 wrapper agent dispatches; remove TBD block | ✅ final | 2026-04-12 |
 | review-stage-parallel-skill-dispatch | execute | Add FO Guidance section for debate-driven reviewer dispatch; restructure for two-phase model | 🟡 in-flight | 2026-04-12 |
+| quality-goal-backward-regression | plan | Insert Step 1e goal-backward verification in pre-scan | 🔵 planned | 2026-04-13 |
 
 ### skills/code-explorer/SKILL.md
 
@@ -261,6 +268,18 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | kc-pr-flow-mod-integration | shipped | Fixture status script for pr-review-loop pipeline | ✅ final | 2026-04-12 |
 
+### tests/pressure/build-quality-regression-gate.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| quality-goal-backward-regression | plan | Pressure test YAML for 2 regression gate scenarios | 🔵 planned | 2026-04-13 |
+
+### tests/pressure/build-review-goal-backward.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| quality-goal-backward-regression | plan | Pressure test YAML for 2 goal-backward verification scenarios | 🔵 planned | 2026-04-13 |
+
 ### tests/pressure/build-review-trailofbits-integration.yaml
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -297,6 +316,7 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | overhaul-skill-implementation | plan | Update file index table with overhaul entry | planned | 2026-04-12 |
 | build-flow-tdd-discipline | execute | Update file index table with 3 TDD pressure test entries | in-flight | 2026-04-12 |
+| quality-goal-backward-regression | plan | Update file index table with 2 new pressure test entries | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/.claude-plugin/plugin.json
 
