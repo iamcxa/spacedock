@@ -518,6 +518,38 @@ None
 - `e2e-pipeline:e2e-flow` skill: CLI flow recording capability (Phase 2.5, asciinema, .cast files)
 - `e2e-pipeline:e2e-flow/SKILL.md`: lines 355-381 define CLI-only recording via asciinema
 
+## Stage Report: execute
+
+**Verdict**: DONE
+**Ran at**: 2026-04-13T07:38:50Z
+**HEAD**: 73629d0
+**Branch**: spacedock-ensign/uat-evidence-and-recording
+
+### task summary
+
+| Task | Wave | Status | Notes |
+| ---- | ---- | ------ | ----- |
+| task-0 | 0 | DONE | All 6 grep checks passed -- 4 insertion points confirmed, e2e-pipeline:e2e-flow = 2 occurrences (expected) |
+| task-1 | 1 | DONE | Step 1.5 added, Tools Available Skill bullet updated, e2e_recording_available flag defined (set true + set false), ToolSearch probe inserted |
+| task-2 | 1 | DONE | Step 2b replaced with e2e-pipeline recording integration, graceful fallback, Recording failure is non-blocking guardrail, asciinema rec reference |
+| task-3 | 2 | DONE | Step 5 row format changed to inline evidence -- markdown image (browser), fenced terminal transcript (CLI), inline body (API), Machine-parseability constraint added |
+| task-4 | 2 | DONE | Step 7a automated evidence section replaced with structured per-type format, example block added, bare "stdout snippet" removed |
+| task-5 | 3 | DONE | ## E2E Evidence summary table section added after ## UAT Results, cast-recording artifact type defined, skip-only append rule mirrored |
+| task-6 | 4 | DONE | 9-point consistency pass: step numbering 1/1.5/2/3/4/5/6/7 contiguous, 0 em dashes in new text, e2e_recording_available set+consumed, formats consistent, artifact types consistent, skip-only append-only in both sections, Rules section uncontradicted, Skill bullet updated, 0 placeholder text. Commit 73629d0 on feature branch. |
+| task-7 | 5 | DONE | Skill TDD -- Test 1 (retrieval): all 3 greps returned matches. Test 2 (application): all 3 questions answerable from SKILL.md alone -- text-only fallback for unavailable e2e-pipeline, markdown image for browser, Step 1.5 ToolSearch for availability. Test 3 (gap check): all 3 edge cases covered -- Recording failure is non-blocking (line 107), MUST NOT rewrite prior rows (line 243), API items inline (line 220). No gaps found, no fixes needed. |
+
+### acceptance criteria
+
+- [x] AC-1: CLI item + e2e-pipeline → .cast recording AND text evidence -- `grep "cli_only: true" skills/build-uat/SKILL.md && grep "\.cast" skills/build-uat/SKILL.md` both return matches (2 each)
+- [x] AC-2: Entity file has inline evidence (images for browser, transcripts for CLI) -- `grep "### Evidence:" skills/build-uat/SKILL.md && grep '!\[' skills/build-uat/SKILL.md` both return matches (3 and 2)
+- [x] AC-3: e2e-pipeline not installed → graceful fallback, no error -- `grep "e2e_recording_available = false"` and `grep "Recording failure is non-blocking"` both found
+
+### Files Modified
+
+- `skills/build-uat/SKILL.md` -- 89 insertions, 8 deletions across 4 insertion points (Tools Available, Step 1.5 new section, Step 2b CLI recording, Step 5 inline evidence, Step 7a evidence format, E2E Evidence table)
+
+---
+
 ## Stage Report: plan
 
 - [x] Research Findings -- 5 domain sections with citations
