@@ -817,3 +817,33 @@ Files modified: 4
 - skills/build-plan/SKILL.md (task 7, 9)
 - tests/pressure/build-quality-ratchet.yaml (task 8, new file)
 - tests/pressure/README.md (task 8)
+
+## Stage Report: execute
+
+**Verdict**: pass
+**Ran at**: 2026-04-13T14:00:00Z
+**HEAD**: 891d32d
+
+| Task | Wave | Status | Summary |
+|------|------|--------|---------|
+| task-0 | 0 | DONE | All 12 environment verification checks passed. Step numbering confirmed, dim 7 exists, dim 8 absent, ops.config.json absent, pressure README present. |
+| task-1 | 1 | DONE | Step 0.5 inserted at line 46 (before Step 1 at line 75). Language detection table, 4-step procedure, TS sub-detection, Tools Available updated with find. |
+| task-2 | 1 | DONE | Runner-aware paragraphs added to all 4 steps (Steps 1-4). 4 matches for "Runner-aware execution". All original step headings unchanged. |
+| task-3 | 2 | DONE | Step 4.75 inserted at line 193 (after Step 4.5 at 163, before Step 5 at 296). Ratchet 1 type coverage, Ratchet 2 test count, TS enhanced ratchets TS-E1/E2/E3, baseline schema, evidence shape, first-run bootstrap. |
+| task-4 | 2 | DONE | Step 6 updated to "six check results". "Repeat this shape" updated with ratchet. Stage Report template: ratchet block inserted between regression and coverage. Step 7 baseline update logic added. Binary Per-Check Verdict updated to include ratchet. |
+| task-5 | 2 | DONE | Ratchet Discipline section appended after Routing and Scope. 5 NEVER rules including entity 052 lesson, first-run rule, interpretation prohibition, runner command rule. |
+| task-6 | 3 | DONE | plan-checker-prompt.md: header updated to 8 dimensions, ## 8 Dimensions section heading, dimension 8 (Type/Test Coverage) with 8a test pairing and 8b tsconfig coverage. entity 052 referenced. |
+| task-7 | 3 | DONE | build-plan SKILL.md: numbered list item 8 added in Step 6 dimensions reference. Table row `| 8 | Type/Test Coverage | ...` added to Plan-Checker Dimensions table. |
+| task-8 | 4 | DONE | tests/pressure/build-quality-ratchet.yaml created with 2 test cases (ratchet-no-baseline-update-on-failing-quality, ratchet-type-coverage-must-enumerate-not-trust-tsc). README updated to 33 unique scenarios. |
+| task-9 | 5 | DONE | Consistency verification: 11 steps correct order, 7 Stage Report categories, 8 plan-checker dimensions, 8 build-plan table rows, 0 em dashes introduced. No fixes needed. |
+| task-10 | 6 | DONE | Skill TDD GREEN phase: all 5 retrieval greps pass, all 4 application questions answerable from SKILL.md, all 4 gap-check edge cases covered (first-run, python no type checker, tie=pass, strict already on). No gaps found, no fixes needed. |
+
+## Files Modified
+
+- `/Users/kent/Project/spacedock/.worktrees/spacedock-ensign-quality-multi-language-ratchet/skills/build-quality/SKILL.md` -- Step 0.5 language detection, Steps 1-4 runner-aware, Step 4.75 ratchet checks, Stage Report ratchet category, baseline update logic, Ratchet Discipline rules
+- `/Users/kent/Project/spacedock/.worktrees/spacedock-ensign-quality-multi-language-ratchet/skills/build-plan/references/plan-checker-prompt.md` -- dimension 8 Type/Test Coverage (8a test pairing, 8b tsconfig coverage), header updated to 8 dimensions
+- `/Users/kent/Project/spacedock/.worktrees/spacedock-ensign-quality-multi-language-ratchet/skills/build-plan/SKILL.md` -- dimension 8 added to numbered list and reference table
+- `/Users/kent/Project/spacedock/.worktrees/spacedock-ensign-quality-multi-language-ratchet/tests/pressure/build-quality-ratchet.yaml` -- new file, 2 pressure test scenarios
+- `/Users/kent/Project/spacedock/.worktrees/spacedock-ensign-quality-multi-language-ratchet/tests/pressure/README.md` -- updated to 33 unique scenarios, new row for build-quality-ratchet.yaml
+
+notes: workflow-index update-status (planned → in-flight) skipped -- CONTRACTS.md had no pre-existing planned rows for entity 083 (plan-stage append deferred to FO per Stage Report: plan). No state to transition.
