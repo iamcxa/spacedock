@@ -190,6 +190,109 @@ Convention: for a failing test at `tests/foo/bar.test.ts`, the corresponding sou
 
 ---
 
+## Step 4.75: Ratchet Checks (Per-Language)
+
+Two ratchet invariants per detected language, plus TS-specific enhanced ratchets. Ratchets compare current counts against persisted baselines in ops.config.json. On first run (no baseline), skip with warning and write initial baselines.
+
+**Read baselines.** Read `{workflow_dir}/ops.config.json`. Parse the `ratchet_baselines` key. If the file is absent or the key is missing, treat all baselines as absent (first run).
+
+### Ratchet 1: Type Coverage
+
+For each detected language, verify that every source file is covered by at least one type-check config.
+
+**TypeScript procedure:**
+1. Enumerate all .ts files: `find . -name "*.ts" -not -path "*/node_modules/*" -not -path "*/dist/*" -not -path "*/.worktrees/*"`
+2. For each tsconfig.json detected in Step 0.5, parse its `include` globs and `exclude` globs.
+3. For each .ts file, check if it matches at least one tsconfig's include pattern (and is not excluded). Files not covered by any tsconfig are flagged.
+4. Verdict: if any .ts file is uncovered, `fail`. Evidence: list each uncovered file path.
+
+**Python procedure:**
+1. Enumerate all .py files: `find . -name "*.py" -not -path "*/node_modules/*" -not -path "*/.venv/*" -not -path "*/__pycache__/*"`
+2. Check if a type checker config exists (pyrightconfig.json, mypy.ini, or pyproject.toml with [tool.pyright] or [tool.mypy]).
+3. If no type checker config, all .py files are uncovered. If config exists, check its include/exclude rules.
+4. Verdict: same as TS -- uncovered files → `fail`.
+
+**Other languages:** Go and Rust have built-in type checking (go vet, cargo check). Type coverage ratchet is auto-pass for these -- record "built-in type checking, all source files covered by language toolchain" in evidence.
+
+### Ratchet 2: Test Count
+
+For each detected language, count current tests and compare against baseline.
+
+**Procedure:**
+1. Run the detected test command with count extraction:
+   - TypeScript/bun: parse `bun test` output for pass/fail/skip counts
+   - Python/pytest: `pytest --co -q` (collect-only, outputs test count)
+   - Go: `go test ./... -v 2>&1 | grep -c "=== RUN"`
+   - Rust: `cargo test -- --list 2>&1 | grep -c "test "`
+2. Compare `count(current) >= count(baseline)` from ops.config.json.
+3. If no baseline exists (first run): skip comparison, record current count as initial baseline. Emit `ratchet: skipped -- first run, baseline initialized at {count}`.
+4. If `count(current) < count(baseline)`: verdict `fail`. Evidence: `test count regression: current={N} < baseline={M}, delta={N-M}`.
+5. If `count(current) >= count(baseline)`: verdict `pass`. Update baseline to current count (deferred to Step 7 -- baselines only written on overall quality pass).
+
+### TS Enhanced Ratchets
+
+These sub-ratchets apply only to detected TypeScript configs. They are tracked as sub-counts within the ratchet evidence, not as separate Stage Report check categories.
+
+**TS-E1: Strict mode verification.**
+For each tsconfig.json, verify `"strict": true` is set. If strict is false or absent, emit a `warning` (not fail on first detection -- the ratchet tracks whether strict was enabled at baseline time). If strict was true at baseline and is now false: `fail`.
+
+**TS-E2: `as any` cast count.**
+Run: `grep -rc "as any" --include="*.ts" {src_dirs} | tail -1` (total count).
+Compare against baseline. `count(current) > count(baseline)` → `fail`. New casts must not be added.
+
+**TS-E3: `@ts-ignore` / `@ts-expect-error` count.**
+Run: `grep -rc "@ts-ignore\|@ts-expect-error" --include="*.ts" {src_dirs} | tail -1` (total count).
+Compare against baseline. `count(current) > count(baseline)` → `fail`. Suppressions must not increase.
+
+### Baseline Update Rule
+
+Baselines are written to ops.config.json ONLY when the overall quality verdict is `pass` (all checks green, Step 7). This ensures the ratchet never ratchets down from a failing state. The update happens in Step 7 after the verdict is determined, not in Step 4.75.
+
+**ops.config.json schema for ratchet_baselines:**
+
+```json
+{
+  "ratchet_baselines": {
+    "typescript": {
+      "test_count": 342,
+      "as_any_count": 5,
+      "ts_ignore_count": 2,
+      "strict_mode": true,
+      "uncovered_files": []
+    },
+    "python": {
+      "test_count": 87,
+      "uncovered_files": []
+    }
+  }
+}
+```
+
+### Evidence Shape
+
+Record per-language ratchet results in the evidence snippet. This evidence feeds into the Stage Report `### ratchet` check category (see Step 6).
+
+```
+#### typescript
+type_coverage: pass (47/47 files covered by 2 tsconfigs)
+test_count: pass (current=342 >= baseline=340)
+ts_strict: pass (all tsconfigs have strict: true)
+ts_as_any: pass (current=5 <= baseline=5)
+ts_ignore: pass (current=2 <= baseline=2)
+
+#### python
+type_coverage: skipped (no python detected)
+test_count: skipped (no python detected)
+```
+
+### Verdict
+
+- All ratchets pass for all detected languages → `pass`
+- Any ratchet fails for any language → `fail`
+- First run with no baselines → `pass` (baselines initialized, no comparison possible)
+
+---
+
 ## Step 5: Coverage Threshold (Conditional)
 
 Coverage is **only** checked if the workflow ops config defines one. Read the ops config file (path passed in by FO or discoverable as `{workflow_dir}/ops.config.json`). Look for a `coverage_threshold` key. If absent or the whole config is absent, **skip this step entirely** and record `coverage: skipped -- no threshold configured in workflow ops config` in the Stage Report.
