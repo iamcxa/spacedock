@@ -84,6 +84,172 @@ Evidence: git semantics -- `--name-only` returns file paths only with zero conte
 
 (none cited -- captain confirmed/corrected assumptions without external file references)
 
+## Research Findings
+
+### Upstream Constraints
+
+- Entity 075 (research dispatch architecture) is shipped and archived (`docs/build-pipeline/_archive/explore-research-dispatch-for-likely-assumptions.md`, status: shipped, completed: 2026-04-13T10:45:00Z). Dependency satisfied -- staleness pre-check does not re-implement research dispatch per GUARDRAILS.
+- Parent 077 GUARDRAILS mandate: staleness is a WARNING, not a blocker. Execute proceeds with caution; captain decides whether to re-plan. Binary comparison only (A-4), no semantic/LLM judgment.
+- `CLAUDE.md` global rule: root cause first -- the staleness warning surfaces the symptom (file changed), not a proposed fix. Consistent with warning-not-blocker design.
+
+### Existing Patterns
+
+- **build-quality Step 6.5** (`skills/build-quality/SKILL.md:156`): uses `git diff --name-only {execute_base_sha}..HEAD` for diff-scope classification. Same git primitive, same baseline variable. The staleness pre-check reuses this exact pattern but compares against per-wave baselines instead of a single execute-entry baseline.
+- **build-execute Step 1** (`skills/build-execute/SKILL.md:62-69`): wave dependency sanity check validates `read_first` paths per wave before dispatch. The staleness pre-check is the same concept applied to `files_modified` targets -- per-wave validation before dispatch is an established pattern in this skill.
+- **build-execute Step 4 mode detection** (`skills/build-execute/SKILL.md:146-150`): `git log --oneline {execute_base_sha}..HEAD` already establishes the `execute_base_sha` variable and demonstrates git log queries within the wave loop context.
+- **Stage Report subsection hierarchy** (`skills/build-execute/SKILL.md:264-280`): `### Per-task summary` (line 264), `### BLOCKED escalations` (line 268), `### Findings` (line 272) are top-level subsections. New `### Stale-file warnings` subsection fits at the same hierarchy level per captain-corrected A-4.
+
+### Library/API Surface
+
+- `git diff --name-only {sha} -- {file1} {file2} ...` returns only file paths that changed between the SHA and current working tree/HEAD. For files that did not exist at the baseline SHA, git reports them as "added" not "modified" -- the pre-check filters for modifications only (A-1 confirmed). Zero content overhead vs `--stat` or full diff. Accepts multiple file paths in a single invocation, avoiding per-file shell loops.
+- `git rev-parse HEAD` after serial commits in Step 4d captures the post-wave commit SHA for baseline advancement. Already in the `Bash` tool list (`skills/build-execute/SKILL.md:24`).
+
+### Known Gotchas
+
+- **Worktree isolation (A-3)**: In worktree execution (standard FO dispatch path), concurrent entities are on separate git branches. The staleness pre-check only detects external drift in main-branch execution (no worktree), which occurs when FO daemon ships other entities to main between waves. The pre-check is still useful in worktree mode for detecting manual edits or rebases, but its primary value is main-branch drift detection.
+- **chore(index) commits between plan and execute (A-2)**: `execute_base_sha` is captured at stage entry. Intervening commits between plan approval and execute entry are `chore(index):` commits that only touch `docs/build-pipeline/_index/CONTRACTS.md`. Since CONTRACTS.md is never in any task's `files_modified`, these commits don't produce false positives. Using `execute_base_sha` is functionally equivalent to plan-approval SHA for source files.
+- **New files in `files_modified`**: Some plan tasks create new files (not present at baseline). `git diff --name-only {baseline} -- {new-file}` returns the file as "added" (A status), not "modified" (M status). The pre-check must filter for M-status only, or equivalently, only flag files that existed at baseline AND changed. Using `git diff --diff-filter=M --name-only {baseline} -- {files}` is the precise filter.
+
+### Reference Examples
+
+- No external reference examples needed. The insertion pattern follows build-execute's own Step 1 wave validation structure: check condition per wave -> if violation found, log warning/error -> proceed or halt based on severity. The staleness check follows the "proceed with warning" branch.
+
+## PLAN
+
+goal: Insert per-wave staleness pre-check into build-execute SKILL.md and update Stage Report format
+
+<task id="task-1" model="sonnet" wave="1">
+  <read_first>
+    - skills/build-execute/SKILL.md
+  </read_first>
+
+  <action>
+  Insert a new subsection `### 4.0 -- Per-Wave Staleness Pre-Check` between `## Step 4: Wave Execution Loop` (line 122) and `### Two execution modes` (line 128) in `skills/build-execute/SKILL.md`. The subsection defines the staleness pre-check that runs before each wave's task dispatch.
+
+  Content to insert:
+
+  ```markdown
+  ### 4.0 -- Per-Wave Staleness Pre-Check
+
+  Before dispatching wave N's tasks (or verifying teammate commits in Mode A), compare the wave's `files_modified` targets against a baseline git state. This is a WARNING mechanism -- staleness does not block dispatch.
+
+  **Baseline selection:**
+  - Wave 0 and wave 1: use `execute_base_sha` (captured at stage entry, functionally equivalent to plan-approval state for source files per entity 080 A-2).
+  - Wave N > 1: use the post-wave-(N-1) commit SHA (the last serial commit from step 4d of the prior wave). This prevents intra-entity modifications by earlier waves from triggering false positives.
+
+  **Detection command:**
+  Collect all `files_modified` from every task in the current wave into a deduped list. Run:
+  ```bash
+  git diff --diff-filter=M --name-only {baseline} -- {file1} {file2} ...
+  ```
+  The `--diff-filter=M` flag restricts output to modified files only, excluding files with "added" status (new files the plan will create -- per entity 080 A-1, these are not stale).
+
+  **Two outcomes:**
+  - **(a) No output** -- all target files unchanged since baseline. Proceed silently to wave dispatch.
+  - **(b) One or more file paths returned** -- these files were modified externally since the baseline. Emit a warning to orchestrator output:
+    ```
+    wave {N}: ⚠ stale-files [{file1}, {file2}] -- baseline {baseline_sha} ({baseline_sha_short})
+    ```
+    Collect the warning in orchestrator memory (keyed by wave number) for inclusion in `## Stage Report: execute` under `### Stale-file warnings`. **Proceed with wave dispatch** -- staleness is a warning, not a blocker (per parent 077 GUARDRAILS).
+
+  **Baseline advancement:** After step 4d completes (serial commits for the wave), capture the new HEAD as the baseline for the next wave:
+  ```bash
+  wave_baseline=$(git rev-parse HEAD)
+  ```
+  This `wave_baseline` replaces `execute_base_sha` as the comparison target for wave N+1's pre-check.
+  ```
+
+  Additionally, add a sentence to the existing `### 4d -- Serial Git Commits After Wave Closes` subsection, after the `Update the ## Validation Map` paragraph (line 188), instructing the orchestrator to capture the post-wave SHA:
+
+  ```markdown
+  **Baseline advancement for staleness pre-check:** After the last commit in this wave, capture the post-wave HEAD via `git rev-parse HEAD` and store it as `wave_baseline` for the next wave's Step 4.0 pre-check. For the first wave, this replaces `execute_base_sha` as the staleness baseline.
+  ```
+  </action>
+
+  <acceptance_criteria>
+    - `grep "4.0 -- Per-Wave Staleness Pre-Check" skills/build-execute/SKILL.md` finds the new subsection
+    - `grep "diff-filter=M --name-only" skills/build-execute/SKILL.md` finds the detection command
+    - `grep "wave_baseline" skills/build-execute/SKILL.md` finds the baseline advancement instruction
+    - `grep "⚠ stale-files" skills/build-execute/SKILL.md` finds the warning format
+    - The new subsection appears BEFORE `### Two execution modes` in the file
+    - The baseline advancement paragraph appears AFTER the Validation Map update paragraph in step 4d
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-execute/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="1">
+  <read_first>
+    - skills/build-execute/SKILL.md
+  </read_first>
+
+  <action>
+  Update the `## Step 9: Stage Report + Advance` section's Stage Report template in `skills/build-execute/SKILL.md` (lines 254-286) to include the new `### Stale-file warnings` subsection. Insert it between `### BLOCKED escalations (if any)` and `### Findings`, at the same hierarchy level.
+
+  The template block currently reads:
+  ```markdown
+  ### BLOCKED escalations (if any)
+  - task-{id}: haiku BLOCKED ({reason}) -> sonnet BLOCKED ({reason}) -> opus {DONE|BLOCKED} ({reason})
+  - ...
+
+  ### Findings
+  ```
+
+  Change it to:
+  ```markdown
+  ### BLOCKED escalations (if any)
+  - task-{id}: haiku BLOCKED ({reason}) -> sonnet BLOCKED ({reason}) -> opus {DONE|BLOCKED} ({reason})
+  - ...
+
+  ### Stale-file warnings
+  - wave {N}: ⚠ stale-files [{file1}, {file2}] -- baseline {sha} ({sha_short})
+  - ...
+  (omit subsection if no stale files detected across any wave)
+
+  ### Findings
+  ```
+
+  This placement matches captain-corrected A-4: top-level subsection alongside `### Per-task summary` and `### BLOCKED escalations`, not under `### Findings` (which is task-scoped, while stale-file warnings are wave-scoped).
+  </action>
+
+  <acceptance_criteria>
+    - `grep "### Stale-file warnings" skills/build-execute/SKILL.md` finds the new subsection in the Stage Report template
+    - The `### Stale-file warnings` subsection appears AFTER `### BLOCKED escalations` and BEFORE `### Findings` in the template
+    - The format shows `wave {N}: ⚠ stale-files` pattern per A-4
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-execute/SKILL.md
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+None
+
+### CLI
+- [ ] Invoke modified build-execute skill with a plan whose `files_modified` target has been externally modified since `execute_base_sha`. Verify the orchestrator emits `⚠ stale-files (wave 1): [{file}]` warning in output listing the changed file. (Skill TDD: create a test scenario where a file in `files_modified` is modified between plan-approval and wave 1 dispatch, assert warning presence in orchestrator output)
+- [ ] Invoke modified build-execute skill with a 2-wave plan where wave 1 modifies `src/a.ts` and wave 2 targets `src/b.ts`. Externally modify `src/b.ts` between wave 1 and wave 2. Verify wave 2 pre-check uses wave 1's final commit SHA as baseline and flags `src/b.ts` as stale. Verify wave 2 pre-check does NOT flag `src/a.ts` (which changed in wave 1 but is expected). (Skill TDD: baseline advancement scenario)
+- [ ] Invoke modified build-execute skill with stale files detected. Verify tasks still execute (not halted) AND `## Stage Report: execute` contains `### Stale-file warnings` subsection with the warning. (Skill TDD: warning-not-blocker + Stage Report integration)
+- [ ] Invoke modified build-execute skill with a plan whose `files_modified` includes a new file (not present at baseline SHA). Verify the pre-check does NOT flag it as stale. (Skill TDD: new-file skip scenario, validates `--diff-filter=M` behavior)
+
+### API
+None
+
+### Interactive
+None
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1: wave 1 pre-check compares files_modified against plan-approval SHA and warns on change | task-1 | `grep "4.0 -- Per-Wave Staleness Pre-Check" skills/build-execute/SKILL.md && grep "diff-filter=M --name-only" skills/build-execute/SKILL.md` | pending | -- |
+| AC-2: wave 2 pre-check uses wave 1's final commit SHA as baseline, not plan-approval SHA | task-1 | `grep "wave_baseline" skills/build-execute/SKILL.md && grep "post-wave-(N-1) commit SHA" skills/build-execute/SKILL.md` | pending | -- |
+| AC-3: stale file warning does not halt dispatch and is logged in Stage Report | task-2 | `grep "### Stale-file warnings" skills/build-execute/SKILL.md && grep "Proceed with wave dispatch" skills/build-execute/SKILL.md` | pending | -- |
+
 ## Stage Report: explore
 
 - [x] Files mapped: 1 across skill/config layer
@@ -117,6 +283,34 @@ Evidence: git semantics -- `--name-only` returns file paths only with zero conte
   captain must say "execute 080" or hand off to First Officer; auto_advance not set
 - [x] Clarify duration: 2 questions asked, session complete
   1 batch assumption presentation (plain text) + 1 AskUserQuestion (A-4 Stage Report location correction)
+
+## Stage Report: plan
+
+status: passed
+plan-checker verdict: PASS (after 1 revision iteration)
+iteration count: 1
+knowledge capture: skipped -- no findings met D1/D2 threshold
+workflow-index append: 1 append call, covering 2 tasks and 1 file (skills/build-execute/SKILL.md), committed as a2bb4ac
+
+### Plan-checker final output
+```yaml
+issues:
+  - dimension: dependency_correctness
+    task: task-1, task-2
+    severity: warning
+    description: "task-1 and task-2 both modify skills/build-execute/SKILL.md in wave 1 -- parallelism concern"
+    fix_hint: "Execute will force serial; no action needed. Tasks edit non-overlapping sections (Step 4 vs Step 9)."
+```
+
+### Plan-checker execution note
+Plan-checker ran inline (ensign context lacks Agent tool per `references/agent-dispatch-guide.md`). All 7 dimensions evaluated: Dim 1 (Requirement Coverage) PASS, Dim 2 (Task Completeness) PASS, Dim 3 (Dependency Correctness) 1 warning (same-file overlap in wave 1), Dim 4 (Context Compliance) PASS, Dim 5 (Research Coverage) PASS, Dim 6 (Validation Sampling) PASS (6c exempt -- <3 tasks), Dim 7 (Cross-Entity Coherence) PASS (skills/build-execute/SKILL.md not in CONTRACTS.md -- new territory).
+
+### Dispatch Gaps
+- Plan-checker dispatched inline (not via Agent subagent) due to ensign tool surface constraint. Evaluation quality is equivalent for a 2-task Small entity.
+
+### Commits
+- chore(plan): execute-staleness-detection plan -- per-wave staleness pre-check for build-execute
+- chore(index): add contracts for entity-execute-staleness-detection entering plan (1 file)
 
 ## References
 
