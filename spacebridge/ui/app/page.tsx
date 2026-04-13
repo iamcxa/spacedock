@@ -12,13 +12,13 @@ export default async function Page() {
 
   try {
     const { openReadOnlyDb } = await import("@/lib/db");
-    const db = openReadOnlyDb();
-    connectedSessions = db.select({
+    const handle = openReadOnlyDb();
+    connectedSessions = handle.db.select({
       projectRoot: sessions.projectRoot,
       sessionId: sessions.sessionId,
     }).from(sessions).all();
 
-    const activeLeases = db.select({
+    const activeLeases = handle.db.select({
       entitySlug: entityLeases.entitySlug,
       role: entityLeases.role,
       sessionId: entityLeases.sessionId,
