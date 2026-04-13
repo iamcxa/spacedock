@@ -491,7 +491,7 @@ status: passed
 plan-checker verdict: PASS (after 1 revision iteration, inline -- ensign subagent cannot dispatch Agent for plan-checker)
 iteration count: 1
 knowledge capture: skipped -- no findings met D1/D2 threshold (all findings are entity-specific, no generalizable patterns beyond what MEMORY.md already captures)
-workflow-index append: pending (will be invoked at commit time)
+workflow-index append: 1 append call, covering 1 task and 1 file (skills/build-uat/SKILL.md), successful
 
 ### Plan-checker final output
 
