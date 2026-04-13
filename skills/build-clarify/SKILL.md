@@ -270,13 +270,13 @@ independently.
 - If captain selects a suggested gray area: discuss the gray area with the captain in plain
   text. Based on the discussion, produce a new annotation in the entity body:
   - If it resolves as an assumption: append `A-{next_n}: {statement}` + `Confidence:` +
-    `Evidence:` + `-> Confirmed: captain, {ISO-date} (interactive)` to `## Assumptions`.
+    `Evidence:` + `→ Confirmed: captain, {ISO-date} (interactive)` to `## Assumptions`.
     Compute `next_n` as max existing A-n + 1.
   - If it resolves as an open question with answer: append `Q-{next_n}: {question}` +
-    `Domain:` + `Why it matters:` + `Suggested options:` + `-> Answer: {response} (captain,
+    `Domain:` + `Why it matters:` + `Suggested options:` + `→ Answer: {response} (captain,
     {ISO-date}, interactive)` to `## Open Questions`.
   - If it requires an option comparison: append a new `### {name}` subsection with table +
-    `-> Selected: {choice} (captain, {ISO-date}, interactive)` to `## Option Comparisons`.
+    `→ Selected: {choice} (captain, {ISO-date}, interactive)` to `## Option Comparisons`.
   - Run the Canonical References accumulator if the captain cites any file paths.
 - If captain selects "Other" (harness-added freeform): treat the freeform text as a
   captain-originated gray area. Discuss, annotate, and loop exactly as for a suggested

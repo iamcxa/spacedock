@@ -89,7 +89,7 @@ the existing `## Assumptions` or `## Open Questions` sections with numbering con
 explore's last entry.
 
 The annotation is written inline (assumption confirmed or question answered in the same
-iteration), so the annotation line (`-> Confirmed:` or `-> Answer:`) always appears
+iteration), so the annotation line (`→ Confirmed:` or `→ Answer:`) always appears
 immediately with mode `(interactive)`.
 
 Example showing A-6 created by Step 4.5 when explore produced A-1 through A-5:
@@ -98,12 +98,15 @@ Example showing A-6 created by Step 4.5 when explore produced A-1 through A-5:
 A-6: WebSocket reconnection uses exponential backoff
 Confidence: Confident (0.90)
 Evidence: captain domain knowledge -- standard practice for production WS clients
--> Confirmed: captain, 2026-04-13 (interactive)
+→ Confirmed: captain, 2026-04-13 (interactive)
 ```
 
 Note: items created by Step 4.5 are indistinguishable from explore-created items by format.
 This is intentional (per Q-1 answer) -- downstream parsers (build-plan, FO, status script)
 process them identically.
+
+**Arrow style rule:** All annotation arrows use → (U+2192 unicode), never -> (ASCII). This
+matches all other annotation sections throughout build-clarify and build-explore outputs.
 
 ## Section: Canonical References
 

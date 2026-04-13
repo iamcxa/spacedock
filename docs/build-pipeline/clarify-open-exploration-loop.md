@@ -428,6 +428,14 @@ None
 - [x] Deviations: none
 - [x] BLOCKED escalations: none
 
+### Feedback Cycle 1
+
+Fixed F-1 (arrow consistency): Replaced all ASCII `->` with unicode `→` (U+2192) in Step 4.5 annotation instructions at SKILL.md:273, 276, 279 and in output-format.md:92, 101 to match downstream grep patterns used by build-plan, FO, status script.
+
+Fixed F-2 (arrow rule documentation): Added explicit arrow-style rule to output-format.md Open Exploration Item section: "All annotation arrows use → (U+2192 unicode), never -> (ASCII). This matches all other annotation sections throughout build-clarify and build-explore outputs."
+
+Fixed F-3 (CONTRACTS.md status): Updated CONTRACTS.md contract rows for entity 076 from `🟡 in-flight` to `✅ final` for both `skills/build-clarify/SKILL.md` and `skills/build-clarify/references/output-format.md`.
+
 ## Stage Report: clarify
 
 - [x] Decomposition: not-applicable
