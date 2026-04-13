@@ -2,7 +2,7 @@
 id: 091
 title: "Clarify pre-presentation evidence gate -- SO must Read-verify before asking captain"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: captain feedback (2026-04-14 SO session -- captain caught unverified citations in assumption batch)
 started:
 completed:
@@ -59,3 +59,57 @@ depends-on: []
 - `agents/science-officer.md` Step 3 — Per-skill execution rules for build-clarify
 - Captain feedback transcript: "這些都是基於 codebase 驗證過的對嗎？" → SO admitted citations came from parallel audit agents, not personal Reads
 - MEMORY.md: "Assumption Presentation" — captain needs detail to evaluate; unverified detail is worse than no detail
+
+## Assumptions
+
+A-1: Step 1.5 skip condition at SKILL.md:115 only covers resume case (prior session). There is no rule preventing SO from informally skipping the Read for "same session" evidence. The gap is real — the spec mandates Read (line 119) but the skip condition allows SO to reason "same session, no drift" and skip without violating any explicit rule.
+Confidence: 🟢 Confident (0.95)
+Evidence: `skills/build-clarify/SKILL.md:115` skip condition text: "If Step 1 detected the resume case (all counts zero), also skip Step 1.5". No mention of same-session provenance. `SKILL.md:119` says "Read the cited file region using the Read tool" but this is a sub-step of 1a which SO can skip by rationalizing temporal freshness.
+
+A-2: SO agent Step 3 (science-officer.md:99) has no pre-presentation checkpoint for build-clarify. It says "follow the skill's 7-step flow" — full delegation with no SO-level verification gate before captain interaction begins.
+Confidence: 🟢 Confident (0.95)
+Evidence: `agents/science-officer.md:99` verbatim: "When running build-clarify: follow the skill's 7-step flow. Captain interacts via AskUserQuestion (loaded via ToolSearch)." No mention of Read-verification, provenance checking, or pre-Step-2 gates.
+
+A-3: Provenance detection is implicit in session context — SO can determine whether it personally Read a file by checking whether a Read tool call for that file:line exists in the current conversation context. No metadata tagging needed. The rule becomes behavioral: "if you cannot recall a Read call for the cited file in this session, Read it now."
+Confidence: 🟢 Confident (0.90)
+Evidence: Claude Code's conversation context preserves all tool calls. In Mode B (inline mapping), SO's context has Read calls for every mapped file. In Mode A (code-explorer dispatch), SO's context has the Agent dispatch + summary return but NOT Read calls for individual files. The distinction is observable from within the session.
+
+A-4: The fix is spec-text-only — 2 markdown files modified, no code changes, no scripts, no test infrastructure.
+Confidence: 🟢 Confident (0.95)
+Evidence: Both target files are markdown specs: `skills/build-clarify/SKILL.md` and `agents/science-officer.md`. Skill behavior is defined by spec text that the LLM follows. MEMORY.md: "Skill Contract Fixes Are Plan-Driven, Not Pipeline-Driven."
+
+## Open Questions
+
+Q-1: Should the provenance rule be strict (always Read every file:line before presenting, even if SO already Read it during explore in the same session) or smart (only Read files that SO did NOT personally Read)?
+
+Domain: Runnable/Invokable
+
+Why it matters: Strict is simpler to specify and eliminates all ambiguity — SO always Re-reads before presenting, no provenance inference needed. But it adds redundant Reads when SO already mapped inline (Mode B). Smart is more efficient but requires SO to self-assess provenance, which is the same kind of informal reasoning that caused the original bug.
+
+Suggested options:
+- (a) Smart provenance: "If you cannot recall a Read tool call for the cited file in this session, Read it now." Efficient, but requires honest self-assessment.
+- (b) Strict always-Read: "Before presenting Step 2 batch, Read every file:line citation regardless of prior reads in this session." Redundant but bulletproof. ~5-10 extra Read calls per entity.
+- (c) Strict for Mode A only: "If explore used code-explorer dispatch (Mode A), Step 1.5 1a is mandatory. If explore used inline mapping (Mode B), Step 1.5 1a may skip file:line citations that SO Read during explore." Targets the actual gap without penalizing Mode B.
+
+## Stage Report: explore
+
+- [x] Files mapped: 2 across skill-spec (1), agent-spec (1)
+  skills/build-clarify/SKILL.md (Step 1.5 lines 113-141, Step 2 lines 145-170); agents/science-officer.md (Step 3 line 99)
+- [x] Assumptions formed: 4 (Confident: 4, Likely: 0, Unclear: 0)
+  A-1 skip condition gap (0.95, SKILL.md:115), A-2 no SO checkpoint (0.95, science-officer.md:99), A-3 provenance is implicit in session context (0.90), A-4 spec-text-only fix (0.95)
+- [x] Options surfaced: 0
+  No competing codebase patterns — fix approach is clear
+- [x] Questions generated: 1
+  Q-1 provenance rule strictness (smart vs strict vs Mode-A-only)
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorm
+- [x] Scale assessment: confirmed Small
+  2 files, 2 targeted text edits, no code changes
+- [x] Research dispatched: 0 researchers (skipped -- internal skill architecture, no external tech)
+
+## Canonical References
+
+- `skills/build-clarify/SKILL.md:115` -- skip condition text (A-1 gap location)
+- `skills/build-clarify/SKILL.md:119` -- Read mandate text (the rule that should fire but doesn't)
+- `agents/science-officer.md:99` -- Step 3 build-clarify delegation text (A-2 gap location)
+- `agents/science-officer.md:93-99` -- full Step 3 per-skill execution rules section (insertion point for checkpoint)
