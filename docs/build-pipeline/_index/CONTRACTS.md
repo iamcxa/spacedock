@@ -339,6 +339,18 @@ Each section lists a file path with entities that have modified it, their stage,
 | build-flow-tdd-discipline | execute | Update file index table with 3 TDD pressure test entries | in-flight | 2026-04-12 |
 | quality-goal-backward-regression | plan | Update file index table with 2 new pressure test entries | 🔵 planned | 2026-04-13 |
 
+### tools/dashboard/static/app.js
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| dashboard-context-status-filter | plan | Extend filterState to 2D (stage x context_status) and add context chip row rendering + filter logic | 🔵 planned | 2026-04-13 |
+
+### tools/dashboard/static/style.css
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| dashboard-context-status-filter | plan | Add .context-status-pipeline, .context-chip, .context-chip--active styles for context_status filter chips | 🔵 planned | 2026-04-13 |
+
 ### spacebridge/.claude-plugin/plugin.json
 
 | Entity | Stage | Intent | Status | Last Updated |
