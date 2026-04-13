@@ -97,8 +97,9 @@ Read the entity body. Count:
 
 Record these counts internally for the Stage Report at Step 6.
 
-**Resume case:** if all three counts are zero → skip to Step 5 (the entity was previously
-clarified; this is a re-entry to finalize the handoff).
+**Resume case:** if all three counts are zero → skip to Step 4.5 (the entity's
+pre-identified items were previously resolved; the open exploration loop may still surface
+new gray areas, or the captain selects "Complete" to proceed to Step 5).
 
 **Empty case:** if the entity has no `## Assumptions`, `## Option Comparisons`, OR `## Open
 Questions` sections at all → report to captain:
@@ -307,7 +308,8 @@ Re-scan the entity body and verify:
 - [ ] `## Canonical References` section exists (may be empty if captain cited no external docs -- that is OK)
 
 **If any check fails** → identify the gap and loop back to the relevant step (Step 2 for
-assumptions, Step 3 for options, Step 4 for questions). Do NOT advance to Step 6 with gaps.
+assumptions, Step 3 for options, Step 4 for questions, Step 4.5 for open exploration). Do
+NOT advance to Step 6 with gaps.
 
 **Exception -- Acceptance Criteria defect**: if the `## Acceptance Criteria` check fails
 (fewer than 2 criteria, or α markers remain), this is an upstream defect -- build-clarify
