@@ -617,3 +617,75 @@ workflow-index append: 3 append calls covering 3 tasks and 3 files, all successf
 - [x] Stage Report: execute written with per-task summary rows
   This section.
 - [x] workflow-index update-status: not applicable at execute stage (status was set in-flight at plan approval; execute stage does not call update-status per skill contract)
+
+## Stage Report: quality
+
+**Ran at**: 2026-04-13T07:15:00Z
+**Executor**: haiku (quality stage ensign)
+
+### Verification Checklist
+
+1. **bun test** — FAILED
+   - Exit code: 1
+   - Result: 464 pass, 2 fail, 2 errors, 1041 expect() calls across 39 files
+   - Error source: `spacebridge/src/schema.test.ts` and `spacebridge/src/db.test.ts` — missing drizzle-orm/bun-sqlite module
+   - Evidence (first/last lines):
+     ```
+     bun test v1.3.9 (cf6cdbbb)
+     
+     spacebridge/src/schema.test.ts:
+     
+     # Unhandled error between tests
+     error: Cannot find module 'drizzle-orm/bun-sqlite' from '/Users/kent/Project/spacedock/spacebridge/src/db.ts'
+     
+     ...
+     
+      464 pass
+      2 fail
+      2 errors
+      1041 expect() calls
+     Ran 466 tests across 39 files. [13.99s]
+     ```
+   - **Verdict**: FAILED (pre-existing test failures unrelated to entity 084 execute changes)
+
+2. **bun lint** — SKIPPED
+   - Rationale: Project does not define a `lint` script in package.json. No linter configuration (biome.json, .eslintrc, .prettierrc) found in repo. Lint tooling not configured for this project.
+   - **Verdict**: SKIPPED (no lint tooling available)
+
+3. **bunx tsc --noEmit** — DONE
+   - Ran type-check on spacebridge/tsconfig.json (only TypeScript source in repo)
+   - Result: No errors, no warnings
+   - Evidence:
+     ```
+     (empty output — successful completion)
+     ```
+   - **Verdict**: PASSED
+
+4. **bun build** — DONE
+   - Built dashboard MCP entry point with `bun build --target bun tools/dashboard/src/channel.ts`
+   - Result: Build succeeded (3.3MB output, full bundle generated)
+   - Evidence (first/last lines):
+     ```
+     // @bun
+     var __create = Object.create;
+     ...
+     writeChannelState,
+     createChannelServer,
+     computeStateDir,
+     cleanChannelState
+     };
+     ```
+   - **Verdict**: PASSED
+
+### Binary Verdicts
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| bun test | FAILED | 2 test failures, 2 errors in spacebridge (pre-existing, unrelated to entity 084 code changes) |
+| bun lint | SKIPPED | No lint tooling configured in project |
+| tsc --noEmit | PASSED | Zero type errors in spacebridge TypeScript |
+| bun build | PASSED | Dashboard MCP channel entry point builds successfully |
+
+### Summary
+
+Quality stage review found pre-existing test failures in the spacebridge module (missing drizzle-orm/bun-sqlite dependency handling) that are unrelated to the entity 084 code changes (which modified only `skills/build-review/SKILL.md`, `skills/build-uat/SKILL.md`, and archived entity 073). TypeScript type-checking and build verification passed. The test failures should be escalated to the execute stage for investigation, as they block clean test suite status but appear to be environmental/dependency issues, not logic errors introduced by this entity's changes.
