@@ -227,6 +227,8 @@ Rules:
 
 **Detail lines (optional, Tier 1 rendering):** Each checklist item MAY have a single detail line directly below it, indented with 2 spaces (do not use tabs or deeper indentation). The dashboard parser reads this as the `detail` field of the Stage Report item and renders it under the metric in the UI card. Tier 1 detail is a single line -- multi-line detail is Tier 2 work deferred to Phase F. For clarify, detail should capture the decision: which option was selected, which assumptions were corrected, which refs were cited. This turns the Stage Report into a one-glance decision audit trail.
 
+**Canonical detail line exemplars:** When writing detail lines, match the style demonstrated by entity 047 (entity-body-rendering-hotfixes). Entity 047's Stage Report: clarify shows decision-audit detail (e.g., "A-1 through A-5 all Confident-level with file:line evidence; captain confirmed entire batch"). For clarify, detail should capture the decision: which option was selected, which assumptions were corrected, which refs were cited. Authors should match this decision-audit style for clarify detail lines.
+
 ## Frontmatter Updates
 
 At the end of Step 5 (Context Sufficiency Gate passes), update frontmatter:
