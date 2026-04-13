@@ -114,13 +114,13 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| clarify-open-exploration-loop | plan | Insert Step 4.5 Open Exploration Loop + update resume case and stage report metric | 🔵 planned | 2026-04-13 |
+| clarify-open-exploration-loop | execute | Insert Step 4.5 Open Exploration Loop + update resume case and stage report metric | 🟡 in-flight | 2026-04-13 |
 
 ### skills/build-clarify/references/output-format.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| clarify-open-exploration-loop | plan | Document Step 4.5 annotation format + add Open exploration metric to Stage Report | 🔵 planned | 2026-04-13 |
+| clarify-open-exploration-loop | execute | Document Step 4.5 annotation format + add Open exploration metric to Stage Report | 🟡 in-flight | 2026-04-13 |
 
 ### skills/build-explore/SKILL.md
 
