@@ -1,7 +1,7 @@
 ---
 id: 084
 title: "Review forge validation -- conditional forge audit + skill invocation testing"
-status: uat
+status: shipped
 source: decomposition of entity 074 (pipeline verification quality uplift)
 started: 2026-04-13T06:30:00Z
 worktree: .worktrees/spacedock-ensign-review-forge-validation
