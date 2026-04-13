@@ -200,13 +200,14 @@ Example: A-5 was Likely (0.75) assuming "Next.js standalone server.js is importa
 
 ### Depth scaling (from entity scope)
 
-Research depth is calibrated to assumption confidence and entity scale:
+Research depth is calibrated to assumption confidence and entity scale. **Proactive validation rule**: dispatch researchers for ALL assumptions at Likely (0.50+) confidence or above, not just for external tech claims. Even Confident (0.85) assumptions carry 15% uncertainty -- proactive web research catches edge cases that codebase grep alone misses.
 
 | Condition | Research mode |
 |---|---|
 | ALL assumptions Confident ≥0.95 AND no external tech claims AND Small scale | SKIP all research |
-| assumptions 0.85-0.94 Confident | Lightweight (1 researcher, targeted) |
-| assumptions 0.70-0.84 Likely | Standard (1-2 researchers, parallel) |
-| assumptions <0.70 Unclear | Deep (2-3 researchers, parallel + continuation) |
+| assumptions 0.80-0.94 Confident with any external library/API/pattern reference | Lightweight (1 researcher, targeted) |
+| assumptions 0.80-0.94 Confident, purely internal codebase patterns | Lightweight (1 researcher) -- validate via deeper codebase trace, not just grep |
+| assumptions 0.50-0.79 Likely | Standard (1-2 researchers, parallel) -- includes web research |
+| assumptions <0.50 Unclear | Deep (2-3 researchers, parallel + continuation) |
 
-The skip threshold is intentionally high (all ≥0.95) because research includes deep internal codebase tracing, not just WebSearch. Surface-level grep is not sufficient validation at Confident thresholds.
+The skip threshold is intentionally tight (all ≥0.95 AND Small AND no external tech) to maximize proactive validation. Confident does not mean "skip research" -- it means "research is lightweight, not deep." The goal is to catch edge cases before they reach plan/execute, where the fix cost is 10x higher.

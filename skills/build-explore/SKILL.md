@@ -231,11 +231,11 @@ After hybrid classification (Step 5), scan Track A assumptions (Likely and Uncle
 - It is NOT purely codebase architecture (internal module interactions, code structure)
 - Confidence is Likely (0.50-0.79) or Unclear (0.20-0.49) for Track A; any confidence for Track B options involving library choice
 
-**Research depth scaling:**
+**Research depth scaling (proactive validation -- dispatch for Likely+ confidence):**
 - SKIP all research: ALL assumptions Confident >=0.95 AND no external tech claims AND Small scale
-- Lightweight (1 researcher, targeted): assumptions 0.85-0.94 Confident
-- Standard (1-2 researchers, parallel): assumptions 0.70-0.84 Likely
-- Deep (2-3 researchers, parallel + continuation): assumptions <0.70 Unclear
+- Lightweight (1 researcher, targeted): assumptions 0.80-0.94 Confident (any external lib/API reference OR purely internal patterns needing deeper trace)
+- Standard (1-2 researchers, parallel): assumptions 0.50-0.79 Likely (includes web research)
+- Deep (2-3 researchers, parallel + continuation): assumptions <0.50 Unclear
 
 **Cap: max 3 researchers per explore step** (entity scope total across brainstorm + explore max 5).
 

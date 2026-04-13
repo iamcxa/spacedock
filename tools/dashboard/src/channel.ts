@@ -17,7 +17,15 @@ const PermissionRequestNotificationSchema = z.object({
     description: z.string(),
     input_preview: z.string().optional(),
   }),
-});
+}) as z.ZodType<{
+  method: "notifications/claude/channel/permission_request";
+  params: {
+    request_id: string;
+    tool_name: string;
+    description: string;
+    input_preview?: string;
+  };
+}>;
 
 import { mkdirSync, writeFileSync, readFileSync, unlinkSync, existsSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
@@ -548,8 +556,8 @@ export function createChannelServer(opts: ChannelServerOptions) {
 
   // Permission relay: Claude Code -> dashboard -> captain -> Claude Code
   mcp.setNotificationHandler(
-    PermissionRequestNotificationSchema,
-    async (notification) => {
+    PermissionRequestNotificationSchema as any,
+    async (notification: any) => {
       const params = notification.params;
       const event: AgentEvent = {
         type: "permission_request",
