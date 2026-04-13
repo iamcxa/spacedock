@@ -413,3 +413,38 @@ All 8 dimensions evaluated:
 - chore(index): add contracts for entity-dashboard-context-status-filter entering plan (2 files)
 - chore(plan): dashboard-context-status-filter add research findings, 4-task plan, UAT spec, validation map
 
+## Stage Report: execute
+
+### Per-Task Results
+
+| Task | Status | SHA | Notes |
+|------|--------|-----|-------|
+| task-0: Environment verification | DONE | — | filterState at line 28 ✓, stage-pipeline at line 180 ✓, context_status count = 0 ✓ |
+| task-1: Refactor filterState to 2D | DONE | f580c01 | loadFilterState migrates old array format; initDim() helper; saveFilterState writes nested object; all filter read/write sites updated; 2D AND/OR predicate with !csVal for Q-2 |
+| task-2: UI rendering + CSS for context_status chip row | DONE | 5c371c5 | context-status-pipeline row below stage chips; purple color scheme; context-label; media query updated for narrow/wide screens |
+| task-3: E2E verification + edge case hardening | DONE | — | No code changes needed — all edge cases verified correct in task-1/2; baseline test comparison confirmed 0 new regressions |
+
+### Baseline Test Comparison
+
+Pre-change: 301 pass, 25 fail, 8 errors (missing npm packages: @modelcontextprotocol/sdk, diff, drizzle-orm)
+Post-change: 301 pass, 25 fail, 8 errors
+Result: 0 new regressions — all failures are pre-existing environment issues unrelated to this entity.
+
+### Edge Case Verification
+
+- **Backward compat (old sessionStorage format)**: `Array.isArray(val)` migration path at loadFilterState line 37 ✓
+- **Zero-filter default preserved**: `hasAnyFilter === false` path retains archived+shipped hide logic ✓
+- **Legacy entity always-visible**: `!csVal` in csMatch handles both `undefined` and `""` ✓
+- **Combined AND filter**: `stageMatch && csMatch` at line 310 ✓
+- **Responsive CSS**: `.context-status-pipeline` added to both narrow (show) and wide (hide) media queries ✓
+
+### Files Modified
+
+- `tools/dashboard/static/app.js` — filterState 2D refactor + context_status chip row rendering
+- `tools/dashboard/static/style.css` — context chip CSS + media query update
+
+## Files Modified
+
+- `tools/dashboard/static/app.js`
+- `tools/dashboard/static/style.css`
+
