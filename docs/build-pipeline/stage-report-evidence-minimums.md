@@ -15,7 +15,7 @@ scale: Small
 project: spacedock
 depends-on: []
 parent: 085
-context_status: pending
+context_status: explored
 ---
 
 ## Directive
@@ -66,6 +66,37 @@ Add "evidence minimum" rules to each stage skill's Rules section:
 
 - [ ] Given a completed execute stage, when Stage Report is written, then it includes per-task commit SHA, files changed count, and at minimum 1 line of test evidence per AC (how to verify: read execute Stage Report, confirm evidence fields present)
 - [ ] Given all 4 stage skills, when their Rules sections are read, then each has a documented "evidence minimum" requirement (how to verify: grep "evidence minimum" in execute/quality/review/uat SKILL.md Rules)
+- [ ] Given a stage skill ensign writing a Stage Report, when it omits a required evidence field, then the Rules section provides a "NEVER ... without ..." rule that makes the omission a Rules violation (how to verify: read each SKILL.md Rules section, confirm evidence minimum rule exists with NEVER phrasing)
+
+## Assumptions
+
+A-1: All 4 stage SKILL.md files have `## Rules -- No Exceptions` sections with consistent formatting. Evidence minimum rules insert as new `### Evidence Minimum` subsections within each Rules section.
+Confidence: Confident (0.95)
+Evidence: build-execute SKILL.md:328, build-quality SKILL.md:296, build-review SKILL.md:326, build-uat SKILL.md:253 -- all have `## Rules -- No Exceptions` with `###` subsections and `**NEVER ...**` bullet conventions.
+
+A-2: Existing Stage Report formats already include partial evidence fields (quality has per-check evidence snippets, execute has per-task results). Evidence minimums formalize these as mandatory requirements, not new formats.
+Confidence: Confident (0.90)
+Evidence: build-quality SKILL.md:159 -- "structured verdict per check category" with evidence snippet shape. build-execute SKILL.md:52 -- "wave-by-wave dispatch log, per-task status, commit SHAs." Evidence exists but is not enforced by Rules.
+
+A-3: Entity 082's inline evidence format (markdown images, transcript blocks) is the reference for UAT evidence minimums. UAT evidence minimum rules should align with 082's format to ensure consistency.
+Confidence: Likely (0.75)
+Evidence: Entity 082 GUARDRAILS: "ensure inline format is machine-parseable for confidence scoring." Entity 082 A-3: "Step 5 evidence writing changes output format to markdown image syntax (browser) and fenced transcript blocks (CLI)."
+
+## Stage Report: explore
+
+- [x] Files mapped: 4 across skill layer
+  build-execute SKILL.md:328 (Rules), build-quality SKILL.md:296 (Rules), build-review SKILL.md:326 (Rules), build-uat SKILL.md:253 (Rules)
+- [x] Assumptions formed: 3 (Confident: 2, Likely: 1)
+  A-1 Rules section pattern (0.95), A-2 partial evidence already exists (0.90), A-3 082 alignment (0.75)
+- [x] Options surfaced: 0
+  All gray areas resolved to Track A -- clear Rules section insertion pattern with 4 consistent precedents
+- [x] Questions generated: 0
+  No open questions -- scope is well-defined additive text to existing Rules sections
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorming spec
+- [x] Scale assessment: confirmed Small
+  4 files, single insertion point per file (Rules section), purely additive text
+- [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident on internal codebase structure)
 
 ## References
 
