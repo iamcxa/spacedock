@@ -83,6 +83,20 @@ Output of this step: a list of `(topic title, topic description, entity context 
 
 **Cap the topic count at 5 researchers per plan.** If you identify more than 5 topics, collapse the lowest-priority topics into the next highest-priority topic (broader scope constraint) or defer them to a follow-up plan. Uncapped dispatch burns context and produces synthesis-step contradictions that are hard to reconcile.
 
+### Research Dedup (Entity 075)
+
+Before dispatching researchers for extracted topics, scan the entity body for existing research annotations from brainstorm (SO Step 3.5) and explore (Step 5.5):
+
+1. Grep entity body for `(✓ research:` annotations -- these topics were already validated by upstream researchers. Example: `grep '✓ research:' entity.md`
+2. Grep entity body for `## Research Findings` subsections written by explore for contradicted assumptions -- these topics have full 5-domain treatment already.
+3. For each extracted topic from the list above, check: does the topic overlap with an already-researched annotation? If yes, skip the topic from researcher dispatch. Record `deduped: {topic} -- already researched by {stage}` in the topic list.
+4. Remaining topics after dedup are **implementation-specific queries only**:
+   - "Which specific API call for X?" (concrete code pattern, not "does X work?")
+   - "How does library Y's API look for this use case?" (Context7/docs for code examples)
+   - Integration patterns between confirmed technologies
+
+**Cap adjustment:** The 5-researcher cap still applies to plan-stage dispatch. After dedup, the effective dispatch count is typically 1-3 -- the broad technology validation was already done upstream by brainstorm/explore researchers.
+
 ---
 
 ## Step 2: Read Research Findings
@@ -95,6 +109,8 @@ Read the `## Research Findings` section from the entity file. This section was p
 - Every topic from Step 1 should have at least one finding in the corresponding subsection.
 - If a topic is missing coverage (researcher timed out, was truncated, or topic was not dispatched), record it as "Unknown Unknowns" in that subsection and flag it in Step 3's Open Question mechanism.
 - If `## Research Findings` is entirely absent or empty, fall back to **inline serial research** inside your own context: for each topic, use Read/Grep/Glob on the entity context paths and write the finding directly into the corresponding subsection, one topic at a time. Keep the 5-subsection output format and citation discipline identical. Log the fallback in `## Stage Report: plan` under `### Dispatch Gaps`.
+
+**Inline annotation dedup (Entity 075):** Also scan for inline `(✓ research: ...)` annotations on assumption Evidence lines in `## Assumptions`. These are per-assumption research results from brainstorm/explore phases. Treat them as pre-populated findings for the relevant topics -- do NOT re-dispatch researchers for topics already covered by inline annotations. Each inline annotation maps to one deduped topic from Step 1's Research Dedup check.
 
 **Contradiction handling stays the same** -- proceed to Step 3 for contradiction resolution regardless of whether research was pre-populated or inline.
 
