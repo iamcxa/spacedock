@@ -1,7 +1,7 @@
 ---
 id: 086
 title: "Stage Report evidence minimums -- per-stage required evidence fields"
-status: quality
+status: review
 source: decomposition of entity 085 (stage report evidence and confidence)
 started: 2026-04-13T06:30:00Z
 worktree: .worktrees/spacedock-ensign-stage-report-evidence-minimums
