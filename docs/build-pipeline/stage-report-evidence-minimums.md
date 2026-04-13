@@ -349,3 +349,75 @@ Captain reads each new `### Evidence Minimum` subsection and confirms: (a) rules
 ### Knowledge capture
 
 No D1/D2 patterns identified. Entity is purely additive text to Rules sections; no architectural decisions, no novel patterns beyond what the plan specified.
+
+## Stage Report: quality
+
+### test
+verdict: fail
+command: bun test
+evidence:
+```
+ 301 pass
+ 25 fail
+ 8 errors
+ 1036 expect() calls
+Ran 326 tests across 39 files. [10.16s]
+
+tests/dashboard/channel.test.ts:
+error: Cannot find module '@modelcontextprotocol/sdk/server/index.js' from '/Users/kent/Project/spacedock/.worktrees/spacedock-ensign-stage-report-evidence-minimums/tools/dashboard/src/channel.ts'
+(fail) Channel Server > createChannelServer returns mcp server and dashboard server
+(fail) Channel Server > createChannelServer dashboard serves HTTP
+(fail) Channel Server > createChannelServer declares channel capabilities
+(fail) MCP server has tools/list handler registered
+(fail) reply tool call pushes channel_response to EventBuffer
+
+spacebridge/src/schema.test.ts:
+error: Cannot find module 'drizzle-orm/bun-sqlite' from '/Users/kent/Project/spacedock/.worktrees/spacedock-ensign-stage-report-evidence-minimums/spacebridge/src/db.ts'
+```
+
+### lint
+verdict: skipped
+command: bun lint
+evidence:
+```
+error: Script not found "lint"
+```
+rationale: No lint script defined in project configuration. Skipping as the entity changes are documentation-only (Rules subsections in SKILL.md files).
+
+### typecheck
+verdict: skipped
+command: bunx tsc --noEmit
+evidence:
+```
+No tsconfig.json at project root. TypeScript type-checking not configured for this repository.
+```
+rationale: Repository has no root tsconfig.json and no type-check script. Skipping as project does not enforce TypeScript compilation at root level.
+
+### build
+verdict: skipped
+command: bun build
+evidence:
+```
+error: Missing entrypoints. What would you like to bundle?
+```
+rationale: No build entrypoints defined at root. Entity changes are documentation-only (Rules subsections added to SKILL.md files); no compiled artifacts required.
+
+### regression
+verdict: fail
+command: n/a -- reuses test evidence
+classification: current-entity-only
+evidence:
+```
+Entity 086 modified only 4 SKILL.md files (build-execute, build-quality, build-review, build-uat) with purely additive Rules subsections. Test failures (301 pass, 25 fail, 8 errors) are pre-existing dependency issues in tools/dashboard and spacebridge, unrelated to documentation changes. No regression from entity work.
+```
+
+### coverage
+verdict: skipped
+command: n/a
+evidence:
+```
+No coverage threshold configured in workflow ops config.
+```
+
+### notes
+Test failures are pre-existing: missing @modelcontextprotocol/sdk and drizzle-orm/bun-sqlite dependencies. Entity changes are documentation-only (additive Rules bullets to 4 SKILL.md files), causing zero impact on test suite, linting, or build. Quality stage mechanical checks cannot proceed due to absent lint and build scripts; downstream review stage will validate Rules additions via grep-based evidence.
