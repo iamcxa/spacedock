@@ -48,8 +48,9 @@ text). See the GSD todo for design notes.
 | `build-clarify-revalidation.yaml` | `skills/build-clarify/SKILL.md` Step 1.5 | 5 | (no dispatches yet -- entity 078) |
 | `build-review-goal-backward.yaml` | `skills/build-review/SKILL.md` Step 1e | 2 | (no dispatches yet -- entity 081) |
 | `build-quality-regression-gate.yaml` | `skills/build-quality/SKILL.md` Step 4.5 | 2 | (no dispatches yet -- entity 081) |
+| `build-quality-ratchet.yaml` | `skills/build-quality/SKILL.md` Step 4.75 + Ratchet Discipline | 2 | (no dispatches yet -- entity 083) |
 
-**Total: 31 unique scenarios.** 5 of them have round-2 history entries
+**Total: 33 unique scenarios.** 5 of them have round-2 history entries
 (re-tested after fix-forward commits), giving 17+ total subagent dispatches
 captured in the history fields.
 

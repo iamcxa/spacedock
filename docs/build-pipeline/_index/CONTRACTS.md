@@ -127,7 +127,6 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | execute-staleness-detection | plan | Insert per-wave staleness pre-check into build-execute Step 4 + Stage Report | planned | 2026-04-13 |
-| stage-report-evidence-minimums | execute | Add ### Evidence Minimum Rules subsection to ## Rules -- No Exceptions | 🟡 in-flight | 2026-04-13 |
 
 ### skills/build-explore/SKILL.md
 
@@ -152,7 +151,6 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | quality-goal-backward-regression | plan | Insert Step 4.5 regression gate with CONTRACTS.md cross-entity classification | 🔵 planned | 2026-04-13 |
-| stage-report-evidence-minimums | execute | Add ### Evidence Minimum Rules subsection to ## Rules -- No Exceptions | 🟡 in-flight | 2026-04-13 |
 
 ### skills/build-review/SKILL.md
 
@@ -161,13 +159,6 @@ Each section lists a file path with entities that have modified it, their stage,
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Replace trailofbits-as-agents with 4 wrapper agent dispatches; remove TBD block | ✅ final | 2026-04-12 |
 | review-stage-parallel-skill-dispatch | execute | Add FO Guidance section for debate-driven reviewer dispatch; restructure for two-phase model | 🟡 in-flight | 2026-04-12 |
 | quality-goal-backward-regression | plan | Insert Step 1e goal-backward verification in pre-scan | 🔵 planned | 2026-04-13 |
-| stage-report-evidence-minimums | execute | Add ### Evidence Minimum Rules subsection to ## Rules -- No Exceptions | 🟡 in-flight | 2026-04-13 |
-
-### skills/build-uat/SKILL.md
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| stage-report-evidence-minimums | execute | Add ### Evidence Minimum Rules subsection to ## Rules -- No Exceptions | 🟡 in-flight | 2026-04-13 |
 
 ### skills/code-explorer/SKILL.md
 
