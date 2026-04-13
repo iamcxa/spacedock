@@ -220,6 +220,44 @@
       });
       card.appendChild(pipeline);
 
+      // --- Context Status Chip Row ---
+      var csValues = ["pending", "explored", "awaiting-clarify", "ready"];
+      var csCounts = {};
+      wf.entities.forEach(function (e) {
+        var cs = e.context_status || e["context_status"];
+        if (!cs) return;
+        csCounts[cs] = (csCounts[cs] || 0) + 1;
+        if (csValues.indexOf(cs) === -1) csValues.push(cs);
+      });
+      var csActiveFilters = dim.context_status;
+      var hasAnyCs = csValues.some(function (v) { return csCounts[v] > 0; });
+      if (hasAnyCs) {
+        var csPipeline = el("div", { className: "context-status-pipeline" });
+        csPipeline.appendChild(el("span", { className: "context-label", textContent: "context:" }));
+        csValues.forEach(function (csName) {
+          var count = csCounts[csName] || 0;
+          if (count === 0) return;
+          var isActive = csActiveFilters.has(csName);
+          var chipClass = "context-chip" + (isActive ? " context-chip--active" : "");
+          var chip = el("span", { className: chipClass }, [
+            csName,
+            el("span", { className: "count", textContent: String(count) })
+          ]);
+          chip.addEventListener("click", function () {
+            initDim(wfIdx);
+            if (filterState[wfIdx].context_status.has(csName)) {
+              filterState[wfIdx].context_status.delete(csName);
+            } else {
+              filterState[wfIdx].context_status.add(csName);
+            }
+            saveFilterState();
+            fetchWorkflows();
+          });
+          csPipeline.appendChild(chip);
+        });
+        card.appendChild(csPipeline);
+      }
+
       // --- Edit Mode Toggle ---
       var editorContainer = el("div", { className: "editor-container" });
       editorContainer.style.display = "none";
