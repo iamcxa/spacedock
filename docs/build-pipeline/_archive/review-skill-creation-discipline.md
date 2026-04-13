@@ -1,7 +1,7 @@
 ---
 id: 073
 title: Review Stage -- Skill Creation Discipline Check (Distill writing-skills into review)
-status: draft
+status: archived
 context_status: pending
 source: captain observation during 068 UAT
 created: 2026-04-12T16:05:00+08:00
@@ -19,6 +19,8 @@ auto_advance:
 parent:
 children:
 ---
+
+> **Archived 2026-04-13**: Scope absorbed by entity 084 (review-forge-validation). Entity 084's Step 1f (conditional forge audit) and test existence sub-check subsume 073's skill creation discipline checks.
 
 ## Directive
 
