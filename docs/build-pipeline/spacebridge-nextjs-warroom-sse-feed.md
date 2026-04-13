@@ -2,7 +2,7 @@
 id: 053
 title: "Next.js app — war room view + SSE live feed"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started:
 completed:
@@ -86,3 +86,104 @@ depends-on: [052]
 - Entity 050 (shipped): Drizzle schema with events, entity_leases, sessions tables -- read-only data source for UI
 - Entity 056 (context ready): lease manager provides owner session badge data via entity_leases table
 - Captain note (2026-04-13): evaluate shadcn/UI + Tailwind + Radix as component library
+
+## Assumptions
+
+A-1: SQLite WAL mode allows concurrent reads from the Next.js process while the daemon writes -- no DB locking conflicts.
+Confidence: Confident (0.95)
+Evidence: spacebridge/src/db.ts:23 -- `sqlite.exec("PRAGMA journal_mode = WAL")` already enabled for file DBs. SQLite WAL specification: multiple concurrent readers + one writer is the designed use case.
+
+A-2: `next build --output standalone` produces deployable artifact; daemon spawns `bun run .next/standalone/server.js` as child process.
+Confidence: Confident (0.95)
+Evidence: entity 049 V4-V5 -- build produced `.next/standalone/server.js`, `bun run ./server.js` served correctly. Entity 052 A-5 -- confirmed NOT importable, child process is the only option.
+
+A-3: shadcn init via `bunx shadcn@latest init` (no `--bun` flag), Tailwind v4 default, `tw-animate-css` for animations.
+Confidence: Confident (0.90)
+Evidence: (✓ research: shadcn CLI v4 docs confirm Bun first-class support; G1 gotcha documented and avoidable)
+
+A-4: Non-interactive shadcn components (Card, Badge, Separator) usable in Server Components; interactive ones (Dialog, Tabs, Sheet) require `"use client"`.
+Confidence: Confident (0.90)
+Evidence: (✓ research: shadcn generates `"use client"` only on hook-using components; Next.js RSC boundary rules apply)
+
+A-5: Entity card data (slug, title, status, stage) comes from entity markdown frontmatter -- same parsing logic as `tools/dashboard/src/frontmatter-io.ts`.
+Confidence: Confident (0.85)
+Evidence: tools/dashboard/src/frontmatter-io.ts -- existing YAML frontmatter parser handles all entity fields. Can be extracted or re-implemented in the Next.js app.
+
+A-6: Post-build step required: copy `.next/static/` into `.next/standalone/.next/static/` and `public/` into `.next/standalone/public/` (Next.js standalone doesn't auto-copy these).
+Confidence: Confident (0.95)
+Evidence: entity 049 Results section -- explicitly documented this post-build step. Standard Next.js standalone deployment requirement.
+
+## Option Comparisons
+
+### O-1: Next.js app directory layout
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| `spacebridge/ui/` as separate subproject with own package.json | Clean separation: daemon src/ and UI ui/ are siblings; independent dependency trees; no accidental import of daemon code from UI | Two package.json files to manage; need to configure daemon to find ui/.next/standalone/ path; slight workspace overhead | Medium | Recommended |
+| Next.js at spacebridge/ root (add next/react to root package.json) | Single package.json; simpler imports; `next build` runs from project root | Mixes daemon deps (drizzle, node:net) with UI deps (next, react, shadcn); `next build` might try to bundle daemon code; harder to reason about what runs where | Medium | Not recommended |
+| `spacebridge/web/` (same as ui/ but different name) | Same pros as ui/ | Same cons; `web/` is less conventional than `ui/` for Next.js projects | Medium | Viable |
+
+Return value trace: daemon.ts `spawn()` needs the path to `server.js`. With `ui/`, the path is `${pluginRoot}/ui/.next/standalone/server.js`. With root, it's `${pluginRoot}/.next/standalone/server.js`. Both work; `ui/` is cleaner for separation of concerns.
+
+### O-2: SSE data flow -- how the Next.js SSE endpoint gets real-time events
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Poll events table (500ms interval) | Simplest; no IPC between daemon and Next.js; SQLite WAL handles concurrent reads; latency ≤ 500ms + render | Polling wastes queries when no events; 500ms latency floor; scales poorly if many SSE clients each poll independently | Low | Recommended |
+| Daemon HTTP push to Next.js private endpoint | Sub-100ms latency; push-based = zero wasted queries; daemon is the single event source | Adds HTTP client in daemon + route in Next.js; daemon must know Next.js URL; coupling between processes increases | Medium | Viable |
+| Shared SQLite NOTIFY/trigger mechanism | Event-driven; no polling | SQLite has no built-in NOTIFY; would need a file-watch on the WAL or custom trigger; fragile and non-portable | High | Not recommended |
+
+Design doc invariant check: §3.4 says "SSE is one-way server→client". The internal daemon→Next.js data flow is orthogonal. Poll is simplest for v1; push can be added later without changing the SSE client contract. Return value trace: SSE endpoint reads events table → streams to EventSource → client renders. No downstream consumer depends on push latency being <500ms for v1.
+
+### O-3: Entity data source for Server Component rendering
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Filesystem parse at request time (read entity markdown from project_root paths via sessions table) | Always fresh; no sync lag; matches existing frontmatter-io.ts pattern | I/O per request (filesystem reads); entity files may be on different volumes; sessions table needed for project_root lookup; parsing cost per entity | Medium | Recommended |
+| Daemon pre-parses entities into DB projection table | Fast DB reads; no filesystem I/O at request time; consistent data shape | New table + sync logic; staleness risk if file changes before watcher updates DB; entity 057 (session registry) may own this later | Medium | Viable |
+| Hybrid: DB for stage/status (from events table), filesystem for title/content | Fast for card rendering (DB); fresh for detail view (filesystem) | Two data paths; inconsistency risk between DB stage and filesystem frontmatter | Medium | Viable |
+
+Design doc invariant check: entity 057 (session registry) will eventually provide a cached entity projection. For v1, filesystem parse is the simplest approach that guarantees freshness. When 057 ships, the data source can switch to DB. Dependency inversion (inject entity scanner, same as A-7 in entity 056) makes this swap clean.
+
+## Open Questions
+
+Q-1: Does entity 053 include the daemon-side file watcher implementation, or is that a separate entity?
+
+Domain: Runnable/Invokable, Behavioral/Callable
+
+Why it matters: The APPROACH says "file watcher events from the daemon are debounced per design doc §4.4". But daemon.ts (entity 052) shipped without a file watcher -- it only has session management and coordination stub. Including the watcher in 053 means 053 owns both UI and daemon-side event generation. Excluding it means the SSE feed only shows events that are explicitly written to the events table by other subsystems (stage transitions from FO, comments from 054), not file changes.
+
+Suggested options: (a) Include file watcher in 053 -- daemon watches entity files, writes change events to events table, SSE streams them. Complete real-time experience. (b) Exclude file watcher -- 053 only consumes existing events table data. File watcher becomes a separate entity. Simpler 053 scope but live feed is limited to explicit events. (c) Minimal watcher -- daemon polls entity frontmatter for stage changes on a 5s interval (simpler than fs.watch), writes to events table. Not true file-watching but covers the primary use case.
+
+Q-2: Which shadcn components should be included in v1? This scopes the component library integration and affects the UI Spec.
+
+Domain: User-facing Visual
+
+Why it matters: shadcn is "copy-paste" -- you add individual components, not the whole library. Adding too many upfront creates unused code; too few means building custom components that shadcn already provides. The v1 set determines the visual language for entity 054 and beyond.
+
+Suggested options: (a) Minimal: Card, Badge, Separator, Skeleton (loading states) -- just enough for entity cards + feed, (b) Standard: add Tabs, ScrollArea, Tooltip, DropdownMenu -- enables richer war room interactions, (c) Comprehensive: add Sheet, Dialog, Command, Table -- prepares for entity 054's detail view, (d) Captain decides based on war room wireframe
+
+Q-3: What grouping/layout should the war room use for entity cards across multiple repos?
+
+Domain: User-facing Visual
+
+Why it matters: Multi-repo awareness is a core feature. The grouping strategy affects information density, navigation, and how users mentally map entities to repos. This decision feeds directly into the UI Spec.
+
+Suggested options: (a) Group by repo with collapsible sections -- clear hierarchy, scalable, (b) Flat grid with repo badge on each card -- simpler, good for few repos, (c) Kanban columns by pipeline stage with repo color coding -- stage-centric view, (d) Tabs per repo -- clean separation but loses cross-repo overview
+
+## Stage Report: explore
+
+- [x] Files mapped: 14 across ui(new), daemon, schema, ipc
+  ui: 0 existing + ~10 new files (layout, page, SSE route, components, styles, config); daemon: 1 modify (bin/daemon.ts child spawn); schema: 2 read-only (schema.ts, db.ts); ipc: 1 read (types.ts for event shape)
+- [x] Assumptions formed: 6 (Confident: 6, Likely: 0, Unclear: 0)
+  A-1 through A-6 all Confident (0.85-0.95); WAL, standalone, shadcn, RSC boundaries, frontmatter parsing, post-build copy
+- [x] Options surfaced: 3
+  O-1 app directory layout; O-2 SSE data flow; O-3 entity data source
+- [x] Questions generated: 3
+  Q-1 file watcher scope; Q-2 shadcn component set for v1; Q-3 entity card grouping layout
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorm
+- [x] Scale assessment: confirmed Medium
+  ~14 files across 4 layers; cohesive "view + data feed" unit despite 3-domain scope; decomposition not recommended
+- [x] Research dispatched: 1 researcher for 1 topic (post-brainstorm Step 3.5)
+  shadcn/UI + Tailwind v4 + Bun: confirmed working, 7 gotchas documented, Tailwind v4 CSS-only config verified
