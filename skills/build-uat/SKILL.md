@@ -283,3 +283,9 @@ If `mode: skip-only`, include the mode in the message: `"uat-resume: {slug} -- i
 - **Never invoke build-review, build-plan, or build-execute from within UAT.** You are a leaf orchestrator above e2e-pipeline; upward routing goes through FO via the Stage Report's `feedback-to` field.
 - **Never edit source code.** Your Write/Edit scope is strictly the entity body (UAT Results, Stage Report, frontmatter `uat_pending_count`) and nothing else.
 - **Use `--` (double dash)** everywhere. Never `—` (em dash). Matches the rest of the build skill family.
+
+### Evidence Minimum
+
+- **NEVER write `## Stage Report: uat` without a per-item evidence entry in `### automated evidence`.** Every automated item (browser, cli, api) must have an entry showing its item id, type, and at least one evidence artifact. Browser items: screenshot path or markdown image reference. CLI items: stdout snippet (first/last 20 lines) or transcript block reference. API items: HTTP status code and response body snippet. An item entry that says only "pass" or "automation ran successfully" is not evidence -- it is a claim without proof.
+- **NEVER write a captain decision row without the captain's verbatim answer.** Every row in `### captain decisions` must include the captain's actual choice (pass/fail/skip) and, for skip decisions, the verbatim reason string. A decision row that says "captain approved" without specifying which option was selected erases the audit trail of what the captain actually decided.
+- **NEVER write `### automated evidence` without artifact references for browser items.** Browser item evidence must include at least one of: screenshot path (`.e2e/screenshots/{item-id}.png`), video path (`.e2e/videos/{item-id}.webm`), or trace path (`.e2e/traces/{item-id}.zip`). Inline markdown image syntax (`![{item-id}](path)`) is preferred per entity 082 alignment. A browser item marked pass with no visual artifact cannot be audited.
