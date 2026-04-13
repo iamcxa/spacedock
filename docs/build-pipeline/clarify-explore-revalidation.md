@@ -1,14 +1,14 @@
 ---
 id: 078
 title: "Clarify-stage explore re-validation -- evidence freshness + consistency gates"
-status: clarify
+status: execute
 context_status: ready
 source: decomposition of entity 077 (cross-phase skepticism)
-started:
+started: 2026-04-13T13:00:00Z
 completed:
 verdict:
 score: 0.0
-worktree:
+worktree: .worktrees/spacedock-ensign-clarify-explore-revalidation
 issue:
 pr:
 intent: feature
