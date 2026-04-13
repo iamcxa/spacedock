@@ -130,6 +130,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | clarify-open-exploration-loop | execute | Document Step 4.5 annotation format + add Open exploration metric to Stage Report | ✅ final | 2026-04-13 |
+| entity-body-rendering-hotfixes | plan | Add canonical detail line exemplars subsection per Q-2 answer | 🔵 planned | 2026-04-13 |
 
 ### skills/build-execute/SKILL.md
 
@@ -142,6 +143,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Refactor Step 2 to dispatch spacedock:code-explorer for fresh-context mapping | ✅ final | 2026-04-12 |
+
+### skills/build-explore/references/output-format.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| entity-body-rendering-hotfixes | plan | Add canonical detail line exemplars subsection per Q-2 answer | 🔵 planned | 2026-04-13 |
 
 ### skills/build-plan/SKILL.md
 
