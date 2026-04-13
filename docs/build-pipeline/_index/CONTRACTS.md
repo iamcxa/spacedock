@@ -110,6 +110,18 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add given/when/then AC guidance to step 4 for TDD-friendly spec generation | in-flight | 2026-04-12 |
 
+### skills/build-clarify/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| clarify-open-exploration-loop | plan | Insert Step 4.5 Open Exploration Loop + update resume case and stage report metric | 🔵 planned | 2026-04-13 |
+
+### skills/build-clarify/references/output-format.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| clarify-open-exploration-loop | plan | Document Step 4.5 annotation format + add Open exploration metric to Stage Report | 🔵 planned | 2026-04-13 |
+
 ### skills/build-explore/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |
