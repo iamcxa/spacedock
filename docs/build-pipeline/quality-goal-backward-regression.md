@@ -1,8 +1,8 @@
 ---
 id: 081
 title: "Goal-backward verification + regression gate -- semantic quality checks"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: decomposition of entity 077 (cross-phase skepticism)
 started:
 completed:
@@ -61,18 +61,22 @@ parent: 077
 A-1: Goal-backward verification inserts as Step 1e in build-review's pre-scan, following the existing 1a-1d pattern. It runs inline in the review ensign's own context (not a subagent dispatch). Its findings flow into Step 3 classification alongside agent findings, using the same two-axis schema (severity + category).
 Confidence: Confident (0.90)
 Evidence: build-review SKILL.md:139-163 -- pre-scan has 4 checks (1a CLAUDE.md rules, 1b stale refs, 1c dependency chains, 1d plan consistency), all inline. Line 163: "Pre-scan findings flow into Step 3 classification alongside agent findings."
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: Regression gate inserts as Step 4.5 in build-quality, between Step 4 (bun build) and Step 5 (coverage threshold). It follows the same binary pass/fail verdict pattern as Steps 1-4 and gets its own row in the structured per-check verdict (Step 6).
 Confidence: Confident (0.85)
 Evidence: build-quality SKILL.md:46-127 -- Steps 1-4 each have verdict: pass/fail, command, evidence. Step 5 is conditional (coverage). Step 4.5 fits between the unconditional checks and the conditional coverage check.
+→ Confirmed: captain, 2026-04-13 (batch)
 
-A-3: Orphan detection (goal-backward sub-check) uses `grep` across the codebase for each function/export added by the diff. If no import or call site exists outside the diff itself, it's flagged as an orphan. This is the same technique build-review Step 1b (stale references) uses in reverse -- 1b finds dangling references TO removed symbols, 1e finds dangling exports FROM added symbols.
-Confidence: Likely (0.75)
-Evidence: build-review SKILL.md:149-151 -- Step 1b runs project-wide grep for removed symbols. Orphan detection is the inverse: project-wide grep for ADDED symbols, flagging zero-hit results.
+A-3: Orphan detection (goal-backward sub-check) uses simplified grep scan: for each function/export added by the diff, grep for import/call sites across codebase. Zero-hit = flagged as finding. This is the inverse of Step 1b (stale refs). No attempt to distinguish API surface from internal code -- if correctness-reviewer also flags the same symbol, Step 3 classification does dedup (build-review SKILL.md:195 -- merge pre-scan + agent findings into single classification pass). No existing pr-review-toolkit agent does systematic orphan detection -- Step 1b's reverse-grep is the closest pattern.
+Confidence: Confident (0.80)
+Evidence: build-review SKILL.md:149-151 -- Step 1b reverse pattern. SKILL.md:195 -- classification merges pre-scan + agent findings for dedup. No orphan/dead-code agent found in pr-review-toolkit or build-review skill tree (grep confirmed).
+→ Corrected by captain, 2026-04-13 (interactive): "簡化版 grep + reviewer dedup。不用精細判斷 API surface，讓 Step 3 classification 跟 correctness-reviewer 做 dedup"
 
 A-4: Regression gate failure routes `feedback-to: execute` (not `feedback-to: captain` or `feedback-to: plan`). This is consistent with quality's existing routing: test failures mean execute produced broken code, and execute should fix it. The `cross-entity-regression` classification tells execute that the failure is in a prior entity's test, not the current entity's test.
 Confidence: Confident (0.85)
 Evidence: build-quality SKILL.md:3 -- "any fail routes feedback to execute." build-execute SKILL.md:192-202 -- BLOCKED escalation ladder handles re-dispatch on execute failures.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 ## Option Comparisons
 
@@ -86,12 +90,16 @@ Where should the judgment-bearing "does the diff satisfy the Acceptance Criteria
 | New "verify" stage after quality | Clean separation; dedicated goal-achievement check; runs before review | Adds pipeline stage to every profile; FO routing changes; cold-start context duplication; high blast radius | High | Not recommended |
 | Quality Step 1.5 (modify quality) | Runs before review; single quality gate | Breaks quality's explicit "mechanical, no judgment" contract; introduces LLM interpretation into a mechanical skill | Medium | Not recommended |
 
+→ Selected: Build-review pre-scan Step 1e (captain, 2026-04-13, interactive)
+
 ### O-2: Regression gate step placement in build-quality
 
 | Option | Pros | Cons | Complexity | Recommendation |
 |---|---|---|---|---|
 | Step 4.5 (after bun build, before coverage) | After all primary checks; doesn't block coverage if regression passes; fractional numbering proven | Runs even if earlier steps failed (but quality already runs all steps regardless) | Low | ✅ Recommended |
 | Step 5.5 (after coverage) | Runs last, cleanest exit point | Coverage is conditional (Step 5 may be skipped); regression gate should not depend on coverage config | Low | Viable |
+
+→ Selected: Step 4.5 (after bun build, before coverage) (captain, 2026-04-13, interactive)
 
 ## Open Questions
 
@@ -102,6 +110,12 @@ Domain: Organizational / Data-transforming
 Why it matters: CONTRACTS.md tracks which entities modified which SOURCE files, but NOT which TEST files cover those source files. The regression gate needs to know "entity 052 modified daemon.ts -- what tests cover daemon.ts?" to run targeted regression tests.
 
 Suggested options: (a) Full test suite -- just run `bun test` (entire project). Simple but slow; catches everything but wastes time on unrelated tests. (b) Co-location glob -- convention-based: for `src/foo.ts`, check `tests/foo.test.ts` and `src/foo.test.ts`. Fast but fragile; misses tests in unexpected locations. (c) Add test tracking to CONTRACTS.md -- extend the schema with a `test_files` column listing test files associated with each entity's source files. Most precise but requires CONTRACTS.md schema change and plan-stage test enumeration. (d) Bun's built-in coverage mapping -- run `bun test --coverage` and use the coverage report to identify which tests exercise which source files. Accurate but requires coverage infrastructure.
+
+→ Answer: Full test suite -- quality Step 1 already runs `bun test` (full project). Regression gate Step 4.5 reuses Step 1's results instead of re-running: if Step 1 passed, all prior entity tests also passed (regression gate auto-pass). If Step 1 failed, Step 4.5 cross-references failing test file paths against CONTRACTS.md to classify whether failures are current-entity bugs (normal quality fail) or cross-entity regressions (tagged `cross-entity-regression` in Stage Report). No new test execution needed. (captain, 2026-04-13, interactive)
+
+## Canonical References
+
+(none cited -- captain selected recommended options and full test suite without external file references)
 
 ## Stage Report: explore
 
@@ -117,6 +131,25 @@ Suggested options: (a) Full test suite -- just run `bun test` (entire project). 
   Brainstorming spec contained no α markers
 - [x] Scale assessment: confirmed Medium
   3 files mapped, 2 skill insertion points across 2 skills, 2 options + 1 question requiring captain decision
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  entity is Medium scope but two sub-scopes are independently deployable, no further split needed
+- [x] Assumptions confirmed: 4 / 4 (1 corrected)
+  A-1, A-2, A-4 confirmed via batch; A-3 corrected -- simplified grep + reviewer dedup, no API surface exclusion
+- [x] Options selected: 2 / 2
+  O-1 Goal-backward placement -- Build-review pre-scan Step 1e (recommended); O-2 Regression gate -- Step 4.5 (recommended)
+- [x] Questions answered: 1 / 1
+  Q-1 Test mapping -- Full test suite, reuse quality Step 1 results, cross-reference failing tests against CONTRACTS.md for regression classification
+- [x] Canonical refs added: 0
+  captain selected recommended options without citing external references
+- [x] Context status: ready
+  gate passed: all 4 assumptions resolved, 2 options selected, 1 question answered, ACs valid (4 criteria, no α markers)
+- [x] Handoff mode: loose
+  captain must say "execute 081" or hand off to First Officer; auto_advance not set
+- [x] Clarify duration: 4 questions asked, session complete
+  1 batch assumption presentation (plain text) + 2 AskUserQuestion (O-1, O-2) + 1 AskUserQuestion (Q-1)
 
 ## References
 
