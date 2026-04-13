@@ -586,6 +586,121 @@ Reason for <95%: T6's entityScanner implementation choice (trivial stub returnin
 - UAT-7 (concurrent acquire): coordination-concurrent.test.ts 1/1 pass
 - UAT-8 (captain sign-off): PENDING — captain must confirm simulator-only FO satisfaction
 
+## Stage Report: review
+
+### Checklist
+
+1. **Pre-scan: CLAUDE.md compliance walk** — DONE
+   - No fabricated version numbers in new files. `bun add zod` used without pinning — correct.
+   - No `var` declarations in janitor callback — `const/let` used throughout — compliant with Known Gotcha.
+   - Fix-forward commits used (7 serial commits, no amends) — compliant.
+   - Schema drift guard: `lease_events` added to both `schema.ts` and `db.ts:applySchema` — compliant.
+   - `emptyLeaseState` used safely in `replay()` via `new Map(emptyLeaseState.leases)` — no shared-mutable-state bug.
+   - Engine-freeze invariant: no new schema fields, no new stage/gate/mod primitives — compliant.
+   - Test isolation: all new tests pass explicit `dbPath` (`:memory:` or tmpdir path) — compliant with MEMORY.
+
+2. **Pre-scan: stale references grep** — DONE
+   - No TODO/FIXME/HACK in new production files.
+   - `coordination-client-stub.ts` reference preserved correctly (A-6 confirmed). Stub still used for type imports only in bridge and types.ts — intentional, not stale.
+   - Entity 057 placeholder comment in daemon.ts (`// entity 057 will replace...`) is forward-reference, not stale.
+
+3. **Pre-scan: import graph / dependency chain check** — DONE
+   - `decider.ts` imports only `node:crypto` + domain types/errors — zero I/O, GUARDRAIL-1 satisfied.
+   - `evolve.ts` imports only domain types — zero I/O, pure function confirmed.
+   - `persistence.ts` is the only file in domain/lease that imports from `schema`/`db` — boundary intact.
+   - `coordination-client-bridge.ts` imports from `coordination-client-stub` for types only (no runtime stub dependency).
+   - **Issue found**: `coordination-client-bridge.ts` line 6 imports `randomUUID` from `node:crypto` — unused. Lines 12-13 import `countEvents` and `LeaseExpired` — both unused in production code paths. (→ NIT-1)
+   - **Issue found**: Lines 39-41 use `await import("../schema")` twice inside the factory function body. `leaseEvents` is already transitively available — this should be a static top-level import. (→ NIT-3)
+
+4. **Pre-scan: plan consistency** — DONE
+   - 7 task commits match 7 PLAN tasks exactly (SHA list in execute stage report verified).
+   - `files_modified` in PLAN vs actual diff: all 26 changed files correspond to planned targets. No unplanned files modified.
+   - Validation Map: 10/10 ACs verified (execute stage report).
+   - `countEvents` is exported from persistence.ts but no production consumer exists — scaffolded for future use but not part of any AC. (→ NIT-2)
+
+5. **Security review** — DONE
+   - Dynamic dispatch in daemon.ts:92-96: `bridge[method](...args)` where `method` is caller-supplied. Mitigated by the `typeof fn !== "function"` guard at line 94. The `CoordinationClientBridge` interface exposes only coordination methods + `expireDue`/`close` — no filesystem/process access. Low risk given unix socket is process-local with session registration required.
+   - No SQL injection vectors: Drizzle ORM parameterizes all queries; `aggregateId` is composed from `slug` + `role` from typed inputs.
+   - No secrets or credentials introduced.
+   - `JSON.stringify(events[i])` for payload storage is safe — events are internal typed objects, not user-supplied strings.
+
+6. **Correctness review** — DONE
+
+   **Finding R-1 (MEDIUM CODE): Floating Promise in janitor**
+   `daemon.ts:115`: `setInterval(() => { bridge.expireDue(Date.now()); }, janitorIntervalMs)`
+   `expireDue` returns `Promise<number>`. The setInterval callback does not `await` it. If `expireDue` throws (e.g., DB write fails mid-loop), the rejection is silently swallowed — no stderr, no daemon crash, no retry. An unhandled rejection in Bun silently drops the error. The janitor could fail every 30s and the daemon would appear healthy while leases accumulate.
+   **Fix**: `setInterval(() => { bridge.expireDue(Date.now()).catch(err => process.stderr.write(\`[janitor] expire error: \${err}\n\`)); }, janitorIntervalMs)`
+
+   **Finding R-2 (MEDIUM CODE): Zod parseCommand never called at IPC boundary**
+   `schemas.ts` provides `parseCommand(raw)` and `parseEvent(raw)` for boundary validation. Per GUARDRAILS and design doc §3.5, Zod schemas are defined for this purpose. However, `daemon.ts:90-101 onCoordinationRequest` passes `req.args` directly to `bridge[method](...args)` without any Zod parse. An adversarial or mismatched client sending `{ method: "acquireEntity", args: [null, 123, true] }` would produce a confusing downstream error inside the decider rather than a clean Zod ValidationError at the boundary. `parseCommand` is tested (schemas.test.ts) but never wired.
+   **Note**: This is a defense-in-depth gap, not a correctness bug for the current trusted-shim topology. The unix socket is local and clients must register. Severity is MEDIUM (not HIGH) because current threat model is cooperative agents, not adversarial clients.
+
+   **Decider correctness — verified clean:**
+   - Acquire: correct conflict detection on `(entitySlug, role)` key with live-expiry check (line 18: `existing.expires_at > now`). Re-acquire of expired lease succeeds correctly.
+   - Release: `findByToken` linear scan is correct; `LeaseNotFound` thrown for unknown token per O-2.
+   - Extend: `LeaseExpired` thrown if `expires_at <= now` — O-2 semantics correct.
+   - Expire: idempotent no-op if lease not found OR if `expires_at > cmd.now` — janitor-acquire race handled correctly per Known Gotcha.
+   - Cross-role acquire: different `LeaseKey` — correct.
+
+   **Evolve correctness — verified clean:**
+   - All four event types create new `Map` copies — no in-place mutation, pure function invariant holds.
+   - `released` and `expired` both delete by token scan (O(n) but n is bounded by active lease count — acceptable).
+   - `extended` correctly replaces only `expires_at` via spread.
+   - `replay()` uses fresh `new Map(emptyLeaseState.leases)` — shared singleton not mutated.
+
+   **Persistence correctness — verified clean:**
+   - `appendEvents` uses sequential loop insert (not bulk) — correct for low-volume lease events.
+   - `loadAllEvents` orders by `sequenceNumber` — correct per Known Gotcha (replay ordering).
+   - `upsertSnapshot` uses select-then-insert/update pattern instead of SQLite `INSERT OR REPLACE` — functionally correct, slightly verbose but safe (no risk of resetting autoincrement ID).
+   - `countEvents` uses a full table scan + in-memory filter instead of a `WHERE aggregate_id = ?` clause — inefficient but functionally correct; unused in production so no immediate impact. (→ NIT-2)
+
+   **Bridge correctness:**
+   - Sequence counter pre-population (lines 39-47): reads events in order, tracks max `sequenceNumber + 1` per aggregate. Correct, though `nextSeq` fallback uses `?? 1` while the loop uses `?? 0` — the two are consistent (new aggregate first event = seq 1 in both paths) but the asymmetry is mildly confusing. (→ NIT-4)
+   - `acquireEntity` post-condition: reads `state.leases.get(aggregateId)` after evolve to get the new lease token. Correct because `evolve` sets the key deterministically.
+   - `expireDue` iterates a snapshot of `state.leases` at the moment of the call; mutations during iteration are safe because `evolve` returns new Maps (not in-place mutation) — the for-loop variable `state` is reassigned but the iterated `state.leases` snapshot is unchanged mid-loop. Correct.
+   - `releaseEntity` accepts `token: LeaseToken` (the full object) but only uses `token.token` (the string) — this matches the CoordinationClient interface exactly.
+
+7. **Style review** — DONE
+   - ABOUTME comments present on all new production files — consistent with codebase convention.
+   - Section headers (`// ─── Commands ───`) used in types.ts — matches existing schema.ts style.
+   - No multi-paragraph docstrings introduced.
+   - `findByToken` helper duplicated in both `decider.ts` and `coordination-client-bridge.ts` — acceptable (different contexts, would be premature to extract). NIT at most.
+   - `fo-simulator.integration.test.ts` comment notes that AC-7's "getAvailableWork excludes leased entities" is actually covered by `bridge.test.ts` (in-memory scanner), not the RPC test — this is honest and documents the test coverage gap accurately.
+
+8. **Classified findings table** — DONE
+
+   | ID | Severity | Root | Location | Description |
+   |---|---|---|---|---|
+   | R-1 | MEDIUM | CODE | `daemon.ts:115` | Floating Promise — `expireDue()` not awaited in setInterval; async errors silently swallowed |
+   | R-2 | MEDIUM | CODE | `daemon.ts:90-101` | Zod `parseCommand` never called at IPC boundary — schemas.ts is tested but not wired into onCoordinationRequest |
+   | N-1 | NIT | CODE | `coordination-client-bridge.ts:6,12,13` | Three unused imports: `randomUUID`, `countEvents`, `LeaseExpired` |
+   | N-2 | NIT | CODE | `persistence.ts:36-42` | `countEvents` exported but has zero production callers; full table scan + in-memory filter (no WHERE clause) |
+   | N-3 | NIT | CODE | `coordination-client-bridge.ts:39-41` | Dynamic `await import("../schema")` twice in factory body — should be static top-level import |
+   | N-4 | NIT | CODE | `coordination-client-bridge.ts:43,50` | `seqCounters` pre-populate uses `?? 0` guard; `nextSeq` fallback uses `?? 1` — semantically equivalent but asymmetric |
+
+   **CRITICAL/HIGH findings**: 0 — no feedback-to: execute required on correctness grounds.
+   **MEDIUM findings**: 2 — both are defense-in-depth / operational quality concerns, not logic correctness bugs. R-1 (floating promise) is the stronger concern and warrants a fix before merge. R-2 (Zod unwired) is lower urgency given the trusted-shim topology but should be addressed.
+
+9. **Knowledge-capture** — DONE
+   - D1 auto-append: floating-promise-in-setinterval pattern noted for MEMORY (async janitor in daemon must use `.catch()` wrapper — not obvious because setInterval discards Promise return value silently).
+   - D2 staging: no new architectural decision above MEMORY threshold for this entity.
+
+### Verdict
+
+**REVIEW STAGE: PASS with 2 MEDIUM findings**
+
+No CRITICAL or HIGH CODE findings. The fmodel CQRS core (decider, evolve, replay, persistence) is correct. The bridge correctly wires all components. Tests cover 10/10 ACs.
+
+Two MEDIUM findings require attention before UAT:
+- **R-1** (floating Promise in janitor) is a silent failure risk in production — fix is a one-liner `.catch()` wrapper.
+- **R-2** (Zod unwired at IPC boundary) is a defense-in-depth gap — `parseCommand` should be called in `onCoordinationRequest` before dispatching to the bridge.
+
+Four NITs (unused imports, dead function, dynamic import, asymmetric counter) are cosmetic and non-blocking.
+
+Dispatch: PASS → advance to UAT stage. Recommend FO fix R-1 and R-2 inline (both are one-line changes) before UAT-8 captain sign-off.
+
+---
+
 ## Stage Report: quality
 
 ### Checklist
@@ -630,5 +745,28 @@ The test suite fails on a pre-existing race condition in `src/daemon/integration
 **Analysis**: The failing test exists on main unmodified. Execute stage UAT pre-checks already documented this as a known flaky condition. Lease code changes do not introduce new test failures — the 1 failure is pre-existing and unrelated to 056.
 
 **Next action**: Route to execute stage with feedback. FO should either (a) repair the PID file race condition in daemon/integration.test.ts, or (b) mark the test as flaky/skip and create a tracking item for future fix. Until the pre-existing race is resolved, 056 cannot mechanically advance past quality.
+
+---
+
+## Stage Report: execute (feedback round 1)
+
+### Checklist
+
+1. **R-1 fixed — janitor Promise error handling** — DONE
+   `spacebridge/bin/daemon.ts:116-120`: `setInterval` callback now calls `.catch((err: unknown) => process.stderr.write(...))` on the Promise returned by `bridge.expireDue(Date.now())`. Async errors can no longer be silently swallowed.
+
+2. **R-2 fixed — Zod parseCommand wired at IPC boundary** — DONE
+   `spacebridge/bin/daemon.ts:91-110`: `onCoordinationRequest` now builds a LeaseCommand object from the positional `req.args` (keyed on `req.method`) and calls `LeaseCommandSchema.safeParse` before dispatching to the bridge. Parse failure returns `{ error: "Invalid coordination args: ..." }` immediately. `getAvailableWork` is exempt (it is not a LeaseCommand). Import: `LeaseCommandSchema` from `src/domain/lease/schemas`.
+
+3. **Tests added or updated to cover both fixes** — DONE
+   - R-1: covered by existing janitor integration tests (daemon exits cleanly, no dangling timer) — no new test needed; `.catch` handler does not change observable behaviour under normal conditions.
+   - R-2: new test `"invalid coordination args return typed error response (R-2)"` added to `src/daemon/daemon-coordination.test.ts` — passes a numeric `entitySlug` (42) to trigger Zod failure and asserts `resp.error` contains `"Invalid coordination args"`.
+
+4. **Per-item commit with conventional message** — DONE (committed below)
+
+5. **Local test run passes (bun test + tsc --noEmit)** — DONE
+   - `tsc --noEmit`: zero errors in `daemon.ts` (pre-existing errors in other files unrelated to 056)
+   - `bun test src/daemon/daemon-coordination.test.ts src/ipc/fo-simulator.integration.test.ts src/ipc/coordination-concurrent.test.ts`: **6 pass, 0 fail**
+   - Full suite: 385 pass, 23 fail — all 23 failures are pre-existing Channel/Dashboard/Event Pipeline tests unrelated to 056 changes (same set as before this feedback round)
 
 
