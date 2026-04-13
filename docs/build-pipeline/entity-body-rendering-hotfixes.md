@@ -465,3 +465,24 @@ No CRITICAL or HIGH findings. 2 NITs noted (redundant wording, archive discovera
 **RECOMMEND: ADVANCE TO CAPTAIN GATE**
 
 All automated and structural verifications pass (6/6). The 2 pending interactive items require captain visual confirmation in the dashboard UI — they cannot be resolved by a subagent without browser access. Evidence basis: parser contract verified at `frontmatter-io.ts:156-158`, renderer confirmed at `detail.js:119-124`, blank-line rules confirmed in both output-format.md files, diff is additive-only with zero regression surface. The implementation is structurally sound. Gate decision deferred to captain after UI sign-off on Interactive-1 and Interactive-2.
+
+### E2E Browser Verification (FO-dispatched, post-gate)
+
+- Interactive-1: **PASS** — 14 `.item-detail` elements visible in dashboard, detail text renders under checklist items (screenshot: /tmp/e2e-047-screenshots/03-stage-reports.png)
+- Interactive-2: **PASS** — 23 `<p>` tags in entity body, Open Questions renders as distinct paragraphs with proper spacing (screenshot: /tmp/e2e-047-screenshots/04-entity-body.png)
+
+**Updated totals: 8 DONE, 0 PENDING, 0 SKIPPED, 0 FAILED**
+
+## Confidence Assessment
+
+| Factor | Weight | Score | Evidence |
+|--------|--------|-------|----------|
+| test_coverage | 25% | 80% | quality checks skipped (markdown-only entity, no code), ratchet absent (first-run rule: pass=80%) |
+| type_coverage | 20% | 100% | typecheck skipped (no code changes), ratchet sub-items absent (first-run) |
+| review_severity | 20% | 100% | 0 CRITICAL, 0 HIGH findings (2 NIT — no deduction) |
+| ac_completeness | 20% | 100% | 8/8 UAT items pass (4 CLI + 2 structural + 2 browser e2e, 0 skipped-with-ack) |
+| integration_breadth | 15% | 100% | 4/4 tasks DONE, 0 BLOCKED, 2/2 planned files modified |
+
+**Composite**: 95.0% (threshold: 90%)
+**Verdict**: PASS -- advancing to shipped
+**Iteration**: 1 of 3
