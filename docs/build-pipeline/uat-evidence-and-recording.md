@@ -654,3 +654,46 @@ Bundled 992 modules in 81ms
 Entity 082 modified only `skills/build-uat/SKILL.md` (89 insertions, 8 deletions). No changes to test infrastructure, dashboard code, or type definitions. Test suite passes with no failures. Build succeeds. Type checking succeeds. Lint script unavailable in project configuration (not a failure state for this repo).
 
 **Auto-advance**: All mechanical checks cleared. No blockers.
+
+---
+
+## Stage Report: review
+
+**Verdict**: FAILED
+**Ran at**: 2026-04-13T08:10:00Z
+**HEAD**: b366147
+**feedback-to**: execute
+
+### 1. Pre-scan
+
+- [x] CLAUDE.md compliance: no em dashes in added text (verified via Unicode grep -- 0 occurrences in new content). `--` used throughout. No fabricated version numbers.
+- [x] Stale refs: entity file references to SKILL.md lines (A-3 cites line 136 shifted to 169) flagged as stale-evidence in plan report -- semantic claim still valid, no correction needed.
+- [x] Plan consistency: 4 insertion points (Step 1.5, Step 2b, Step 5, Step 7a) all confirmed present in diff. CONTRACTS.md entry added correctly. Plan tasks 0-7 all DONE per execute Stage Report.
+
+### 2. Diff Review
+
+Scope: 3 files changed, 643 insertions, 10 deletions.
+
+- `skills/build-uat/SKILL.md` (+89/-8): four insertion points correctly implemented. Tools Available bullet updated, Step 1.5 added, Step 2b expanded, Step 5 table examples updated with inline format + E2E Evidence section, Step 7a automated evidence format restructured.
+- `docs/build-pipeline/_index/CONTRACTS.md` (+6/-0): entity entry added under `skills/build-uat/SKILL.md` with status `planned`. Correct.
+- `docs/build-pipeline/uat-evidence-and-recording.md`: entity body updated with execute and quality Stage Reports.
+
+All three ACs are addressed in the skill text. E2E Evidence table, Machine-parseability constraint, and skip-only append rules are all present.
+
+### 3. Findings
+
+| # | Severity | Root | Location | Description |
+|---|----------|------|----------|-------------|
+| F-1 | medium | Clarity | `skills/build-uat/SKILL.md` Step 2b, lines 97-107 | Double-execution ambiguity in recording path |
+
+**F-1 detail**: Step 2b opens with an unconditional statement: "Run the declared command via Bash." The `e2e_recording_available=true` block then says "before running the Bash command, invoke e2e-pipeline." After the e2e-test invocation (which runs the command via `asciinema rec`), the text does not say whether the agent should ALSO run Bash separately. The `NOT e2e_recording_available` branch explicitly says "run the Bash command directly" -- which implies the YES branch does NOT run a separate Bash call. But the guardrail at line 107 says "pass/fail is determined solely by the Bash command's exit code," which contradicts the impression that e2e-test is the sole executor. An agent following this as written could plausibly (a) run Bash then e2e-test (command executes twice), or (b) run only e2e-test (no separate Bash). Either interpretation is defensible from the text, and a double-execution would cause side effects on CLI commands that mutate state. The fix is a single clarifying sentence in the YES block: either "Do NOT run the Bash command separately -- e2e-test runs the command via asciinema" or "After e2e-test completes, also run the Bash command directly to capture stdout/stderr for text evidence." This requires the author to decide the correct semantic before writing the fix.
+
+### 4. Knowledge Capture
+
+No new generalizable patterns surfaced. The double-execution issue is an entity-specific spec gap, not a reusable pattern.
+
+### 5. Verdict
+
+FAILED -- F-1 routes back to execute. Severity is medium because the ambiguity affects the correctness of the recording path (a core new behavior). The `NOT e2e_recording_available` fallback path is unambiguous and correct.
+
+**Required fix**: Clarify Step 2b YES block to explicitly state whether the agent should run a separate Bash command after e2e-test, or whether e2e-test's asciinema execution is sufficient for pass/fail evaluation and text capture.
