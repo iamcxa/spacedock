@@ -113,24 +113,40 @@ CURRENT_IGNORES=$(grep -r "@ts-ignore\|@ts-expect-error" --include='*.ts' | wc -
 # CURRENT_IGNORES <= BASELINE_IGNORES
 ```
 
-#### Ratchet 2: Test Count (never decrease)
+#### Ratchet 2: Test Count (never decrease, runner-agnostic)
 
-| Language | Tool | Check |
-|----------|------|-------|
-| **TypeScript** | `bun test` / `vitest` / `jest` | Test count on branch >= main baseline |
-| **Python** | `pytest --co -q` | Collected test count >= main baseline |
-| **Go** | `go test -count=1 -v ./... 2>&1 \| grep "=== RUN"` | Test count >= main |
-| **Rust** | `cargo test -- --list` | Test count >= main |
+The ratchet must work regardless of which test runner the project uses. Quality stage auto-detects the runner from project config, not hardcoded assumptions.
+
+**TypeScript test runner detection (priority order):**
+
+| Signal | Runner | Count command |
+|--------|--------|---------------|
+| `bunfig.toml` or `bun.lock` | `bun test` | `bun test 2>&1 \| grep -o '[0-9]* pass'` |
+| `vitest.config.*` or `vite.config.*` with test | `vitest` | `vitest run --reporter=json \| jq '.numPassedTests'` |
+| `jest.config.*` or `package.json[jest]` | `jest` | `jest --json \| jq '.numPassedTests'` |
+| `package.json scripts.test` contains `mocha` | `mocha` | `mocha --reporter json \| jq '.stats.passes'` |
+| None of above | `node --test` | `node --test 2>&1 \| grep "# pass" \| awk '{print $3}'` |
+
+**Other languages:**
+
+| Language | Detection | Runner | Count command |
+|----------|-----------|--------|---------------|
+| **Python** | `pyproject.toml` / `setup.py` / `pytest.ini` | `pytest` | `pytest --co -q \| tail -1 \| awk '{print $1}'` |
+| **Go** | `go.mod` | `go test` | `go test -count=1 -v ./... 2>&1 \| grep -c "=== RUN"` |
+| **Rust** | `Cargo.toml` | `cargo test` | `cargo test -- --list 2>&1 \| grep -c ": test"` |
+
+**Key principle:** The ratchet checks `count(current) >= count(baseline)` — it never references a specific test runner in the rule itself. The runner is a detection detail, not a constraint. If a project migrates from jest to vitest, the ratchet continues working.
 
 ```bash
-# Language-agnostic test ratchet
-detect_languages()  # scan for package.json (TS), pyproject.toml/setup.py (Python), go.mod (Go), Cargo.toml (Rust)
-for lang in detected_languages:
-  BASELINE = run_test_count(lang, "main")
-  CURRENT = run_test_count(lang, "HEAD")
-  if CURRENT < BASELINE:
-    FAIL "$lang test count regressed: $CURRENT < $BASELINE"
+# Runner-agnostic test ratchet
+detect_test_runner()  # returns: {command, count_extractor}
+BASELINE = run_on_main(runner.command, runner.count_extractor)
+CURRENT = run_on_head(runner.command, runner.count_extractor)
+if CURRENT < BASELINE:
+  FAIL "test count regressed: $CURRENT < $BASELINE (runner: $runner.name)"
 ```
+
+**Overhaul portability:** When `/spacedock:overhaul` installs the build flow into a new project, the quality stage must work without assuming bun. The ratchet auto-detects from the project's actual toolchain. A Next.js project using vitest, a Bun project using bun test, and a legacy project using jest all get the same ratchet invariant — just with different detection paths.
 
 #### Implementation across stages
 
