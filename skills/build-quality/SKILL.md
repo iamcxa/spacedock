@@ -18,7 +18,7 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
 ## Tools Available
 
 **Can use:**
-- `Bash` -- run `bun test`, `bun lint`, `bunx tsc --noEmit`, `bun build`, and project ops-config reads
+- `Bash` -- run `bun test`, `bun lint`, `bunx tsc --noEmit`, `bun build`, project ops-config reads, and `find` for config file scanning (Step 0.5 language detection)
 - `Read` -- open the entity file to find the quality section anchor, open workflow ops config if coverage threshold is defined
 - `Grep` -- only to locate the ops-config file if its path is not already known
 - `Write` / `Edit` -- only to append the `## Stage Report: quality` section to the entity body
@@ -40,6 +40,35 @@ FO dispatches you with these fields in the prompt:
 4. **Execute base SHA** -- the commit execute started from (informational only; you still run the full suite regardless)
 
 If any field is missing, proceed with best-effort discovery (e.g. Grep the repo for the entity slug) and record the gap in the Stage Report under a `notes:` line. Do NOT ask FO or the captain for clarification -- you have no interactive channel.
+
+---
+
+## Step 0.5: Language and Runner Detection
+
+Auto-detect which languages are present in the project by scanning for config files at the repo root and one level of subdirectories. This step runs once; Steps 1-4 consume its output.
+
+**Detection table:**
+
+| Config file | Language | Test runner | Type checker | Linter | Build |
+|-------------|----------|-------------|--------------|--------|-------|
+| `tsconfig.json` | TypeScript | `bun test` (default), `vitest run` (if vitest.config.*), `npx jest` (if jest.config.*) | `bunx tsc --noEmit -p {tsconfig_path}` | `bun lint` (if eslint config exists) | `bun build` (if build script in package.json) |
+| `pyproject.toml` or `setup.py` | Python | `pytest` (if pytest in deps), `python -m unittest discover` (fallback) | `pyright` (if pyright in deps or pyrightconfig.json), `mypy` (if mypy in deps) | `ruff check .` (if ruff in deps) | n/a |
+| `go.mod` | Go | `go test ./...` | `go vet ./...` (built-in) | `golangci-lint run` (if installed) | `go build ./...` |
+| `Cargo.toml` | Rust | `cargo test` | (built-in to cargo check) | `cargo clippy` (if installed) | `cargo build` |
+
+**Procedure:**
+
+1. Scan for config files: `find . -maxdepth 2 -name "tsconfig.json" -o -name "pyproject.toml" -o -name "setup.py" -o -name "go.mod" -o -name "Cargo.toml" | head -20`
+2. For each detected config, resolve the runner by checking for runner-specific config files (vitest.config.ts, jest.config.js, pyrightconfig.json, etc.) in the same directory or repo root.
+3. Produce a `detected_languages` list of `{language, config_path, test_cmd, typecheck_cmd, lint_cmd, build_cmd}` objects.
+4. If no config files found, default to the legacy hardwired commands: `{language: "typescript", test_cmd: "bun test", typecheck_cmd: "bunx tsc --noEmit", lint_cmd: "bun lint", build_cmd: "bun build"}`.
+
+**Evidence:** Record the full find output and the resolved runner list in the evidence snippet for this step. The evidence is informational only -- Step 0.5 never fails.
+
+**TS enhanced sub-detection:** For each detected TypeScript config, also record:
+- `strict_mode`: whether `"strict": true` is set in compilerOptions
+- `include_globs`: the `include` array from the tsconfig
+These are consumed by Step 4.75 for TS-specific ratchets.
 
 ---
 
