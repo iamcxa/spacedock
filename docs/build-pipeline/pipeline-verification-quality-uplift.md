@@ -2,7 +2,7 @@
 id: 074
 title: Pipeline Verification Quality Uplift — Review + UAT Evidence & Skill Testing
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: captain observation during 050/068 pipeline run
 created: 2026-04-12T16:30:00+08:00
 started:
@@ -13,7 +13,7 @@ worktree:
 issue:
 pr:
 intent: feature
-scale: Medium
+scale: Large
 project: spacedock
 auto_advance:
 parent:
@@ -202,6 +202,61 @@ If composite < 90%, auto-iterate: identify which factors pull score down, dispat
 - Plan-checker dimension 8: warns when new source files (any language) lack test pairing or type-check config coverage (how to verify: plan with .ts task and no test, run plan-checker, observe WARN)
 - Pre-ship confidence gate blocks shipping below 90% and auto-dispatches fix ensigns for identified gaps (how to verify: ship an entity with low type coverage, observe auto-fix cycle before PR creation)
 - Recce project gets TS full + Python full ratchets from day 1 (pyright + pytest --cov, not ruff-only) (how to verify: run pipeline on recce, both ratchets fire)
+
+## Assumptions
+
+A-1: All 7 gaps are confirmed absent from the codebase -- no partial implementations exist. Each gap is a greenfield insertion into an existing skill, not a modification of existing logic.
+Confidence: Confident (0.95)
+Evidence: code-explorer mapped 6 files across 5 target skills; all gap-to-file cross-references confirmed "absent". No grep matches for forge/ratchet/confidence-gate/e2e-recording in any target SKILL.md.
+
+A-2: Entity 073 (review-skill-creation-discipline) is a strict subset of Gap 4 (forge validation in review). 073's directive describes exactly the conditional forge-audit check that Gap 4 specifies. 073 is `status: draft` with no parent/children links — it should be absorbed into the Gap 4 child entity.
+Confidence: Confident (0.90)
+Evidence: docs/build-pipeline/review-skill-creation-discipline.md:34 -- directive matches Gap 4. Status: draft, context_status: pending, no parent field.
+
+A-3: build-quality SKILL.md is hardwired to `bun test`, `bun lint`, `bunx tsc --noEmit`, `bun build` with no runner detection or language auto-detection. Gap 6 (multi-language ratchet) requires fundamental restructuring of Steps 1-4, not just a new Step 4.5. ops.config.json has no schema doc and only one known key (`coverage_threshold`).
+Confidence: Confident (0.90)
+Evidence: build-quality SKILL.md:46-109 -- four hardwired commands. ops.config.json referenced at line 114 for coverage_threshold only.
+
+A-4: build-uat SKILL.md has no e2e-pipeline integration for CLI items (Gap 1), no inline evidence writing (Gap 2), and no confidence gate (Gap 7). Step 2b captures stdout/exit code as text only. Step 5 writes path refs, not inline artifacts.
+Confidence: Confident (0.90)
+Evidence: build-uat SKILL.md:80 -- Step 2b "Capture stdout, stderr, exit code." Line 166 -- Step 5 appends table with evidence column as "stdout snippet."
+
+A-5: build-review pre-scan has exactly 4 sub-checks (1a-1d). Gap 4 (forge audit) would be Step 1e — same pattern as entity 081's goal-backward Step 1e. However, 081's Step 1e and 074-Gap-4's Step 1e are different checks and need distinct step numbers (1e vs 1f, or ordered by ship date).
+Confidence: Likely (0.75)
+Evidence: build-review SKILL.md:139-163 -- 4 pre-scan checks. Entity 081 already claims Step 1e for goal-backward verification. If both ship, numbering conflict must be resolved.
+
+## Decomposition Recommendation
+
+⚠️ This entity spans 7 gaps across 5 pipeline skills with 12 acceptance criteria and 3+ domains. Each gap is independently deployable. Recommended split into 4 child entities, grouping by target skill and coupling:
+
+1. `uat-evidence-and-recording` -- Gaps 1 + 2: CLI e2e recording + inline evidence writing in build-uat. Both modify build-uat SKILL.md Steps 2b and 5. Tightly coupled — evidence format affects recording output. ACs 1-2. (Runnable/Invokable, Medium)
+
+2. `quality-multi-language-ratchet` -- Gap 6: Multi-language type coverage + test count ratchets in build-quality. Restructures Steps 1-4 for runner detection, adds per-language ratchet checks, extends ops.config.json schema. Adds plan-checker dimension 8 for type/test coverage at plan time. ACs 6-10, 12. (Runnable/Invokable + Organizational/Data-transforming, Medium-Large)
+
+3. `review-forge-validation` -- Gap 4: Conditional forge audit + skill invocation testing. Review Step 1e/1f (conditional on `skills/*/SKILL.md` in diff). UAT skill invocation item type. Absorbs entity 073. ACs 4-5. (Runnable/Invokable, Small-Medium)
+
+4. `stage-report-evidence-and-confidence` -- Gaps 3 + 5 + 7: Stage Report evidence minimums across execute/quality/review/uat (Gap 3), debate-driven skill simulation (Gap 5), pre-ship confidence gate (Gap 7). Gap 3 is cross-cutting (touches 4 skills). Gap 7 is the aggregation container. Gap 5 may be further deferred. ACs 3, 5, 11. (Runnable/Invokable + Readable/Textual, Medium)
+
+Dependencies:
+- 1 and 2 are fully independent — can ship in any order
+- 3 depends on entity 081 shipping first (both add pre-scan sub-checks to build-review — numbering must be coordinated)
+- 4 depends on 1 (confidence gate scores UAT evidence quality) and 2 (scores type/test coverage)
+- Entity 073 is absorbed into child 3 — archive 073 when 3 is created
+
+## Stage Report: explore
+
+- [x] Files mapped: 6 across config layer
+  build-uat SKILL.md, build-quality SKILL.md, build-review SKILL.md, build-execute SKILL.md, plan-checker-prompt.md, entity 073
+- [x] Assumptions formed: 5 (Confident: 4, Likely: 1)
+  A-1 all gaps absent (0.95), A-2 entity 073 absorption (0.90), A-3 quality hardwired (0.90), A-4 uat no e2e (0.90), A-5 review pre-scan numbering (0.75)
+- [x] Options surfaced: 0
+  Decomposition recommendation takes priority; per-gap options deferred to child entities
+- [x] Questions generated: 0
+  Cross-cutting questions deferred to child entities where they become local decisions
+- [x] α markers resolved: 0 / 0
+  Brainstorming spec contained no α markers
+- [x] Scale assessment: revised from Medium to Large
+  7 gaps × 5 target skills × 12 ACs = Large; decomposition recommended into 4 children
 
 ## Notes
 
