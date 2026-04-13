@@ -9,7 +9,7 @@ completed:
 verdict:
 score: 0.0
 issue:
-pr:
+pr: "#39"
 intent: feature
 scale: Small
 project: spacedock
