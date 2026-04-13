@@ -300,6 +300,11 @@ workflow-index transition: {commit SHA from step 2}
 - task-{id}: haiku BLOCKED ({reason}) -> sonnet BLOCKED ({reason}) -> opus {DONE|BLOCKED} ({reason})
 - ...
 
+### Stale-file warnings
+- wave {N}: ⚠ stale-files [{file1}, {file2}] -- baseline {sha} ({sha_short})
+- ...
+(omit subsection if no stale files detected across any wave)
+
 ### Findings
 #### Skill suggestions
 - ...
