@@ -134,6 +134,285 @@ Suggested options: (a) Independent -- 076 proceeds now, Step 4.5 adapts dynamica
 - Entity 072 (build-explore domain-aware gray areas): overlapping concern -- explore-stage directive-derived gray areas
 - Entity 075 (research dispatch): related pipeline improvement, but distinct concern (research = evidence gathering, this = interaction design)
 
+## Research Findings
+
+### Upstream Constraints
+
+- **SKILL.md step ordering is strict and named, not numbered positionally.** Steps are referenced by name ("Step 5 sufficiency gate") in `agents/science-officer.md:79` and throughout build-clarify itself. Fractional numbering (Step 4.5) is safe because external references use names, not ordinal positions (`skills/build-clarify/SKILL.md:171-220` -- Step 4 ends at line 218 with `---`, Step 5 begins at line 220).
+- **AskUserQuestion rules are non-negotiable.** 2-4 options per question, one question per message, header <=12 chars, concrete options only, recommendation when evidence supports it (`skills/build-clarify/references/ask-user-question-rules.md:1-9`). Step 4.5 must follow these identically.
+- **Entity body is the checkpoint.** No external state files allowed (`skills/build-clarify/SKILL.md:335`). The "seen topics" set must be recoverable from the entity body itself on resume.
+- **Directive and Captain Context Snapshot are immutable.** Step 4.5 must not modify them (`skills/build-clarify/SKILL.md:146`).
+- **Output format uses `--` (double dash), never em dash.** Annotations must be grep-compatible (`skills/build-clarify/SKILL.md:332-333`).
+
+### Existing Patterns
+
+- **Step 3 Option Selection loop pattern.** Steps 3 and 4 both iterate over items one-at-a-time using AskUserQuestion, record results with `-> Selected:` or `-> Answer:` annotations, and append to the entity body (`skills/build-clarify/SKILL.md:147-217`). Step 4.5 follows the same loop-and-annotate pattern but generates its own items rather than consuming explore's output.
+- **Step 5 sufficiency gate scans by format, not by source.** The gate checks for `-> Answer:`, `-> Confirmed:`, `-> Selected:` annotations without distinguishing who created the A-n/Q-n items (`skills/build-clarify/SKILL.md:222-228`). Items created by Step 4.5 in the same format pass the gate automatically.
+- **Resume case in Step 1.** When all counts are zero, skill skips to Step 5 (`skills/build-clarify/SKILL.md:100-101`). This means Step 4.5's "seen topics" must handle resume gracefully -- items already annotated from a previous session won't trigger re-discussion.
+- **Canonical References accumulator runs during Steps 3 and 4.** The same accumulator pattern should extend to Step 4.5 -- if captain cites a file path during gray area discussion, append to `## Canonical References` (`skills/build-clarify/SKILL.md:200-214`).
+
+### Library/API Surface
+
+- **AskUserQuestion tool is DEFERRED.** Must be loaded via `ToolSearch(query: "select:AskUserQuestion", max_results: 1)` at Step 0 before any question (`skills/build-clarify/SKILL.md:28-31`). Already loaded once per session -- Step 4.5 does not need a second load.
+- **Gray-area-templates.md structure.** Five domain sections (User-facing Visual, Behavioral/Callable, Runnable/Invokable, Readable/Textual, Organizational/Data-transforming), each with a table of gray area patterns. Skip rules: already decided, clear codebase precedent, solved by related entity (`skills/build-explore/references/gray-area-templates.md:1-86`). Multi-domain rule applies -- entity can match multiple domains.
+- **CONTRACTS.md structure for cross-entity lookup.** File-path-keyed sections with entity/stage/intent/status/date columns. Sibling entities touching the same files are discoverable by scanning CONTRACTS.md for `skills/build-clarify/SKILL.md` entries (`docs/build-pipeline/_index/CONTRACTS.md:1-6`). Currently no entries exist for `skills/build-clarify/`, confirming entity 076 has no cross-entity conflicts.
+
+### Known Gotchas
+
+- **"Complete" option must always be present.** Without a terminal option, the loop has no exit condition. AskUserQuestion's auto-added "Other" freeform option is NOT sufficient as a terminal -- the captain might type a gray area via "Other", which should loop, not exit. "Complete" must be an explicit canned option.
+- **Suggestion freshness requires deduplication against BOTH explore-created items AND previously discussed Step 4.5 items.** The "seen topics" set is the union of all A-n/O-n/Q-n headings in the entity body (per A-3), but suggestion generation must ALSO avoid re-suggesting topics that map to the same template row, even if they produced different A-n labels. Track by template row identity, not just A-n label.
+- **Cross-skill file read path stability.** O-1 selected "read by absolute path from explore's references" for `gray-area-templates.md`. The path `skills/build-explore/references/gray-area-templates.md` is relative to repo root. If build-explore ever moves or renames this file, Step 4.5 breaks silently. No mitigation beyond documenting the dependency -- accepted risk per O-1 discussion.
+- **AskUserQuestion option count constraint with "Complete".** With 2-3 suggestions plus "Complete", the option count is 3-4. AskUserQuestion allows 2-4 options before the harness auto-adds "Other". This means at most 3 suggestions + "Complete" = 4 options. The brainstorming spec says "2-3 suggested gray areas" which yields 3-4 total options -- within the 2-4 limit.
+
+### Reference Examples
+
+- **Step 4 Open Question Resolution** (`skills/build-clarify/SKILL.md:171-217`) is the closest structural analogue to Step 4.5. Both: (1) iterate over items, (2) present AskUserQuestion with options derived from the item, (3) record the result as an annotation, (4) run the Canonical References accumulator. Step 4.5 differs only in that it generates its own items from three sources rather than consuming explore's pre-written questions.
+- **Entity 076's own clarify session** demonstrates the gap: 5 assumptions confirmed, 1 option selected, 2 questions answered -- all from explore's output. The captain identified no additional gray areas because clarify had no mechanism to prompt for them. This entity IS the evidence for the feature it proposes.
+
+## PLAN
+
+<task id="task-0" model="sonnet" wave="0">
+  <read_first>
+    - skills/build-clarify/SKILL.md
+    - skills/build-clarify/references/ask-user-question-rules.md
+    - skills/build-clarify/references/output-format.md
+    - skills/build-explore/references/gray-area-templates.md
+  </read_first>
+
+  <action>
+  Environment verification. Confirm all files the plan references exist and contain the expected content:
+  1. `skills/build-clarify/SKILL.md` exists and contains `## Step 4:` and `## Step 5:` sections with a `---` separator between them (line 218)
+  2. `skills/build-clarify/references/ask-user-question-rules.md` exists and documents 2-4 option limit
+  3. `skills/build-clarify/references/output-format.md` exists and documents A-n/Q-n annotation formats
+  4. `skills/build-explore/references/gray-area-templates.md` exists and contains 5 domain sections
+  5. No other entity has an in-flight contract on `skills/build-clarify/SKILL.md` in CONTRACTS.md
+  </action>
+
+  <acceptance_criteria>
+    - `test -f skills/build-clarify/SKILL.md && echo EXISTS` prints EXISTS
+    - `test -f skills/build-clarify/references/ask-user-question-rules.md && echo EXISTS` prints EXISTS
+    - `test -f skills/build-clarify/references/output-format.md && echo EXISTS` prints EXISTS
+    - `test -f skills/build-explore/references/gray-area-templates.md && echo EXISTS` prints EXISTS
+    - `grep -c "## Step 4:" skills/build-clarify/SKILL.md` returns 1
+    - `grep -c "## Step 5:" skills/build-clarify/SKILL.md` returns 1
+    - `grep "skills/build-clarify/SKILL.md" docs/build-pipeline/_index/CONTRACTS.md | grep -c "in-flight"` returns 0
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1">
+  <read_first>
+    - skills/build-clarify/SKILL.md
+    - skills/build-clarify/references/ask-user-question-rules.md
+    - skills/build-explore/references/gray-area-templates.md
+  </read_first>
+
+  <action>
+  Insert `## Step 4.5: Open Exploration Loop` into `skills/build-clarify/SKILL.md` between the `---` separator after Step 4 (line 218) and the `## Step 5: Context Sufficiency Gate` heading (line 220). The new section contains:
+
+  1. **Preamble**: "After all pre-identified items from Steps 2-4 are resolved, Step 4.5 opens an exploration loop where SO proactively suggests gray areas the captain's domain knowledge may surface beyond what explore found."
+
+  2. **Seen-topics computation**: "Build the seen-topics set: scan the entity body for all `A-{n}:`, `O-{n}:` (subsection headings in Option Comparisons), and `Q-{n}:` entries. Extract the topic label from each. This set prevents re-suggesting already-discussed topics."
+
+  3. **Suggestion generation from three sources**:
+     - Source 1: Read `skills/build-explore/references/gray-area-templates.md`. For each domain matching the entity's `## Captain Context Snapshot` Domain field, scan the template table rows. Skip rows where the gray area is already covered by an item in seen-topics (match by semantic overlap, not exact string). Collect uncovered template rows as candidate suggestions.
+     - Source 2: Read `docs/build-pipeline/_index/CONTRACTS.md`. Find sibling entities (same `files_modified` paths as this entity's brainstorming spec mentions) with status `in-flight` or `planned`. For each sibling, check if it implies a cross-entity concern not yet in seen-topics (e.g., "entity X is also modifying file Y -- does this entity need to coordinate?"). Collect as candidate suggestions.
+     - Source 3: Re-read the entity's `## Directive` and `## Brainstorming Spec`. Identify technology or design choices implied by the directive but not surfaced by explore (e.g., "the directive mentions 'WebSocket' but no assumption or question addresses WebSocket connection management"). Collect as candidate suggestions.
+
+  4. **Suggestion selection**: From all candidates, pick 2-3 that are most likely to surface actionable gray areas. Prioritize: cross-entity concerns (source 2) > uncovered templates (source 1) > implied technology (source 3), since cross-entity concerns are hardest for captains to spot independently.
+
+  5. **AskUserQuestion presentation**: Build the AskUserQuestion payload:
+     - `header`: "Gray areas" (10 chars)
+     - `question`: "Are there gray areas not yet covered? Here are suggestions from domain analysis:"
+     - `options`: 2-3 suggestion options, each with a `label` (the gray area name, e.g., "Cross-entity file conflict with entity 075") and `description` (1-sentence explanation of why it matters). Plus one terminal option: `label: "Complete -- no more gray areas"`, `description: "All gray areas are covered. Proceed to sufficiency gate."`
+     - If a suggestion has strong evidence, prefix its label with `(recommended)`.
+     - Call `AskUserQuestion(...)`.
+
+  6. **Response handling**:
+     - If captain selects "Complete -- no more gray areas": exit Step 4.5, proceed to Step 5.
+     - If captain selects a suggested gray area: discuss the gray area with the captain in plain text. Based on the discussion, produce a new annotation in the entity body:
+       - If it resolves as an assumption: append `A-{next_n}: {statement}` + `Confidence:` + `Evidence:` + `-> Confirmed: captain, {ISO-date} (interactive)` to the `## Assumptions` section. Compute `next_n` as max existing A-n + 1.
+       - If it resolves as an open question with answer: append `Q-{next_n}: {question}` + `Domain:` + `Why it matters:` + `Suggested options:` + `-> Answer: {response} (captain, {ISO-date}, interactive)` to the `## Open Questions` section.
+       - If it requires an option comparison: append a new `### {name}` subsection with table + `-> Selected: {choice} (captain, {ISO-date}, interactive)` to the `## Option Comparisons` section.
+       - Run the Canonical References accumulator if the captain cites any file paths.
+     - If captain selects "Other" (harness-added freeform): treat the freeform text as a captain-originated gray area. Discuss, annotate, and loop exactly as for a suggested gray area.
+     - After annotation, add the discussed topic to seen-topics and loop back to step 3 (suggestion generation) with the updated seen-topics set for fresh suggestions.
+
+  7. **Rules specific to Step 4.5**:
+     - Maximum 2-3 suggestions per iteration (brainstorming spec guardrail). Never present more than 3 suggestions plus "Complete".
+     - "Complete" option is always present in every iteration. It is always the last option.
+     - No suggestion may repeat a topic from seen-topics. If all three sources produce zero new candidates, present only the "Complete" option with a note: "All domain templates are covered and no cross-entity concerns detected. Select Complete to proceed."
+     - Step 4.5 inherits all Rules from the skill-level Rules section (double dash, entity body checkpoint, AskUserQuestion rules, Canonical References accumulator, preserve explore output).
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "## Step 4.5:" skills/build-clarify/SKILL.md` returns 1
+    - `grep "Open Exploration Loop" skills/build-clarify/SKILL.md` finds the heading
+    - `grep -c "Complete -- no more gray areas" skills/build-clarify/SKILL.md` returns at least 1
+    - `grep "gray-area-templates.md" skills/build-clarify/SKILL.md` finds the cross-skill reference path
+    - `grep "CONTRACTS.md" skills/build-clarify/SKILL.md` finds the cross-entity lookup reference
+    - `grep "seen-topics" skills/build-clarify/SKILL.md` finds at least 2 occurrences (computation + update)
+    - `grep -c "## Step 5:" skills/build-clarify/SKILL.md` still returns 1 (Step 5 not displaced)
+    - `grep -A2 "## Step 4.5:" skills/build-clarify/SKILL.md` shows the new section exists between Steps 4 and 5
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-clarify/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="1">
+  <read_first>
+    - skills/build-clarify/SKILL.md
+    - skills/build-clarify/references/output-format.md
+  </read_first>
+
+  <action>
+  Update `skills/build-clarify/references/output-format.md` to document the annotation formats Step 4.5 produces. Add a new section `## Annotation: Open Exploration Item` after the existing `## Annotation: Open Question Answered` section. The new section documents:
+
+  1. Step 4.5 creates items in the SAME A-n/Q-n format as explore (per Q-1 answer), appended to the existing `## Assumptions` or `## Open Questions` sections with numbering continuing from explore's last entry.
+  2. The annotation is written inline (assumption confirmed or question answered in the same iteration), so the annotation line (`-> Confirmed:` or `-> Answer:`) always appears immediately with mode `(interactive)`.
+  3. Example showing A-6 created by Step 4.5 when explore produced A-1 through A-5:
+
+  ```markdown
+  A-6: WebSocket reconnection uses exponential backoff
+  Confidence: Confident (0.90)
+  Evidence: captain domain knowledge -- standard practice for production WS clients
+  -> Confirmed: captain, 2026-04-13 (interactive)
+  ```
+
+  4. Note: items created by Step 4.5 are indistinguishable from explore-created items by format. This is intentional (per Q-1 answer) -- downstream parsers (build-plan, FO, status script) process them identically.
+  </action>
+
+  <acceptance_criteria>
+    - `grep "Open Exploration Item" skills/build-clarify/references/output-format.md` finds the new section heading
+    - `grep "Step 4.5" skills/build-clarify/references/output-format.md` finds at least 1 reference
+    - `grep "A-6:" skills/build-clarify/references/output-format.md` finds the example
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-clarify/references/output-format.md
+  </files_modified>
+</task>
+
+<task id="task-3" model="sonnet" wave="2">
+  <read_first>
+    - skills/build-clarify/SKILL.md
+    - skills/build-clarify/references/output-format.md
+  </read_first>
+
+  <action>
+  Update the Step 6 Stage Report template in `skills/build-clarify/SKILL.md` (lines 282-301) to include a new metric line for Step 4.5 activity. Add after the "Questions answered" line and before the "Canonical refs added" line:
+
+  ```markdown
+  - [x] Open exploration: {n} gray areas surfaced ({n} from templates, {n} from CONTRACTS, {n} from directive, {n} via freeform)
+    e.g., "3 gray areas surfaced (1 from templates, 1 from CONTRACTS, 0 from directive, 1 via freeform)"
+  ```
+
+  Also update the `references/output-format.md` Stage Report section to include this new metric line in the canonical format, so the two stay synchronized.
+
+  Additionally, update the `## Step 6: Commit` clarify duration metric example to account for Step 4.5 AskUserQuestion calls in the count:
+
+  ```markdown
+  - [x] Clarify duration: {n} questions asked, session complete
+    e.g., "7 AskUserQuestion calls (1 batch + 1 option + 2 Qs + 3 exploration iterations)"
+  ```
+  </action>
+
+  <acceptance_criteria>
+    - `grep "Open exploration:" skills/build-clarify/SKILL.md` finds the new metric line
+    - `grep "Open exploration:" skills/build-clarify/references/output-format.md` finds the matching line
+    - `grep "exploration iterations" skills/build-clarify/SKILL.md` finds the updated duration example
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-clarify/SKILL.md
+    - skills/build-clarify/references/output-format.md
+  </files_modified>
+</task>
+
+<task id="task-4" model="sonnet" wave="2">
+  <read_first>
+    - skills/build-clarify/SKILL.md
+  </read_first>
+
+  <action>
+  Update `skills/build-clarify/SKILL.md` Step 1 (Load Entity State, lines 91-108) to account for Step 4.5 in the resume case. Currently the resume case says "if all three counts are zero -> skip to Step 5". This needs to become: "if all three counts are zero -> skip to Step 4.5" so that a resumed session still offers the open exploration loop even when all pre-identified items are already resolved.
+
+  Specifically, change line 100:
+  FROM: `**Resume case:** if all three counts are zero → skip to Step 5 (the entity was previously clarified; this is a re-entry to finalize the handoff).`
+  TO: `**Resume case:** if all three counts are zero → skip to Step 4.5 (the entity's pre-identified items were previously resolved; the open exploration loop may still surface new gray areas, or the captain selects "Complete" to proceed to Step 5).`
+
+  Also update Step 5's loop-back instruction (line 230) to include Step 4.5:
+  FROM: `identify the gap and loop back to the relevant step (Step 2 for assumptions, Step 3 for options, Step 4 for questions)`
+  TO: `identify the gap and loop back to the relevant step (Step 2 for assumptions, Step 3 for options, Step 4 for questions, Step 4.5 for open exploration)`
+  </action>
+
+  <acceptance_criteria>
+    - `grep "skip to Step 4.5" skills/build-clarify/SKILL.md` finds the updated resume case
+    - `grep "Step 4.5 for open exploration" skills/build-clarify/SKILL.md` finds the updated loop-back instruction
+    - `grep -c "skip to Step 5" skills/build-clarify/SKILL.md` returns 0 (old reference removed from resume case)
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-clarify/SKILL.md
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+None
+
+### CLI
+None
+
+### API
+None
+
+### Interactive
+- [ ] Run build-clarify on a test entity that has all assumptions confirmed, all options selected, and all questions answered. After Steps 2-4 complete with zero items, verify Step 4.5 triggers and presents an AskUserQuestion with 2-3 suggestions plus "Complete"
+- [ ] Select a suggested gray area in Step 4.5, verify SO discusses it, produces an A-n or Q-n annotation in the entity body, and loops with fresh suggestions (no repeats)
+- [ ] Select "Complete" in Step 4.5, verify flow proceeds to Step 5 sufficiency gate without further prompting
+- [ ] Select "Other" (freeform) in Step 4.5, type a custom gray area, verify it is discussed, annotated, and loops
+- [ ] Run clarify on a previously-clarified entity (resume case), verify Step 4.5 triggers (not skipped to Step 5)
+- [ ] Verify Stage Report includes "Open exploration:" metric line with correct source breakdown
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1: Step 4.5 presents AskUserQuestion with 2-3 suggestions + Complete | task-1 | `grep -c "Complete -- no more gray areas" skills/build-clarify/SKILL.md` | pending | -- |
+| AC-2: Captain selects gray area, result annotated, loop with fresh suggestions | task-1 | `grep "seen-topics" skills/build-clarify/SKILL.md` finds >=2 occurrences | pending | -- |
+| AC-3: Captain selects Complete, proceeds to Step 5 | task-1 | `grep "proceed to Step 5" skills/build-clarify/SKILL.md` in Step 4.5 section | pending | -- |
+| AC-4: No suggestion repeats across 3+ iterations | task-1 | `grep "seen-topics" skills/build-clarify/SKILL.md` confirms dedup logic present | pending | -- |
+| AC-5: Freeform "Other" gray area is discussed and annotated | task-1 | `grep "Other.*freeform" skills/build-clarify/SKILL.md` in Step 4.5 section | pending | -- |
+| Stage Report metric | task-3 | `grep "Open exploration:" skills/build-clarify/SKILL.md` | pending | -- |
+| Output format documented | task-2 | `grep "Open Exploration Item" skills/build-clarify/references/output-format.md` | pending | -- |
+| Resume case routes to Step 4.5 | task-4 | `grep "skip to Step 4.5" skills/build-clarify/SKILL.md` | pending | -- |
+| Environment verified | task-0 | `test -f skills/build-clarify/SKILL.md && echo EXISTS` | pending | -- |
+
+## Stage Report: plan
+
+- [x] Research topics extracted: 5
+  SKILL.md insertion mechanics, AskUserQuestion loop pattern, gray-area-templates structure, A-n/Q-n numbering continuation, CONTRACTS.md cross-entity lookup
+- [x] Research dispatch: inline (ensign context, no Agent tool)
+  5 topics researched serially via Read/Grep -- all findings written with file:line citations
+- [x] Research synthesis: no contradictions
+  all 5 domain sections populated, zero conflicting findings across topics
+- [x] Plan written: 5 tasks across 3 waves
+  task-0 (wave 0, env verify), task-1 + task-2 (wave 1, parallel -- SKILL.md + output-format.md), task-3 + task-4 (wave 2, serial -- stage report metric + resume case)
+- [x] Self-review: passed
+  zero-placeholder scan clean, wave dependency sane, validation map complete (9 rows covering 5 ACs + 4 bonus)
+- [x] Plan-checker: PASS (1 iteration, 0 blockers, 1 warning)
+  warning: task-3 and task-4 overlap on SKILL.md in wave 2 (execute forces serial -- acceptable)
+- [x] Knowledge capture: skipped -- no findings met D1/D2 threshold
+  research confirmed known patterns (AskUserQuestion rules, entity body checkpoint), no novel generalizable gotchas
+- [x] Workflow-index append: 2 append calls, covering 4 tasks and 2 files, all successful
+  skills/build-clarify/SKILL.md (tasks 1,3,4), skills/build-clarify/references/output-format.md (tasks 2,3)
+
 ## Stage Report: clarify
 
 - [x] Decomposition: not-applicable
