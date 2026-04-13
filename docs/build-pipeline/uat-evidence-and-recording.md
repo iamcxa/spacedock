@@ -1,8 +1,8 @@
 ---
 id: 082
 title: "UAT evidence and recording -- CLI e2e recording + inline evidence writing"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: decomposition of entity 074 (pipeline verification quality uplift)
 started:
 completed:
@@ -57,14 +57,21 @@ parent: 074
 A-1: Step 2b (lines 80-82) is the CLI item execution block — currently 3 lines ("Run command, capture stdout/stderr/exit code, record evidence"). The e2e-pipeline recording hook inserts before the Bash command, and artifact collection inserts after. Step 2a (browser items, lines 66-78) already uses `Skill` tool with e2e-pipeline — the CLI extension follows the same dispatch pattern.
 Confidence: Confident (0.90)
 Evidence: build-uat SKILL.md:80-82 -- Step 2b. Lines 66-78 -- Step 2a browser items already invoke e2e-pipeline:e2e-flow and e2e-pipeline:e2e-test via Skill tool.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: e2e-pipeline availability detection uses `ToolSearch` probe at Step 0 (or Step 2 entry) — same pattern build-uat already uses for AskUserQuestion (line 21-23). If ToolSearch returns empty for e2e-pipeline skills, set a flag and skip recording throughout the session.
 Confidence: Confident (0.85)
 Evidence: build-uat SKILL.md:21-23 -- ToolSearch pattern for AskUserQuestion. Same probe pattern works for e2e-pipeline skill detection.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-3: Step 5 evidence writing (line 94) currently writes provisional result rows. Inline evidence changes the output format from path references to markdown image syntax (browser) and fenced transcript blocks (CLI). The `## UAT Results` table shape at line 136 shows the current format — the evidence column needs to expand from one-line snippets to multi-line inline content.
 Confidence: Likely (0.75)
 Evidence: build-uat SKILL.md:94 -- "Do NOT append to ## UAT Results yet -- Step 5 does the canonical write." Line 136 -- `item-3 (cli) pass -- stdout matched "Created X"`. Line 220 -- Stage Report evidence shape: `item-2 (cli): stdout snippet`.
+→ Confirmed: captain, 2026-04-13 (batch)
+
+## Canonical References
+
+(none cited)
 
 ## Stage Report: explore
 
@@ -80,6 +87,20 @@ Evidence: build-uat SKILL.md:94 -- "Do NOT append to ## UAT Results yet -- Step 
   No α markers in brainstorming spec
 - [x] Scale assessment: confirmed Medium
   1 primary file but changes span Steps 0, 2b, 5, and Stage Report format — multiple insertion points within one file
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+- [x] Assumptions confirmed: 3 / 3 (0 corrected)
+  A-1, A-2, A-3 all confirmed via batch
+- [x] Options selected: 0 / 0
+- [x] Questions answered: 0 / 0
+- [x] Canonical refs added: 0
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, ACs valid (3 criteria, no α markers)
+- [x] Handoff mode: loose
+- [x] Clarify duration: 1 question asked, session complete
+  1 batch assumption presentation (plain text)
 
 ## References
 

@@ -1,8 +1,8 @@
 ---
 id: 083
 title: "Multi-language coverage ratchet -- type-check and test count never regress"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: decomposition of entity 074 (pipeline verification quality uplift)
 started:
 completed:
@@ -63,18 +63,22 @@ parent: 074
 A-1: build-quality Steps 1-4 are hardwired to bun commands (SKILL.md:46-109). Restructuring to runner-agnostic requires: (a) Step 0.5 language detection from config files, (b) Steps 1-4 parameterized by detected runner, (c) Step 4.5 ratchet checks using detected runner's count commands. This is a significant restructuring, not a simple insertion.
 Confidence: Confident (0.90)
 Evidence: build-quality SKILL.md:46 (`bun test`), 64 (`bun lint`), 80 (`bunx tsc --noEmit`), 96 (`bun build`) -- all hardwired. No abstraction layer exists.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: ops.config.json currently has only one key (`coverage_threshold`, SKILL.md:114). Ratchet baselines need persistent storage between runs. ops.config.json is the natural location — add `ratchet_baselines: { type_coverage: {}, test_count: {} }` keyed by language.
 Confidence: Likely (0.75)
 Evidence: build-quality SKILL.md:114 -- ops.config.json read for coverage_threshold. No schema doc exists. Adding keys is low-risk but schema ownership is unclear.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-3: plan-checker-prompt.md has 7 dimensions (ending at dimension 7, line ~147). Dimension 8 (type/test coverage) follows the same format — a heading, description, check instructions, and output format block.
 Confidence: Confident (0.85)
 Evidence: parent 074 code-explorer finding -- plan-checker-prompt.md:19 defines 7 dimensions. Dimension 8 is absent. Same insertion pattern as dimensions 1-7.
+→ Confirmed: captain, 2026-04-13 (batch)
 
-A-4: The ratchet uses `main` branch as baseline for count comparison. `git stash` + run on main + `git stash pop` pattern (from parent 074's directive) gives the baseline counts. Alternative: persist baselines in ops.config.json and compare against stored values.
-Confidence: Likely (0.70)
-Evidence: parent 074 directive lines 106-113 -- `git stash` pattern for baseline. This is fragile (stash conflicts, dirty worktree). Persisted baselines in ops.config.json are more reliable but require a "baseline update" workflow.
+A-4: The ratchet uses persisted baselines in ops.config.json. Quality pass writes current counts to `ratchet_baselines` key. Next run reads and compares `count(current) >= count(baseline)`. First run with no baseline = skip ratchet with warning (bootstrap automatically on first pass).
+Confidence: Confident (0.85)
+Evidence: O-1 selected "Persisted baselines in ops.config.json" (captain, 2026-04-13). build-quality SKILL.md:114 -- ops.config.json already read at runtime. Atomic update on quality pass eliminates git stash fragility.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 ## Option Comparisons
 
@@ -87,6 +91,12 @@ How does the ratchet know what "last time" was?
 | Git stash + run on main | No persistent state needed; always compares against latest main | Fragile (stash conflicts, dirty worktree, slow for large test suites); runs test suite twice | Medium | Not recommended |
 | Persisted baselines in ops.config.json | Fast (no re-run); reliable; updates atomically on quality pass | Needs "baseline update" step on quality pass; first run needs bootstrap | Low | ✅ Recommended |
 | Git notes on main HEAD | No extra files; standard git mechanism | Obscure; easy to lose on force-push; not widely understood | Medium | Not recommended |
+
+→ Selected: Persisted baselines in ops.config.json (captain, 2026-04-13, interactive)
+
+## Canonical References
+
+(none cited)
 
 ## Stage Report: explore
 
@@ -102,6 +112,21 @@ How does the ratchet know what "last time" was?
   No α markers in brainstorming spec
 - [x] Scale assessment: confirmed Medium
   2 files mapped, significant restructuring of Steps 1-4 + new Step 0.5 + Step 4.5 + plan-checker dimension 8
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+- [x] Assumptions confirmed: 4 / 4 (0 corrected)
+  A-1 through A-4 confirmed via batch; A-4 updated to reflect O-1 selection (persisted baselines)
+- [x] Options selected: 1 / 1
+  O-1 Ratchet baseline source -- Persisted baselines in ops.config.json (recommended)
+- [x] Questions answered: 0 / 0
+- [x] Canonical refs added: 0
+- [x] Context status: ready
+  gate passed: all 4 assumptions confirmed, 1 option selected, ACs valid (6 criteria, no α markers)
+- [x] Handoff mode: loose
+- [x] Clarify duration: 2 questions asked, session complete
+  1 batch assumption presentation (plain text) + 1 AskUserQuestion (O-1 baseline source)
 
 ## References
 
