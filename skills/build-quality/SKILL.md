@@ -334,3 +334,9 @@ Write the report with the Write or Edit tool into the entity body at the `## Sta
 - **Never invoke other skills** from within quality. You are a leaf stage skill.
 - **Never edit code** -- your Write/Edit scope is strictly the entity body's `## Stage Report: quality` section.
 - **Use `--` (double dash)** everywhere. Never `—` (em dash). Matches the rest of the build skill family.
+
+### Evidence Minimum
+
+- **NEVER write a per-check verdict block without the actual command output in the evidence field.** Every check (test, lint, typecheck, build, regression, coverage) must include the raw command output (last 40 lines or full output if shorter) in a fenced code block under `evidence:`. A verdict of `pass` with an empty evidence block is a fabricated pass -- it claims green without showing what ran. A verdict of `fail` with only a test count and no assertion messages is under-reporting per the existing "NEVER report a bare FAIL" rule.
+- **NEVER write a `pass` verdict without evidence proving the pass.** The evidence for a pass is the command's stdout showing zero errors/failures. An empty evidence block or a bare "all checks pass" string is not evidence -- it is a claim. The evidence field exists so that quality's downstream consumers (review, captain, audit) can verify the pass without re-running the command.
+- **NEVER omit the test count from the test check evidence.** The evidence block for `### test` must include the total test count (e.g., `342 tests passed`) extracted from `bun test` output. A pass verdict without a test count cannot be audited -- "tests passed" could mean 1 test or 342 tests. The count is the denominator that makes the verdict meaningful.
