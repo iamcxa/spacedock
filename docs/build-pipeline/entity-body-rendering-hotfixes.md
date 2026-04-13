@@ -11,7 +11,7 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-entity-body-rendering-hotfixes
 issue:
-pr:
+pr: "#42"
 intent: feature
 scale: Small
 project: spacedock

@@ -1,15 +1,15 @@
 ---
 id: 046
 title: Dashboard Entity List Context Status Filter
-status: clarify
+status: plan
 context_status: ready
 source: /build
 created: 2026-04-09T22:15:00+08:00
-started:
+started: 2026-04-13T14:25:00Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-dashboard-context-status-filter
 issue:
 pr:
 intent: feature
