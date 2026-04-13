@@ -469,3 +469,42 @@ Result: 0 new regressions — all failures are pre-existing environment issues u
 
 ✅ **PASS** — All mechanical checks completed. No build failures, no type errors (N/A for client-side JS/CSS), no test regressions. Entity 046 is ready to advance.
 
+## Stage Report: review
+
+### Pre-scan
+
+- [x] CLAUDE.md compliance: DONE — no new dependencies, no TS changes, static JS/CSS only. Compliant.
+- [x] Stale refs: DONE — no references to removed functions or renamed symbols.
+- [x] Plan consistency: DONE — 4 tasks across waves 0-3 executed; files_modified matches actual diff (app.js, style.css). No unplanned files modified.
+
+### Findings
+
+| ID | Severity | Location | Description |
+|----|----------|----------|-------------|
+| F-1 | HIGH | app.js:223–257, style.css:643–650 | Context chip row hidden on wide screens (`display: none` at ≥769px) but context_status filter remains active. Stage filter has SVG graph as wide-screen control; context filter has no wide-screen equivalent. User cannot deactivate context filter on wide screens without clearing sessionStorage. |
+| F-2 | NIT | app.js:227, 308 | `e.context_status \|\| e["context_status"]` — bracket and dot notation are identical in JS; redundant double-access pattern. Harmless but noisy. |
+
+### Detailed Analysis
+
+**var hoisting check (MEMORY.md pattern)**: No issues found. `dim` (line 176) and `filterDim` (line 301) are top-level `var` declarations in the render function, not inside nested if-blocks or loops. `csName` in forEach callbacks is correctly captured as a forEach parameter in its own function scope — no hoisting shadowing.
+
+**Q-2 legacy always-visible semantics**: Correct. `csMatch = csFilters.size === 0 || csFilters.has(csVal) || !csVal` (line 309) — when `csVal` is `undefined`/empty, `!csVal` is `true`, entity always passes csMatch. Handles both `undefined` and `""` as required by task-3.
+
+**A-4 AND/OR semantics**: Correct. `stageMatch && csMatch` enforces AND across dimensions; within each dimension, `stageFilters.has(e.status)` and `csFilters.has(csVal)` are OR semantics (matching any selected chip suffices).
+
+**A-3 zero-filter default**: Correct. `hasAnyFilter === false` takes the archived+shipped-hiding branch unchanged.
+
+**Backward compat migration**: Correct. `Array.isArray(val)` at line 37 migrates old plain-array sessionStorage data to `{ stages: new Set(val), context_status: new Set() }`.
+
+**defense-in-depth client-side filtering (MEMORY.md pattern)**: Not applicable — data comes from a single `/api/workflows` fetch, no secondary fetch on context_status-filtered data. No redundant filter needed.
+
+**F-1 deeper analysis**: The stage chip row (`.stage-pipeline`) is also hidden on wide screens, but the SVG pipeline graph (`renderPipelineGraph` with `onStageClick` at line 183) provides an equivalent wide-screen control for stage filtering. No equivalent wide-screen control exists for context_status. This is a functional gap: if `csFilters.size > 0` persists in sessionStorage and the user switches to wide screen, entities will appear filtered with no visible way to reset, except clearing browser storage. This is a regression risk for usability.
+
+**Fix options**: (a) Also render `.context-status-pipeline` on wide screens below the SVG graph (simplest, minimal diff), (b) Add a reset-all-filters button, (c) Hide `.context-status-pipeline` only when `.stage-pipeline` is also hidden AND csFilters is empty (complex). Option (a) is recommended — remove the wide-screen `display: none` for `.context-status-pipeline`, or keep it visible always since it provides orthogonal information to the SVG graph.
+
+### Verdict
+
+**FAIL** — F-1 (HIGH) blocks advance. Context filter has no wide-screen UI control; users on wide screens cannot deactivate an active context_status filter. Recommend fix: remove `.context-status-pipeline { display: none; }` from the `min-width: 769px` media query, rendering context chips visible on all screen sizes (they provide different information from the SVG stage graph). F-2 is NIT and does not block.
+
+feedback-to: execute
+
