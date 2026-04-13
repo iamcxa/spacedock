@@ -2,7 +2,7 @@
 // ABOUTME: ChannelProvider interface — the contract between the MCP channel layer
 // ABOUTME: and its backing dashboard server. Enables external providers (e.g., bridge shim).
 
-import type { AgentEvent, SnapshotSource } from "./types";
+import type { AgentEvent, SequencedEvent, EntitySnapshot, SnapshotSource } from "./types";
 import type { EventBuffer } from "./events";
 import type { SnapshotStore } from "./snapshots";
 
@@ -31,20 +31,29 @@ export interface CreateSnapshotInput {
  */
 export interface ChannelProvider {
   /** Push an event to all connected clients (SSE/WS). Returns the sequence number. */
-  publishEvent(event: AgentEvent): number;
+  publishEvent(event: AgentEvent): number | Promise<number>;
 
   /** Notify connected clients of MCP channel connection status. */
-  broadcastChannelStatus(connected: boolean): void;
+  broadcastChannelStatus(connected: boolean): void | Promise<void>;
 
   /** Access to channel message replay (used by get_pending_messages MCP tool). */
-  readonly eventBuffer: Pick<EventBuffer, "getChannelMessagesSince">;
+  readonly eventBuffer: Pick<EventBuffer, "getChannelMessagesSince" | "getAll"> | {
+    getChannelMessagesSince(afterSeq: number, entity?: string): SequencedEvent[] | Promise<SequencedEvent[]>;
+    getAll(): SequencedEvent[];
+  };
 
   /** Access to entity snapshot creation (used by update_entity MCP tool). */
-  readonly snapshotStore: Pick<SnapshotStore, "createSnapshot">;
+  readonly snapshotStore: Pick<SnapshotStore, "createSnapshot" | "listVersions"> | {
+    createSnapshot(input: CreateSnapshotInput): EntitySnapshot | Promise<EntitySnapshot>;
+    listVersions(entity: string): EntitySnapshot[];
+  };
 
   /** The HTTP port the provider is listening on, if applicable. */
   readonly port: number | undefined;
 
+  /** The URL the provider is listening on, if applicable. */
+  readonly url?: URL;
+
   /** Graceful shutdown. */
-  stop(): void;
+  stop(): void | Promise<void>;
 }
