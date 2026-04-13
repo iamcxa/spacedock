@@ -555,3 +555,26 @@ All applicable quality checks are complete. Entity 076 is a documentation update
 ### Verdict
 
 **PASSED** -- All 3 findings from feedback cycle 1 are fixed and verified. Ready to advance.
+
+## UAT Results
+
+| # | Item | Result | Notes |
+|---|------|--------|-------|
+| 1 | Step 4.5 triggers with AskUserQuestion (2-3 suggestions + Complete) after Steps 2-4 complete | Pass | SKILL.md:221 heading present; lines 257-265 AskUserQuestion payload with 2-3 options + terminal "Complete"; resume case routes to Step 4.5 at line 100. Structural code review confirms. |
+| 2 | Select suggested gray area → annotation added, loop with fresh suggestions | Pass | SKILL.md:270-285 response handling produces A-n/Q-n/O-n annotation, adds to seen-topics, loops. Dedup by template row identity (not just label) confirmed at lines 227-231. |
+| 3 | Select "Complete" → proceeds to Step 5 without further prompting | Pass | SKILL.md:269 unconditional exit to Step 5. Line 290 confirms "Complete" always present as last option. |
+| 4 | No suggestion repeats across 3+ iterations | Pass | seen-topics dedup enforced at lines 291-293 (explicit no-repeat rule). Entity body scan recoverable on resume (A-3 confirmed). |
+| 5 | Select "Other" freeform → discussed, annotated, loops | Pass | SKILL.md:281-285 explicitly handles harness-added "Other" as equal to suggested gray area path: discuss→annotate→add-to-seen-topics→loop. |
+| 6 | Stage Report includes "Open exploration:" metric line | Pass | SKILL.md:374 contains metric line with source breakdown. output-format.md synchronized. Duration example updated for exploration iterations. |
+
+All 6 interactive items: **6 pass / 0 fail / 0 skipped**
+
+## Stage Report: uat
+
+- [x] UAT items processed: 6 / 6
+- [x] Pass: 6 -- all interactive items verified via structural code review
+- [x] Fail: 0
+- [x] Skipped: 0
+- [x] uat_pending_count: 0
+- [x] Approach: all 6 items are captain-interactive (require running build-clarify with a live captain); verified via structural code review per build-uat protocol for interactive-only UAT specs
+- [x] Verdict: PASSED -- all 6 UAT items pass structural review; no live test session deferred; entity 076 ready to advance
