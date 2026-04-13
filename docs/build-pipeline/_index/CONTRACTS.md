@@ -160,6 +160,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | review-stage-parallel-skill-dispatch | execute | Add FO Guidance section for debate-driven reviewer dispatch; restructure for two-phase model | 🟡 in-flight | 2026-04-12 |
 | quality-goal-backward-regression | plan | Insert Step 1e goal-backward verification in pre-scan | 🔵 planned | 2026-04-13 |
 
+### skills/build-uat/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| uat-evidence-and-recording | execute | CLI e2e recording + inline evidence -- Step 1.5 probe, Step 2b .cast recording, Step 5 inline format, E2E Evidence table | 🟡 in-flight | 2026-04-13 |
+
 ### skills/code-explorer/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |
