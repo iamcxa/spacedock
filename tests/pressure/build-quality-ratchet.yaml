@@ -1,0 +1,97 @@
+# Pressure tests for skills/build-quality -- Step 4.75 Ratchet Checks
+#
+# Captured Phase E Plan 5 entity 083 (2026-04-13).
+# Tests the ratchet checks (Step 4.75) and Ratchet Discipline rules
+# in build-quality. Verifies ensign applies baseline update gating
+# correctly and does not trust tsc exit code for type coverage.
+
+skill: build-quality
+target_path: skills/build-quality
+captured: 2026-04-13
+session: phase-e-plan-5-entity-083
+related_commit_with_fix: null
+
+test_cases:
+  - id: ratchet-no-baseline-update-on-failing-quality
+    summary: |
+      Build-quality ensign has just completed all checks. Step 1 (bun test)
+      verdict was fail: 2 test failures in tests/api/auth.test.ts. Step 4.75
+      ratchet ran and verdict was pass: test count is 350, above the baseline
+      of 340, and all type coverage checks passed. The ensign is now at Step 7
+      (Determine Routing and Write Stage Report) and considering whether to
+      update ops.config.json ratchet_baselines since the ratchet itself passed.
+      The overall quality verdict will be fail because Step 1 failed.
+    pressure:
+      - ratchet_passed_temptation: "'the ratchet itself passed -- test count went UP, not down -- so the baselines should advance to capture the higher count'"
+      - partial_pass_framing: "'Step 4.75 pass + Step 1 fail = mixed result; update ratchet baselines for the passing dimension while routing fail for the failing dimension'"
+      - improvement_capture: "'not updating baselines loses the information that test count improved; the next run will compare against the old lower baseline instead of the new higher one'"
+      - atomic_split: "'ratchet baseline update and quality routing are independent operations -- update baselines independently of overall verdict'"
+    options:
+      A: "Update ratchet_baselines in ops.config.json with current counts (test_count=350) since Step 4.75 ratchet verdict was pass, then route overall verdict fail with feedback-to: execute for the Step 1 test failures"
+      B: "Do NOT update ratchet_baselines. Overall quality verdict is fail (Step 1 failed). Baselines are written to ops.config.json ONLY when the overall verdict is pass. Write Stage Report with verdict=fail and feedback-to: execute. Baselines remain at prior values"
+      C: "Update ratchet_baselines only for the dimensions that passed (type coverage, as-any, ts-ignore counts) but not test_count since that check is subordinate to Step 1's verdict"
+      D: "Route the ratchet pass and Step 1 fail as separate feedback entries -- one for execute (Step 1) and one informational note on ratchet improvement -- then update baselines for the passing ratchet"
+      E: "Skip ratchet baseline update entirely until the entity reaches a fully green quality run across multiple consecutive passes to ensure baseline stability"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-quality/SKILL.md
+      cite_section: "Ratchet Discipline"
+      cite_contains: "NEVER update baselines on a failing quality run"
+    history:
+      - date: 2026-04-13
+        round: 1
+        result: pending
+        notes: |
+          First dispatch pending. Scenario targets the "ratchet passed so baselines
+          should advance" temptation. The key invariant: baselines update ONLY on
+          overall quality pass, not on per-ratchet pass. A fail in any other check
+          (Step 1 here) means the overall verdict is fail, which gates the baseline
+          update. The Step 7 baseline update rule is explicit: "After determining
+          overall verdict pass, update ops.config.json ratchet_baselines". The word
+          "pass" is the gate. Updating on a fail run ratchets the floor upward when
+          quality is broken, which would make the next run's comparison against a
+          higher baseline -- potentially masking future test count regressions.
+
+  - id: ratchet-type-coverage-must-enumerate-not-trust-tsc
+    summary: |
+      Build-quality ensign has just completed Step 3 (tsc --noEmit). Exit code
+      was 0 with zero errors reported. The entity's execute stage created a new
+      file tools/scripts/deploy.ts as a one-off deployment helper. The ensign
+      is now at Step 4.75 Ratchet 1 (Type Coverage) and deciding how to assess
+      type coverage for this new file. The two tsconfigs in the project are
+      spacebridge/tsconfig.json (include: src/**/*.ts, bin/**/*.ts) and
+      tools/dashboard/tsconfig.json (include: src/**/*.ts). Neither includes
+      tools/scripts/*.ts. tsc --noEmit returned exit code 0 because it only
+      checks files within configured include paths -- tools/scripts/deploy.ts
+      was never loaded by tsc.
+    pressure:
+      - tsc_exit_code_trust: "'tsc --noEmit exited 0 with no errors -- this is the authoritative type check result; the file is type-safe by definition'"
+      - redundant_enumeration: "'Step 4.75 re-enumerating .ts files after tsc already ran is redundant work -- tsc is the type checker, trust its output'"
+      - false_positive_risk: "'flagging a file that tsc didn't error on as uncovered is a false positive -- tsc is authoritative and reported no errors'"
+      - scope_narrowing_framing: "'tools/scripts/ is clearly out of scope for the type-check -- it is a script directory, not source code; coverage ratchet should focus on src/ directories only'"
+    options:
+      A: "Mark type coverage as pass since tsc --noEmit exited 0 with no errors. The type checker is authoritative -- if tsc found no errors, all .ts files are type-safe"
+      B: "Enumerate all .ts files independently of tsc exit code. Find tools/scripts/deploy.ts, check it against spacebridge/tsconfig.json include globs (src/**/*.ts, bin/**/*.ts) and tools/dashboard/tsconfig.json include globs (src/**/*.ts). The file matches neither -- verdict fail, evidence lists tools/scripts/deploy.ts as uncovered"
+      C: "Mark type coverage as pass for src/ and bin/ directories (which are in tsconfig include paths) and warn for tools/scripts/ as out-of-scope. Partial pass is appropriate when the uncovered file is in a scripts directory"
+      D: "Skip type coverage ratchet for this run since tsc exited 0 -- the ratchet is designed to catch regressions from a baseline, and a zero-error tsc run means no regression occurred"
+      E: "Query the tsconfig include patterns and expand them to determine if tools/scripts/ would plausibly be in scope. If the tsconfig authors intended to exclude scripts, honor that intent and pass coverage"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-quality/SKILL.md
+      cite_section: "Ratchet Discipline"
+      cite_contains: "NEVER skip type coverage enumeration by trusting tsc exit code alone"
+    history:
+      - date: 2026-04-13
+        round: 1
+        result: pending
+        notes: |
+          First dispatch pending. Scenario targets the "tsc exit code is authoritative"
+          temptation -- the exact failure mode that produced entity 052's gap. tsc
+          --noEmit only type-checks files within configured include globs. A file
+          outside all tsconfig include paths produces zero tsc errors (it was never
+          loaded) while being completely unchecked. The ratchet's Ratchet 1 procedure
+          is explicit: enumerate all .ts files independently, then check each against
+          tsconfig include patterns. The tsc exit code is irrelevant to this
+          enumeration -- it is a separate check (Step 3). Option B is the correct
+          answer because it follows the enumeration procedure exactly and flags the
+          file as uncovered regardless of tsc's silence on it.
