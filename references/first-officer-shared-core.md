@@ -289,6 +289,32 @@ If the stage is gated:
 - keep the worker alive while waiting at the gate
 - if the stage is a feedback gate that recommends `REJECTED`, auto-bounce directly into the feedback rejection flow instead of waiting on manual review
 
+### Pre-Ship Confidence Gate
+
+When the UAT gate passes (captain approval or auto-resolve) and the next stage is terminal (shipped), FO runs the pre-ship confidence gate BEFORE advancing:
+
+1. Read `references/confidence-gate.md` for the scoring specification and parsing patterns.
+2. Read the entity file fresh. Parse all 4 Stage Reports using the LAST occurrence of each section (handles feedback-loop re-runs with multiple Stage Report entries):
+   - `## Stage Report: execute` — per-task DONE/BLOCKED status and file counts
+   - `## Stage Report: quality` — test, typecheck, ratchet verdicts
+   - `## Stage Report: review` — findings table with severity classification
+   - `## Stage Report: uat` — summary counts (total, pass, fail, skipped)
+   - `## PLAN` — task wave assignments and `<files_modified>` lists (for factor 5)
+3. Compute the 5-factor composite score per `references/confidence-gate.md` Section 3–4.
+4. Write `## Confidence Assessment` to the entity body (Section 8 format) with all factor scores, evidence, composite, and iteration number.
+5. Route based on composite:
+   - **Composite >= 90%**: Advance to shipped (terminal). Proceed to Merge and Cleanup.
+   - **Composite < 90%**: Enter auto-fix loop (Section 7 of confidence-gate.md):
+     - Identify lowest-scoring factor by contribution (score × weight).
+     - Generate a targeted fix task description.
+     - Prepend to `## Auto-Fix PLAN (iteration N)` in entity body.
+     - Set entity `status: execute`, dispatch ensign. Entity flows through execute → quality → review → UAT → confidence normally.
+     - On UAT re-dispatch: pass `skip_interactive_passed: true` (auto-pass previously-approved interactive items).
+     - Track iteration in `## Confidence Assessment` section (`Iteration: N of 3`).
+     - **Cap at 3 iterations.** On 3rd attempt still < 90%: escalate to captain with full per-factor breakdown (see Section 7e). Do NOT retry without explicit captain override.
+
+See `references/confidence-gate.md` for factor definitions, parsing specification, auto-fix loop details, and captain escalation message format.
+
 ## Feedback Rejection Flow
 
 When a feedback stage recommends REJECTED:
@@ -306,6 +332,13 @@ The first officer owns the `### Feedback Cycles` section and keeps it on the mai
 ## Merge and Cleanup
 
 When an entity reaches its terminal stage:
+
+0.5. Read `## Confidence Assessment` from the entity body (LAST occurrence if multiple exist).
+   - Display the per-factor breakdown table to the captain before any other merge action.
+   - If composite score < 90% (defense-in-depth: should not occur if gate is working):
+     **BLOCK merge.** Report to captain: "Confidence {score}% is below 90% threshold. This entity should not have reached the merge hook without passing the confidence gate. Options: route to auto-fix loop or captain override." Do NOT proceed to step 1 until composite >= 90% or captain explicitly overrides.
+   - If `## Confidence Assessment` is absent (pre-087 legacy entity): display warning "No confidence assessment found -- pre-087 entity, skipping confidence display." Proceed to step 1 without blocking.
+   - If composite >= 90%: proceed to step 1.
 
 1. Run registered merge hooks before any local merge, archival, or status advancement.
    The `pr-review-loop` mod (library: `mods/pr-review-loop.md`) is the canonical merge hook for PR-based workflows. It delegates PR creation to `kc-pr-flow:kc-pr-create` and review triage to `kc-pr-flow:kc-pr-review-resolve`. When this mod is active, its merge hook handles branch push and PR creation -- FO skips the default local merge per step 2.

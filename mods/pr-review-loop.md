@@ -53,6 +53,11 @@ Instructions for FO:
    - Branch name (from `worktree` field or git)
    - Stage Reports (to populate PR body with context)
    - Files changed (from most recent Stage Report's `## Files Modified` section)
+1.5. Read `## Confidence Assessment` from the entity body (LAST occurrence if multiple exist):
+   - If the section exists: display the per-factor confidence breakdown table to the captain (all 5 factors with weights, scores, evidence, and composite).
+   - If composite score < 90%: **BLOCK PR creation.** Report to captain: "Confidence {score}% is below 90% threshold. Factors below average contribution: {lowest-scoring factors}. Route to auto-fix loop?" Return without invoking `kc-pr-create` or the manual fallback. Wait for captain direction.
+   - If composite >= 90%: proceed to step 2 (PR creation).
+   - If the section is absent (legacy entity without confidence gate): display warning "No confidence assessment found -- pre-087 entity, skipping confidence display." Proceed to step 2 without blocking.
 2. Invoke `Skill("kc-pr-flow:kc-pr-create", args="--draft-only")` with the entity context above. The skill's own Step 4 confirmation gate serves as the captain approval guardrail -- do NOT add a redundant approval prompt on top of the skill's gate.
 3. If the `kc-pr-flow` plugin is not available: fall back to the `mods/pr-merge.md` library mod's manual flow --
    - Present a PR summary to the captain: title, branch -> main, files changed, commit count

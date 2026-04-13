@@ -132,6 +132,11 @@ stages:
       # Infra fails auto-route to execute; assertion fails routed through captain review.
       #
       # NAMESPACE NOTE: Migration to `spacebridge:build-uat` happens when spacebridge plugin skeleton is created (entity 050).
+      #
+      # CONFIDENCE GATE: After UAT gate passes, FO runs a 5-factor pre-ship
+      # confidence assessment (references/confidence-gate.md). Composite >= 90%
+      # advances to shipped. < 90% triggers auto-fix loop (max 3 iterations).
+      # Factor weights configurable in ops.config.json confidence_weights key.
     - name: shipped
       terminal: true
       worktree: false
@@ -139,6 +144,9 @@ stages:
       # gh pr create on merge hook and PR state polling on idle hook.
       # If mod not installed, captain manually creates PR from the completed
       # feature branch.
+      #
+      # Confidence gate: FO displays per-factor confidence breakdown to captain
+      # at merge hook time (before PR creation). Confidence < 90% blocks PR.
 ---
 
 # Idea to PR -- Generalized Development Pipeline
@@ -406,6 +414,8 @@ Terminal stage. Mod-driven: `mods/pr-review-loop.md` (Phase E+1) handles PR life
   - OPEN + pending → no action
 - **Startup hook:** Same PR-state checks as idle (defense in depth on session start)
 - **Fallback** (mod not installed): Captain manually creates PR from the completed feature branch
+
+**Pre-ship confidence gate.** Before reaching shipped, FO runs a 5-factor confidence assessment reading Stage Reports from execute, quality, review, and UAT. See `references/confidence-gate.md` for scoring specification. If composite < 90%, auto-fix loop dispatches targeted fixes (max 3 iterations). At merge hook time, FO displays the per-factor breakdown to captain before PR creation; confidence < 90% blocks PR creation.
 
 The detailed shipped design (PR body template, PR agent review dispatch, human-review gate, merge strategy, post-merge cleanup) is deferred to Phase E+1. This README documents the mod contract; the mod itself ships separately.
 
