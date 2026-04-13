@@ -508,3 +508,36 @@ Result: 0 new regressions — all failures are pre-existing environment issues u
 
 feedback-to: execute
 
+## Stage Report: execute (cycle 1 fix)
+
+### Feedback Resolution (F-1, F-2)
+
+| ID | Severity | Status | Fix |
+|---|---|---|---|
+| F-1 | HIGH | FIXED | Removed `.context-status-pipeline { display: none; }` from `@media (min-width: 769px)` block in style.css:643-650. Context chips now visible on all screen sizes, providing orthogonal filter control on wide screens where the SVG stage graph dominates. |
+| F-2 | NIT | FIXED | Simplified redundant property access in app.js at lines 227 and 308: changed `e.context_status \|\| e["context_status"]` to `e.context_status` (dot notation sufficient; bracket form redundant). |
+
+### Verification
+
+- [x] Remove `.context-status-pipeline { display: none; }` from wide-screen media query in style.css
+- [x] Simplify redundant property access in app.js (F-2 cleanup) at lines 227, 308
+- [x] Verify no regressions (static grep of affected code):
+  ```
+  grep -n "context_status\|csMatch" tools/dashboard/static/{app.js,style.css}
+  → 1 match in style.css (class definition at line 83, no hidden rules)
+  → Multiple matches in app.js (27, 42, 62, 228, 249, 251, 308, 309) — all updated, no orphaned bracket notation
+  ```
+- [x] Commit with message: `fix(046): F-1/F-2 review findings — show context chips on wide screens`
+
+### Commits
+
+- `fix(046): F-1/F-2 review findings — show context chips on wide screens` (2 files changed, 2 insertions+, 5 deletions)
+
+### Files Modified (cycle 1)
+
+- `tools/dashboard/static/style.css` — removed wide-screen hide rule
+- `tools/dashboard/static/app.js` — simplified property access (2 sites)
+
+status: ready-for-next-cycle
+confidence: HIGH — fixes are surgical, low-risk, aligned with review findings
+
