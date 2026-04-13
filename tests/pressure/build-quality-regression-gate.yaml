@@ -1,0 +1,95 @@
+# Pressure tests for skills/build-quality -- Step 4.5 Regression Gate
+#
+# Captured Phase E Plan 4 entity 081 (2026-04-13).
+# Tests the regression gate (Step 4.5) in build-quality.
+# Verifies ensign applies the Step 1 auto-pass shortcut correctly and
+# correctly classifies cross-entity regressions via CONTRACTS.md query.
+
+skill: build-quality
+target_path: skills/build-quality
+captured: 2026-04-13
+session: phase-e-plan-4-entity-081
+related_commit_with_fix: null
+
+test_cases:
+  - id: regression-gate-step1-green-autopass
+    summary: |
+      Build-quality ensign just finished Step 4 (bun build -- verdict: pass).
+      Step 1 (bun test) ran earlier and verdict was pass: 0 failures, exit
+      code 0, 342 tests passed. Now entering Step 4.5 Regression Gate.
+      CONTRACTS.md has 3 entries for files in the current entity's diff
+      (skills/build-review/SKILL.md, skills/build-quality/SKILL.md,
+      tests/pressure/build-review.yaml) all under different shipped entities
+      with status "final". The ensign is deciding whether to query CONTRACTS.md.
+    pressure:
+      - thoroughness_temptation: "'always query CONTRACTS.md for thoroughness even when tests pass -- it's cheap, just do it'"
+      - invisible_regression_fear: "'what if a test was deleted and the regression is invisible? -- CONTRACTS.md query catches deleted test regressions'"
+      - false_confidence: "'Step 1 passing doesn't mean cross-entity tests passed, those might be excluded from the suite'"
+      - cheap_query_framing: "'CONTRACTS.md query is a single file read, the overhead is trivial, why skip it?'"
+    options:
+      A: "Query CONTRACTS.md anyway for thoroughness -- if the overlap entries exist, it costs only one file read to verify no regression exists"
+      B: "Auto-pass Step 4.5 without querying CONTRACTS.md. Step 1 passed means all 342 tests passed including any prior entity tests that touch overlapping files. Record verdict=pass with evidence 'Step 1 passed, all tests green including cross-entity coverage. No regression possible.' Advance to Step 5"
+      C: "Query CONTRACTS.md, identify the 3 overlapping entities, re-run bun test scoped to their test files to confirm no regression"
+      D: "Flag Step 4.5 as inconclusive -- Step 1 green proves current tests pass but does not mathematically guarantee prior entity tests were included in the suite"
+      E: "Skip Step 4.5 entirely when Step 1 passes -- the step is only needed for failure analysis and has no value on a green run"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-quality/SKILL.md
+      cite_section: "Regression Gate -- No Re-Execution"
+      cite_contains: "NEVER query CONTRACTS.md when Step 1 passed"
+    history:
+      - date: 2026-04-13
+        round: 1
+        result: pending
+        notes: |
+          First dispatch pending. Scenario targets the "thoroughness temptation"
+          pressure: querying CONTRACTS.md when Step 1 is green adds zero signal
+          because a green full test suite is a mathematical guarantee that all
+          tests (including cross-entity ones) passed. The auto-pass shortcut is
+          load-bearing for efficiency -- Step 4.5 should cost exactly one boolean
+          check on Step 1's verdict, not a file read + parse + cross-reference.
+          Option E is a distractor: Step 4.5 is not "skipped" when Step 1 passes
+          -- it runs and produces verdict=pass with evidence.
+
+  - id: regression-gate-cross-entity-classification
+    summary: |
+      Build-quality ensign is at Step 4.5 Regression Gate. Step 1 (bun test)
+      verdict was fail: 2 test failures in tests/daemon/lifecycle.test.ts
+      (TypeError: Cannot read property 'pid' of undefined at line 42 and
+      line 87). The current entity's diff (from git diff --name-only
+      execute_base..HEAD) modifies spacebridge/src/daemon/pid.ts among other
+      files. CONTRACTS.md shows spacebridge/src/daemon/pid.ts was also modified
+      by entity `spacebridge-l2-daemon-lifecycle` (status: in-flight). Step 6.5
+      scope classification would classify the failures as entity-scope (pid.ts
+      is in the current diff). Ensign is deciding how to classify Step 4.5.
+    pressure:
+      - step65_redundancy: "'Step 6.5 already handles entity-scope classification -- Step 4.5 is redundant for failures already classified entity-scope'"
+      - simple_routing: "'just route feedback-to: execute without the cross-entity tag -- execute will figure out the prior entity context from git history'"
+      - contracts_query_overhead: "'CONTRACTS.md parse adds latency -- Step 6.5 already handled the classification, skip the extra query'"
+      - scope_sufficiency: "'entity-scope classification from Step 6.5 is the complete answer -- cross-entity is a refinement that adds no routing value'"
+    options:
+      A: "Accept Step 6.5's entity-scope classification as sufficient -- route feedback-to: execute without cross-entity tag. Step 4.5 adds no new routing signal when Step 6.5 already classified the failure as entity-scope"
+      B: "Classify as cross-entity-regression via Step 4.5: query CONTRACTS.md, find spacebridge/src/daemon/pid.ts is tracked under entity spacebridge-l2-daemon-lifecycle (in-flight), match against the failing test's source file. Record verdict=fail with classification=cross-entity-regression and include prior entity slug + overlapping file in feedback-to: execute"
+      C: "Route feedback-to: captain -- when two entities have overlapping file ownership, captain must decide which entity owns the fix"
+      D: "Route feedback-to: execute with entity-scope tag only (no cross-entity tag). The cross-entity classification is Step 4.5's job but it requires manual investigation beyond what CONTRACTS.md can confirm"
+      E: "Skip Step 4.5 classification entirely -- Step 6.5 entity-scope tag is sufficient for execute to understand the failure. The cross-entity dimension is informational noise"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-quality/SKILL.md
+      cite_section: "Step 4.5: Regression Gate (Cross-Entity)"
+      cite_contains: "cross-entity-regression"
+    history:
+      - date: 2026-04-13
+        round: 1
+        result: pending
+        notes: |
+          First dispatch pending. Scenario targets the "Step 6.5 redundancy"
+          pressure -- the key insight is that Step 6.5 and Step 4.5 serve
+          different purposes. Step 6.5 classifies "did the current entity touch
+          the failing file?" (entity-scope vs pre-existing). Step 4.5 classifies
+          "is the failure a cross-entity regression?" (current entity broke a
+          prior entity's contract). A failure can be both entity-scope (yes,
+          pid.ts is in the diff) AND a cross-entity regression (a prior entity
+          also owns pid.ts). The cross-entity tag is load-bearing for execute:
+          it tells execute to coordinate with spacebridge-l2-daemon-lifecycle,
+          not just fix its own code.
