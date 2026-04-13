@@ -143,6 +143,8 @@ Written as the LAST new section at the end of Step 6 (Commit). Appended AFTER ex
   e.g., "O-1 Filter UI placement -- Second chip row per workflow card (recommended)"
 - [x] Questions answered: {n} / {total}
   e.g., "Q-1 persisted via client-side filterState; Q-2 always-visible spec interpretation"
+- [x] Open exploration: {n} gray areas surfaced ({n} from templates, {n} from CONTRACTS, {n} from directive, {n} via freeform)
+  e.g., "3 gray areas surfaced (1 from templates, 1 from CONTRACTS, 0 from directive, 1 via freeform)"
 - [x] Canonical refs added: {n}
   e.g., "entity 009 app.js:244-246; ADR-001 single-server architecture"
 - [x] Context status: ready
@@ -150,7 +152,7 @@ Written as the LAST new section at the end of Step 6 (Commit). Appended AFTER ex
 - [x] Handoff mode: {loose|tight}
   e.g., "loose means captain must say 'execute {slug}'; tight means auto_advance: true in frontmatter"
 - [x] Clarify duration: {n} questions asked, session complete
-  e.g., "4 AskUserQuestion calls (1 batch + 1 option + 2 Qs)"
+  e.g., "7 AskUserQuestion calls (1 batch + 1 option + 2 Qs + 3 exploration iterations)"
 ```
 
 Rules:
