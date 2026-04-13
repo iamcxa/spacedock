@@ -2,7 +2,7 @@
 id: 077
 title: "Cross-phase skepticism -- validation gates between pipeline stages"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: GSD distillation during 075 clarify session (2026-04-13); GSD verify-phase.md, execute-phase.md
 started:
 completed:
@@ -48,7 +48,7 @@ depends-on: [075]
 
 ## Brainstorming Spec
 
-**APPROACH**: Implement cross-phase skepticism as a series of validation gates inserted at specific points in four pipeline skills, each re-validating the prior phase's conclusions against current codebase state before proceeding. The five gates are: (1) Clarify Step 1.5 -- evidence freshness + internal consistency check on explore's assumptions before presenting to captain (re-read file:line citations, cross-reference A-1~A-N for contradictions, verify option table distinctness, run domain template coverage check), (2) Plan Step 0.5 -- re-read clarify-confirmed assumptions' cited evidence to verify it still holds; hard-block on contradictions, warn on staleness, (3) Execute Wave Pre-check -- compare plan's `files_modified` targets against current file hashes; warn if stale, offer re-plan or proceed-with-caution, (4) Quality Step 1.5 -- goal-backward verification reading `## Acceptance Criteria` and `## Directive` against actual code changes to verify goal achievement (not just test pass); detect stub/orphan code not wired into runtime, (5) Quality Step 2.5 -- regression gate using CONTRACTS.md to find prior entities that touched the same files, run their test suites, block quality gate on failure. Additionally, document researcher vs code-explorer disambiguation in SO agent and reference docs. Each gate uses fractional step numbering (proven in entity 076) and has a clear pass/fail contract.
+**APPROACH**: Implement cross-phase skepticism as a series of validation gates inserted at specific points in four pipeline skills, each re-validating the prior phase's conclusions against current codebase state before proceeding. The five gates are: (1) Clarify Step 1.5 -- evidence freshness + internal consistency check on explore's assumptions before presenting to captain (✓ confirmed by explore: skills/build-clarify/SKILL.md:91-108 -- Step 1 reads entity body then Step 2 presents assumptions with NO intervening validation; gap confirmed), (2) Plan Step 0.5 -- re-read clarify-confirmed assumptions' cited evidence to verify it still holds (✓ confirmed by explore: skills/build-plan/SKILL.md:70-80 -- Step 1 Topic Extraction has no re-validation of assumption evidence; gap confirmed), (3) Execute Wave Pre-check -- compare plan's `files_modified` targets against current file hashes (✓ confirmed by explore: skills/build-execute/SKILL.md:62-68 -- Step 1 builds wave graph with no staleness check against codebase; gap confirmed), (4) Goal-backward verification reading `## Acceptance Criteria` and `## Directive` against actual code changes (⚠ contradicted: skills/build-quality/SKILL.md:10 -- quality is explicitly "mechanical, no judgment"; goal-backward requires judgment -- see O-1), (5) Regression gate using CONTRACTS.md to find prior entities that touched the same files, run their test suites (✓ confirmed by explore: CONTRACTS.md tracks file-entity ownership; mechanical test execution fits quality's contract). Additionally, document researcher vs code-explorer disambiguation in SO agent and reference docs. Each gate uses fractional step numbering (proven in entity 076) and has a clear pass/fail contract.
 
 **ALTERNATIVE**: Instead of distributed gates in each skill, implement a centralized "skepticism engine" -- a new shared module that all skills call with their prior-phase artifacts, returning a validation report (`validatePriorPhase({stage, entity})` -> `{passed, issues[]}`). -- D-01 Rejected: centralization introduces a new abstraction that must understand every phase's artifact format (assumptions from clarify, tasks from plan, file hashes from execute, test results from quality). The distributed approach is simpler -- each skill validates its own upstream using patterns it already knows. Build-explore Step 3.7 (brainstorm claim verification) is the existence proof that per-skill validation gates work. A centralized engine would also create a single point of failure and need to evolve with every skill change.
 
@@ -78,6 +78,66 @@ depends-on: [075]
 - [ ] Given a regression gate failure, when quality reports, then the failure is classified as cross-entity regression and routed back to execute with prior entity context (how to verify: create scenario where prior entity test fails, verify routing to execute with regression classification)
 - [ ] Given SO agent or build-explore reference docs, when researcher vs code-explorer disambiguation docs exist, then each tool's purpose, dispatch trigger, and overlap zone are clearly documented (how to verify: grep for "code-explorer" and "researcher" in updated docs, confirm role distinction present)
 
+## Decomposition Recommendation
+
+⚠️ This entity touches 4 pipeline skills across 3 domains with 5 distinct sub-scopes. Each gate is independently deployable (per GUARDRAILS). Recommended split:
+
+1. `clarify-explore-revalidation` -- Clarify Step 1.5 (evidence freshness, internal consistency, option validity, coverage check) + researcher vs code-explorer documentation (Runnable/Invokable + Readable/Textual). ACs 1-6, 13.
+2. `plan-assumption-revalidation` -- Plan Step 0.5 (re-read clarify-confirmed assumption evidence against codebase) (Runnable/Invokable). ACs 7-8.
+3. `execute-staleness-detection` -- Execute Wave Pre-check (file hash comparison against plan-time state) (Runnable/Invokable). AC 9.
+4. `quality-goal-backward-regression` -- Goal-backward verification + regression gate (Runnable/Invokable + Organizational/Data-transforming). ACs 10-12. Note: O-1 (goal-backward placement) must be resolved before this child can be planned.
+
+Dependencies:
+- All 4 children are independently deployable (no hard dependencies between them)
+- Each validates its OWN upstream phase -- they do not chain through each other
+- 1 has the most ACs (7) and is the most complex; recommend starting there
+- 4 depends on O-1 resolution (goal-backward placement decision)
+- All inherit parent's depends-on: [075]
+
+## Assumptions
+
+A-1: Each gate inserts as a fractional step in its target skill using the pattern proven by entity 076 (Step 4.5 in build-clarify).
+Confidence: Confident (0.95)
+Evidence: Entity 076 A-1 confirmed fractional numbering; skills/build-clarify/SKILL.md:171-220, skills/build-plan/SKILL.md:70, skills/build-execute/SKILL.md:62, skills/build-quality/SKILL.md:46 -- all have clear step boundaries for insertion
+
+A-2: Evidence freshness check (clarify Step 1.5) re-reads file:line citations using content-match, similar to how explore Step 3.7 already verifies brainstorm claims against codebase evidence.
+Confidence: Likely (0.70)
+Evidence: skills/build-explore/SKILL.md Step 3.7 -- cross-references APPROACH claims against codebase evidence using Read/Grep. Same pattern applies to clarify re-validating explore's A-n citations
+
+A-3: Internal consistency check (clarify Step 1.5) uses LLM runtime analysis to detect contradictions between assumptions -- not a static algorithm. The LLM reads all A-n entries and flags semantic contradictions.
+Confidence: Likely (0.70)
+Evidence: skills/build-explore/SKILL.md Step 3.7 -- uses LLM judgment for claim verification (not a regex/hash). Cross-referencing assumptions for contradictions requires the same kind of semantic analysis
+
+A-4: Execute Wave Pre-check uses binary file content comparison -- any change since plan-time triggers a staleness warning (warn, not block).
+Confidence: Likely (0.65)
+Evidence: skills/build-execute/SKILL.md:62-68 -- Step 1 already has file-level awareness via wave graph and files_modified parsing. Git-level hash comparison (git diff --stat) is standard for change detection
+
+A-5: Entity 075's researcher dispatch architecture is respected -- clarify re-validation uses 075's dispatch pattern (SO orchestrates, hybrid annotation) for deep evidence re-validation, not a parallel mechanism.
+Confidence: Confident (0.90)
+Evidence: Entity 075 context_status: ready -- decisions authoritative. O-2 selected "SO heuristic scan", O-3 selected "agent teams by default", Q-1 selected "hybrid annotation". 077's clarify gate consumes these decisions, does not re-implement
+
+## Option Comparisons
+
+### O-1: Goal-backward verification placement
+
+The APPROACH placed goal-backward verification in quality (Step 1.5). But quality is explicitly "mechanical, no judgment" (build-quality/SKILL.md:10). Goal-backward requires reading Acceptance Criteria and JUDGING whether code changes satisfy them -- inherently interpretive.
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Expand build-review pre-scan | Review is already "judgment-bearing" (SKILL.md:10); pre-scan reads entity context; natural fit for AC verification | Review scope is diff-based, not entity-AC-based; mixing concerns | Medium | Recommended |
+| New "verify" stage after quality | Clean separation; preserves quality purity; dedicated goal-achievement check | Adds pipeline stage; profile/stage graph changes; FO routing | High | Viable |
+| Quality Step 1.5 (modify quality) | Single quality gate, compact pipeline | Breaks quality's explicit mechanical-only contract; introduces judgment into judgment-free skill | Medium | Not recommended |
+
+## Open Questions
+
+Q-1: How should the regression gate map entities to their test files?
+
+Domain: Organizational / Data-transforming
+
+Why it matters: CONTRACTS.md tracks which entities modified which source files, but NOT which test files cover those source files. The regression gate needs to know "entity 052 modified daemon.ts -- what tests cover daemon.ts?" to run targeted regression tests for prior entities.
+
+Suggested options: (a) Run full test suite (regression = any test failure after execute; simple but overbroad), (b) Use co-location convention (daemon.ts -> daemon.test.ts via glob; works for co-located tests but misses integration tests), (c) Add test file tracking to CONTRACTS.md (each entity's plan lists test files alongside source files; most precise but requires plan schema change)
+
 ## References
 
 - GSD `verify-phase.md:7-18`: "Task completion ≠ Goal achievement" principle
@@ -92,3 +152,19 @@ depends-on: [075]
 - `skills/build-execute/SKILL.md`: where execute-stage assumption check (Wave Pre-check) would be added
 - `skills/build-quality/SKILL.md`: where goal-backward verification (Step 1.5) and regression gate (Step 2.5) would be added
 - `docs/build-pipeline/_index/CONTRACTS.md`: cross-entity file ownership for regression gate scope
+- `skills/build-review/SKILL.md`: "judgment-bearing" stage -- candidate for goal-backward verification placement (O-1)
+
+## Stage Report: explore
+
+- [x] Files mapped: 12 across skill definitions, reference docs, index
+  build-clarify/SKILL.md, build-plan/SKILL.md, build-execute/SKILL.md, build-quality/SKILL.md, build-review/SKILL.md, build-explore/SKILL.md, clarify refs (3), explore refs (2), CONTRACTS.md
+- [x] Assumptions formed: 5 (Confident: 2, Likely: 3, Unclear: 0)
+  A-1 A-5 Confident (fractional numbering, 075 decisions); A-2 A-3 A-4 Likely (evidence patterns, LLM analysis, hash comparison)
+- [x] Options surfaced: 1
+  O-1 goal-backward verification placement (review pre-scan recommended vs new stage vs quality)
+- [x] Questions generated: 1
+  Q-1 regression gate entity-to-test-file mapping strategy
+- [x] α markers resolved: 0 / 0
+  no α markers in brainstorming spec
+- [x] Scale assessment: confirmed
+  12 files across 5 skill definitions + refs confirms Large estimate; decomposition recommended (4 children)
