@@ -440,6 +440,47 @@ Modify build-uat SKILL.md in four insertion points: (1) Step 0 adds e2e-pipeline
   </files_modified>
 </task>
 
+<task id="task-7" model="sonnet" wave="5" skills="superpowers:writing-skills" test_first="false">
+  <read_first>
+    - skills/build-uat/SKILL.md
+  </read_first>
+
+  <action>
+  Skill TDD verification (GREEN phase) for build-uat SKILL.md edits. The skill has already been modified (tasks 1-6). Verify agents comply with the new rules.
+
+  **Test 1 — Retrieval (inline evidence rules):**
+  Read the modified SKILL.md. Confirm the following rules are unambiguously findable:
+  1. `grep -n "inline" skills/build-uat/SKILL.md` -- must find Step 5 inline evidence format
+  2. `grep -n "e2e_recording_available" skills/build-uat/SKILL.md` -- must find both set (Step 1.5) and consume (Step 2b)
+  3. `grep -n "### Evidence:" skills/build-uat/SKILL.md` OR equivalent header pattern -- must exist in Step 7a Stage Report format
+
+  **Test 2 — Application (mock scenario):**
+  Simulate a UAT ensign reading the skill by answering these questions from SKILL.md content alone:
+  1. "A CLI item needs evidence. e2e-pipeline is unavailable. What format should evidence be in?" -- Expected: fenced code block with stdout/stderr transcript (text-only fallback)
+  2. "A browser item passed. What goes in the UAT Results evidence column?" -- Expected: inline markdown image (screenshot), not a file path reference
+  3. "How do I know if e2e-pipeline is available?" -- Expected: Step 1.5 ToolSearch probe
+
+  **Test 3 — Gap check:**
+  Verify these edge cases are covered in the SKILL.md:
+  1. What happens when a CLI .cast recording fails but text evidence succeeds? (graceful fallback)
+  2. What happens in skip-only mode (uat-resume)? (append only, don't rewrite)
+  3. Are API items covered by inline evidence format? (yes -- inline body)
+
+  If any test reveals a gap (answer not findable in SKILL.md), fix the gap inline and commit.
+  </action>
+
+  <acceptance_criteria>
+    - All 3 retrieval greps return matches
+    - All 3 application questions answerable from SKILL.md alone
+    - All 3 gap-check edge cases covered
+    - If any fix applied, `git diff --stat` shows only skills/build-uat/SKILL.md
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-uat/SKILL.md
+  </files_modified>
+</task>
+
 ---
 
 ## UAT Spec
