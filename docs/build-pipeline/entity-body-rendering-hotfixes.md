@@ -1,15 +1,15 @@
 ---
 id: 047
 title: Entity Body Rendering Hotfixes -- Stage Report Detail + Open Questions Format
-status: clarify
+status: plan
 context_status: ready
 source: /build
 created: 2026-04-10T14:45:00+08:00
-started:
+started: 2026-04-13T13:30:00Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-entity-body-rendering-hotfixes
 issue:
 pr:
 intent: feature
