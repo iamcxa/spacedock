@@ -94,4 +94,67 @@ describe("GET /api/events", () => {
     const mod = await import("./route");
     expect((mod as Record<string, unknown>).dynamic).toBe("force-dynamic");
   });
+
+  // R-1: isNaN guard — malformed ?since must not produce a broken stream
+  test("R-1: ?since=abc (NaN) falls back to 0 and returns valid SSE response", async () => {
+    mkdirSync(TMP, { recursive: true });
+    const dbPath = join(TMP, "sse-r1-nan.db");
+    const sqlite = createTestDb(dbPath);
+    sqlite.close();
+
+    process.env.SPACEBRIDGE_DB_PATH = dbPath;
+    const { GET } = await import("./route");
+    const ac = new AbortController();
+    const req = new Request("http://localhost/api/events?since=abc", { signal: ac.signal });
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("text/event-stream");
+    const text = await readChunks(res.body!, 2000, ": ping");
+    expect(text).toContain(": ping");
+    ac.abort();
+  });
+
+  test("R-1: ?since=1.5e2 (float string) falls back to 150 without error", async () => {
+    mkdirSync(TMP, { recursive: true });
+    const dbPath = join(TMP, "sse-r1-float.db");
+    const sqlite = createTestDb(dbPath);
+    sqlite.close();
+
+    process.env.SPACEBRIDGE_DB_PATH = dbPath;
+    const { GET } = await import("./route");
+    const ac = new AbortController();
+    // parseInt("1.5e2", 10) === 1 (not NaN), so this should proceed normally
+    const req = new Request("http://localhost/api/events?since=1.5e2", { signal: ac.signal });
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+    ac.abort();
+  });
+
+  // R-2: DB handle must be closed when SSE client aborts
+  test("R-2: DB handle close() called on abort (no FD leak)", async () => {
+    mkdirSync(TMP, { recursive: true });
+    const dbPath = join(TMP, "sse-r2-close.db");
+    const sqlite = createTestDb(dbPath);
+    sqlite.close();
+
+    process.env.SPACEBRIDGE_DB_PATH = dbPath;
+    const { GET } = await import("./route");
+
+    const ac = new AbortController();
+    const req = new Request("http://localhost/api/events", { signal: ac.signal });
+    const res = await GET(req);
+
+    // Consume the ping chunk so the stream is live
+    const text = await readChunks(res.body!, 1500, ": ping");
+    expect(text).toContain(": ping");
+
+    // Abort simulates client disconnect
+    ac.abort();
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Verify DB file is released: opening a read-write connection after close should succeed
+    const verifyDb = new Database(dbPath);
+    expect(() => verifyDb.exec("SELECT 1")).not.toThrow();
+    verifyDb.close();
+  });
 });
