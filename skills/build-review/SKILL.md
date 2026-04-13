@@ -175,7 +175,7 @@ Read the entity's `## Acceptance Criteria` and `## Directive` sections.
 grep -r "symbolName" --include="*.ts" --include="*.js" .
 ```
 
-A symbol that appears exactly once (the export definition itself) with zero import sites is an **orphan** -- it was written but never wired into any runtime path. Record as severity **CRITICAL**, root **CODE**, source `pre-scan:goal-backward`.
+A symbol that appears exactly once (the export definition itself) with zero import sites is an **orphan** -- it was written but never wired into any runtime path. Record as severity **CRITICAL**, root **CODE**, source `pre-scan:goal-backward`. Severity rationale: orphan = CRITICAL because zero runtime call sites means the feature is completely disconnected from the application; unmet AC = HIGH because the functionality exists but wiring is incomplete, a less severe gap.
 
 This is the inverse of Step 1b (stale references -- symbols removed, grep for remaining references). Step 1e does: symbols added, grep for existing references.
 

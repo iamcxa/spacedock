@@ -112,7 +112,7 @@ Then stop. Do not invent sections.
 
 ## Step 1.5: Explore Re-Validation
 
-**Skip condition:** If Step 1 detected the empty case (no explore output), skip Step 1.5 entirely -- there are no assumptions to re-validate. If Step 1 detected the resume case (all counts zero), also skip Step 1.5 -- all items were already resolved in a prior session.
+**Skip condition:** If Step 1 detected the empty case (no explore output), skip Step 1.5 entirely -- there are no assumptions to re-validate. If Step 1 detected the resume case (all counts zero), also skip Step 1.5 -- all items were already resolved in a prior session. Rationale: the resume case means the captain already reviewed and confirmed all items in a prior clarify session; re-validating evidence that the captain explicitly accepted would undermine session continuity. If evidence truly drifted between sessions, the captain will catch it during Steps 2-4 interactive review.
 
 After Step 1 loads the entity state and counts unresolved items, Step 1.5 runs five automated sub-checks to verify explore's output is still valid. Step 1.5 is internal -- it does NOT use AskUserQuestion. Its findings are written to the entity body so Step 2 presents pre-validated assumptions.
 
@@ -397,6 +397,8 @@ correctly.
 
    - [x] Decomposition: {accepted|modified|rejected|not-applicable}
      e.g., "not-applicable -- entity is Small scope, no children proposed"
+   - [x] Re-validation: {n} assumptions checked, {n} stale, {n} contradicted, {n} options deduped, {n} coverage gaps, {n} research re-validated
+     e.g., "5 assumptions checked, 1 stale (A-2 line shifted), 0 contradicted, 0 deduped, 1 coverage gap (A-6 added), 0 research re-validated"
    - [x] Assumptions confirmed: {n} / {total} ({n corrected})
      e.g., "A-1, A-2, A-4 confirmed via batch; A-3 corrected captain cited src/foo.ts"
    - [x] Options selected: {n} / {total}
