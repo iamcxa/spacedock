@@ -1,8 +1,8 @@
 ---
 id: 079
 title: "Plan-stage assumption re-validation -- verify clarify evidence before task generation"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: decomposition of entity 077 (cross-phase skepticism)
 started:
 completed:
@@ -60,22 +60,31 @@ parent: 077
 A-1: Evidence file/line not found (file deleted, renamed, or line number out of range) is treated as a contradiction -- blocker severity, halt task generation, write `feedback-to: captain` in Stage Report.
 Confidence: Likely (0.75)
 Evidence: build-plan SKILL.md:47 -- Input Contract already halts on missing sections with `feedback-to: captain`; same severity model for missing evidence files. build-explore SKILL.md:188 -- Step 3.7 flags contradictions when claims cannot be verified.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: Evidence citation format parsing handles both single-line (`file:42`) and range (`file:42-50`) references. Regex pattern `(\S+):(\d+)(?:-(\d+))?` extracts path and line(s). Assumptions without parseable `Evidence:` fields are skipped (no file reference to re-validate).
 Confidence: Confident (0.85)
 Evidence: entity 075 lines 151-171 -- Evidence fields use both `agents/researcher.md:1-21` (range) and `build-plan SKILL.md:82` (single line) across 5 confirmed assumptions
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-3: Semantic comparison between assumption claim and current file content uses LLM runtime judgment (Read the cited region, evaluate whether it still supports the claim), not mechanical hash comparison. This is the same method explore Step 3.7 uses for brainstorm claim verification.
 Confidence: Likely (0.70)
 Evidence: build-explore SKILL.md:181-196 -- Step 3.7 cross-references APPROACH claims against codebase evidence using LLM judgment. Parent 077 A-4 specifies "binary file content comparison" for execute-stage (entity 080), but plan-stage requires semantic comparison because assumptions are natural language claims about code behavior, not file identity checks.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-4: Step 0.5 treats all file changes equally regardless of source -- whether another entity shipped changes, FO daemon committed, or a manual edit occurred. The three-outcome model (hold/stale/contradicted) does not distinguish change source; the captain decides via `feedback-to: captain` whether to proceed or re-clarify.
 Confidence: Confident (0.80)
 Evidence: parent 077 GUARDRAILS line 57-58 -- "Staleness = warn + proceed-with-caution option. Contradiction = hard block." No source-discrimination requirement. Pipeline entities are independently deployable per 077 GUARDRAILS line 61.
+→ Confirmed: captain, 2026-04-13 (batch)
 
-A-5: Output follows entity 075's hybrid annotation pattern -- inline annotations on each re-validated assumption (`(✓ evidence-fresh)` for hold, `(⚠ stale-evidence: {detail})` for stale), and detailed contradiction block in `## Stage Report: plan` with `feedback-to: captain` for blockers. No new entity body section needed.
-Confidence: Likely (0.75)
-Evidence: entity 075 Q-1 answer -- "Hybrid -- inline annotation for confirmed findings, full Research Findings section for contradictions." build-plan SKILL.md:285-305 -- Stage Report escalation format with `feedback-to: captain` is well-defined.
+A-5: Step 0.5 output follows "silent hold, inline stale, Stage Report contradicted" pattern -- Hold (evidence valid): no annotation, silence = OK, plan proceeds. Stale (file changed, claim plausible): `(⚠ stale-evidence: {detail})` inline on the Evidence line, visible to downstream plan Steps 1-8. Contradicted (file refutes claim): detailed contradiction block in `## Stage Report: plan` with `feedback-to: captain`, halts task generation. No `(✓ evidence-fresh)` annotation for hold -- absence of warning IS confirmation.
+Confidence: Confident (0.85)
+Evidence: entity 075 Q-1 answer -- hybrid annotation pattern (inline for confirmed, section for contradictions). build-explore SKILL.md:186-188 -- `(⚠ contradicted: ...)` inline annotation precedent. build-plan SKILL.md:285-305 -- Stage Report `feedback-to: captain` escalation format. Re-exploration confirmed: `(✓ evidence-fresh)` adds noise with no information value; silence-as-OK is the pipeline convention (absence of `→ Confirmed:` means "not yet confirmed", not "failed").
+→ Confirmed: captain, 2026-04-13 (interactive -- re-explored, captain selected recommended option)
+
+## Canonical References
+
+(none cited -- captain confirmed assumptions without external file references)
 
 ## Stage Report: explore
 
@@ -91,6 +100,25 @@ Evidence: entity 075 Q-1 answer -- "Hybrid -- inline annotation for confirmed fi
   Brainstorming spec contained no α markers (decomposition-born entity with well-defined scope from parent 077)
 - [x] Scale assessment: confirmed Small
   3 files mapped, single skill insertion point, no cross-layer concerns
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  entity is Small scope, no children proposed
+- [x] Assumptions confirmed: 5 / 5 (0 corrected)
+  A-1 through A-4 confirmed via batch; A-5 re-explored (output format), captain selected recommended option (silent hold, inline stale, Stage Report contradicted)
+- [x] Options selected: 0 / 0
+  no option comparisons surfaced by explore
+- [x] Questions answered: 0 / 0
+  no open questions surfaced by explore
+- [x] Canonical refs added: 0
+  captain confirmed assumptions without citing external file references
+- [x] Context status: ready
+  gate passed: all 5 assumptions confirmed, 0 options, 0 questions, ACs valid (3 criteria, no α markers)
+- [x] Handoff mode: loose
+  captain must say "execute 079" or hand off to First Officer; auto_advance not set
+- [x] Clarify duration: 2 questions asked, session complete
+  1 batch assumption presentation (plain text) + 1 AskUserQuestion (A-5 output format re-exploration)
 
 ## References
 
