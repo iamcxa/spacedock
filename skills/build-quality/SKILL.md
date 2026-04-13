@@ -500,3 +500,11 @@ Write the report with the Write or Edit tool into the entity body at the `## Sta
 - **Never invoke other skills** from within quality. You are a leaf stage skill.
 - **Never edit code** -- your Write/Edit scope is strictly the entity body's `## Stage Report: quality` section.
 - **Use `--` (double dash)** everywhere. Never `—` (em dash). Matches the rest of the build skill family.
+
+### Ratchet Discipline
+
+- **NEVER update baselines on a failing quality run.** Baselines are written to ops.config.json ONLY when the overall verdict is `pass`. Writing baselines on partial-pass or fail ratchets the floor down, defeating the invariant. Step 7 baseline update is gated on overall verdict.
+- **NEVER skip type coverage enumeration by trusting tsc exit code alone.** `tsc --noEmit` only checks files within tsconfig `include`. The type coverage ratchet must independently enumerate all source files and verify each is covered by at least one tsconfig. This is the entity 052 lesson: tsc can report 0 errors while files go unchecked.
+- **NEVER ratchet on first run.** First run with no ops.config.json or no `ratchet_baselines` key initializes baselines and skips comparison. Ratcheting on first run would fail every bootstrapping entity.
+- **NEVER interpret ratchet failures.** Like all quality checks, ratchet results are verbatim counts. "The as-any count increased by 2" is the full evidence. Do not suggest which casts to remove or why they were added.
+- **NEVER hardwire runner commands in ratchet count extraction.** Use the runner resolved in Step 0.5. If Step 0.5 detected vitest, the test count extraction runs against vitest output, not bun test output.
