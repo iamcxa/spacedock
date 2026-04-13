@@ -431,3 +431,37 @@ issues: []
 
 **Verdict: PASS**
 No CRITICAL or HIGH findings. 2 NITs noted (redundant wording, archive discoverability) — neither blocks shipping. The diff is small (4 lines, 2 paragraphs), correctly placed, content-accurate, and plan-adherent. UAT checklist items (browser + CLI + interactive captain confirmation) remain as the next gate.
+
+## Stage Report: uat
+
+- [x] CLI-1: `grep -c 'Canonical detail line exemplars' skills/build-explore/references/output-format.md` → DONE
+  Result: 1 (expected: 1). PASS.
+- [x] CLI-2: `grep -c 'Canonical detail line exemplars' skills/build-clarify/references/output-format.md` → DONE
+  Result: 1 (expected: 1). PASS.
+- [x] CLI-3: `grep -c '\- \[x\]' skills/build-explore/SKILL.md` → DONE
+  Result: 8 (expected: >= 7). PASS. Step 7 example contains 8 checklist items with detail lines.
+- [x] CLI-4: `grep -c '\[x\]' skills/build-clarify/SKILL.md` → DONE
+  Result: 10 (expected: >= 10). PASS. Step 6 example contains exactly 10 checklist items with detail lines.
+- [x] Browser-1: Dashboard Stage Report detail rendering — structural verification → DONE
+  Parser: `tools/dashboard/src/frontmatter-io.ts:156-158` — `let detail = ""; if (j+1 < lines.length && lines[j+1].startsWith("  ")) { detail = lines[j+1].trim() }` — confirmed present. Renderer: `tools/dashboard/static/detail.js:119-124` — `if (item.detail) { var detail = document.createElement('span'); detail.className = 'item-detail'; detail.textContent = item.detail; li.appendChild(detail); }` — confirmed present inside `renderStageReports()`. Both parser and renderer structurally support the detail field. Live browser verification deferred to captain interactive items.
+- [x] Browser-2: Open Questions spacing — blank-line rules verified → DONE
+  `skills/build-explore/references/output-format.md:95` — "MUST be separated from the next by exactly one blank line so markdown renders them as distinct paragraphs." confirmed present. `skills/build-clarify/references/output-format.md:80` — "with exactly one blank line separating them (markdown paragraph break)" confirmed present. `tools/dashboard/static/detail.js:62-64` — `renderBody()` routes entity body through markdown before Stage Report split, confirming blank-line separation is the correct fix for the markdown soft-newline collapsing issue.
+- [x] Browser-3: Regression spot-check — diff review → DONE
+  `git diff main --name-only` shows only 2 files modified by entity 047's task-1 and task-2: `skills/build-explore/references/output-format.md` (+2 lines) and `skills/build-clarify/references/output-format.md` (+2 lines). Both changes are additive-only (no deletions). No parser code, no renderer code, no entity files touched. Zero regression surface. The dashboard parser's "detail is optional, blank string if missing" behavior (existing `let detail = ""` default at line 156) remains untouched — production entities without detail lines continue to render correctly.
+- [ ] Interactive-1: Captain confirms detail lines render correctly in dashboard Stage Report cards — PENDING CAPTAIN SIGN-OFF
+- [ ] Interactive-2: Captain confirms Open Questions render as distinct paragraphs, not wall of text — PENDING CAPTAIN SIGN-OFF
+
+### Classification Summary
+
+| Status | Count | Items |
+|--------|-------|-------|
+| DONE | 6 | CLI-1, CLI-2, CLI-3, CLI-4, Browser-1, Browser-2, Browser-3 (regression) |
+| PENDING | 2 | Interactive-1 (detail rendering), Interactive-2 (OQ spacing) |
+| SKIPPED | 0 | — |
+| FAILED | 0 | — |
+
+### Gate Decision Recommendation
+
+**RECOMMEND: ADVANCE TO CAPTAIN GATE**
+
+All automated and structural verifications pass (6/6). The 2 pending interactive items require captain visual confirmation in the dashboard UI — they cannot be resolved by a subagent without browser access. Evidence basis: parser contract verified at `frontmatter-io.ts:156-158`, renderer confirmed at `detail.js:119-124`, blank-line rules confirmed in both output-format.md files, diff is additive-only with zero regression surface. The implementation is structurally sound. Gate decision deferred to captain after UI sign-off on Interactive-1 and Interactive-2.
