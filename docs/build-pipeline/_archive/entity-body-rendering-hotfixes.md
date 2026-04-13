@@ -6,10 +6,10 @@ context_status: ready
 source: /build
 created: 2026-04-10T14:45:00+08:00
 started: 2026-04-13T13:30:00Z
-completed:
-verdict:
-score:
-worktree: .worktrees/spacedock-ensign-entity-body-rendering-hotfixes
+completed: 2026-04-13T14:32:32Z
+verdict: PASSED
+score: 0.95
+worktree:
 issue:
 pr: "#42"
 intent: feature

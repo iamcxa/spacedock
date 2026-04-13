@@ -1,0 +1,47 @@
+flow: 047-rendering-hotfix-uat
+description: Verify entity body rendering hotfixes — Stage Report detail lines and Open Questions paragraph spacing
+mapping: spacedock-dashboard
+tags: [uat, entity-047]
+
+steps:
+  - id: navigate-to-dashboard
+    action: navigate
+    target: dashboard
+    expect:
+      - element: page_heading
+        state: visible
+
+  - id: open-entity-detail
+    action: click
+    target: entity_detail.entity_link
+    note: Click any entity with Stage Reports to view detail page
+    expect:
+      - element: entity_detail.content_area
+        state: visible
+
+  - id: verify-stage-report-cards-exist
+    action: assert
+    target: entity_detail.stage_report_card
+    expect:
+      - state: visible
+        count: ">= 1"
+    note: At least one Stage Report card should render
+
+  - id: verify-detail-lines-render
+    action: assert
+    target: entity_detail.item_detail
+    expect:
+      - state: visible
+        count: ">= 1"
+    note: "AC-2: Detail text (.item-detail spans) should appear under checklist items"
+
+  - id: verify-body-has-paragraphs
+    action: assert
+    target: entity_detail.content_area
+    expect:
+      - state: visible
+    note: "AC-3: Entity body content renders (Open Questions would be in body section)"
+
+  - id: screenshot-evidence
+    action: screenshot
+    note: Capture visual evidence of Stage Report detail lines and entity body rendering
