@@ -555,3 +555,28 @@ confidence: HIGH — fixes are surgical, low-risk, aligned with review findings
 ### Feedback Cycles
 
 - **Cycle 1** (2026-04-13): F-1 HIGH (wide-screen filter gap) + F-2 NIT (redundant bracket notation) → execute fix-forward → inline re-review PASS.
+
+## Stage Report: uat
+
+**Verified**: hybrid (E2E verifier static inspection + live dashboard smoke + captain approval)
+
+- [x] Browser-1 through Browser-9: PASS — E2E verifier confirmed 2D filterState, chip rendering, purple CSS, wide-screen fix, AND/OR filter logic, Q-2 legacy-visible semantics, zero-filter default
+- [x] Live smoke: dashboard at http://127.0.0.1:8420/ responds without breakage
+- [x] Interactive-1: APPROVED by captain (Path A — trust static verification, spot-check post-merge)
+
+**Summary**: 10 done, 0 skipped, 0 failed. Gate PASSED.
+
+## Confidence Assessment
+
+| Factor | Weight | Score | Evidence |
+|--------|--------|-------|----------|
+| test_coverage | 25% | 80% | quality PASS (494 tests, 0 fail), ratchet absent (first-run rule: pass=80%) |
+| type_coverage | 20% | 100% | typecheck N/A for client-side JS/CSS, ratchet absent (first-run) |
+| review_severity | 20% | 100% | 0 CRITICAL, 0 HIGH (F-1 HIGH resolved cycle 1, F-2 NIT resolved) |
+| ac_completeness | 20% | 100% | 10/10 UAT items pass (9 browser + 1 interactive captain approved) |
+| integration_breadth | 15% | 100% | 4/4 tasks DONE, 0 BLOCKED, 2/2 planned files modified |
+
+**Composite**: 95.0% (threshold: 90%)
+**Verdict**: PASS -- advancing to shipped
+**Iteration**: 1 of 3
+**Feedback cycles used**: 1 of 3 (F-1 HIGH + F-2 NIT resolved)
