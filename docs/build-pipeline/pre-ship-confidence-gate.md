@@ -51,6 +51,8 @@ context_status: ready
 - [ ] Given the confidence gate auto-fix has iterated 3 times without reaching 90%, when the 3rd attempt completes, then the gate escalates to captain with a per-factor breakdown instead of retrying (how to verify: create scenario with persistent gap, observe escalation after 3 attempts)
 - [ ] Given a completed UAT with composite confidence >= 90%, when the confidence gate fires, then it advances to shipped without blocking (how to verify: ship entity with full test + type coverage, observe direct advance)
 - [ ] Given confidence gate factor weights in ops.config.json, when the weights are modified, then the gate uses the updated weights on the next run (how to verify: change weights in ops.config.json, re-run confidence gate, observe different composite score)
+- [ ] Given FO runs the merge hook (PR creation), when confidence has been computed, then FO displays the per-factor breakdown and composite score to the captain BEFORE creating the PR (how to verify: observe FO output during merge hook shows confidence table with 5 factors, weights, scores, and composite)
+- [ ] Given confidence < 90% at merge hook time, when FO displays the breakdown, then FO blocks PR creation and routes to auto-fix loop instead of creating PR (how to verify: entity with low score does not get PR created until confidence passes)
 
 ## Assumptions
 
