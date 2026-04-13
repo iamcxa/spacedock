@@ -61,6 +61,13 @@ SO reads entity spec
     Agent("general-purpose", prompt="Devil's advocate on {spec}...")
   -> SO synthesizes findings, discusses with captain
   -> SO writes Brainstorming Spec to entity body
+
+After brainstorm completes, SO runs research dispatch (Step 3.5):
+  SO scans APPROACH for unvalidated external tech claims
+  SO dispatches researchers via team (SendMessage) or individual Agent
+    -> researchers validate/contradict claims
+    -> SO annotates APPROACH with research results
+    -> SO commits annotations before proceeding to explore
 ```
 
 **Small/Medium entities:** SO can skip the brainstorm team and do inline assessment. The team dispatch is an upgrade path for complex specs.
@@ -80,6 +87,13 @@ Large (>15 files):
   -> SO reads explorer results
   -> SO does Steps 3-7: classification, question generation
   -> SO writes Assumptions / Option Comparisons / Open Questions to entity body
+
+After Step 5 classification, SO runs research dispatch (Step 5.5):
+  SO scans Likely/Unclear assumptions for external tech dependencies
+  SO dispatches researchers via team (SendMessage) or individual Agent
+    -> researchers validate/contradict assumptions
+    -> SO upgrades/downgrades confidence with research annotations
+    -> SO commits research annotations
   -> context_status: pending -> awaiting-clarify
 ```
 
@@ -104,6 +118,8 @@ SO runs AskUserQuestion loop with captain
 ```
 FO reads entity body (context_status: ready, full clarify output)
 FO extracts N research topics from entity body (cap 5)
+FO dedup check: skip topics already covered by (✓ research: ...) annotations
+Effective dispatch count after dedup: typically 1-3 (implementation-specific only)
 
 FO creates team + tasks:
   Task 1..N: research topics (unblocked, self-claimable)
@@ -240,6 +256,10 @@ FO does NOT advance entity state during SO-owned stages. Suggestions only.
 | `build-execute` Step 4 | "You dispatch task-executors" | "FO dispatched task-executors per wave. Read commits + write Stage Report." |
 | `build-review` Step 2 | "You dispatch 10 review agents" | "FO dispatched themed reviewers who debated. Read findings + classify." |
 | `build-explore` Step 2 | "You dispatch code-explorer" | When SO-owned: "SO dispatches code-explorer, you read results." When FO-owned (fallback): "FO dispatches, you read results." |
+
+| `build-brainstorm` | "No agent dispatch" | "Unchanged -- brainstorm is leaf skill (no Agent tool). SO dispatches researchers AFTER brainstorm returns (Step 3.5). Brainstorm SKILL.md is not modified." |
+| `build-explore` Step 5.5 | "No research dispatch" | "SO dispatches researchers for Likely/Unclear external tech assumptions after Step 5 classification. Ensign mode: FO pre-dispatches before invoking ensign; ensign reads pre-populated results." |
+| `build-plan` Step 1 | "Dispatches all extracted topics as researchers" | "Dedup-aware: scans entity body for (✓ research: ...) annotations; skips topics already researched by brainstorm/explore. Effective dispatch narrows to implementation-specific topics (1-3 typically)." |
 
 ### What stays the same
 
