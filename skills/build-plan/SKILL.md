@@ -485,7 +485,7 @@ The `chore(index):` commits from step 9a are already in place from the `workflow
 
 ## Plan-Checker Dimensions (Reference)
 
-The full plan-checker prompt template, including all 7 dimensions and YAML output format, lives in `skills/build-plan/references/plan-checker-prompt.md`. Step 6 reads that file and dispatches the rendered template as the prompt of an `Agent(subagent_type="general-purpose", model="sonnet", ...)` call. Keep the template in its own reference file so SKILL.md stays readable.
+The full plan-checker prompt template, including all 8 dimensions and YAML output format, lives in `skills/build-plan/references/plan-checker-prompt.md`. Step 6 reads that file and dispatches the rendered template as the prompt of an `Agent(subagent_type="general-purpose", model="sonnet", ...)` call. Keep the template in its own reference file so SKILL.md stays readable.
 
 | # | Dimension | Check |
 |---|-----------|-------|
