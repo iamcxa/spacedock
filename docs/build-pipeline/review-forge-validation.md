@@ -564,3 +564,56 @@ workflow-index append: 3 append calls covering 3 tasks and 3 files, all successf
   Self-review PASS, confidence 95.2%, auto-advance eligible
 - [x] workflow-index append called unconditionally at plan approval
   3 append calls: task-1 (skills/build-review/SKILL.md), task-2 (skills/build-uat/SKILL.md), task-3 (docs/build-pipeline/_archive/review-skill-creation-discipline.md) -- committed as chore(index)
+
+## Stage Report: execute
+
+**Ran at**: 2026-04-13T07:10:00Z
+**HEAD**: b0b4766
+**Executor**: sonnet (wave orchestrator)
+
+### Per-task summary
+
+| Task | Wave | Status | Summary |
+|------|------|--------|---------|
+| task-0 | 0 | DONE | Environment verification -- all 5 grep/ls checks passed: "five checks (1a-1e)" present, type enum confirmed, entity 073 status:draft confirmed, entity 081 status:shipped confirmed, _archive/ directory exists |
+| task-1 | 1 | DONE | Added Step 1f conditional forge audit to build-review SKILL.md -- updated check count (five->six) in 2 prose locations, fixed stale Agent tool claim at line 28, inserted Step 1f section (forge validate-only + test existence sub-check + fallback), added "Forge Audit Is Conditional and Filtered" rules block, updated "Scope/Routing/Hygiene" rule to note kc-plugin-forge exception. All 6 ACs verified via grep. |
+| task-2 | 1 | DONE | Added type: skill-invocation to build-uat SKILL.md -- updated Step 1 type enum, updated Step 2 intro, inserted Step 2d (pre-classify + runtime invocation + structural validation), added "Skill Invocation -- Pre-Classify Before Runtime" rules block. All 4 ACs verified via grep (skill-invocation count: 9). |
+| task-3 | 2 | DONE | Archived entity 073 -- moved review-skill-creation-discipline.md to _archive/, changed status: draft -> status: archived, added absorption note referencing entity 084. All 4 ACs verified. |
+| task-4 | 2 | DONE | Cross-consistency verification -- all 6 checks passed: "six checks" count=2, Step 1e (line 163) before Step 1f (line 186), skill-invocation count=9 (>=3), pre-scan:forge-audit and pre-scan:test-existence present and non-colliding, entity 073 archived, no new em dashes introduced by Tasks 1-3 (2 pre-existing em dashes in rules examples confirmed pre-existing via git history). |
+
+### Acceptance criteria verification
+
+| AC | Status | Evidence |
+|----|--------|----------|
+| Step 1f fires forge audit on skill diff | DONE | `grep "1f -- Conditional Forge Audit" skills/build-review/SKILL.md` -- line 186 |
+| Step 1f skipped on non-skill diff | DONE | `grep "skip Step 1f entirely" skills/build-review/SKILL.md` -- explicit condition in section |
+| skill-invocation UAT type loads and verifies | DONE | `grep "2d -- Skill Invocation" skills/build-uat/SKILL.md` -- Step 2d present |
+| Entity 073 archived with absorption note | DONE | `grep "absorbed by entity 084" docs/build-pipeline/_archive/review-skill-creation-discipline.md` -- line 23 |
+| Entity 081 shipped before 084 execute | DONE | `grep "status: shipped" docs/build-pipeline/_archive/quality-goal-backward-regression.md` -- confirmed task-0 |
+| Missing tests produce HIGH finding | DONE | `grep "pre-scan:test-existence" skills/build-review/SKILL.md` -- present in Step 1f with HIGH/CODE severity |
+
+### Files Modified
+
+- `skills/build-review/SKILL.md` -- Step 1f added, check count updated (five->six), Agent tool claim fixed, rules block added
+- `skills/build-uat/SKILL.md` -- skill-invocation type added to enum, Step 2d inserted, rules block added
+- `docs/build-pipeline/_archive/review-skill-creation-discipline.md` -- moved from active, status: archived, absorption note added
+
+### Commits
+
+- `6d9b534` feat(084): add Step 1f conditional forge audit to build-review pre-scan
+- `1be03ac` feat(084): add type: skill-invocation to build-uat UAT item types
+- `b0b4766` archive(073): absorb review-skill-creation-discipline into entity 084
+
+### Checklist
+
+- [x] All PLAN tasks executed per wave ordering
+  Wave 0: task-0. Wave 1: task-1 + task-2 (sequential, independent). Wave 2: task-3 + task-4 (sequential).
+- [x] Per-task commits on feature branch with conventional message format
+  3 commits on spacedock-ensign/review-forge-validation branch.
+- [x] Acceptance criteria verified per task
+  All 6 ACs confirmed via grep commands documented above.
+- [x] Files Modified section present
+  3 files listed above.
+- [x] Stage Report: execute written with per-task summary rows
+  This section.
+- [x] workflow-index update-status: not applicable at execute stage (status was set in-flight at plan approval; execute stage does not call update-status per skill contract)
