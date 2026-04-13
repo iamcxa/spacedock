@@ -109,6 +109,36 @@ If the project does not define a `build` script, run the equivalent entry-point 
 
 ---
 
+## Step 4.5: Regression Gate (Cross-Entity)
+
+This step classifies whether Step 1 test failures are caused by the current entity's changes breaking a prior entity's test coverage. It does NOT re-run tests -- it reuses Step 1's already-captured results.
+
+**(1) Auto-pass shortcut.** If Step 1 verdict = `pass` (all tests green, exit code 0, zero failing-test lines), Step 4.5 verdict = `pass` with evidence:
+
+```
+Step 1 passed, all tests green including cross-entity coverage. No regression possible.
+```
+
+Skip to Step 5. Do NOT query CONTRACTS.md when Step 1 is green -- if all tests passed, prior entity tests also passed by definition.
+
+**(2) CONTRACTS.md query when Step 1 failed.** If Step 1 verdict = `fail`, read `docs/build-pipeline/_index/CONTRACTS.md`. Parse the `## Active Contracts` section: each subsection header is a file path (e.g., `### skills/build-review/SKILL.md`), and each table row under it has columns `Entity | Stage | Intent | Status | Last Updated`. Run:
+
+```bash
+git diff --name-only {execute_base}..HEAD
+```
+
+to get the current entity's file delta. For each file path in the delta, check if CONTRACTS.md has a subsection for that path with a DIFFERENT entity's row (status `final` or `in-flight`).
+
+**(3) Cross-entity regression classification.** For each failing test file from Step 1's evidence, check if the test's corresponding source file appears in CONTRACTS.md under a DIFFERENT entity (not the current one) with status `final` or `in-flight`. If yes, classify that failure as `cross-entity-regression`.
+
+Convention: for a failing test at `tests/foo/bar.test.ts`, the corresponding source file is typically `src/foo/bar.ts` or the closest co-located source. Use the file paths from Step 1's failing-test output (stack traces, file references) to identify which source files are involved.
+
+**(4) Verdict.**
+- If any `cross-entity-regression` classified failure found: verdict = `fail`, classification tag = `cross-entity-regression`, `feedback-to: execute` with prior entity context (entity slug + overlapping file path from CONTRACTS.md) included in the Stage Report.
+- If all Step 1 failures are current-entity only (no CONTRACTS.md cross-entity match): verdict = `pass` for the regression gate. The current-entity failures are already handled by Step 1's `fail` verdict and `feedback-to: execute`. Step 4.5 does not duplicate that routing.
+
+---
+
 ## Step 5: Coverage Threshold (Conditional)
 
 Coverage is **only** checked if the workflow ops config defines one. Read the ops config file (path passed in by FO or discoverable as `{workflow_dir}/ops.config.json`). Look for a `coverage_threshold` key. If absent or the whole config is absent, **skip this step entirely** and record `coverage: skipped -- no threshold configured in workflow ops config` in the Stage Report.
@@ -143,7 +173,24 @@ evidence:
 ```
 ```
 
-Repeat this shape for `lint`, `typecheck`, `build`, `coverage`.
+Repeat this shape for `lint`, `typecheck`, `build`, `regression`, `coverage`.
+
+For `regression` (Step 4.5), use this shape:
+
+```
+### regression
+verdict: {pass|fail}
+command: n/a -- reuses Step 1 evidence
+classification: {cross-entity-regression | current-entity-only | auto-pass (Step 1 green)}
+evidence:
+```
+{If auto-pass: "Step 1 passed, all tests green including cross-entity coverage. No regression possible."}
+{If cross-entity-regression: prior entity slug + overlapping file path from CONTRACTS.md + failing test reference}
+{If current-entity-only: "Step 1 failures are entity-scope only; no CONTRACTS.md cross-entity match found"}
+```
+{if fail:} prior-entity: {entity-slug}
+{if fail:} overlapping-file: {file path from CONTRACTS.md}
+```
 
 ---
 
@@ -220,6 +267,17 @@ evidence:
 {snippet}
 ```
 
+### regression
+verdict: {pass|fail}
+command: n/a -- reuses Step 1 evidence
+classification: {cross-entity-regression | current-entity-only | auto-pass (Step 1 green)}
+evidence:
+```
+{see Step 4.5 verdict shape}
+```
+{if fail:} prior-entity: {entity-slug}
+{if fail:} overlapping-file: {file path from CONTRACTS.md}
+
 ### coverage
 verdict: {pass|fail|skipped}
 command: {bun test --coverage | n/a}
@@ -236,6 +294,14 @@ Write the report with the Write or Edit tool into the entity body at the `## Sta
 ---
 
 ## Rules -- No Exceptions
+
+### Regression Gate -- No Re-Execution
+
+- **NEVER re-run tests in Step 4.5.** Step 4.5 reuses Step 1 evidence exclusively. The full suite already ran in Step 1; re-running it in Step 4.5 is redundant, costs tokens, and would produce identical results. Evidence reuse is the contract.
+- **NEVER skip CONTRACTS.md query when Step 1 has failures.** When Step 1 verdict = fail, CONTRACTS.md query is mandatory. The query is lightweight (one file read + table parse) and is the only way to distinguish current-entity failures from cross-entity regressions. Skipping it when failures exist means cross-entity regressions go undetected and get misrouted as simple execute bounces.
+- **NEVER invent a parallel tracking mechanism for cross-entity file ownership.** CONTRACTS.md is the single source of truth for which entities modified which files. Do NOT grep git history, do NOT scan commit messages, do NOT maintain a local cache. CONTRACTS.md is authoritative and is maintained by the pipeline.
+- **NEVER query CONTRACTS.md when Step 1 passed.** If Step 1 is green, all tests passed -- including any tests from prior entities that touch overlapping files. A green Step 1 is a mathematical guarantee that no cross-entity regression exists. Querying CONTRACTS.md when tests are green is wasted computation that adds no signal.
+- **NEVER emit `feedback-to: execute` twice** (once from Step 1 and once from Step 4.5) for a cross-entity regression. Step 4.5's `feedback-to: execute` supersedes Step 1's by adding the `cross-entity-regression` classification tag and prior entity context. The Stage Report contains exactly one `feedback-to` directive with all relevant classification context merged.
 
 ### Full Suite, Not Targeted
 
