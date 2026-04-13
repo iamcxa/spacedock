@@ -1,14 +1,14 @@
 ---
 id: 079
 title: "Plan-stage assumption re-validation -- verify clarify evidence before task generation"
-status: clarify
+status: plan
 context_status: ready
 source: decomposition of entity 077 (cross-phase skepticism)
-started:
+started: 2026-04-13T13:00:00Z
 completed:
 verdict:
 score: 0.0
-worktree:
+worktree: .worktrees/spacedock-ensign-plan-assumption-revalidation
 issue:
 pr:
 intent: feature

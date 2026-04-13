@@ -1,14 +1,14 @@
 ---
 id: 080
 title: "Execute-stage staleness detection -- file hash pre-check before wave dispatch"
-status: clarify
+status: plan
 context_status: ready
 source: decomposition of entity 077 (cross-phase skepticism)
-started:
+started: 2026-04-13T13:00:00Z
 completed:
 verdict:
 score: 0.0
-worktree:
+worktree: .worktrees/spacedock-ensign-execute-staleness-detection
 issue:
 pr:
 intent: feature
