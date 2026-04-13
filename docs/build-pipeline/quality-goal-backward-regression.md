@@ -1,14 +1,14 @@
 ---
 id: 081
 title: "Goal-backward verification + regression gate -- semantic quality checks"
-status: clarify
+status: execute
 context_status: ready
 source: decomposition of entity 077 (cross-phase skepticism)
-started:
+started: 2026-04-13T13:00:00Z
 completed:
 verdict:
 score: 0.0
-worktree:
+worktree: .worktrees/spacedock-ensign-quality-goal-backward-regression
 issue:
 pr:
 intent: feature

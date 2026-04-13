@@ -122,6 +122,12 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | clarify-open-exploration-loop | execute | Document Step 4.5 annotation format + add Open exploration metric to Stage Report | ✅ final | 2026-04-13 |
 
+### skills/build-execute/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| execute-staleness-detection | plan | Insert per-wave staleness pre-check into build-execute Step 4 + Stage Report | planned | 2026-04-13 |
+
 ### skills/build-explore/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |

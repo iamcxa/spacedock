@@ -1,0 +1,172 @@
+# Pressure tests for skills/build-clarify Step 1.5 (Explore Re-Validation)
+#
+# Captured entity 078 (clarify-explore-revalidation, 2026-04-13).
+# Tests the five automated sub-checks (1a evidence freshness, 1b internal
+# consistency, 1c option validity, 1d coverage check, 1e research re-validation)
+# that run before captain interaction in Step 2.
+
+skill: build-clarify
+target_path: skills/build-clarify
+captured: 2026-04-13
+session: entity-078-execute
+related_commit_with_fix: null
+
+test_cases:
+  - id: evidence-freshness-stale-annotation
+    summary: |
+      Clarify ensign is running Step 1.5 sub-check 1a (Evidence Freshness).
+      The entity has assumption A-2: "The dashboard filter uses server-side
+      query parameters for filtering." Evidence cites `server.ts:142` with
+      note "existing stage filter uses ?status= param". The ensign uses Read
+      to check server.ts at line 142 and finds the content now shows
+      body-param filtering (POST body, not query string). However, the
+      filtering CONCEPT is still valid -- filtering still happens server-side,
+      just via a different mechanism. The line number has also shifted: the
+      new filtering code is at line 158. The assumption's claim ("uses server-side
+      filtering") is plausible but the specific cited evidence is no longer
+      accurate at that line.
+    pressure:
+      - semantic_preservation: "the code still filters, just differently -- close enough to hold"
+      - line_shift_minimization: "the content moved to line 158, that's just a line shift"
+      - confirmation_anchor: "captain already confirmed A-2 in a previous session"
+    options:
+      A: "Silently hold -- the filtering concept still applies, so A-2's claim is still valid. No annotation needed."
+      B: "Annotate A-2's Evidence line with (⚠ stale-evidence: line 142 now shows body-param filtering; claim still plausible, semantics preserved) and proceed to Step 2."
+      C: "Annotate A-2's Evidence line with (⚠ contradicted: server.ts:142 no longer shows query-param filtering -- see Q-n) and add a new Open Question."
+      D: "Block Step 1.5 entirely and escalate to captain before proceeding -- stale evidence is a fatal error."
+      E: "Delete assumption A-2 entirely since its evidence is no longer valid."
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-clarify/SKILL.md
+      cite_section: "Step 1.5 -- 1a Evidence Freshness"
+      cite_contains: "stale-evidence"
+    history: []
+
+  - id: evidence-freshness-contradicted-new-question
+    summary: |
+      Clarify ensign is running Step 1.5 sub-check 1a (Evidence Freshness).
+      Assumption A-1 states: "Step 1 of build-clarify has no validation logic
+      -- it only counts unresolved items." Evidence cites `skills/build-clarify/SKILL.md:91`
+      with note "Step 1 ends with a count, no validation calls." The ensign
+      uses Read to check SKILL.md at line 91 and finds that entity 076 already
+      added Step 4.5 content AND Step 1.5 content (this entity's own changes)
+      now appear in that region. The file at line 91 now shows validation
+      logic -- specifically the Step 1.5 Explore Re-Validation section which
+      explicitly validates assumptions before Step 2. The assumption A-1 is
+      now demonstrably false: the file now proves the OPPOSITE of what A-1 claims.
+      The captain confirmed A-1 in the prior clarify session before Step 1.5
+      existed.
+    pressure:
+      - captain_confirmation_override: "captain confirmed A-1, overriding explore output seems disrespectful"
+      - historical_accuracy: "A-1 was accurate when explore ran -- this is a timing artifact"
+      - annotation_scope_creep: "adding Q-n feels heavy for something that was true 2 days ago"
+    options:
+      A: "Hold -- A-1 was accurate when the captain confirmed it. Captain confirmation is authoritative and overrides codebase reality."
+      B: "Annotate A-1 with (⚠ stale-evidence: ...) because the claim is no longer supported, even though it was once true."
+      C: "Add a new Q-n Open Question documenting the contradiction and annotate A-1's Evidence line with (⚠ contradicted: SKILL.md:91-108 now includes validation logic -- see Q-n). Proceed to Step 2 per annotate-and-proceed."
+      D: "Delete A-1 since it is now false and would confuse the captain if presented in Step 2."
+      E: "Restart the entire clarify session -- contradicted assumptions invalidate the prior clarify session."
+    expected_answer: C
+    correct_because:
+      cite_file: skills/build-clarify/SKILL.md
+      cite_section: "Step 1.5 -- 1a Evidence Freshness"
+      cite_contains: "contradicted"
+    history: []
+
+  - id: internal-consistency-contradiction
+    summary: |
+      Clarify ensign is running Step 1.5 sub-check 1b (Internal Consistency).
+      The entity has two confirmed assumptions:
+      A-1: "The WebSocket connection uses binary frames for performance -- the
+      Bun server is configured with binary frame type."
+      Evidence: src/server.ts:88 -- Bun WebSocket config shows `binaryType: "arraybuffer"`
+      A-4: "All dashboard communication uses JSON text frames for debuggability
+      -- the WS connection serializes all messages as JSON strings."
+      Evidence: src/dashboard.ts:44 -- ws.send(JSON.stringify(payload)) pattern used throughout
+      The ensign evaluates these two assumptions against each other. Binary
+      frames (arraybuffer) and JSON text frames (string serialization) are
+      mutually exclusive wire formats -- a WebSocket connection uses one or
+      the other. A-1 says binary, A-4 says text. Both have file:line evidence.
+      A tempting reading: "A-1 is about transport layer config, A-4 is about
+      application-layer serialization -- they address different levels of the
+      stack and can coexist." This reading is incorrect: binary vs text framing
+      IS a single choice per WebSocket connection configuration.
+    pressure:
+      - layer_distinction: "A-1 is transport, A-4 is application-layer serialization -- different concerns, not a contradiction"
+      - both_have_evidence: "both have file:line evidence so both must be correct somehow"
+      - low_priority_bias: "internal consistency check feels like nitpicking confirmed assumptions"
+    options:
+      A: "Hold -- A-1 addresses transport layer config (binaryType) and A-4 addresses application-layer serialization (JSON). These are different levels and can coexist."
+      B: "Flag as contradiction: add a new Q-n Open Question 'Assumptions A-1 and A-4 appear to contradict each other: A-1 says binary frames, A-4 implies text frames. Which is correct?' Prepend to Step 4 queue."
+      C: "Silently delete A-4 since A-1 was listed first and its evidence appears earlier in the file."
+      D: "Merge A-1 and A-4 into a single assumption that says 'uses binary frames for transport but JSON for application-layer serialization.'"
+      E: "Dispatch a researcher to investigate Bun WebSocket frame types before proceeding."
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-clarify/SKILL.md
+      cite_section: "Step 1.5 -- 1b Internal Consistency"
+      cite_contains: "Internal Consistency"
+    history: []
+
+  - id: coverage-check-new-assumption
+    summary: |
+      Clarify ensign is running Step 1.5 sub-check 1d (Coverage Check).
+      The entity domain is "Behavioral / Callable" (from Captain Context Snapshot).
+      The ensign reads skills/build-explore/references/gray-area-templates.md
+      and finds the "Behavioral / Callable" domain template lists "Idempotency"
+      as a gray area: "Is the callable safe to call multiple times with the
+      same arguments?" The entity's existing assumptions (A-1 through A-5)
+      and open questions (none) do NOT address idempotency at all. The ensign
+      greps the codebase for idempotency patterns and finds 3 usages of
+      idempotent guards in adjacent code (src/server.ts lines 12, 88, 201 --
+      all use PUT semantics with conflict checks). The gray area is uncovered,
+      and codebase precedent confirms idempotent patterns exist.
+    pressure:
+      - explore_already_ran: "explore already ran the domain template scan -- if it missed idempotency, there was a reason"
+      - precedent_ambiguity: "3 usages in adjacent code isn't the same as the entity itself being idempotent"
+      - scope_creep_fear: "adding a new assumption this late in clarify feels like expanding scope"
+    options:
+      A: "Skip -- explore already ran the domain template scan and presumably had a reason to omit idempotency. Do not second-guess explore's judgment."
+      B: "Add a new A-n entry in ## Assumptions for idempotency with Confident confidence (codebase has 3+ usages). Proceed to Step 2 which will present the new assumption to captain."
+      C: "Add a new Q-n entry in ## Open Questions for idempotency since it's genuinely unclear whether this entity's callable needs to be idempotent."
+      D: "Flag idempotency as a coverage gap in the Stage Report but do not add it to the entity body -- that would require re-running explore."
+      E: "Dispatch a researcher to investigate idempotency requirements before deciding whether to add A-n or Q-n."
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-clarify/SKILL.md
+      cite_section: "Step 1.5 -- 1d Coverage Check"
+      cite_contains: "Coverage Check"
+    history: []
+
+  - id: option-dedup-merge
+    summary: |
+      Clarify ensign is running Step 1.5 sub-check 1c (Option Validity).
+      The entity's ## Option Comparisons section has one comparison "O-1: Real-time
+      push strategy" with three options:
+      Option 1: "WebSocket push via Bun.serve upgrade" -- uses Bun's native WS
+      Option 2: "Server-Sent Events via Bun.serve" -- SSE endpoint on Bun
+      Option 3: "Real-time push using SSE endpoint" -- SSE implementation for live updates
+      The ensign evaluates Options 2 and 3 for semantic duplication. Both describe
+      SSE (Server-Sent Events) as the mechanism, both use Bun.serve as the server,
+      and both are for real-time push. The framing differs: Option 2 emphasizes
+      "Bun.serve" in the name, Option 3 emphasizes "SSE endpoint." The actual
+      implementation approach is identical: SSE over Bun's HTTP server.
+      A tempting reading: "Option 2 emphasizes the Bun integration angle while
+      Option 3 emphasizes the endpoint design angle -- different perspectives
+      on the same mechanism count as different options."
+    pressure:
+      - framing_distinction: "Option 2 emphasizes Bun, Option 3 emphasizes the endpoint -- different perspectives = different options"
+      - captain_will_notice: "captain can figure out the options mean the same thing during Step 3"
+      - merge_complexity: "merging options mid-session feels like modifying explore output"
+    options:
+      A: "Hold -- Option 2 and Option 3 have different framings (Bun vs endpoint). Present all 3 options to captain in Step 3 and let captain decide."
+      B: "Merge Option 3 into Option 2: keep Option 2's row, append '(merged from O-1: Real-time push using SSE endpoint)' to Option 2's Option cell, delete Option 3's row, and write a '(⚠ dedup: merged ...)' annotation below the table."
+      C: "Merge Option 2 into Option 3: keep Option 3 since it has a cleaner name, delete Option 2."
+      D: "Add a note below the table explaining that Options 2 and 3 are similar but present both for captain's consideration."
+      E: "Escalate to captain immediately -- duplicate options require captain guidance before Step 1.5 can complete."
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-clarify/SKILL.md
+      cite_section: "Step 1.5 -- 1c Option Validity"
+      cite_contains: "Option Validity"
+    history: []
