@@ -1,7 +1,6 @@
 ---
 name: graft
 description: "This skill should be used when the user asks to 'graft a workflow', 'transplant a workflow', 'port a workflow to another repo', 'graft init', 'graft upgrade', 'graft status', 'graft diff', 'graft localize', or wants to install a Spacedock workflow into a target repo with local overrides and version tracking."
-argument-hint: "[init <source-path> | localize | upgrade | status | diff]"
 user-invocable: true
 ---
 
@@ -63,10 +62,7 @@ Graft exposes five sub-commands. Parse the user's invocation to determine which 
 | `graft status` | Status | Show version, tier distribution, drift, health |
 | `graft diff` | Diff | Show local vs origin differences |
 
-If the user says just "graft" with no sub-command:
-1. Check if any graft exists at `.spacedock/workflows/` in the current repo
-2. If yes: show `graft status` output, then ask what the captain wants to do next
-3. If no: ask for a source workflow path to begin `graft init`
+If the user says just "graft" with no sub-command, ask which operation they want.
 
 ---
 
@@ -81,12 +77,9 @@ After `graft init`, the target repo contains:
 │   ├── .origin/
 │   │   ├── manifest.yaml            # Source tracking + tier classification
 │   │   ├── README.md                # Upstream original (read-only reference)
-│   │   ├── skills/                  # Upstream skill originals (localize tier only)
-│   │   │   ├── build-quality/SKILL.md
-│   │   │   ├── build-quality/references/  # Skill's reference files (if any)
-│   │   │   └── ...
-│   │   └── agents/                  # Upstream agent originals (if referenced by localize skills)
-│   │       └── code-explorer.md
+│   │   └── skills/                  # Upstream skill originals (localize tier only)
+│   │       ├── build-quality/SKILL.md
+│   │       └── ...
 │   ├── LOCAL.yaml                   # Overlay definition (persistent)
 │   └── _index/                      # Infrastructure (if Tier 3 skills ported)
 │       ├── CONTRACTS.md
@@ -95,10 +88,7 @@ After `graft init`, the target repo contains:
 ├── .claude/skills/                  # Target repo's skill directory
 │   ├── {existing-skills}/           # Pre-existing project skills
 │   ├── build-quality/SKILL.md       # Localized skill copy (graft-managed)
-│   ├── build-quality/references/    # Copied reference files
 │   └── ...
-├── .claude/agents/                  # Target repo's agent directory
-│   └── code-explorer.md             # Localized agent copy (graft-managed)
 ```
 
 ---
@@ -130,35 +120,15 @@ skills:
     portability_signals:                       # Why this was classified as localize
       - "hardcoded CLI: bun test, bun lint, bunx tsc, bun build"
 
-  - name: build-explore
-    tier: localize
-    source_path: skills/build-explore/SKILL.md
-    target_path: .claude/skills/build-explore/SKILL.md
-    version: "0.9.0"
-    override_count: 1
-    references:                                  # Reference files copied with this skill
-      - gray-area-templates.md
-      - hybrid-classification-heuristic.md
-    agents:                                      # Agents referenced by this skill
-      - code-explorer
-
   - name: build-plan
     tier: localize
     source_path: skills/build-plan/SKILL.md
     target_path: .claude/skills/build-plan/SKILL.md
     version: "0.9.0"
     override_count: 2
-    references:
-      - plan-checker-prompt.md
     infra:
       - workflow-index
       - CONTRACTS.md
-
-agents:                                          # Agent files managed by graft
-  - name: code-explorer
-    source_path: agents/code-explorer.md
-    target_path: .claude/agents/code-explorer.md
-    version: "0.9.0"
 
 local:
   overlay: LOCAL.yaml
@@ -397,12 +367,7 @@ mkdir -p .spacedock/workflows/{name}/_index
 
 1. **Copy upstream originals to `.origin/`:**
    - Copy source README.md -> `.origin/README.md`
-   - For each localize tier skill:
-     - Copy source SKILL.md -> `.origin/skills/{name}/SKILL.md`
-     - If the skill's SKILL.md contains `Read →` or `Read ->` references to `references/*.md` files, also copy those reference files -> `.origin/skills/{name}/references/`
-   - For each localize tier skill that references agents (e.g., `spacedock:code-explorer`):
-     - Check if the agent definition exists in source plugin's `agents/` directory
-     - Copy agent .md file -> `.origin/agents/{agent-name}.md`
+   - For each localize tier skill: copy source SKILL.md -> `.origin/skills/{name}/SKILL.md`
 
 2. **Write manifest.yaml** to `.origin/manifest.yaml`
 
@@ -413,25 +378,19 @@ mkdir -p .spacedock/workflows/{name}/_index
    - Start from `.origin/skills/{name}/SKILL.md`
    - Apply `skill_overrides[{name}]` from LOCAL.yaml (anchor-based find-replace)
    - Write result to `.claude/skills/{name}/SKILL.md`
-   - If `.origin/skills/{name}/references/` exists, copy reference files to `.claude/skills/{name}/references/`
 
-5. **Apply localized agents** (if any were copied in step 1):
-   For each agent in `.origin/agents/`:
-   - Apply namespace overrides (e.g., `spacedock:` -> local refs)
-   - Write result to `.claude/agents/{agent-name}.md`
-
-6. **Apply README overlay:**
+5. **Apply README overlay:**
    - Start from `.origin/README.md`
    - Apply `readme_operations` from LOCAL.yaml (same logic as overhaul Step 4)
    - Write merged result to `README.md`
 
-7. **Port infrastructure** (if Tier 3 skills present):
+6. **Port infrastructure** (if Tier 3 skills present):
    - Copy workflow-index SKILL.md to `.claude/skills/workflow-index/SKILL.md`
    - Apply namespace overrides (spacedock:workflow-index -> workflow-index)
    - Create empty `_index/CONTRACTS.md` and `_index/DECISIONS.md` with header template
    - Copy workflow-index reference files to `.claude/skills/workflow-index/references/`
 
-8. **Write prerequisites doc** to `.spacedock/workflows/{name}/PREREQUISITES.md`
+7. **Write prerequisites doc** to `.spacedock/workflows/{name}/PREREQUISITES.md`
 
 ### Step 10 -- Post-apply validation
 
@@ -440,9 +399,7 @@ mkdir -p .spacedock/workflows/{name}/_index
 3. Skill ref resolution:
    - Verbatim refs (`spacedock:build-*`) -- verify spacedock plugin is installed
    - Localize refs (`build-*`) -- verify `.claude/skills/{name}/SKILL.md` exists
-4. Reference file resolution: for each localize skill with `references` in manifest, verify files exist at `.claude/skills/{name}/references/`
-5. Agent resolution: for each agent in manifest `agents` list, verify `.claude/agents/{name}.md` exists
-6. Infrastructure files exist (if Tier 3)
+4. Infrastructure files exist (if Tier 3)
 
 ### Step 11 -- Report
 
@@ -455,8 +412,6 @@ Target: .spacedock/workflows/{name}/
 Skills:
   Verbatim (referencing upstream): {N} ({list})
   Localized (copied to .claude/skills/): {M} ({list})
-  Reference files copied: {K} across {J} skills
-  Agents ported: {A} ({list or "none"})
   Infrastructure ported: {list or "none"}
 
 Files created:
@@ -465,7 +420,6 @@ Files created:
   .spacedock/workflows/{name}/.origin/README.md
   .spacedock/workflows/{name}/LOCAL.yaml
   .claude/skills/{localized skill list}
-  .claude/agents/{agent list if any}
   {infra files if any}
 
 Prerequisites: see PREREQUISITES.md
