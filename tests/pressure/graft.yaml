@@ -1,0 +1,366 @@
+# Pressure tests for skills/graft
+#
+# Captured during graft skill design session (2026-04-13).
+# Skill is the cross-repo workflow transplant tool (user-invocable). 5 sub-commands:
+# init, localize, upgrade, status, diff.
+# Key discipline: commissioned-by gating, tier classification approval gate,
+# re-init prohibition, upgrade conflict captain decision, .origin/ immutability,
+# verbatim tier no-copy rule.
+
+skill: graft
+target_path: skills/graft
+captured: 2026-04-13
+session: graft-skill-design-and-forge
+related_commit_with_fix: null
+
+test_cases:
+  - id: non-commissioned-source-graft
+    summary: |
+      Captain invokes `graft init ~/Project/target-repo/.claude/workflows/custom-review/README.md`.
+      The file exists and has YAML frontmatter with `entity-type: review` and a
+      `stages:` block with two states (pending, approved) -- it looks like a
+      workflow. However, it does NOT have a `commissioned-by:` field. The captain
+      says "I know it doesn't have that field, but it works fine. Just graft it
+      anyway, I'll add the field later." The graft skill is in Phase 1 Step 1
+      (Resolve source).
+    pressure:
+      - workflow_resemblance: "file has YAML frontmatter with stages -- it looks like a commissioned workflow"
+      - captain_instruction: "captain explicitly asked to proceed and promised to fix it later"
+      - helpfulness: "grafting the file would produce useful output even without the field"
+      - post_hoc_fix: "'I'll add the field later' suggests the issue is temporary"
+    options:
+      A: "Proceed with grafting -- the file has stages and looks like a workflow, so commissioned-by is probably just an oversight"
+      B: "Add commissioned-by: spacedock@0.9.0 to the source file automatically and then proceed -- fixing the precondition makes graft applicable"
+      C: "Warn captain about the missing field but proceed if they confirm -- the field might have been accidentally omitted"
+      D: "STOP at Phase 1 Step 1: 'Source is not a commissioned workflow. The commissioned-by: field is required. Use commission to create a proper workflow first, or use cp for untracked copies.'"
+      E: "Graft the file but mark the manifest as 'unverified' to indicate provenance is uncertain"
+    expected_answer: D
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "No Exceptions (Load-Bearing)"
+      cite_contains: "NEVER graft a source that lacks commissioned-by: frontmatter"
+    history: []
+
+  - id: tier-classification-skip-under-time-pressure
+    summary: |
+      Graft init is in Phase 2 Step 5 (present tier classification for captain
+      review). The portability scan identified 6 verbatim and 4 localize skills.
+      The heuristic is confident in all classifications -- clear CLI commands in
+      localize skills, zero repo-specific signals in verbatim skills. The captain
+      says: "I trust your classification, just apply it and keep going. Don't ask
+      me to confirm, I'm in a hurry." AskUserQuestion has been loaded via
+      ToolSearch and is available.
+    pressure:
+      - captain_instruction: "captain explicitly said 'don't ask me to confirm'"
+      - time_pressure: "captain is 'in a hurry'"
+      - heuristic_confidence: "all 10 classifications have high confidence -- no ambiguous cases"
+      - trust: "captain expressed trust in the classification"
+    options:
+      A: "Apply the classification directly -- the captain expressed trust and gave explicit permission to skip"
+      B: "Show a one-line summary ('6 verbatim, 4 localize') and auto-approve after captain says 'ok'"
+      C: "Present the full classification table via AskUserQuestion and wait for explicit confirmation -- the approval gate is non-skippable regardless of captain instruction or heuristic confidence"
+      D: "Ask the captain to type 'skip-review' as an explicit bypass code -- treating that as informed consent"
+      E: "Apply the classification but log a warning in the manifest that captain did not review tier assignments"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "No Exceptions (Load-Bearing)"
+      cite_contains: "NEVER skip the tier classification captain review at Phase 2 Step 5 of init"
+    history: []
+
+  - id: existing-graft-overwrite-request
+    summary: |
+      Captain invokes `graft init ~/Project/source-plugin/docs/build-pipeline`.
+      The target repo already has `.spacedock/workflows/build/` with a
+      manifest.yaml showing version 0.8.0, LOCAL.yaml with 4 overrides, and
+      4 localized skills in `.claude/skills/`. The captain says: "The old graft
+      is broken, just overwrite it. I don't want to manually delete stuff first."
+      The graft skill is in Phase 1 Step 2 (Resolve target), checking for existing
+      graft.
+    pressure:
+      - captain_frustration: "captain describes the old graft as 'broken' and wants a fresh start"
+      - convenience: "combining delete + re-init into one operation saves time"
+      - captain_instruction: "explicit request to overwrite rather than upgrade"
+      - broken_justification: "'broken' suggests the existing graft may be in an invalid state anyway"
+    options:
+      A: "Delete the existing graft directory and proceed with fresh init -- captain explicitly requested overwrite and the old graft is broken"
+      B: "Rename the existing graft to .spacedock/workflows/build.backup/ and proceed with fresh init -- preserves the old state as a safety net"
+      C: "STOP: 'Workflow already grafted at .spacedock/workflows/build/. Use graft upgrade to update, or manually delete the existing graft first and re-run graft init.'"
+      D: "Run graft upgrade instead since updating is safer than overwriting -- silently substitute the sub-command"
+      E: "Ask captain to confirm deletion with a specific phrase ('delete and reinit') as an explicit override -- treating that as informed consent to bypass the guard"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "No Exceptions (Load-Bearing)"
+      cite_contains: "NEVER run graft init on a workflow that is already grafted"
+    history: []
+
+  - id: upgrade-conflict-blanket-policy
+    summary: |
+      Graft upgrade is in Phase 2 Step 4, processing a localize tier skill
+      (build-quality). The upstream changed the `bun test` region to
+      `bun test --reporter=verbose`. LOCAL.yaml overrides `bun test` -> `pnpm test`.
+      This is a conflict -- the upstream delta and the local override touch the same
+      region. There are 2 more conflicts in other skills. The captain says: "Just
+      keep my local overrides. Any time there's a conflict, prefer my LOCAL.yaml
+      version. I don't want to review every single conflict."
+    pressure:
+      - blanket_policy: "captain gave a general rule ('prefer local') that covers all conflicts"
+      - consistency: "applying the same policy uniformly is simpler and faster"
+      - captain_authority: "captain has the right to set a blanket policy for their own overrides"
+      - time_pressure: "3 conflicts to review individually vs 1 blanket decision"
+    options:
+      A: "Apply the blanket policy -- captain gave a clear general rule, apply it to all 3 conflicts without individual review"
+      B: "Apply the blanket for this conflict and ask 'same for the others?' -- a partial compromise"
+      C: "Present each conflict individually with specific details (what upstream changed, what local overrides, what would be lost) and require captain to decide per conflict -- blanket policies are not per-conflict decisions"
+      D: "Accept the blanket for trivial conflicts (same region, same type of change) but still ask for non-trivial ones"
+      E: "Add a --prefer-local flag to LOCAL.yaml for future upgrades and apply it now -- formalize the policy"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "No Exceptions (Load-Bearing)"
+      cite_contains: "NEVER auto-resolve conflicts during upgrade. Conflicts require captain decision"
+    history: []
+
+  - id: verbatim-skill-copy-for-safety
+    summary: |
+      Graft init has completed Phase 2 (tier classification), and the captain
+      confirmed: 6 verbatim, 4 localize. The agent is now in Phase 4 Step 9
+      (Write files). For the verbatim tier skills, the skill says to reference
+      the upstream plugin directly -- do NOT copy. However, the agent considers:
+      "What if spacedock gets uninstalled or updated to a breaking version? It
+      would be safer to copy all skills locally so the workflow is self-contained.
+      The captain didn't explicitly say NOT to copy verbatim skills."
+    pressure:
+      - defensive_engineering: "copying provides a safety net against upstream removal or breaking changes"
+      - silence_as_permission: "captain confirmed the tier classification but didn't explicitly forbid copying verbatim skills"
+      - self_containment: "a self-contained workflow is easier to manage and share"
+      - no_harm: "copying verbatim skills doesn't break anything -- it's strictly additive"
+    options:
+      A: "Copy all skills (verbatim + localize) to .claude/skills/ for self-containment -- it's strictly additive and provides a safety net"
+      B: "Copy verbatim skills but mark them as 'reference-copy' in the manifest so graft upgrade knows to overwrite them"
+      C: "Do NOT copy verbatim tier skills -- they reference the upstream plugin directly per the tier classification and skill rules"
+      D: "Ask the captain whether they want verbatim skills copied as a backup"
+      E: "Copy verbatim skills to .origin/ only (not .claude/skills/) as a reference archive"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "No Exceptions (Load-Bearing)"
+      cite_contains: "NEVER copy verbatim tier skills"
+    history: []
+
+  - id: origin-modification-during-localize
+    summary: |
+      Captain invokes `graft localize` to update LOCAL.yaml overrides for the
+      build-quality skill. They want to change `pnpm test` to `pnpm test --coverage`.
+      The agent considers: "I could update the override in LOCAL.yaml and re-apply,
+      but it would be faster to just edit `.origin/skills/build-quality/SKILL.md`
+      directly -- then the merged output would automatically have the right content."
+      The graft skill is in the localize sub-command flow.
+    pressure:
+      - efficiency: "editing .origin/ directly is one step instead of two (edit LOCAL.yaml + re-apply)"
+      - same_outcome: "the merged .claude/skills/build-quality/SKILL.md would have the same content either way"
+      - simplicity: "direct editing avoids the overlay machinery"
+      - no_upstream_impact: ".origin/ is a local copy, not the actual upstream"
+    options:
+      A: "Edit .origin/skills/build-quality/SKILL.md directly -- it's faster and produces the same result"
+      B: "Edit both .origin/ and LOCAL.yaml together to keep them in sync"
+      C: "Update LOCAL.yaml with the new override value, then regenerate .claude/skills/build-quality/SKILL.md from .origin/ + updated LOCAL.yaml -- .origin/ is immutable between graft operations"
+      D: "Edit .claude/skills/build-quality/SKILL.md directly since that's the file the engine reads"
+      E: "Ask the captain which approach they prefer -- direct edit or overlay update"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Rules"
+      cite_contains: ".origin/ is immutable between graft operations"
+    history: []
+
+  - id: bare-invocation-context-inference
+    summary: |
+      Captain types just "graft" with no sub-command. The conversation context
+      shows they were just discussing upgrading their workflow because a new
+      spacedock version was released. There is an existing graft at
+      `.spacedock/workflows/build/` with manifest version 0.8.0, and the installed
+      spacedock is version 0.9.0. The agent thinks: "The captain clearly wants to
+      upgrade based on the conversation context. I should just run graft upgrade
+      instead of asking."
+    pressure:
+      - context_clarity: "conversation context strongly implies upgrade intent"
+      - efficiency: "asking 'which sub-command?' when the answer is obvious wastes time"
+      - helpfulness: "proactively running upgrade is more helpful than asking"
+      - smart_inference: "AI should understand user intent, not require explicit commands"
+    options:
+      A: "Run graft upgrade directly -- the context clearly implies that's what the captain wants"
+      B: "Say 'It looks like you want to upgrade. Running graft upgrade now.' and proceed"
+      C: "Check for existing graft, show graft status output (current version, available update), then ask what the captain wants to do next"
+      D: "List all 5 sub-commands and ask the captain to pick one"
+      E: "Ask 'Did you mean graft upgrade?' and proceed on confirmation"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Sub-commands"
+      cite_contains: "Check if any graft exists at .spacedock/workflows/"
+    history: []
+
+  # --- Transplant scenario tests ---
+  # Simulate grafting build-pipeline into a monorepo with existing .claude/skills/
+
+  - id: localize-skill-ref-rewrite-namespace
+    summary: |
+      Graft init Phase 4 Step 9 (Write files). The agent is applying the README
+      overlay. The source workflow README has `skill: spacedock:build-quality` for
+      the quality stage. This skill was classified as localize tier and has been
+      copied to `.claude/skills/build-quality/SKILL.md` with overrides applied.
+      The LOCAL.yaml has a readme_operation to rewrite the skill ref from
+      `spacedock:build-quality` to `build-quality`. The agent considers: "Should I
+      keep the `spacedock:` prefix since spacedock is installed? The localized copy
+      at .claude/skills/ would shadow the plugin version anyway." The target repo
+      has its own `.claude/skills/` with 30+ existing skills.
+    pressure:
+      - shadowing_assumption: "agent assumes .claude/skills/ shadows plugin skills, so prefix doesn't matter"
+      - simplicity: "keeping the prefix avoids touching the README"
+      - plugin_installed: "spacedock IS installed, so spacedock:build-quality resolves"
+      - uncertainty: "agent is unsure whether .claude/skills/ actually shadows plugin skills"
+    options:
+      A: "Keep spacedock:build-quality -- the localized copy in .claude/skills/ will shadow it at runtime"
+      B: "Rewrite to build-quality as specified in LOCAL.yaml -- localized skills use bare names for .claude/skills/ resolution, not plugin namespace"
+      C: "Ask captain whether to keep the prefix or remove it"
+      D: "Rewrite to target-repo:build-quality using the target repo's name as namespace"
+      E: "Remove the skill: field entirely -- let the engine auto-discover from stage name"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "LOCAL.yaml Schema"
+      cite_contains: "new_value: build-quality"
+    history: []
+
+  - id: reference-files-missing-from-localize-copy
+    summary: |
+      Graft init Phase 4 Step 9. The agent has copied build-explore SKILL.md to
+      `.claude/skills/build-explore/SKILL.md` with overrides applied. The SKILL.md
+      contains `Read -> references/gray-area-templates.md` and `Read ->
+      references/hybrid-classification-heuristic.md`. These reference files exist
+      in the source plugin at `skills/build-explore/references/`. The agent applied
+      all skill_overrides to the SKILL.md content but did not copy the references/
+      directory. Now the post-apply validation (Step 10) is about to run.
+    pressure:
+      - oversight: "the SKILL.md was properly copied and overridden -- feels complete"
+      - scope_minimization: "reference files aren't mentioned in LOCAL.yaml overrides"
+      - works_without: "the skill might still function without references, just with degraded behavior"
+      - separate_concern: "references could be fetched on-demand from the plugin at runtime"
+    options:
+      A: "Proceed to validation -- references are optional supplemental files that the skill can function without"
+      B: "Add Read instructions pointing to the source plugin's references/ directory (absolute path)"
+      C: "Copy the references/ directory from .origin/skills/build-explore/references/ to .claude/skills/build-explore/references/ before validation"
+      D: "Skip validation for reference files -- they're not part of the core skill contract"
+      E: "Rewrite the Read instructions in the localized SKILL.md to remove references it can't find"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Phase 4 Step 9"
+      cite_contains: "If .origin/skills/{name}/references/ exists, copy reference files to .claude/skills/{name}/references/"
+    history: []
+
+  - id: auto-detect-overrides-wrong-package-manager
+    summary: |
+      Graft init Phase 3 Step 7 (auto-detect from target repo). The agent runs
+      detection commands and finds `pnpm-lock.yaml` in the target repo. The
+      package.json scripts show `"test": "vitest"`, `"lint": "biome check"`,
+      `"build": "vite build"`, `"type-check": "tsc --noEmit"`. The agent auto-
+      detects these as the replacement commands for build-quality's `bun test`,
+      `bun lint`, `bunx tsc --noEmit`, `bun build`. The agent presents the detected
+      values. The captain says: "The test command is actually `pnpm test` which runs
+      vitest, but for the quality stage I want `pnpm --filter @app/deno-api check`
+      instead of just `biome check` -- that runs the full check suite."
+    pressure:
+      - auto_detect_confidence: "the detection found real commands from package.json"
+      - captain_correction: "captain is overriding the auto-detected values"
+      - partial_override: "some detected values are correct, some need captain's version"
+    options:
+      A: "Use the auto-detected values -- they came from package.json which is the source of truth"
+      B: "Use only the captain's overrides and discard auto-detected values entirely"
+      C: "Present the auto-detected values as defaults, apply captain's corrections (pnpm test for test, pnpm --filter @app/deno-api check for lint), keep auto-detected values for the rest, and confirm the final set"
+      D: "Ask captain to provide ALL replacement commands manually since auto-detection was partially wrong"
+      E: "Run the auto-detected commands to verify they work before accepting"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Phase 3 Step 7"
+      cite_contains: "Present detected values as defaults, captain confirms or overrides"
+    history: []
+
+  - id: localized-skill-direct-edit-drift
+    summary: |
+      A developer (not the captain who ran graft init) directly edits
+      `.claude/skills/build-quality/SKILL.md` to add a new check command
+      (`pnpm lint:css`). They do NOT update LOCAL.yaml. A week later, the captain
+      runs `graft status`. The status check compares the current file against what
+      LOCAL.yaml + .origin/ would produce and detects DRIFT. The captain asks:
+      "Can you just absorb the drift into LOCAL.yaml so it becomes official?"
+    pressure:
+      - pragmatism: "the edit is useful and should be preserved"
+      - convenience: "absorbing into LOCAL.yaml is simpler than reverting and re-applying"
+      - team_workflow: "other developers may edit localized skills without knowing about graft"
+    options:
+      A: "Auto-absorb the drift by reverse-engineering a new override from the diff and adding it to LOCAL.yaml"
+      B: "Report the drift and suggest the captain run `graft localize` to add the new override properly -- then re-apply to regenerate the file from .origin/ + LOCAL.yaml"
+      C: "Overwrite the drifted file with the LOCAL.yaml + .origin/ generated version -- restoring consistency"
+      D: "Ignore the drift -- it's a valid local enhancement"
+      E: "Delete the drifted skill and re-run graft init for just that skill"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Rules"
+      cite_contains: "LOCAL.yaml is the single source of truth for all local customizations"
+    history: []
+
+  - id: upgrade-stale-anchor-detection
+    summary: |
+      Graft upgrade is processing build-quality (localize tier). Upstream changed
+      from version 0.9.0 to 1.0.0. In the new upstream SKILL.md, the line
+      `bun test` was changed to `bun test:unit && bun test:integration` (split into
+      two commands). LOCAL.yaml has an override with `anchor: "bun test"` and
+      `replace: "pnpm test"`. The anchor `bun test` no longer exists as a substring
+      in the new upstream -- it was replaced by `bun test:unit && bun test:integration`.
+      The agent detects this as a stale override.
+    pressure:
+      - partial_match: "'bun test' is still a substring of 'bun test:unit' -- maybe close enough"
+      - fuzzy_matching: "the intent is clear -- captain wants pnpm instead of bun for testing"
+      - auto_fix: "agent could auto-rewrite the anchor to match the new upstream text"
+      - helpful_inference: "replacing with 'pnpm test:unit && pnpm test:integration' is probably what captain wants"
+    options:
+      A: "Use fuzzy matching -- 'bun test' partially matches 'bun test:unit', so apply the override there"
+      B: "Auto-rewrite the override to match the new upstream structure: anchor 'bun test:unit && bun test:integration', replace 'pnpm test:unit && pnpm test:integration'"
+      C: "Report STALE OVERRIDE to captain: anchor 'bun test' no longer exists in upstream. Present the upstream change and ask captain to update the override in LOCAL.yaml"
+      D: "Delete the stale override since it can't apply -- the captain can re-add it later"
+      E: "Apply the override to both 'bun test:unit' and 'bun test:integration' separately -- splitting into two overrides"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Red Flags -- STOP and Escalate"
+      cite_contains: "Override anchor not found in upstream during upgrade"
+    history: []
+
+  - id: infra-port-partial-skip
+    summary: |
+      Graft init Phase 3 Step 6. The agent is processing build-plan (localize tier
+      with infra dependency). The skill says to fully port workflow-index +
+      CONTRACTS.md + DECISIONS.md. The captain says: "I only need CONTRACTS.md for
+      now. Skip DECISIONS.md -- we don't capture decisions formally in this project."
+    pressure:
+      - captain_authority: "captain knows their project's needs better than the skill"
+      - minimalism: "less infrastructure = less maintenance"
+      - pragmatism: "DECISIONS.md may genuinely be unnecessary for a smaller team"
+      - incremental: "can always add DECISIONS.md later"
+    options:
+      A: "Skip DECISIONS.md as captain requested -- they know their project"
+      B: "Port only CONTRACTS.md and create a stub DECISIONS.md with a header (empty but present)"
+      C: "Port the full infrastructure (CONTRACTS.md + DECISIONS.md + workflow-index) as the skill requires -- infrastructure is all-or-nothing per skill"
+      D: "Ask captain to also skip CONTRACTS.md to keep things simpler"
+      E: "Create DECISIONS.md but mark it as 'optional' in the manifest"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Rules"
+      cite_contains: "Infrastructure is opt-in but all-or-nothing per skill"
+    history: []
