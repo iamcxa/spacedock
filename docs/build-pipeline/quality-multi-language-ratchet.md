@@ -665,6 +665,53 @@ How does the ratchet know what "last time" was?
   </files_modified>
 </task>
 
+<task id="task-10" model="sonnet" wave="6" skills="superpowers:writing-skills" test_first="false">
+  <read_first>
+    - skills/build-quality/SKILL.md
+    - skills/build-plan/references/plan-checker-prompt.md
+  </read_first>
+
+  <action>
+  Skill TDD verification (GREEN phase) for build-quality SKILL.md and plan-checker edits. The skills have been modified (tasks 1-9). Verify agents comply with the new rules.
+
+  **Test 1 — Retrieval (ratchet rules):**
+  Read the modified SKILL.md. Confirm the following rules are unambiguously findable:
+  1. `grep -n "Step 0.5" skills/build-quality/SKILL.md` -- language detection step exists
+  2. `grep -n "Step 4.75" skills/build-quality/SKILL.md` -- ratchet check step exists
+  3. `grep -n "ops.config.json" skills/build-quality/SKILL.md` -- baseline storage referenced
+  4. `grep -n "ratchet" skills/build-quality/SKILL.md` -- ratchet discipline rules exist
+  5. `grep -n "### 8." skills/build-plan/references/plan-checker-prompt.md` -- dimension 8 exists
+
+  **Test 2 — Application (mock scenario):**
+  Simulate a quality ensign reading the skill by answering these questions from SKILL.md content alone:
+  1. "A project has tsconfig.json and pyproject.toml. What languages are detected?" -- Expected: TypeScript + Python, with specific runners per detection table
+  2. "Test count was 340 last run, now 338. What happens?" -- Expected: ratchet fail, verdict fail for test count regression
+  3. "A new .ts file exists outside all tsconfig include paths. What does Step 4.75 report?" -- Expected: type coverage ratchet fail, file listed as uncovered
+  4. "When do baselines get written to ops.config.json?" -- Expected: ONLY on overall quality pass, never on fail/partial
+
+  **Test 3 — Gap check:**
+  Verify these edge cases are covered:
+  1. First run (no ops.config.json exists) -- bootstrap behavior defined?
+  2. Python detected but no type checker configured -- what happens?
+  3. Ratchet count ties (same as baseline) -- pass or fail?
+  4. TS enhanced ratchets (strict, as-any, ts-ignore) -- what if strict was already on?
+
+  If any test reveals a gap, fix the gap inline and commit.
+  </action>
+
+  <acceptance_criteria>
+    - All 5 retrieval greps return matches
+    - All 4 application questions answerable from SKILL.md alone
+    - All 4 gap-check edge cases covered
+    - If any fix applied, `git diff --stat` shows only skill files
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-quality/SKILL.md
+    - skills/build-plan/references/plan-checker-prompt.md
+  </files_modified>
+</task>
+
 ## UAT Spec
 
 ### Browser
