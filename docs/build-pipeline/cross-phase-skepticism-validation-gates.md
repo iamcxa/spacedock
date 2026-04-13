@@ -1,7 +1,7 @@
 ---
 id: 077
 title: "Cross-phase skepticism -- validation gates between pipeline stages"
-status: draft
+status: epic
 context_status: awaiting-clarify
 source: GSD distillation during 075 clarify session (2026-04-13); GSD verify-phase.md, execute-phase.md
 started:
@@ -15,6 +15,7 @@ intent: feature
 scale: Large
 project: spacedock
 depends-on: [075]
+children: [078, 079, 080, 081]
 ---
 
 ## Directive
