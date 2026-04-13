@@ -1,7 +1,7 @@
 ---
 id: 047
 title: Entity Body Rendering Hotfixes -- Stage Report Detail + Open Questions Format
-status: execute
+status: quality
 context_status: ready
 source: /build
 created: 2026-04-10T14:45:00+08:00
