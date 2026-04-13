@@ -1,7 +1,7 @@
 ---
 id: 053
 title: "Next.js app — war room view + SSE live feed"
-status: uat
+status: shipped
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started: 2026-04-13T18:00:00+08:00
@@ -15,6 +15,7 @@ intent: feature
 scale: Medium
 project: spacedock
 depends-on: [052]
+uat_pending_count: 4
 ---
 
 ## Directive
