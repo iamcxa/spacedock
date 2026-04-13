@@ -1,14 +1,14 @@
 ---
 id: 083
 title: "Multi-language coverage ratchet -- type-check and test count never regress"
-status: plan
+status: shipped
 context_status: ready
 source: decomposition of entity 074 (pipeline verification quality uplift)
 started: 2026-04-13T06:30:00Z
 worktree: .worktrees/spacedock-ensign-quality-multi-language-ratchet
 completed:
 verdict:
-score: 0.0
+score: 0.95
 issue:
 pr:
 intent: feature
