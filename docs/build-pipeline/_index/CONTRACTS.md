@@ -42,12 +42,6 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent for variant-analysis trailofbits skill | ✅ final | 2026-04-12 |
 
-### docs/build-pipeline/_archive/review-skill-creation-discipline.md
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| review-forge-validation | plan | Archive entity 073 (absorbed by 084 review-forge-validation) | 🔵 planned | 2026-04-13 |
-
 ### docs/build-pipeline/_mods/pr-merge.md
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -165,13 +159,6 @@ Each section lists a file path with entities that have modified it, their stage,
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Replace trailofbits-as-agents with 4 wrapper agent dispatches; remove TBD block | ✅ final | 2026-04-12 |
 | review-stage-parallel-skill-dispatch | execute | Add FO Guidance section for debate-driven reviewer dispatch; restructure for two-phase model | 🟡 in-flight | 2026-04-12 |
 | quality-goal-backward-regression | plan | Insert Step 1e goal-backward verification in pre-scan | 🔵 planned | 2026-04-13 |
-| review-forge-validation | plan | Add Step 1f conditional forge audit + test existence sub-check to pre-scan | 🔵 planned | 2026-04-13 |
-
-### skills/build-uat/SKILL.md
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| review-forge-validation | plan | Add type: skill-invocation item type with Class 3 pre-classification | 🔵 planned | 2026-04-13 |
 
 ### skills/code-explorer/SKILL.md
 

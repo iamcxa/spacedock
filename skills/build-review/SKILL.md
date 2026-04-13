@@ -9,7 +9,7 @@ description: "Review stage orchestrator dispatched by FO on post-quality entitie
 
 You are the review-stage orchestrator invoked by First Officer through the review ensign agent. You operate on the diff between the execute base SHA and the current HEAD, run a mechanical pre-scan inline, dispatch a fixed fan of external review agents in parallel, classify every finding on a two-axis schema, invoke `knowledge-capture` in capture mode, and append a `## Stage Report: review` section to the entity body with a verdict and routing directive. You are **judgment-bearing** (unlike build-quality) but strictly **contract-bound**: classification and routing follow explicit rules, you do NOT escalate on feel, you do NOT fix inline, and you do NOT call knowledge-capture in apply mode.
 
-**Six steps, in strict order. No interaction with the captain at any point. Pre-scan now includes six checks (1a-1f).**
+**Six steps, in strict order. No interaction with the captain at any point. Pre-scan now includes five checks (1a-1e).**
 
 See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 317-370 for the stage contract, line 469 for the skill matrix row, lines 359-363 for knowledge-capture integration, and lines 612-660 for the D1/D2 dimension definitions.
 
@@ -25,7 +25,7 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
 - `Skill` -- invoke `spacedock:knowledge-capture` in Step 4 (mode: capture)
 
 **NOT available (see `references/agent-dispatch-guide.md`):**
-- `Agent` -- absent from ensign subagent context (per references/agent-dispatch-guide.md verification matrix). FO dispatches themed reviewer teammates (debate-driven pattern) before invoking you. You read their findings from the entity file and classify them.
+- `Agent` -- you run as an ensign subagent, which does not have the Agent tool. FO dispatches themed reviewer teammates (debate-driven pattern) before invoking you. You read their findings from the entity file and classify them.
 - `AskUserQuestion` -- FO owns captain interaction. If escalation is genuinely needed, write `feedback-to: captain` in the Stage Report and return; FO routes to captain.
 
 ---
@@ -138,7 +138,7 @@ The ensign reads reviewer findings from the entity file, classifies them (Step 3
 
 ## Step 1: Pre-Scan (Inline in Ensign Context)
 
-**Runs INLINE in your own orchestrator context before any parallel dispatch.** These six checks are mechanical -- they do not need fresh context and they do not benefit from subagent isolation. Per spec lines 332-339, run them in the review ensign's own context before paying for subagent dispatch overhead. The pre-scan findings feed classification in Step 3 alongside the agent findings.
+**Runs INLINE in your own orchestrator context before any parallel dispatch.** These five checks are mechanical -- they do not need fresh context and they do not benefit from subagent isolation. Per spec lines 332-339, run them in the review ensign's own context before paying for subagent dispatch overhead. The pre-scan findings feed classification in Step 3 alongside the agent findings.
 
 Capture `git diff {execute_base}..HEAD --stat` to get the list of changed files. For each file:
 
@@ -182,27 +182,6 @@ This is the inverse of Step 1b (stale references -- symbols removed, grep for re
 **False positive handling:** Exported public API symbols with zero in-repo import sites may be called externally. Do NOT apply API surface exclusion logic -- flag the orphan and let Step 3 classification do dedup with the correctness-reviewer's findings. If correctness-reviewer also flags the same symbol, the classification pass handles dedup (build-review SKILL.md Step 3 classification merges pre-scan + agent findings).
 
 Pre-scan findings flow into Step 3 classification **alongside** findings from the parallel agents. They are not "extra"; they are the mechanical floor of the review.
-
-### 1f -- Conditional Forge Audit (Skill Entities Only)
-
-**Condition**: Check whether `git diff {execute_base}..HEAD --name-only` contains any path matching `skills/*/SKILL.md`. If NO skill files are in the diff, skip Step 1f entirely -- no output, no finding, no log line. This check is explicitly conditional, unlike Steps 1a-1e which run on every entity.
-
-When the condition is met, run two sub-checks:
-
-**(1) Forge validate-only audit.** Invoke `kc-plugin-forge` via the Skill tool with route `validate-only` and the repo root path. Filter the output to only findings that reference skill paths present in the diff. Map each finding to the pre-scan severity schema:
-- Frontmatter violations (missing/malformed name, description) -> MEDIUM/CODE, source `pre-scan:forge-audit`
-- Structure violations (missing SKILL.md, wrong directory layout) -> HIGH/CODE, source `pre-scan:forge-audit`
-- Naming convention violations (skill name vs directory name mismatch) -> LOW/CODE, source `pre-scan:forge-audit`
-- Reference integrity failures (broken file references in SKILL.md) -> HIGH/CODE, source `pre-scan:forge-audit`
-
-**Fallback**: If the Skill tool invocation of `kc-plugin-forge` fails (tool unavailable, agent dispatch error, timeout), fall back to inline structural checks:
-- Read each diff-touched `skills/*/SKILL.md` and verify: frontmatter has `name` and `description` fields, skill directory contains SKILL.md, any `references/` paths cited in SKILL.md exist on disk.
-- Record findings with the same severity mapping. Log "forge-audit: inline fallback (Skill invocation failed: {error})" in the pre-scan summary.
-
-**(2) Test existence sub-check.** For each skill path `skills/{name}/SKILL.md` in the diff, check whether the SKILL.md is a **new file** (added by the diff) or a **modification of an existing file**:
-
-- **New skill** (SKILL.md added by diff): grep the diff for corresponding test files matching `skills/{name}/tests/*` or `tests/*{name}*`. If NO test file is present, produce a finding: severity HIGH, root CODE, source `pre-scan:test-existence`, description "New skill {name} SKILL.md added but no test file in diff -- skill shipping without tests (entity-068-class gap)".
-- **Existing skill modification** (SKILL.md modified, not new): check whether `skills/{name}/tests/` directory exists on disk. If the directory exists, grep the diff for test files -- if SKILL.md changed substantially but no test file updated, produce a finding: severity MEDIUM, root CODE, source `pre-scan:test-existence`, description "Skill {name} SKILL.md modified but no test file updated in diff -- verify tests cover new behavior". If the directory does NOT exist, this is a spec-only skill with no executable tests by design -- produce NO finding (NIT/DOC noise would fire on every skill-spec entity).
 
 ---
 
@@ -356,11 +335,11 @@ Return control to FO. FO reads the verdict and `feedback-to` field and routes ac
 
 ### Pre-Scan Runs Inline Before Parallel Dispatch
 
-- **ALWAYS run pre-scan inline in the review ensign's own context BEFORE dispatching the 8 review agents.** The six pre-scan checks (CLAUDE.md walk, stale refs, dependency chain, plan consistency, goal-backward verification, forge audit) are mechanical; they do not need fresh context; they feed classification alongside agent findings. Running them inline costs nothing and locks in the mechanical floor.
+- **ALWAYS run pre-scan inline in the review ensign's own context BEFORE dispatching the 8 review agents.** The four pre-scan checks (CLAUDE.md walk, stale refs, dependency chain, plan consistency) are mechanical; they do not need fresh context; they feed classification alongside agent findings. Running them inline costs nothing and locks in the mechanical floor.
 - **NEVER skip pre-scan with the rationale "code-reviewer reads the diff anyway, my pre-scan would just duplicate what it finds".** Pre-scan is not duplication -- it covers project-wide CLAUDE.md rule walks, stale references outside the diff, and PLAN-vs-diff consistency, none of which a diff-scoped code-reviewer sees. Conflating "agent reads diff" with "pre-scan covers the same ground" is silently clever overriding of a load-bearing mechanical check.
 - **NEVER dispatch pre-scan as its own general-purpose subagent for "fresh context purity".** Fan-out to a fresh subagent is not architecturally cleaner when the check is mechanical -- it burns dispatch overhead for no signal. The subagent-purity instinct is "fresh context always beats polluted context"; here it is wrong. Pre-scan runs in the ensign's own context, full stop.
 - **NEVER skip pre-scan for small diffs (<10 files) "to save latency".** Captain-is-waiting pressure is exactly the failure mode the pre-scan exists to withstand. Small diffs hide the same CLAUDE.md violations big ones do. Latency savings on a 2-second grep are not savings at all.
-- **NEVER reduce the pre-scan to a subset** (e.g. "only the CLAUDE.md rule check, skip stale refs and imports since those are too low-level for review"). All six checks run every time. Stale refs and broken imports are exactly what review catches before they reach UAT.
+- **NEVER reduce the pre-scan to a subset** (e.g. "only the CLAUDE.md rule check, skip stale refs and imports since those are too low-level for review"). All four checks run every time. Stale refs and broken imports are exactly what review catches before they reach UAT.
 
 ### CRITICAL and HIGH CODE Always Route Feedback-to Execute
 
@@ -381,19 +360,18 @@ Return control to FO. FO reads the verdict and `feedback-to` field and routes ac
 - **NEVER hand D2 candidates directly to FO via SendMessage** with "D2 feels urgent, I should just hand it to FO". The staging path is `## Pending Knowledge Captures` in the entity body; FO reads it from there in apply mode. SendMessage payloads are ephemeral and do not survive FO's apply-mode scan. Stage to the entity body, always.
 - **NEVER call knowledge-capture in BOTH modes** ("capture for D1, then apply for D2 to cover all cases"). The mode is mutually exclusive per invocation; calling apply from ensign context fails regardless of whether you also called capture first.
 
-### Forge Audit Is Conditional and Filtered
-
-- **ALWAYS check the diff for `skills/*/SKILL.md` before running forge audit.** Step 1f is explicitly conditional -- it only fires when the diff contains skill files. Running forge on every entity wastes cycles and produces irrelevant findings.
-- **ALWAYS filter forge output to diff-relevant skills.** Forge validate-only runs on the entire plugin. Unfiltered output includes findings for all 12+ skills, most of which are not touched by the current entity. Only findings referencing skill paths in the diff are pre-scan findings; others are discarded.
-- **NEVER skip the test existence sub-check because forge already ran.** Forge validate-only checks structural discipline (frontmatter, naming, references). It does NOT check whether test files exist for the skill. The test existence sub-check is independent of forge and runs regardless of forge success or failure.
-- **NEVER block review on forge failure.** Forge is an external dependency. If the Skill invocation fails, fall back to inline structural checks. The fallback covers frontmatter and reference integrity -- the highest-value forge checks. Log the fallback but do not escalate.
-
 ### Scope, Routing, and Hygiene
 
 - **Never review outside `git diff {execute_base}..HEAD`.** Review's scope is the execute iteration's diff, NOT the whole project. Full-project checks are build-quality's job and have already run before you.
-- **Never invoke other skills except `knowledge-capture` (Step 4) and `kc-plugin-forge` (Step 1f, conditional).** Review is a leaf orchestrator over external agents; it does not call other spacebridge skills.
+- **Never invoke other skills except `knowledge-capture` (Step 4).** Review is a leaf orchestrator over external agents; it does not call other spacebridge skills.
 - **Never edit code** -- your Write/Edit scope is strictly the entity body's `## Stage Report: review` and `## Pending Knowledge Captures` sections.
 - **Use `--` (double dash)** everywhere. Never `—` (em dash). Matches the rest of the build skill family.
+
+### Evidence Minimum
+
+- **NEVER write `## Stage Report: review` without a classified findings table.** The `### Findings` section must contain a markdown table with columns `Severity | Root | File:Line | Description | Source`. Every finding from pre-scan (Step 1) and agent dispatch (Step 2) must appear as a row. If the review produced zero findings, the table must still exist with a row: `| -- | -- | -- | No findings (clean diff) | pre-scan + agents |`. An empty or absent `### Findings` section is incomplete evidence -- downstream cannot distinguish "no findings" from "findings not recorded".
+- **NEVER write a findings row without a file:line citation.** Every finding row must include a specific `file:line` reference (e.g., `src/api/user.ts:42`). A finding described as "potential issue in the API layer" without a file:line citation is not actionable -- execute cannot locate what to fix, and the finding cannot be verified by re-reading the diff.
+- **NEVER write `## Stage Report: review` without pre-scan counts.** The `### Pre-scan` section must list the finding count for each of the five pre-scan checks: claude-md-compliance, stale-references, dependency-chain, plan-consistency, goal-backward. Zero counts are valid and expected for clean diffs. Omitting pre-scan counts makes it impossible to verify that all five checks actually ran.
 
 ---
 
