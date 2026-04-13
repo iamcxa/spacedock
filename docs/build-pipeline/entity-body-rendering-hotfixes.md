@@ -384,3 +384,19 @@ issues: []
 ### Commits
 - chore(index): add contracts for entity-body-rendering-hotfixes entering plan (2 files)
 - chore(plan): entity-body-rendering-hotfixes verify + exemplar subsections
+
+## Stage Report: execute
+
+- [x] task-0: DONE -- environment verification passed (wave 0)
+  All 8 pre-existing fix checks passed; exemplar subsection confirmed absent (checks 9-10); no blocking gaps found
+- [x] task-1: DONE -- canonical exemplar paragraph added to build-explore/references/output-format.md (wave 1)
+  Inserted after "Detail lines" paragraph; entity 008 + entity 047 named as canonical style references; commit a3b58d3
+- [x] task-2: DONE -- canonical exemplar paragraph added to build-clarify/references/output-format.md (wave 1)
+  Inserted after "Detail lines" paragraph; entity 047 named as decision-audit style reference; commit a3b58d3
+- [x] task-3: DONE -- cross-file consistency verification passed (wave 2)
+  6/6 checks pass: SKILL.md Step 7 + Step 6 use checklist format; blank-line rules present; both exemplar paragraphs present; no OLD flat bullets found
+
+## Files Modified
+
+- skills/build-explore/references/output-format.md (task-1: added "Canonical detail line exemplars" paragraph)
+- skills/build-clarify/references/output-format.md (task-2: added "Canonical detail line exemplars" paragraph)
