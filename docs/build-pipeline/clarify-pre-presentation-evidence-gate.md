@@ -1,7 +1,7 @@
 ---
 id: 091
 title: "Clarify pre-presentation evidence gate -- SO must Read-verify before asking captain"
-status: draft
+status: clarify
 context_status: awaiting-clarify
 source: captain feedback (2026-04-14 SO session -- captain caught unverified citations in assumption batch)
 started:
@@ -65,18 +65,22 @@ depends-on: []
 A-1: Step 1.5 skip condition at SKILL.md:115 only covers resume case (prior session). There is no rule preventing SO from informally skipping the Read for "same session" evidence. The gap is real — the spec mandates Read (line 119) but the skip condition allows SO to reason "same session, no drift" and skip without violating any explicit rule.
 Confidence: 🟢 Confident (0.95)
 Evidence: `skills/build-clarify/SKILL.md:115` skip condition text: "If Step 1 detected the resume case (all counts zero), also skip Step 1.5". No mention of same-session provenance. `SKILL.md:119` says "Read the cited file region using the Read tool" but this is a sub-step of 1a which SO can skip by rationalizing temporal freshness.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-2: SO agent Step 3 (science-officer.md:99) has no pre-presentation checkpoint for build-clarify. It says "follow the skill's 7-step flow" — full delegation with no SO-level verification gate before captain interaction begins.
 Confidence: 🟢 Confident (0.95)
 Evidence: `agents/science-officer.md:99` verbatim: "When running build-clarify: follow the skill's 7-step flow. Captain interacts via AskUserQuestion (loaded via ToolSearch)." No mention of Read-verification, provenance checking, or pre-Step-2 gates.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-3: Provenance detection is implicit in session context — SO can determine whether it personally Read a file by checking whether a Read tool call for that file:line exists in the current conversation context. No metadata tagging needed. The rule becomes behavioral: "if you cannot recall a Read call for the cited file in this session, Read it now."
 Confidence: 🟢 Confident (0.90)
 Evidence: Claude Code's conversation context preserves all tool calls. In Mode B (inline mapping), SO's context has Read calls for every mapped file. In Mode A (code-explorer dispatch), SO's context has the Agent dispatch + summary return but NOT Read calls for individual files. The distinction is observable from within the session.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-4: The fix is spec-text-only — 2 markdown files modified, no code changes, no scripts, no test infrastructure.
 Confidence: 🟢 Confident (0.95)
 Evidence: Both target files are markdown specs: `skills/build-clarify/SKILL.md` and `agents/science-officer.md`. Skill behavior is defined by spec text that the LLM follows. MEMORY.md: "Skill Contract Fixes Are Plan-Driven, Not Pipeline-Driven."
+→ Confirmed: captain, 2026-04-14 (batch)
 
 ## Open Questions
 
