@@ -1,7 +1,7 @@
 ---
 id: 076
 title: "Clarify open exploration loop -- captain-driven gray area discovery"
-status: review
+status: execute
 context_status: ready
 source: captain feedback during 052 clarify session (2026-04-13)
 started: 2026-04-13T10:05:00Z
