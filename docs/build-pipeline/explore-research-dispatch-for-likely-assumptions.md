@@ -1,14 +1,14 @@
 ---
 id: 075
 title: "Research dispatch architecture for discuss + plan pipeline"
-status: clarify
+status: plan
 context_status: ready
 source: captain observation during 052 clarify session (2026-04-13)
-started:
+started: 2026-04-13T10:05:00Z
 completed:
 verdict:
 score: 0.0
-worktree:
+worktree: .worktrees/spacedock-ensign-explore-research-dispatch-for-likely-assumptions
 issue:
 pr:
 intent: feature

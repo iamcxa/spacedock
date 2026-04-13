@@ -1,14 +1,14 @@
 ---
 id: 076
 title: "Clarify open exploration loop -- captain-driven gray area discovery"
-status: clarify
+status: plan
 context_status: ready
 source: captain feedback during 052 clarify session (2026-04-13)
-started:
+started: 2026-04-13T10:05:00Z
 completed:
 verdict:
 score: 0.0
-worktree:
+worktree: .worktrees/spacedock-ensign-clarify-open-exploration-loop
 issue:
 pr:
 intent: feature
