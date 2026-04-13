@@ -1,7 +1,7 @@
 ---
 id: 053
 title: "Next.js app — war room view + SSE live feed"
-status: execute
+status: quality
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started: 2026-04-13T18:00:00+08:00
@@ -267,3 +267,17 @@ app/api/events/route.ts (Route Handler -- SSE endpoint, polls events table 500ms
   Component hierarchy, layout pattern (2-column desktop), v1 component set, empty/loading/error states, accessibility notes.
 - [x] Sufficiency gate: PASS
   All assumptions confirmed, all options selected, all questions answered, UI Spec produced, zero unresolved items.
+
+## Stage Report: execute (feedback round 1)
+
+- [x] R-1 fixed — isNaN guard on parseInt
+  `spacebridge/ui/app/api/events/route.ts:10`: replaced `sinceParam ? parseInt(sinceParam, 10) : 0` with explicit `isNaN` check — `parseInt(sinceParam ?? "0", 10)` then `isNaN(parsed) ? 0 : parsed`. Malformed `?since=abc` now yields `lastSeenId=0` instead of NaN.
+- [x] R-2 fixed — SQLite DB handle closed on SSE abort
+  `spacebridge/ui/lib/db.ts`: `openReadOnlyDb()` now returns `ReadOnlyDbHandle { db, close() }` instead of bare `SpacebridgeReadDb`. `route.ts` calls `handle.close()` inside the `req.signal` abort listener before `controller.close()`.
+- [x] Tests added or updated to cover both fixes
+  Added 3 regression test cases to `spacebridge/ui/app/api/events/route.test.ts`: R-1 NaN fallback (`?since=abc`), R-1 partial parse (`?since=1.5e2`), R-2 abort triggers `close()` (verified by reopening DB file write-mode after abort).
+- [x] Per-item commit with conventional message (2 commits expected)
+  Commit 1: `fix(sse): guard NaN on ?since param and close DB handle on client abort` (03af2a2) — route.ts + db.ts
+  Commit 2: `test(sse): add regression tests for R-1 NaN guard and R-2 DB close on abort` (3620315) — route.test.ts
+- [x] Local test run: the new test cases pass
+  `bun test app/api/events/route.test.ts` — 7 pass, 0 fail (4 existing + 3 new). Full suite: 19 pass, 0 fail.
