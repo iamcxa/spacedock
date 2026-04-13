@@ -160,3 +160,53 @@ When assessing a gray area:
 5. **Found nothing, but standard domain options exist?** --> Track B.
 6. **Found nothing, no standard options?** --> Track C.
 7. **Alpha marker from brainstorming unresolved after search?** --> Track C.
+
+---
+
+## Research Upgrade Path
+
+After Step 5 hybrid classification, Step 5.5 dispatches researchers for assumptions and Track B options with external technology dependencies. Research results can upgrade or downgrade confidence scores -- but they cannot change the Track assignment.
+
+### When research confirms an assumption
+
+Append `(✓ research: {source} -- {finding})` to the assumption's `Evidence:` line. Adjust the numeric confidence score upward:
+
+| Pre-research confidence | After confirmed research |
+|---|---|
+| Likely (0.50-0.79) | Confident (add +0.10 to +0.15, cap at 0.95) |
+| Unclear (0.20-0.49) | Likely or Confident depending on finding depth |
+| Confident (0.80+) | No change -- already validated |
+
+Example: A-4 was Likely (0.75) based on one codebase usage. Researcher confirmed the external API behavior. Result: Confident (0.90) with annotation.
+
+### When research contradicts an assumption
+
+The assumption's confidence drops to 0.0 and it must be reclassified or escalated:
+
+1. Append `(⚠ research contradicted: {source} -- {finding} -- see Research Findings)` to the Evidence line.
+2. Write a `## Research Findings` subsection with the 5-domain treatment for the contradiction.
+3. **Escalate options:**
+   - If a viable alternative exists in the codebase: reclassify to Track B (competing options now exist).
+   - If no viable alternative is known: escalate to Track C (Open Question for captain).
+4. Do NOT leave the assumption at its original confidence -- a contradiction invalidates codebase-only evidence.
+
+Example: A-5 was Likely (0.75) assuming "Next.js standalone server.js is importable". Researcher found it is NOT importable. Result: Track B (alternative import approach vs process-level hook) or Track C if no alternative is known.
+
+### What research CANNOT do
+
+- **Research cannot change the Track assignment unilaterally.** Reclassification (A→B, A→C) happens through the standard escalation paths above, triggered by a contradiction finding. Research that only confirms does not move tracks.
+- **Research cannot override the Priority Rule** (A over B over C). If research confirms a Likely assumption, it stays Track A at higher confidence -- it does not get promoted to a Track B for further discussion.
+- **Research does not replace codebase evidence.** Confirmed research adds to Evidence; it does not replace the original codebase-found evidence line.
+
+### Depth scaling (from entity scope)
+
+Research depth is calibrated to assumption confidence and entity scale:
+
+| Condition | Research mode |
+|---|---|
+| ALL assumptions Confident ≥0.95 AND no external tech claims AND Small scale | SKIP all research |
+| assumptions 0.85-0.94 Confident | Lightweight (1 researcher, targeted) |
+| assumptions 0.70-0.84 Likely | Standard (1-2 researchers, parallel) |
+| assumptions <0.70 Unclear | Deep (2-3 researchers, parallel + continuation) |
+
+The skip threshold is intentionally high (all ≥0.95) because research includes deep internal codebase tracing, not just WebSearch. Surface-level grep is not sufficient validation at Confident thresholds.

@@ -130,11 +130,12 @@ Summary block written at the end of the explore stage output. The FO and status 
   α-1 (protocol), α-2 (storage) resolved via codebase; α-3 (state) escalated to Q-3
 - [x] Scale assessment: revised from Small to Medium
   initial Small was Brainstorming Spec estimate; 14-file breadth + 3 open questions push to Medium
+- [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident, no external tech claims)
 ```
 
 **Detail lines (optional, Tier 1 rendering):** Each checklist item MAY have a single detail line directly below it, indented with 2 spaces (do not use tabs or deeper indentation). The dashboard parser reads this as the `detail` field of the Stage Report item and renders it under the metric in the UI card. Tier 1 detail is a single line -- multi-line detail is Tier 2 work deferred to Phase F. Keep detail concise: the "what" of each metric (file names, entity IDs, counts) so a reviewer understands the metric without opening the entity body.
 
-Six items, always in this order. Each item MUST use checklist format (`- [x]` for done, `- [ ]` for pending, `- [ ] SKIP: ...` or `- [ ] FAIL: ...` for partial stages) -- this is the parser contract defined at `tools/dashboard/src/frontmatter-io.ts:140`. Flat bullet format (`- {metric}`) is a drift bug; the dashboard will render the Stage Report card as empty. Field names must match exactly (the FO and status script parse these). Scale assessment uses one of: `confirmed` (no change from brainstorm's estimate) or `revised from X to Y` (where X and Y are `Small`, `Medium`, or `Large`).
+Seven items, always in this order. The seventh item (`Research dispatched`) is new as of entity 075. Use `- [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident, no external tech claims)` when Step 5.5 is skipped. Each item MUST use checklist format (`- [x]` for done, `- [ ]` for pending, `- [ ] SKIP: ...` or `- [ ] FAIL: ...` for partial stages) -- this is the parser contract defined at `tools/dashboard/src/frontmatter-io.ts:140`. Flat bullet format (`- {metric}`) is a drift bug; the dashboard will render the Stage Report card as empty. Field names must match exactly (the FO and status script parse these). Scale assessment uses one of: `confirmed` (no change from brainstorm's estimate) or `revised from X to Y` (where X and Y are `Small`, `Medium`, or `Large`).
 
 ---
 
@@ -161,3 +162,31 @@ APPROACH: Use REST polling for real-time updates (contradicted: src/server.ts:42
 Format: `(contradicted: {evidence} -- see Q-{n})`
 
 Always links to the relevant open question or option comparison. Used when exploration found evidence that challenges the brainstorming spec's claim.
+
+### Research Evidence
+
+Research annotations are written by Step 5.5 (explore-phase research dispatch) and Step 3.5 (SO post-brainstorm research dispatch). Two sub-formats depending on the outcome:
+
+**Confirmed research** -- appended to the assumption's `Evidence:` line when a researcher validates the assumption:
+
+```
+A-4: Socket bind timing is safe for async initialization.
+Confidence: Confident (0.90)
+Evidence: src/server.ts:55 -- bind deferred to listen() call (✓ research: MDN/net.Server -- listen() is non-blocking, emits 'listening' event; safe for async init)
+```
+
+Format: `(✓ research: {source} -- {finding})`
+
+Grep compatibility: `grep '✓ research:' entity.md` finds all confirmed research annotations.
+
+**Contradicted research** -- when a researcher contradicts an assumption, two changes are made:
+1. Append to the assumption's `Evidence:` line: `(⚠ research contradicted: {source} -- {finding} -- see Research Findings)`
+2. Write a `## Research Findings` subsection with the full 5-domain treatment so the conflict context is preserved for clarify.
+
+```
+A-5: Next.js standalone server.js is importable and hookable.
+Confidence: Unclear (0.30)
+Evidence: docs/deployment.md:12 -- describes standalone output (⚠ research contradicted: Next.js docs/GitHub -- standalone server.js is NOT importable; it is a self-contained executable -- see Research Findings)
+```
+
+The `## Research Findings` subsection for contradictions uses the 5-domain format (Upstream Constraints / Existing Patterns / Library/API Surface / Known Gotchas / Reference Examples) from `skills/build-research/SKILL.md`, so clarify has full context on why the assumption was contradicted.
