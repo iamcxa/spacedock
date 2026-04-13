@@ -1,7 +1,7 @@
 ---
 id: 053
 title: "Next.js app — war room view + SSE live feed"
-status: review
+status: execute
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started: 2026-04-13T18:00:00+08:00
