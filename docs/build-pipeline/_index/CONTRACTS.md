@@ -66,7 +66,7 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Correct pr-review-toolkit bundling claim at line 183 | ✅ final | 2026-04-12 |
 | review-stage-parallel-skill-dispatch | execute | Add dispatch: debate-driven to review stage YAML + update prose | 🟡 in-flight | 2026-04-12 |
-| pre-ship-confidence-gate | plan | Document confidence gate in uat and shipped stage definitions | 🔵 planned | 2026-04-13 |
+| pre-ship-confidence-gate | execute | Document confidence gate in uat and shipped stage definitions | 🟡 in-flight | 2026-04-13 |
 
 ### docs/overhaul/recipes/phase-e-plan-3-build-pipeline.yaml
 
@@ -85,7 +85,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | kc-pr-flow-mod-integration | shipped | Create pr-review-loop library mod with skill-delegating 3-hook design | ✅ final | 2026-04-12 |
-| pre-ship-confidence-gate | plan | Add confidence display and < 90% PR blocking to merge hook | 🔵 planned | 2026-04-13 |
+| pre-ship-confidence-gate | execute | Add confidence display and < 90% PR blocking to merge hook | 🟡 in-flight | 2026-04-13 |
 
 ### mods/workflow-index-maintainer.md
 
@@ -103,7 +103,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| pre-ship-confidence-gate | plan | New reference doc: 5-factor pre-ship confidence scoring specification | 🔵 planned | 2026-04-13 |
+| pre-ship-confidence-gate | execute | New reference doc: 5-factor pre-ship confidence scoring specification | 🟡 in-flight | 2026-04-13 |
 
 ### references/first-officer-shared-core.md
 
@@ -111,7 +111,7 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | kc-pr-flow-mod-integration | shipped | Update FO shared core for layered mod scanning and pr-review-loop reference | ✅ final | 2026-04-12 |
 | review-stage-parallel-skill-dispatch | execute | Clarify team creation policy in single-entity mode section | 🟡 in-flight | 2026-04-12 |
-| pre-ship-confidence-gate | plan | Add Pre-Ship Confidence Gate subsection to Completion and Gates + Merge steps | 🔵 planned | 2026-04-13 |
+| pre-ship-confidence-gate | execute | Add Pre-Ship Confidence Gate subsection to Completion and Gates + Merge steps | 🟡 in-flight | 2026-04-13 |
 
 ### skills/build-brainstorm/SKILL.md
 
@@ -173,7 +173,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| pre-ship-confidence-gate | plan | Add skip_interactive_passed input and auto-fix iteration re-entry docs | 🔵 planned | 2026-04-13 |
+| pre-ship-confidence-gate | execute | Add skip_interactive_passed input and auto-fix iteration re-entry docs | 🟡 in-flight | 2026-04-13 |
 
 ### skills/code-explorer/SKILL.md
 
