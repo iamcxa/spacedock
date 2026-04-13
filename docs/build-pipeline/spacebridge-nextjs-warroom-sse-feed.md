@@ -2,7 +2,7 @@
 id: 053
 title: "Next.js app — war room view + SSE live feed"
 status: draft
-context_status: awaiting-clarify
+context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started:
 completed:
@@ -90,28 +90,34 @@ depends-on: [052]
 ## Assumptions
 
 A-1: SQLite WAL mode allows concurrent reads from the Next.js process while the daemon writes -- no DB locking conflicts.
-Confidence: Confident (0.95)
+Confidence: 🟢 Confident (0.95)
 Evidence: spacebridge/src/db.ts:23 -- `sqlite.exec("PRAGMA journal_mode = WAL")` already enabled for file DBs. SQLite WAL specification: multiple concurrent readers + one writer is the designed use case.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: `next build --output standalone` produces deployable artifact; daemon spawns `bun run .next/standalone/server.js` as child process.
-Confidence: Confident (0.95)
+Confidence: 🟢 Confident (0.95)
 Evidence: entity 049 V4-V5 -- build produced `.next/standalone/server.js`, `bun run ./server.js` served correctly. Entity 052 A-5 -- confirmed NOT importable, child process is the only option.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-3: shadcn init via `bunx shadcn@latest init` (no `--bun` flag), Tailwind v4 default, `tw-animate-css` for animations.
-Confidence: Confident (0.90)
+Confidence: 🟢 Confident (0.90)
 Evidence: (✓ research: shadcn CLI v4 docs confirm Bun first-class support; G1 gotcha documented and avoidable)
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-4: Non-interactive shadcn components (Card, Badge, Separator) usable in Server Components; interactive ones (Dialog, Tabs, Sheet) require `"use client"`.
-Confidence: Confident (0.90)
+Confidence: 🟢 Confident (0.90)
 Evidence: (✓ research: shadcn generates `"use client"` only on hook-using components; Next.js RSC boundary rules apply)
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-5: Entity card data (slug, title, status, stage) comes from entity markdown frontmatter -- same parsing logic as `tools/dashboard/src/frontmatter-io.ts`.
-Confidence: Confident (0.85)
+Confidence: 🟢 Confident (0.85)
 Evidence: tools/dashboard/src/frontmatter-io.ts -- existing YAML frontmatter parser handles all entity fields. Can be extracted or re-implemented in the Next.js app.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-6: Post-build step required: copy `.next/static/` into `.next/standalone/.next/static/` and `public/` into `.next/standalone/public/` (Next.js standalone doesn't auto-copy these).
 Confidence: Confident (0.95)
 Evidence: entity 049 Results section -- explicitly documented this post-build step. Standard Next.js standalone deployment requirement.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 ## Option Comparisons
 
@@ -125,6 +131,8 @@ Evidence: entity 049 Results section -- explicitly documented this post-build st
 
 Return value trace: daemon.ts `spawn()` needs the path to `server.js`. With `ui/`, the path is `${pluginRoot}/ui/.next/standalone/server.js`. With root, it's `${pluginRoot}/.next/standalone/server.js`. Both work; `ui/` is cleaner for separation of concerns.
 
+→ Selected: `spacebridge/ui/` as separate subproject -- captain, 2026-04-13
+
 ### O-2: SSE data flow -- how the Next.js SSE endpoint gets real-time events
 
 | Option | Pros | Cons | Complexity | Recommendation |
@@ -134,6 +142,8 @@ Return value trace: daemon.ts `spawn()` needs the path to `server.js`. With `ui/
 | Shared SQLite NOTIFY/trigger mechanism | Event-driven; no polling | SQLite has no built-in NOTIFY; would need a file-watch on the WAL or custom trigger; fragile and non-portable | High | Not recommended |
 
 Design doc invariant check: §3.4 says "SSE is one-way server→client". The internal daemon→Next.js data flow is orthogonal. Poll is simplest for v1; push can be added later without changing the SSE client contract. Return value trace: SSE endpoint reads events table → streams to EventSource → client renders. No downstream consumer depends on push latency being <500ms for v1.
+
+→ Selected: Poll events table (500ms interval) -- captain, 2026-04-13
 
 ### O-3: Entity data source for Server Component rendering
 
@@ -145,6 +155,8 @@ Design doc invariant check: §3.4 says "SSE is one-way server→client". The int
 
 Design doc invariant check: entity 057 (session registry) will eventually provide a cached entity projection. For v1, filesystem parse is the simplest approach that guarantees freshness. When 057 ships, the data source can switch to DB. Dependency inversion (inject entity scanner, same as A-7 in entity 056) makes this swap clean.
 
+→ Selected: Filesystem parse at request time -- captain, 2026-04-13
+
 ## Open Questions
 
 Q-1: Does entity 053 include the daemon-side file watcher implementation, or is that a separate entity?
@@ -155,6 +167,8 @@ Why it matters: The APPROACH says "file watcher events from the daemon are debou
 
 Suggested options: (a) Include file watcher in 053 -- daemon watches entity files, writes change events to events table, SSE streams them. Complete real-time experience. (b) Exclude file watcher -- 053 only consumes existing events table data. File watcher becomes a separate entity. Simpler 053 scope but live feed is limited to explicit events. (c) Minimal watcher -- daemon polls entity frontmatter for stage changes on a 5s interval (simpler than fs.watch), writes to events table. Not true file-watching but covers the primary use case.
 
+→ Answer: (b) Exclude -- entity 057 (Multi-root session registry + file watcher) already owns the file watcher scope. 053 consumes events table data written by FO (stage transitions), 057 (file changes), and 054 (comments). -- captain, 2026-04-13
+
 Q-2: Which shadcn components should be included in v1? This scopes the component library integration and affects the UI Spec.
 
 Domain: User-facing Visual
@@ -163,6 +177,8 @@ Why it matters: shadcn is "copy-paste" -- you add individual components, not the
 
 Suggested options: (a) Minimal: Card, Badge, Separator, Skeleton (loading states) -- just enough for entity cards + feed, (b) Standard: add Tabs, ScrollArea, Tooltip, DropdownMenu -- enables richer war room interactions, (c) Comprehensive: add Sheet, Dialog, Command, Table -- prepares for entity 054's detail view, (d) Captain decides based on war room wireframe
 
+→ Answer: (b) Standard -- Card, Badge, Separator, Skeleton, Tabs, ScrollArea, Tooltip, Button. Richer war room interactions without over-provisioning for 054. -- captain, 2026-04-13
+
 Q-3: What grouping/layout should the war room use for entity cards across multiple repos?
 
 Domain: User-facing Visual
@@ -170,6 +186,57 @@ Domain: User-facing Visual
 Why it matters: Multi-repo awareness is a core feature. The grouping strategy affects information density, navigation, and how users mentally map entities to repos. This decision feeds directly into the UI Spec.
 
 Suggested options: (a) Group by repo with collapsible sections -- clear hierarchy, scalable, (b) Flat grid with repo badge on each card -- simpler, good for few repos, (c) Kanban columns by pipeline stage with repo color coding -- stage-centric view, (d) Tabs per repo -- clean separation but loses cross-repo overview
+
+→ Answer: (a) Group by repo with collapsible sections. Tabs component for "All" + per-repo filtering. Clear hierarchy, scalable to many repos. -- captain, 2026-04-13
+
+## UI Spec
+
+### Design System
+- **Component library**: shadcn/UI (copy-paste model) + Tailwind CSS v4 + Radix primitives
+- **Init command**: `bunx shadcn@latest init` (NOT `--bun` flag)
+- **CSS config**: Tailwind v4 via `@import "tailwindcss"` + `@theme inline {}` in `globals.css` (no `tailwind.config.js`)
+- **Animations**: `tw-animate-css` package
+
+### v1 Component Set
+Card, Badge, Separator, Skeleton, Tabs, ScrollArea, Tooltip, Button
+
+### Component Hierarchy
+```
+app/layout.tsx (Server Component -- root layout, theme, fonts)
+└── app/page.tsx (Server Component -- fetch entities from filesystem + leases from DB)
+    ├── <Tabs> (Client Component -- "All" + per-repo tabs)
+    │   └── <RepoSection> (Server Component -- collapsible repo group)
+    │       └── <EntityCard> (Server Component -- Card + Badge + Tooltip)
+    │           ├── slug, title, status badge
+    │           ├── current stage badge
+    │           └── owner session badge (from entity_leases, if leased)
+    └── <LiveFeed> (Client Component -- "use client", EventSource SSE consumer)
+        ├── <ScrollArea> (wraps feed entries)
+        └── <FeedEntry> (event type icon + entity slug + timestamp + detail)
+
+app/api/events/route.ts (Route Handler -- SSE endpoint, polls events table 500ms)
+```
+
+### Layout Pattern
+- **Desktop**: Two-column layout. Left: entity cards (grouped by repo via Tabs). Right: live feed (ScrollArea, newest on top).
+- **Mobile (v1)**: Single column, live feed below cards. No special mobile treatment in v1.
+
+### Key Interactions
+- Tab switching filters cards by repo ("All" shows all repos)
+- Repo sections are collapsible (default: expanded)
+- Entity card click → navigates to entity detail page (entity 054, link only in v1)
+- Live feed auto-scrolls to newest event (top, since newest-first rendering)
+- Skeleton loaders during Server Component data fetch
+
+### Empty / Loading / Error States
+- **No sessions**: Full-page empty state with guidance ("No Claude Code sessions connected. Start a session with spacebridge installed to see entities here.")
+- **Loading**: Skeleton cards (Skeleton component) while Server Component fetches
+- **SSE disconnect**: Feed shows "Reconnecting..." banner, EventSource auto-reconnects
+
+### Accessibility
+- Radix primitives provide keyboard navigation + ARIA by default
+- Badge colors use semantic tokens (not raw hex) for contrast compliance
+- Tab panels use proper `role="tabpanel"` via shadcn Tabs component
 
 ## Stage Report: explore
 
@@ -187,3 +254,16 @@ Suggested options: (a) Group by repo with collapsible sections -- clear hierarch
   ~14 files across 4 layers; cohesive "view + data feed" unit despite 3-domain scope; decomposition not recommended
 - [x] Research dispatched: 1 researcher for 1 topic (post-brainstorm Step 3.5)
   shadcn/UI + Tailwind v4 + Bun: confirmed working, 7 gotchas documented, Tailwind v4 CSS-only config verified
+
+## Stage Report: clarify
+
+- [x] Assumptions confirmed: 6 / 6
+  All batch-confirmed by captain, 2026-04-13. Zero reclassified.
+- [x] Options selected: 3 / 3
+  O-1: spacebridge/ui/ separate subproject. O-2: Poll events table 500ms. O-3: Filesystem parse at request time.
+- [x] Questions answered: 3 / 3
+  Q-1: Exclude file watcher (entity 057 owns it). Q-2: Standard shadcn set (Card, Badge, Separator, Skeleton, Tabs, ScrollArea, Tooltip, Button). Q-3: Group by repo with collapsible sections + Tabs.
+- [x] UI Spec produced: yes
+  Component hierarchy, layout pattern (2-column desktop), v1 component set, empty/loading/error states, accessibility notes.
+- [x] Sufficiency gate: PASS
+  All assumptions confirmed, all options selected, all questions answered, UI Spec produced, zero unresolved items.
