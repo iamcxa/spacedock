@@ -310,7 +310,7 @@ Do NOT interpret line-by-line coverage gaps. Do NOT suggest tests to add. The nu
 
 ## Step 6: Assemble Structured Per-Check Verdict
 
-Collect the five check results from Steps 1-5 into a structured verdict per check category. This is the core of the Stage Report -- each check is its own pass/fail row with its own evidence snippet. Do NOT aggregate. Do NOT flatten to a single "mostly passing" summary. Do NOT compute percentages.
+Collect the six check results from Steps 1-5 (including Step 4.75) into a structured verdict per check category. This is the core of the Stage Report -- each check is its own pass/fail row with its own evidence snippet. Do NOT aggregate. Do NOT flatten to a single "mostly passing" summary. Do NOT compute percentages.
 
 **The Stage Report contains a structured verdict per check category, not an aggregate.** Aggregating loses the signal FO needs to route feedback correctly. A single "3/4" or "mostly passing" line erases which gate closed, which blocks downstream automation from branching on a specific failure.
 
@@ -327,7 +327,7 @@ evidence:
 ```
 ```
 
-Repeat this shape for `lint`, `typecheck`, `build`, `regression`, `coverage`.
+Repeat this shape for `lint`, `typecheck`, `build`, `regression`, `ratchet`, `coverage`.
 
 For `regression` (Step 4.5), use this shape:
 
@@ -432,6 +432,16 @@ evidence:
 {if fail:} prior-entity: {entity-slug}
 {if fail:} overlapping-file: {file path from CONTRACTS.md}
 
+### ratchet
+verdict: {pass|fail|skipped}
+command: n/a -- composite of per-language ratchet checks
+evidence:
+```
+{per-language ratchet results from Step 4.75}
+{if fail: which language, which ratchet, current vs baseline counts}
+{if skipped: "first run -- baselines initialized, no comparison"}
+```
+
 ### coverage
 verdict: {pass|fail|skipped}
 command: {bun test --coverage | n/a}
@@ -442,6 +452,8 @@ evidence:
 
 notes: {one line if any input field was missing, else omit}
 ```
+
+**Baseline update.** After determining overall verdict `pass`, update ops.config.json `ratchet_baselines` with current counts from Step 4.75. Use Read + Write to atomically update the file. If ops.config.json does not exist, create it with the `ratchet_baselines` key only. Do NOT update baselines if overall verdict is `fail` or `pass (pre-existing failures noted)` -- baselines only advance on a clean overall pass.
 
 Write the report with the Write or Edit tool into the entity body at the `## Stage Report: quality` anchor (create the section if absent; replace in full if the section already exists from a prior quality run). Do not edit any other part of the entity.
 
@@ -475,7 +487,7 @@ Write the report with the Write or Edit tool into the entity body at the `## Sta
 
 ### Binary Per-Check Verdict
 
-- **The Stage Report contains a structured verdict per check category**, not an aggregate. Each of `test`, `lint`, `typecheck`, `build`, `coverage` gets its own `verdict: {pass|fail|skipped}` row with its own evidence snippet.
+- **The Stage Report contains a structured verdict per check category**, not an aggregate. Each of `test`, `lint`, `typecheck`, `build`, `ratchet`, `coverage` gets its own `verdict: {pass|fail|skipped}` row with its own evidence snippet.
 - **NEVER report "MOSTLY PASSING (3/4)".** Prose-fuzzy aggregation hides which gate closed; downstream automation cannot branch on "mostly". FO needs to know exactly which check failed to route feedback correctly.
 - **NEVER apply a 75% threshold** or any other percentage-based aggregation. There is no 75% threshold. Any single failing check closes the quality gate.
 - **NEVER report a bare "FAIL with failing-test count".** Under-reporting. Captain and execute need the per-check breakdown plus the verbatim failing output to plan the fix, not just a count.
