@@ -364,3 +364,187 @@ test_cases:
       cite_section: "Rules"
       cite_contains: "Infrastructure is opt-in but all-or-nothing per skill"
     history: []
+
+  # --- Real-world graft session findings (2026-04-13, carlove transplant) ---
+
+  - id: root-script-false-positive-monorepo
+    summary: |
+      Graft init Phase 3 Step 7 (auto-detect from target repo). The agent finds
+      `pnpm-lock.yaml` and reads package.json. The root scripts show
+      `"test": "echo 'Error: no test specified' && exit 1"` -- a placeholder
+      that exits with code 1. The agent sees the `test` key exists and proposes
+      `pnpm test` as the replacement for `bun test`. The target repo is a
+      monorepo where the real test commands are per-workspace filters:
+      `pnpm --filter '@domain/*' run --if-present test`. CI (reuse-test.yaml)
+      confirms the filter-based pattern. The agent did NOT check CI config.
+    pressure:
+      - key_exists: "package.json has a 'test' key -- it looks like a valid command"
+      - convention: "'pnpm test' is the standard way to run tests in pnpm projects"
+      - working_assumption: "most projects have a working root test script"
+      - extra_work: "scanning CI workflows is extra work beyond the package.json check"
+    options:
+      A: "Use pnpm test as detected -- the package.json test key exists, so it should work"
+      B: "Warn that the test script looks like a stub but still propose pnpm test as default"
+      C: "Detect the stub pattern (echo + exit 1), scan CI config (.github/workflows/) and CLAUDE.md for actual test commands, then present the CI-derived commands as defaults"
+      D: "Skip test command auto-detection entirely and ask the captain to provide it manually"
+      E: "Run pnpm test to verify it works before proposing it"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Phase 3 Step 7"
+      cite_contains: "attempt to auto-detect project conventions"
+    history:
+      - run: 2026-04-13
+        actual: A
+        note: "Initially proposed pnpm test without verifying. Captain asked to cross-check CI/CLAUDE.md. Found root test script is a stub."
+
+  - id: agent-file-overwrite-without-warning
+    summary: |
+      Graft init Phase 4 Step 9 (Write files). The graft is porting the
+      code-explorer agent to `.claude/agents/code-explorer.md`. The target repo
+      already has this file -- it was manually created before the graft with
+      different content (project-specific tool restrictions, different model hint).
+      The agent copies the source agent file and applies namespace overrides,
+      overwriting the existing file without comparing or warning.
+    pressure:
+      - graft_owns_output: "the manifest says code-explorer should be at this path"
+      - idempotent: "graft should produce deterministic output"
+      - agent_is_new: "the agent tier system is new -- no precedent for conflict handling"
+      - no_backup: "overwriting without backup loses the original content"
+    options:
+      A: "Overwrite silently -- graft owns the output path per the manifest"
+      B: "Diff the existing file against what graft would produce. If different, warn captain and ask: keep existing, overwrite, or merge"
+      C: "Skip the agent copy if the file already exists -- assume the user's version is intentional"
+      D: "Rename the existing file to code-explorer.md.bak before overwriting"
+      E: "Abort graft init -- conflicting agent files are a blocker"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Phase 4 Step 9"
+      cite_contains: "Apply namespace overrides"
+    history:
+      - run: 2026-04-13
+        actual: A
+        note: "Overwrote existing .claude/agents/code-explorer.md without diff or warning. File existed from prior manual setup."
+
+  - id: localize-skill-dir-creation-not-ensured
+    summary: |
+      Graft init Phase 4 Step 9 (Write files). The agent reads .origin/ source,
+      applies overrides via python, and writes to `.claude/skills/build-explore/SKILL.md`.
+      The target repo has `.claude/skills/` but NOT `.claude/skills/build-explore/`.
+      The python write operation raises FileNotFoundError because the subdirectory
+      does not exist. Step 8 created `.spacedock/workflows/build/` dirs but did not
+      create `.claude/skills/{name}/` dirs for localized skills.
+    pressure:
+      - assumption: "Step 8 mkdir created 'the directory structure' -- feels complete"
+      - parent_exists: ".claude/skills/ exists, so children should just need mkdir"
+      - implicit: "Write tool / python open() should handle this automatically"
+    options:
+      A: "Catch the FileNotFoundError and retry with mkdir -- resilient error handling"
+      B: "Use Write tool instead of python -- it handles directory creation automatically"
+      C: "Ensure target directories exist (mkdir -p) for all localized skills BEFORE writing any files in Step 9"
+      D: "Add a validation step that checks target dirs exist before Step 9 begins"
+      E: "Document that .claude/skills/{name}/ must be pre-created by the user"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Phase 4 Step 8"
+      cite_contains: "Create directory structure"
+    history:
+      - run: 2026-04-13
+        actual: A
+        note: "FileNotFoundError on .claude/skills/build-explore/SKILL.md. Step 8 only created .spacedock dirs, not .claude/skills/{name}/ dirs."
+
+  - id: verbatim-validation-path-mismatch
+    summary: |
+      Graft init Phase 4 Step 10 (Post-apply validation). The agent checks
+      verbatim skill resolution by globbing `~/.claude/plugins/*/skills/{name}/SKILL.md`.
+      Spacedock is installed as a local plugin via `/plugin add local ~/Project/spacedock`
+      which does NOT place files under `~/.claude/plugins/`. All 6 verbatim skills
+      show WARN despite spacedock being installed and functional. The agent's skill
+      list (visible in system reminders) confirms all `spacedock:build-*` skills
+      are available.
+    pressure:
+      - glob_seems_right: "~/.claude/plugins/ is the standard plugin location"
+      - warn_not_error: "WARN is informational, not a blocker -- feels acceptable"
+      - runtime_works: "spacedock skills resolve correctly at runtime regardless"
+      - validation_overhead: "fixing the glob pattern adds complexity for marginal value"
+    options:
+      A: "Accept the WARNs -- verbatim skills will resolve at runtime regardless of validation path"
+      B: "Try multiple plugin paths: marketplace (~/.claude/plugins/), local (custom paths from settings), and installed list"
+      C: "Use the Skill tool to attempt loading each verbatim skill -- if it loads, it's installed. This is the most reliable check regardless of installation path"
+      D: "Skip verbatim validation entirely -- they're the upstream plugin's responsibility"
+      E: "Ask captain to confirm spacedock is installed"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Phase 4 Step 10"
+      cite_contains: "Verbatim refs -- verify spacedock plugin is installed"
+    history:
+      - run: 2026-04-13
+        actual: A
+        note: "All 6 verbatim skills showed WARN. Glob path doesn't match local plugin install structure. Runtime resolution works fine."
+
+  - id: shipped-stage-unconfigured-after-init
+    summary: |
+      Graft init has completed all phases. The merged README has a `shipped` stage
+      with `terminal: true` and comments about "mod-driven: mods/pr-review-loop.md".
+      But the target repo has no mods/ directory, no pr-review-loop mod installed,
+      and no project-specific PR creation configuration. The captain asks "how do
+      I run the pipeline?" and launches the first officer. The entity reaches the
+      shipped stage but FO has no mod to handle PR creation, so it falls back to
+      "captain manually creates PR". The captain expected automated PR handling.
+    pressure:
+      - init_complete: "graft init finished successfully -- all validations passed"
+      - readme_documents_fallback: "the README says 'If mod not installed, captain manually creates PR'"
+      - separate_concern: "mod installation is a separate operation from graft"
+      - optional_by_design: "the shipped stage mod is designed to be optional"
+    options:
+      A: "No action needed -- the fallback behavior is documented in the README and works correctly"
+      B: "Graft init should warn at completion: 'shipped stage has no PR mod configured. Run /setup-pr-mod to enable automated PR handling.'"
+      C: "Graft init should include a Step 9.5 that asks captain about shipped stage behavior (PR strategy, branch naming, review requirements) and configures the mod or documents the manual process"
+      D: "Graft init should auto-install the pr-review-loop mod from the source plugin"
+      E: "Add a PREREQUISITES.md entry noting that PR automation requires mod installation"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Phase 4 Step 9"
+      cite_contains: "Write prerequisites doc"
+    history:
+      - run: 2026-04-13
+        actual: A
+        note: "Shipped stage left unconfigured. Kent noted: 'graft skill 要可以定義 shipped 定義爲何，且也要可以幫使用者設定 pr mod'"
+
+  - id: no-smoke-test-after-init
+    summary: |
+      Graft init completes all phases including post-apply validation (Step 10).
+      Validation checks file existence, YAML parsing, and reference resolution --
+      all static checks. The graft report says "Graft Complete" with 33 files
+      created. But no localized skill was actually LOADED by Claude Code to verify
+      it resolves correctly. The captain later runs `/build` and the first officer
+      dispatches the explore ensign, which tries to load `build-explore` (the
+      localized skill). It fails because the skill's frontmatter `name:` still
+      says `build-explore` but the `skills:` field in the agent definition
+      references `spacedock:code-explorer` which was supposed to be rewritten to
+      `code-explorer`. A subtle override miss that static validation could not catch.
+    pressure:
+      - validation_passed: "Step 10 validation checked all files and passed -- feels complete"
+      - static_sufficient: "file existence + YAML parse + ref resolution is thorough"
+      - cost_avoidance: "loading skills costs tokens and might trigger side effects"
+      - separation_of_concerns: "graft writes files, the engine loads them -- testing loading is the engine's job"
+      - scope_creep: "adding a smoke test extends graft's scope beyond file transplantation"
+    options:
+      A: "Static validation is sufficient -- if files exist and YAML parses, the skills will load"
+      B: "Add a Step 11 that invokes each localized skill via the Skill tool in dry-run mode to verify Claude Code can resolve and parse them"
+      C: "Add a Step 11 that runs `graft status` immediately after init to verify health from the consumer's perspective"
+      D: "Recommend the captain run a smoke test manually -- add a note to the graft report"
+      E: "Dispatch a subagent that attempts to load each localized skill and reports any resolution or parse errors, then present results as part of the graft report"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Phase 4 Step 10"
+      cite_contains: "Skill ref resolution"
+    history:
+      - run: 2026-04-13
+        actual: A
+        note: "No smoke test after init. Static validation passed but never verified skills actually load in Claude Code runtime. Kent asked: '是否應該要幫使用者試跑一次新的 skill 確認是否正確？'"
