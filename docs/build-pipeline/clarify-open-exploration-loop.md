@@ -481,3 +481,43 @@ None
 **Binary verdict: PASSED**
 
 All applicable quality checks are complete. Entity 076 is a documentation update (Small scope, 3 markdown files modified) with zero code changes. TypeScript compilation passes (full project integrity verified). Test suite and lint checks are skipped due to project infrastructure constraints and non-applicability to markdown changes. No quality issues detected.
+
+## Stage Report: review
+
+### Pre-scan
+
+- [x] CLAUDE.md compliance walk: DONE
+  No fabricated version numbers, no em dashes introduced, no destructive ops, double-dash convention maintained throughout Step 4.5 content.
+- [x] Stale refs grep: DONE
+  All file paths cited in diff are confirmed present: `skills/build-explore/references/gray-area-templates.md`, `docs/build-pipeline/_index/CONTRACTS.md`, `skills/build-clarify/references/ask-user-question-rules.md`. No dead references introduced.
+- [x] Plan consistency check: DONE
+  All 4 tasks completed per execute Stage Report. Task-1 acceptance_criteria verified (seen-topics x6, Complete x3, gray-area-templates.md ref, CONTRACTS.md ref, Step 5 not displaced). Task-2 criteria verified (Open Exploration Item section, Step 4.5 ref, A-6 example). Task-3/4 verified (Open exploration metric in both files, resume case routes to Step 4.5, skip-to-Step-5 ref removed). No deviations noted.
+- [x] Import/dependency graph: DONE
+  No code imports changed -- markdown-only diff. agents/science-officer.md Step 5 reference intact (uses name "Step 5 sufficiency gate", not positional index -- A-1 assumption holds).
+
+### Reviewer dispatch
+
+- [x] Reviewer teams: SKIPPED (markdown-only diff, < 5 files, no TypeScript)
+  Rationale: Pre-scan is the primary value for this diff. Correctness and style reviewers have no executable code to analyze. All structural correctness findings are captured below via pre-scan.
+
+### Findings
+
+| # | Severity | Root | Location | Description |
+|---|----------|------|----------|-------------|
+| F-1 | HIGH | DOC | SKILL.md:273,276,279 + output-format.md:92,101 | Arrow style inconsistency: Step 4.5 annotation instructions use `->` (ASCII) while all other steps in SKILL.md (lines 94-96, 138-141, 162-163, 197-199, 304-306) and all existing examples in output-format.md (lines 17, 29, 35-36, 54, 61, 76) use `→` (U+2192 unicode). Downstream parsers (build-plan, FO, status script) scan for `→ Confirmed:` / `→ Answer:` / `→ Selected:` patterns -- `->` will fail those grep-based checks. |
+| F-2 | LOW | DOC | output-format.md:85-106 | New `## Annotation: Open Exploration Item` section description text (lines 92-93) says annotation line "always appears immediately with mode `(interactive)`" but the inline example (line 101) uses `->` not `→`. The Rules block in the pre-existing Annotation sections (lines 33-39) explicitly says "Use `→ Confirmed:` or `→ Corrected by` ... consistently" -- the new section has no equivalent rule clarifying arrow style, leaving a gap. |
+| F-3 | NIT | DOC | CONTRACTS.md:117,123 | Both contract rows remain `🟡 in-flight` after execute completed. Not a blocking issue (CONTRACTS.md update is post-review work) but should be updated to `✅ final` on the next commit. |
+
+### Knowledge capture
+
+- [x] D1/D2 staging: SKIPPED
+  F-1 is HIGH/DOC (annotation format drift) -- not a novel generalizable pattern beyond "match arrow style to file convention". Does not meet D1 threshold (actionable gotcha requiring cross-session retention). F-2 and F-3 are LOW/NIT.
+
+### Verdict
+
+**FEEDBACK-TO-EXECUTE** -- F-1 is a HIGH CODE-adjacent DOC finding that will cause annotation parsing failures at runtime. `->` in Step 4.5 instructions must be replaced with `→` to match the grep patterns used by downstream parsers. F-2 should be fixed in the same pass. F-3 (CONTRACTS.md) is a NIT -- can be bundled with the fix commit.
+
+**Required fix before advance:**
+1. In `skills/build-clarify/SKILL.md` lines 273, 276, 279: replace `->` with `→` in the three annotation format lines inside Response handling.
+2. In `skills/build-clarify/references/output-format.md` lines 92, 101: replace `->` with `→` in the new Open Exploration Item section description and example.
+3. (Optional NIT) Update CONTRACTS.md entries for `clarify-open-exploration-loop` from `🟡 in-flight` to `✅ final`.
