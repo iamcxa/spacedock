@@ -217,6 +217,85 @@ or freeform response cites a file path or ADR, apply the same resolve-read-appen
 
 ---
 
+## Step 4.5: Open Exploration Loop
+
+After all pre-identified items from Steps 2-4 are resolved, Step 4.5 opens an exploration
+loop where SO proactively suggests gray areas the captain's domain knowledge may surface
+beyond what explore found.
+
+**Seen-topics computation:** Build the seen-topics set by scanning the entity body for all
+`A-{n}:`, `O-{n}:` (subsection headings in Option Comparisons), and `Q-{n}:` entries.
+Extract the topic label from each. This set prevents re-suggesting already-discussed topics.
+Also track template row identity (not just A-n label) to avoid re-suggesting the same gray
+area pattern under a different annotation number.
+
+**Suggestion generation from three sources:**
+
+- **Source 1 (templates):** Read `skills/build-explore/references/gray-area-templates.md`.
+  For each domain matching the entity's `## Captain Context Snapshot` Domain field, scan
+  the template table rows. Skip rows where the gray area is already covered by an item in
+  seen-topics (match by semantic overlap, not exact string). Collect uncovered template rows
+  as candidate suggestions.
+
+- **Source 2 (cross-entity):** Read `docs/build-pipeline/_index/CONTRACTS.md`. Find sibling
+  entities with the same `files_modified` paths as this entity's brainstorming spec mentions,
+  with status `in-flight` or `planned`. For each sibling, check if it implies a cross-entity
+  concern not yet in seen-topics (e.g., "entity X is also modifying file Y -- does this
+  entity need to coordinate?"). Collect as candidate suggestions.
+
+- **Source 3 (directive-implied):** Re-read the entity's `## Directive` and
+  `## Brainstorming Spec`. Identify technology or design choices implied by the directive
+  but not surfaced by explore (e.g., "the directive mentions 'WebSocket' but no assumption
+  or question addresses WebSocket connection management"). Collect as candidate suggestions.
+
+**Suggestion selection:** From all candidates, pick 2-3 most likely to surface actionable
+gray areas. Prioritize: cross-entity concerns (source 2) > uncovered templates (source 1) >
+implied technology (source 3), since cross-entity concerns are hardest for captains to spot
+independently.
+
+**AskUserQuestion presentation:** Build the AskUserQuestion payload:
+- `header`: "Gray areas" (10 chars)
+- `question`: "Are there gray areas not yet covered? Here are suggestions from domain analysis:"
+- `options`: 2-3 suggestion options, each with a `label` (the gray area name) and
+  `description` (1-sentence explanation of why it matters). Plus one terminal option:
+  `label: "Complete -- no more gray areas"`, `description: "All gray areas are covered.
+  Proceed to sufficiency gate."` -- this is always the last option.
+- If a suggestion has strong evidence, prefix its label with `(recommended)`.
+- Call `AskUserQuestion(...)`.
+
+**Response handling:**
+
+- If captain selects "Complete -- no more gray areas": exit Step 4.5, proceed to Step 5.
+- If captain selects a suggested gray area: discuss the gray area with the captain in plain
+  text. Based on the discussion, produce a new annotation in the entity body:
+  - If it resolves as an assumption: append `A-{next_n}: {statement}` + `Confidence:` +
+    `Evidence:` + `-> Confirmed: captain, {ISO-date} (interactive)` to `## Assumptions`.
+    Compute `next_n` as max existing A-n + 1.
+  - If it resolves as an open question with answer: append `Q-{next_n}: {question}` +
+    `Domain:` + `Why it matters:` + `Suggested options:` + `-> Answer: {response} (captain,
+    {ISO-date}, interactive)` to `## Open Questions`.
+  - If it requires an option comparison: append a new `### {name}` subsection with table +
+    `-> Selected: {choice} (captain, {ISO-date}, interactive)` to `## Option Comparisons`.
+  - Run the Canonical References accumulator if the captain cites any file paths.
+- If captain selects "Other" (harness-added freeform): treat the freeform text as a
+  captain-originated gray area. Discuss, annotate, and loop exactly as for a suggested
+  gray area.
+- After annotation, add the discussed topic to seen-topics and loop back to suggestion
+  generation (above) with the updated seen-topics set for fresh suggestions.
+
+**Rules specific to Step 4.5:**
+- Maximum 2-3 suggestions per iteration. Never present more than 3 suggestions plus
+  "Complete".
+- "Complete -- no more gray areas" is always present in every iteration as the last option.
+- No suggestion may repeat a topic from seen-topics. If all three sources produce zero new
+  candidates, present only the "Complete" option with a note: "All domain templates are
+  covered and no cross-entity concerns detected. Select Complete to proceed."
+- Step 4.5 inherits all Rules from the skill-level Rules section (double dash, entity body
+  checkpoint, AskUserQuestion rules, Canonical References accumulator, preserve explore
+  output).
+
+---
+
 ## Step 5: Context Sufficiency Gate
 
 Re-scan the entity body and verify:
