@@ -609,3 +609,41 @@ Notes: Tasks 2, 3, and 4 were committed together as one atomic wave-1 commit (3 
 - Bundling: **SKIP** (no entrypoints)
 
 **Auto-advance verdict**: **YES** — All mechanical checks pass. No failures detected. Entity advances to review stage.
+
+## Stage Report: review
+
+**Verdict**: PASS
+**Reviewed at**: 2026-04-13
+**HEAD**: 62c824b
+**Diff scope**: `git diff 2dc2841..HEAD` — 7 files (5 entity + 2 dashboard from quality fix)
+
+### Pre-scan
+- CLAUDE.md compliance: clean
+- Stale refs: none
+- Plan consistency: 5/5 tasks executed, all files_modified match
+- Unexpected files: tools/dashboard/package.json + channel.ts (quality-stage fix, commit 1fa1324, not in plan — harmless)
+
+### Findings
+
+| # | Severity | Root | Location | Finding |
+|---|----------|------|----------|---------|
+| F-1 | LOW | Spec gap | `references/confidence-gate.md` | Factor 3 "absent section" fallback was implicit — fixed in commit 62c824b |
+| F-2 | NIT | Clarity | `mods/pr-review-loop.md:58` | "Factors below average contribution" slightly ambiguous; display table makes intent clear regardless |
+| F-3 | NIT | Scope | dashboard files | Unrelated quality-fix files in diff; documented in commit message |
+
+### Key verifications
+- Composite formula Σ(score × weight)/100: mathematically correct, example computes 97.5% ✓
+- Factor weights 25/20/20/20/15 = 100, single source of truth in confidence-gate.md ✓
+- Auto-fix loop cap at 3 iterations, hard stop, captain escalation: present ✓
+- FO insertion point (post-UAT-gate, pre-shipped-advance): correct ✓
+- Merge hook step 0.5 (FO core) + step 1.5 (pr-review-loop): both present, BLOCK language unambiguous ✓
+- Legacy entity (no Confidence Assessment): warning-only path in both files ✓
+- LAST-occurrence parsing for multiple Stage Reports: stated in FO core and pr-review-loop ✓
+
+### Skill TDD summary
+- Test 1 (retrieval): 3/3 grep checks pass ✓
+- Test 2 (application): 4/4 mock scenarios match expected behavior ✓
+- Test 3 (gap check): ops.config.json absent → defaults ✓; missing Stage Report → F-1 fixed ✓; weight consistency across files ✓
+
+### Fix applied
+- F-1 fixed: added explicit rule to Factor 3 scoring: "`## Stage Report: review` entirely absent → treat as 0 CRITICAL/HIGH → 100%" (commit 62c824b)
