@@ -367,6 +367,12 @@ Return control to FO. FO reads the verdict and `feedback-to` field and routes ac
 - **Never edit code** -- your Write/Edit scope is strictly the entity body's `## Stage Report: review` and `## Pending Knowledge Captures` sections.
 - **Use `--` (double dash)** everywhere. Never `—` (em dash). Matches the rest of the build skill family.
 
+### Evidence Minimum
+
+- **NEVER write `## Stage Report: review` without a classified findings table.** The `### Findings` section must contain a markdown table with columns `Severity | Root | File:Line | Description | Source`. Every finding from pre-scan (Step 1) and agent dispatch (Step 2) must appear as a row. If the review produced zero findings, the table must still exist with a row: `| -- | -- | -- | No findings (clean diff) | pre-scan + agents |`. An empty or absent `### Findings` section is incomplete evidence -- downstream cannot distinguish "no findings" from "findings not recorded".
+- **NEVER write a findings row without a file:line citation.** Every finding row must include a specific `file:line` reference (e.g., `src/api/user.ts:42`). A finding described as "potential issue in the API layer" without a file:line citation is not actionable -- execute cannot locate what to fix, and the finding cannot be verified by re-reading the diff.
+- **NEVER write `## Stage Report: review` without pre-scan counts.** The `### Pre-scan` section must list the finding count for each of the five pre-scan checks: claude-md-compliance, stale-references, dependency-chain, plan-consistency, goal-backward. Zero counts are valid and expected for clean diffs. Omitting pre-scan counts makes it impossible to verify that all five checks actually ran.
+
 ---
 
 ## Red Flags -- STOP and escalate instead
