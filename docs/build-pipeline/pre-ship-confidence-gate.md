@@ -15,7 +15,7 @@ scale: Medium
 project: spacedock
 depends-on: [082, 083]
 parent: 085
-context_status: pending
+context_status: explored
 ---
 
 ## Directive
@@ -51,6 +51,70 @@ context_status: pending
 - [ ] Given the confidence gate auto-fix has iterated 3 times without reaching 90%, when the 3rd attempt completes, then the gate escalates to captain with a per-factor breakdown instead of retrying (how to verify: create scenario with persistent gap, observe escalation after 3 attempts)
 - [ ] Given a completed UAT with composite confidence >= 90%, when the confidence gate fires, then it advances to shipped without blocking (how to verify: ship entity with full test + type coverage, observe direct advance)
 - [ ] Given confidence gate factor weights in ops.config.json, when the weights are modified, then the gate uses the updated weights on the next run (how to verify: change weights in ops.config.json, re-run confidence gate, observe different composite score)
+
+## Assumptions
+
+A-1: The confidence gate inserts into FO's UAT→shipped routing logic. After FO reads UAT verdict = pass, it runs confidence scoring before advancing to shipped. No new pipeline stage needed.
+Confidence: Confident (0.90)
+Evidence: build-uat SKILL.md:186 -- "All items pass → verdict pass, no feedback-to, FO advances entity to shipped." README.md:397 -- "shipped" is terminal stage, mod-driven. Gate intercepts the FO transition, not the stage graph.
+
+A-2: All 5 factor data sources already exist in Stage Reports produced by prior stages. No new data collection needed -- the gate is a pure reader/scorer.
+Confidence: Confident (0.85)
+Evidence: quality Stage Report has test/type/lint/build verdicts per check (SKILL.md:159). Review Stage Report has classified findings table (SKILL.md:279). Execute Stage Report has per-task status + commit SHAs (SKILL.md:52). UAT Stage Report has per-item pass/fail/skipped (SKILL.md:197).
+
+A-3: Factor weights stored in ops.config.json alongside existing `coverage_threshold` (quality SKILL.md:144) and entity 083's `ratchet_baselines`.
+Confidence: Likely (0.75)
+Evidence: build-quality SKILL.md:144 -- ops.config.json read for coverage_threshold. Entity 083 A-2 confirmed ops.config.json for baseline storage. Adding `confidence_weights` follows same pattern.
+
+A-4: Auto-fix loop is a full pipeline re-entry: execute→quality→review→UAT→confidence. Each iteration dispatches 4 stages. With 3-iteration cap, max 12 stage dispatches for a stubborn gap.
+Confidence: Confident (0.85)
+Evidence: Pipeline README stage ordering is linear. There is no shortcut path that skips stages. FO dispatches stages in order per profile.
+
+## Option Comparisons
+
+### O-1: Auto-fix dispatch mechanism
+
+When confidence < 90%, how does the gate dispatch the fix?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Full pipeline re-entry | All stages re-run; quality gate catches regressions; consistent with existing fix flow | 4-stage overhead per iteration; max 12 dispatches for 3 attempts; heavy | High | Recommended |
+| Captain-assisted fix | Gate presents breakdown, captain writes fix task, controls iteration | Breaks automation; captain must be present; defeats "auto" in auto-fix | Low | Viable |
+| Targeted stage re-entry | Only re-run the stage that produced low score | Skips intermediate stages; fix might introduce review issues that get missed; violates stage ordering contract | Medium | Not recommended |
+
+## Open Questions
+
+Q-1: How is "integration breadth" (15% factor) computed? The APPROACH says "execute Stage Report files_modified coverage vs PLAN files_modified" -- does this mean (files actually modified / files planned to modify)?
+
+Domain: Behavioral/Callable
+
+Why it matters: This factor's definition determines whether it catches partially-completed entities (e.g., entity that planned 10 file changes but only modified 7). A clear formula is needed for the scoring implementation.
+
+Suggested options: (a) Ratio: count(files_modified in execute Stage Report) / count(files_modified in PLAN) -- simple percentage, (b) Binary: all planned files modified = 100%, any missing = 0% -- harsh but simple, (c) Weighted by task importance: critical-path tasks' files weighted higher than polish tasks
+
+Q-2: Does the auto-fix loop reset the UAT stage? If UAT already passed with captain sign-off, does the fix iteration require captain to re-approve all UAT items?
+
+Domain: Runnable/Invokable
+
+Why it matters: If UAT re-runs after a fix, captain must re-approve interactive items -- expensive and potentially annoying. If UAT is skipped or only re-runs automated items, interactive verification may be stale.
+
+Suggested options: (a) Full UAT re-run including interactive items -- captain re-approves everything, (b) Automated-only re-run -- skip interactive items that already passed, captain only reviews new/changed items, (c) UAT skip -- trust prior UAT pass, only re-run quality and review for the fix diff
+
+## Stage Report: explore
+
+- [x] Files mapped: 5 across skill, config, entity layers
+  build-uat SKILL.md:186 (UAT→shipped transition), build-quality SKILL.md:144 (ops.config), README.md:397 (shipped stage), entity 082 (evidence format), entity 083 (ratchet baselines)
+- [x] Assumptions formed: 4 (Confident: 3, Likely: 1)
+  A-1 FO routing insertion (0.90), A-2 Stage Report data sources (0.85), A-3 ops.config weights (0.75), A-4 full pipeline re-entry (0.85)
+- [x] Options surfaced: 1
+  O-1 auto-fix dispatch mechanism (full re-entry vs captain-assisted vs targeted)
+- [x] Questions generated: 2
+  Q-1 integration breadth formula; Q-2 UAT reset on auto-fix iteration
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorming spec
+- [x] Scale assessment: confirmed Medium
+  5 files mapped; FO routing modification + ops.config schema + scoring logic
+- [x] Research dispatched: 0 researchers (skipped -- all assumptions on internal architecture, no external tech claims)
 
 ## Problem
 
