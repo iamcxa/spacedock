@@ -1,7 +1,7 @@
 ---
 id: 078
 title: "Clarify-stage explore re-validation -- evidence freshness + consistency gates"
-status: plan
+status: execute
 context_status: ready
 source: decomposition of entity 077 (cross-phase skepticism)
 started: 2026-04-13T13:00:00Z
