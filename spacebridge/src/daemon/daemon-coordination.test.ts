@@ -142,4 +142,23 @@ describe("daemon coordination — stub-replaced bridge", () => {
       try { proc.kill("SIGTERM"); } catch {}
     }
   }, 10_000);
+
+  test("invalid coordination args return typed error response (R-2)", async () => {
+    const proc = spawnDaemon();
+    try {
+      await waitForSocket(socketPath());
+      const client = makeClient();
+      await client.connect();
+
+      // Pass a non-string entitySlug (number) to trigger Zod validation failure
+      const resp = await coordinationRequest(client, "acquireEntity", [42, "FO", "sess-bad"]);
+      expect(resp.error).toBeDefined();
+      expect(resp.error).toContain("Invalid coordination args");
+
+      client.close();
+    } finally {
+      proc.kill("SIGTERM");
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }, 15_000);
 });

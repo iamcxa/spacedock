@@ -14,6 +14,7 @@ import { createCoordinationClientBridge } from "../src/ipc/coordination-client-b
 import { createDb } from "../src/db";
 import { writePidFile, readPidFile, isProcessAlive } from "../src/daemon/pid";
 import { releaseLock } from "../src/daemon/lock";
+import { LeaseCommandSchema } from "../src/domain/lease/schemas";
 
 // ─── State directory resolution ──────────────────────────────────────────────
 
@@ -88,6 +89,27 @@ async function cmdStart(): Promise<void> {
       return { error: `RPC method ${req.method} not implemented in daemon stub` };
     },
     onCoordinationRequest: async (_sessionId, req) => {
+      // Build a LeaseCommand from the positional args and validate at the IPC boundary
+      // before dispatching to the bridge. getAvailableWork is not a LeaseCommand — skip.
+      if (req.method !== "getAvailableWork") {
+        const args = req.args as unknown[];
+        let rawCmd: unknown;
+        if (req.method === "acquireEntity") {
+          rawCmd = { type: "acquire", entitySlug: args[0], role: args[1], sessionId: args[2], leaseDurationMs };
+        } else if (req.method === "releaseEntity") {
+          const tok = args[0] as { token?: string };
+          rawCmd = { type: "release", token: tok?.token, outcome: args[1] };
+        } else if (req.method === "extendLease") {
+          const tok = args[0] as { token?: string };
+          rawCmd = { type: "extend", token: tok?.token, leaseDurationMs };
+        }
+        if (rawCmd !== undefined) {
+          const parsed = LeaseCommandSchema.safeParse(rawCmd);
+          if (!parsed.success) {
+            return { error: `Invalid coordination args: ${parsed.error.message}` };
+          }
+        }
+      }
       try {
         const method = req.method as keyof typeof bridge;
         const fn = bridge[method];
@@ -112,7 +134,11 @@ async function cmdStart(): Promise<void> {
   writePidFile(pidPath, process.pid);
 
   // Start janitor after socket is live
-  janitorTimer = setInterval(() => { bridge.expireDue(Date.now()); }, janitorIntervalMs);
+  janitorTimer = setInterval(() => {
+    bridge.expireDue(Date.now()).catch((err: unknown) => {
+      process.stderr.write(`[${ts()}] janitor error: ${(err as Error).message}\n`);
+    });
+  }, janitorIntervalMs);
 
   process.stderr.write(`[${ts()}] spacebridge daemon started (pid: ${process.pid}, socket: ${socketPath})\n`);
 
