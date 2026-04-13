@@ -647,3 +647,56 @@ Notes: Tasks 2, 3, and 4 were committed together as one atomic wave-1 commit (3 
 
 ### Fix applied
 - F-1 fixed: added explicit rule to Factor 3 scoring: "`## Stage Report: review` entirely absent → treat as 0 CRITICAL/HIGH → 100%" (commit 62c824b)
+
+## Stage Report: uat
+
+**Verdict**: PASS
+**Run at**: 2026-04-13
+**HEAD**: 62c824b
+
+### UAT Results
+
+| Item | Type | Command / Notes | Result | Evidence |
+|------|------|-----------------|--------|----------|
+| item-1 | cli | `grep -c "Factor [1-5]" references/confidence-gate.md` | PASS | 5 matches (lines 23, 48, 75, 102, 126 — one per factor heading) |
+| item-2 | cli | `grep "Pre-Ship Confidence Gate" references/first-officer-shared-core.md` | PASS | Found at line 292: `### Pre-Ship Confidence Gate` |
+| item-3 | cli | `grep -i "confidence gate" docs/build-pipeline/README.md \| wc -l` | PASS | 3 matches: uat stage comment (`# CONFIDENCE GATE`), shipped stage comment, shipped prose section |
+| item-4 | cli | `grep "Confidence Assessment" mods/pr-review-loop.md` | PASS | Found at line 56: step 1.5 reads `## Confidence Assessment` with display + BLOCK logic |
+| item-5 | cli | `grep "skip_interactive_passed" skills/build-uat/SKILL.md` | PASS | 3 matches: input field 6 (line 46), fallback note (line 48), auto-fix re-entry note (line 282) |
+| item-6 | cli | `grep "confidence_weights" references/confidence-gate.md` | PASS | 4 matches: read instruction (line 178), Section 6 header (line 202), schema block (line 209), defaults note (line 221) |
+| item-7 | interactive | Captain reviews `references/confidence-gate.md` — factor scoring formulas and auto-fix loop spec | SKIPPED | Captain ack required — FO handles AskUserQuestion in separate session |
+| item-8 | interactive | Captain reviews FO shared core changes — gate insertion point and merge hook display are architecturally sound | SKIPPED | Captain ack required — FO handles AskUserQuestion in separate session |
+
+### automated evidence
+
+**item-1**: `grep -c "Factor [1-5]" references/confidence-gate.md` → `5` (expected >= 5) ✓
+
+**item-2**: `grep "Pre-Ship Confidence Gate" references/first-officer-shared-core.md` → `292: ### Pre-Ship Confidence Gate` (non-empty) ✓
+
+**item-3**: `grep -i "confidence gate" docs/build-pipeline/README.md | wc -l` → `3` (expected >= 3):
+- `# CONFIDENCE GATE: After UAT gate passes...` (uat stage comment)
+- `# Confidence gate: FO displays per-factor...` (shipped stage comment)
+- `**Pre-ship confidence gate.**...` (shipped prose)
+
+**item-4**: `grep "Confidence Assessment" mods/pr-review-loop.md` → line 56 (non-empty) ✓
+- Step 1.5 includes: `Read \`## Confidence Assessment\`` + display table + `BLOCK PR creation` at line 58
+
+**item-5**: `grep "skip_interactive_passed" skills/build-uat/SKILL.md` → 3 matches (expected non-empty) ✓
+- Input field 6 defined, referenced in fallback note, and in auto-fix re-entry note after Step 6
+
+**item-6**: `grep "confidence_weights" references/confidence-gate.md` → 4 matches (expected non-empty) ✓
+- Schema with defaults (25/20/20/20/15) documented, read-path specified
+
+### captain decisions
+
+- item-7: SKIPPED — interactive, requires captain review of `references/confidence-gate.md`
+- item-8: SKIPPED — interactive, requires captain review of FO shared core architectural changes
+
+### summary
+
+- total items: 8
+- pass: 6
+- fail: 0
+- skipped: 2 (captain ack required — interactive items for FO session)
+
+**UAT verdict**: PASS (6/6 automated items pass, 2 interactive items deferred to captain via FO AskUserQuestion)
