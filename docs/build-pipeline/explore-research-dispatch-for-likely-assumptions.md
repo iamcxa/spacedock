@@ -10,7 +10,7 @@ verdict:
 score: 0.0
 worktree: .worktrees/spacedock-ensign-explore-research-dispatch-for-likely-assumptions
 issue:
-pr:
+pr: "#36"
 intent: feature
 scale: Large
 project: spacedock

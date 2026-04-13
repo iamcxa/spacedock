@@ -10,7 +10,7 @@ verdict:
 score: 0.0
 worktree: .worktrees/spacedock-ensign-clarify-open-exploration-loop
 issue:
-pr:
+pr: "#35"
 intent: feature
 scale: Small
 project: spacedock
