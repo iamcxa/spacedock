@@ -224,7 +224,7 @@
       var csValues = ["pending", "explored", "awaiting-clarify", "ready"];
       var csCounts = {};
       wf.entities.forEach(function (e) {
-        var cs = e.context_status || e["context_status"];
+        var cs = e.context_status;
         if (!cs) return;
         csCounts[cs] = (csCounts[cs] || 0) + 1;
         if (csValues.indexOf(cs) === -1) csValues.push(cs);
@@ -305,7 +305,7 @@
         var filtered = hasAnyFilter
           ? wf.entities.filter(function (e) {
               var stageMatch = stageFilters.size === 0 || stageFilters.has(e.status);
-              var csVal = e.context_status || e["context_status"];
+              var csVal = e.context_status;
               var csMatch = csFilters.size === 0 || csFilters.has(csVal) || !csVal;
               return stageMatch && csMatch;
             })
