@@ -2,7 +2,7 @@
 id: 054
 title: "Entity detail page + comments API (parity part 1)"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started:
 completed:
@@ -66,3 +66,88 @@ depends-on: [053]
 - Entity 056 (context ready): fmodel CQRS aggregate pattern (decider/evolve/types), dual-table persistence, Zod `.passthrough()`
 - Entity 050 (shipped): `comments` table already in schema.ts with fmodel columns (commentId, entityPath, selectedText, sectionHeading, content, author, resolved, resolvedReason)
 - Current dashboard: `tools/dashboard/src/comments.ts` -- JSON sidecar storage being replaced
+- Current dashboard: `tools/dashboard/src/comments.ts:65-81` -- addSuggestion/applyBodyEdit for inline edit proposals (scope question for 054)
+
+## Assumptions
+
+A-1: Comment decider follows 056's lease decider pattern -- pure function at `spacebridge/src/domain/comment/decider.ts`, same structure (commands → decide → events, evolve → state).
+Confidence: 🟢 Confident (0.95)
+Evidence: entity 056 APPROACH establishes the pattern; design doc §3.5 classifies both leases and comments as 🟢 full CQRS; schema.ts:60-80 comments table already has fmodel columns (event_type, aggregate_id, sequence_number, payload)
+
+A-2: Dual-table persistence -- `comments` table (snapshot projection, already in schema.ts) + new `comment_events` table (append-only event log). Same pattern as 056 O-1 (selected: dual table).
+Confidence: 🟢 Confident (0.95)
+Evidence: entity 056 O-1 captain selected dual table. schema.ts:62-80 comments table exists. Pattern is established and consistent.
+
+A-3: Detail page at `/entity/[slug]` -- standard Next.js App Router dynamic route in `spacebridge/ui/app/entity/[slug]/page.tsx`.
+Confidence: 🟢 Confident (0.95)
+Evidence: entity 053 O-1 selected `spacebridge/ui/` as the Next.js app directory. Dynamic routes are core Next.js App Router feature, proven by 049 spike.
+
+A-4: Entity body rendering via `react-markdown` (or `@next/mdx`) -- renders markdown to React components, compatible with Server Components.
+Confidence: 🟢 Confident (0.85)
+Evidence: react-markdown is the standard React markdown renderer, works with RSC. Entity body is markdown with YAML frontmatter. The frontmatter is already parsed separately (A-5 in 053); body needs markdown→HTML rendering.
+
+A-5: Auto-resolve is event-driven -- when a `stage_transition` event is written to events table, the comment domain processes it as a command that triggers `comment_resolved` events for all comments anchored to the previous stage.
+Confidence: 🟢 Confident (0.85)
+Evidence: design doc §3.5 -- comments listed as full CQRS with "auto-resolve on stage advance" in the scope. The decider can accept a `resolve_by_stage_advance` command type that bulk-resolves by section_heading matching.
+
+A-6: Comment reply threading uses `parent_id` field on the comments snapshot table -- flat storage with parent reference, not nested JSON.
+Confidence: 🟢 Confident (0.90)
+Evidence: schema.ts:62-80 comments table doesn't have a parent_id column yet, but addReply in comments.ts:29+ stores replies in a `thread: []` array. The CQRS version uses a flat table with parent_id for SQL queryability + LCD discipline. Requires adding `parent_id` column to comments table.
+
+## Option Comparisons
+
+### O-1: Reply threading depth
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Single-level replies (comment → replies, no nested replies) | Simple UI; flat query; matches existing dashboard pattern (comment.thread[]) | Can't have discussion threads deeper than 1 level | Low | Recommended |
+| Unlimited nesting (each reply can have replies) | Full discussion capability | Recursive queries; complex UI rendering; indentation hell on narrow screens; overkill for code review comments | High | Not recommended |
+| Two-level max (comment → reply → sub-reply, then stop) | Middle ground | Still needs recursion; marginal benefit over single-level | Medium | Viable |
+
+Design doc invariant check: the current dashboard's `comment.thread[]` is single-level. Entity 054 is "parity part 1" -- matching existing capability. Deeper threading is a future enhancement, not parity. Return value trace: `GET /api/entities/[slug]/comments` returns flat list with parent_id → UI groups by parent → single-level nesting renders cleanly in a Card component.
+
+### O-2: Suggestions (inline edit proposals) scope
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Defer suggestions to v2 (054 = comments only) | Smaller scope; focus on CQRS foundation; suggestions add diff logic (applyBodyEdit) that crosses comment domain into entity-editing domain | No parity with existing dashboard's addSuggestion/acceptSuggestion | Low | Recommended |
+| Include suggestions in 054 | Full parity with current dashboard; suggestions are tightly coupled to comments | Adds 3 more commands to decider (add_suggestion, accept_suggestion, reject_suggestion); applyBodyEdit needs entity file write access from the comment domain -- violates domain boundary | High | Not recommended |
+| Suggestion commands in comment domain, apply logic in separate module | Clean domain boundary; comment domain only stores suggestions, a separate module applies edits | Still complex; partial parity but cleaner architecture | Medium | Viable |
+
+Design doc invariant check: design doc §3.5 lists "Comments + replies (with auto-resolve)" as the 🟢 CQRS scope. Suggestions are not mentioned. Current dashboard's suggestions are a convenience feature, not a core coordination primitive. Entity title says "parity part 1" — suggestions can be part 2.
+
+### O-3: Comment anchoring strategy
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Section-based anchoring (match by `section_heading`) | Matches existing comments.ts pattern; sections are stable across minor edits; simple to implement | Can't anchor to specific lines within a section; less precise | Low | Recommended |
+| Line-based anchoring (line number + content hash) | Precise; code-review style | Line numbers shift on any edit; requires content-hash verification; complex reconciliation | High | Not recommended |
+| Both (section default, optional line-level) | Maximum flexibility | Over-engineered for v1; line-level has the same instability issues | Medium | Viable |
+
+Design doc invariant check: schema.ts:66-67 has `selected_text` and `section_heading` fields — both exist. The current dashboard uses section_heading for anchoring and selected_text for highlight context. This is proven and stable. Line-based is a v2 enhancement.
+
+## Open Questions
+
+Q-1: Should the entity detail page include a stage history timeline (showing all stage transitions with timestamps), or is that a v2 feature?
+
+Domain: User-facing Visual
+
+Why it matters: The directive mentions "stage history timeline" but the events table may not have comprehensive stage transition data yet (depends on what FO writes during dispatch). Including it in v1 means querying the events table for `type: 'stage_transition'` events for this entity. Excluding it simplifies the detail page to: header + body + comments.
+
+Suggested options: (a) Include -- query events table for stage transitions, render as a vertical timeline component. Data is available since FO writes stage events. (b) Exclude -- detail page is header + body + comments only. Stage history added when more event types are consistently written. (c) Minimal -- show current stage + previous stage only (from frontmatter, no events query).
+
+## Stage Report: explore
+
+- [x] Files mapped: 15 across ui(new), domain(new), schema, dashboard(reference)
+  ui: ~6 new files (detail page, route handlers, comment components); domain: ~5 new (comment decider, evolve, types, tests); schema: 2 read + 1 modify (add comment_events table + parent_id column); dashboard: 1 reference (comments.ts for parity comparison)
+- [x] Assumptions formed: 6 (🟢 Confident: 6, 🟡 Likely: 0, 🔴 Unclear: 0)
+  A-1 through A-6 all Confident (0.85-0.95); decider pattern, dual-table, dynamic route, markdown rendering, auto-resolve, flat threading
+- [x] Options surfaced: 3
+  O-1 reply threading depth; O-2 suggestions scope; O-3 comment anchoring strategy
+- [x] Questions generated: 1
+  Q-1 stage history timeline scope
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorm
+- [x] Scale assessment: confirmed Medium
+  ~15 files across 4 layers; cohesive "detail view + comments domain" unit; decomposition not recommended
+- [x] Research dispatched: 0 researchers (skipped -- all patterns established by 056/053, no external tech claims)
