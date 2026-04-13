@@ -886,3 +886,136 @@ None. Pre-populated research from SO (explore Step 3.5 / Step 5.5) covered shadc
 ### Summary
 
 All 4 mechanical checks PASS. Zero lint mandate. Full test coverage (515 tests), zero type errors, standalone build ready. Quality gate satisfied. Auto-advance to next stage.
+
+## Stage Report: review
+
+### 1. Pre-scan: CLAUDE.md compliance walk — DONE
+
+- No `--no-verify` or hook bypass found.
+- No `console.log` in production paths (only `console.warn` in entity-scan for skip events — correct).
+- No fabricated version pins in docs or code; versions come from package.json resolved by Bun.
+- No new `.claude/TODO-xxx.md` files created.
+- `force-dynamic` export on both `page.tsx` and `route.ts` prevents stale SSG — correct per CLAUDE.md E2E-first rule requiring runtime behavior.
+- Commits follow conventional commit format (`feat(053):`, `chore(053):`). All task commits present.
+- COMPLIANCE: PASS
+
+### 2. Pre-scan: stale references grep — DONE
+
+- `spacebridge/ui/lib/schema.ts` ABOUTME says "Keep in sync with `spacebridge/src/schema.ts` field additions." Current diff confirms 3 tables (sessions, entityLeases, events) are structurally identical to `spacebridge/src/schema.ts`. The `comments` table present in `src/schema.ts` is intentionally absent (not needed for war room view) — not a staleness issue.
+- `resolveNextjsServerScript` path `.next/standalone/ui/server.js` matches execute deviation note #3 confirming Next.js 16 standalone nesting. Consistent.
+- `docs/architecture/spacebridge-ui.md` references to port 8420 match ADR-001 and daemon spawn.
+- No stale `tools/dashboard/` cross-imports in `spacebridge/ui/` (MEMORY extract-pure-module pattern followed: `entity-parse.ts` is an inline duplicate, no import from `tools/dashboard/`).
+- STALE REFS: NONE
+
+### 3. Pre-scan: import graph / dependency chain check — DONE
+
+- `page.tsx` → `@/lib/entity-scan` → `@/lib/entity-parse` (pure, no external I/O)
+- `page.tsx` → `@/lib/db` (dynamic import, bun:sqlite, read-only)
+- `route.ts` → `@/lib/schema` (drizzle schema, pure), `@/lib/db` (dynamic import)
+- `nextjs-child.ts` → `node:child_process`, `node:fs`, `node:path` only — no spacebridge business logic leaked into child-spawn helper.
+- No circular imports detected.
+- `spacebridge/ui/` does not import from `spacebridge/src/` (correct isolation; cross-`node_modules` drizzle conflict avoided per deviation #2).
+- IMPORT GRAPH: CLEAN
+
+### 4. Pre-scan: plan consistency — DONE
+
+Plan tasks vs commits:
+- task-0 → `chore(053): task-0` ✓
+- task-1 → `feat(053): task-1` ✓
+- task-2 → `feat(053): task-2` ✓
+- task-3 → `feat(053): task-3` ✓
+- task-4 + task-6 → single commit (justified: `war-room.tsx` imports `live-feed.tsx`, build would fail otherwise) ✓
+- task-5 → `feat(053): task-5` ✓
+- task-7 → `feat(053): task-7` ✓
+- task-8 → `feat(053): task-8` ✓
+
+Files modified vs plan scope: all 9 tasks shipped their expected files. No unplanned files modified outside `spacebridge/ui/`, `spacebridge/bin/daemon.ts`, `spacebridge/src/daemon/nextjs-child.ts`, and `docs/`.
+
+Deviation #4 (task-6 bundled with task-4) is a valid technical necessity and documented. No plan deviation without justification.
+- PLAN CONSISTENCY: PASS
+
+### 5. Security review — DONE
+
+**Threat surface**: localhost-only daemon tool, no public network exposure, no auth layer (by design). Risk level is MEDIUM-LOW for this deployment context.
+
+**Findings**:
+
+**MEDIUM — SSE route: `parseInt` does not guard against `NaN`**
+- `route.ts:9`: `let lastSeenId = sinceParam ? parseInt(sinceParam, 10) : 0`
+- `parseInt("abc", 10)` returns `NaN`. Drizzle's `gt(events.id, NaN)` produces `WHERE id > NULL` in SQLite, which is always false. Effect: client sends `?since=abc`, receives no backlog events (silent empty stream, not a crash). Exploitability: low (local tool), but a crafted `since` value produces confusing silent failure.
+- Recommend: `const lastSeenId = sinceParam ? (isNaN(parseInt(sinceParam, 10)) ? 0 : parseInt(sinceParam, 10)) : 0`
+
+**LOW — SSE route: SQLite DB handle opened per-request, never explicitly closed**
+- `route.ts:14`: `const db = openReadOnlyDb()` inside `GET()`. `db.ts` wraps `new Database(path, { readonly: true })` but returns only the Drizzle wrapper — underlying `Database` instance has no close call anywhere in the SSE handler (including the abort cleanup path at line 44-47).
+- In Bun/SQLite, open `readonly` handles are GC'd on process exit (safe for a daemon child), and the SSE polling loop holds the connection alive for the duration of the stream. On abort (client disconnect), the interval is cleared, the controller is closed, but the DB handle leaks until GC. For a local tool with low concurrency this is acceptable, but under load (many tabs) could exhaust file descriptors.
+- Recommend: add `const sqlite = new Database(...); return drizzle(sqlite)` pattern with exposed `sqlite` ref for close; call `sqlite.close()` in the abort handler.
+
+**LOW — No auth on SSE endpoint or war room page**
+- By design (localhost-only, daemon spawns child on loopback). Consistent with existing dashboard architecture (ADR-001 / no auth). Not a finding requiring execute feedback — flagged for captain awareness only.
+
+**LOW — `projectRoot` from DB used as filesystem path without sanitization**
+- `page.tsx:47`: `scanEntitiesForRepo(s.projectRoot, label)` reads `projectRoot` directly from the `sessions` table. This path comes from `process.cwd()` at daemon connect time (`daemon.ts:219`), not from user input. Threat model: if the DB were tampered, an attacker could point `projectRoot` to an arbitrary path and read `.md` files from it. In a local daemon-only context the threat is negligible. `entity-scan.ts` constrains reads to `<projectRoot>/docs/build-pipeline/*.md` which limits blast radius even if `projectRoot` were manipulated.
+
+**NIT — `spawnNextjsChild` spreads `process.env` into child**
+- `nextjs-child.ts:19`: `env: { ...process.env, PORT: ..., SPACEBRIDGE_DB_PATH: ..., SPACEBRIDGE_STATE_DIR: ... }`. The daemon's full env (including any secrets in env vars) is inherited by the Next.js child. For a local dev tool this is standard practice and intentional, but worth noting for future production hardening.
+
+**SECURITY SUMMARY**: No CRITICAL or HIGH findings. Two LOW findings (DB handle leak, NaN guard) are quality-of-life issues rather than security vulnerabilities in this deployment context.
+
+### 6. Correctness review — DONE
+
+**LiveFeed reconnect status is inaccurate**
+- `live-feed.tsx:31`: `es.onerror = () => setStatus("reconnecting")`. `EventSource` auto-reconnects natively; the `onerror` callback fires on each failed poll attempt, not just on initial disconnect. The UI shows "Reconnecting..." immediately on any transient error even when `EventSource` has already recovered. However, `EventSource.onopen` fires again on reconnect, which resets status to `"connected"` — so the display eventually self-corrects. No data loss, UI flicker only.
+
+**`lastSeenId` mutation inside `start()` is safe (single-stream scope)**
+- `route.ts:33`: `lastSeenId` is captured per-request via closure. Correct — each SSE connection gets its own cursor. No cross-request state contamination.
+
+**`shutdownNextjsChild` double-resolve race is benign**
+- `nextjs-child.ts:62-64`: After SIGKILL, both `child.once("exit", resolve)` and `setTimeout(resolve, 500)` can fire. `Promise.resolve()` called twice on an already-resolved promise is a no-op in JS. Safe.
+
+**`resolveNextjsServerScript` default opts object is shared reference**
+- `nextjs-child.ts:75`: `opts: ResolveOpts = { checkExists: true }` — default argument is a literal object. In TS/Bun this is re-created per call (unlike Python mutable defaults). Not a bug.
+
+**`scanEntitiesForRepo` does not check for symlink traversal**
+- `readdir(pipelineDir)` followed by `readFile(join(pipelineDir, file))` — if a `.md` file is a symlink pointing outside the repo, it would be followed. In a local daemon context the threat is negligible; `file.endsWith(".md")` filter provides minimal protection. Not blocking.
+
+**`parseInt` NaN → silent empty SSE stream** — see Security §5 above.
+
+**CORRECTNESS SUMMARY**: One NIT-level behavior inaccuracy (reconnect status display), one LOW correctness gap (NaN `since` param). No silent failure paths that corrupt data.
+
+### 7. Style review — DONE
+
+**Comments**: `ABOUTME` headers are present on all new modules per project convention. No multi-paragraph docstrings. Only one inline comment worth noting: `route.ts:35` `// DB read error — skip this poll cycle` — appropriate. Comments explain WHY, not WHAT.
+
+**Type design**: `FrontmatterFields = Record<string, string>` is appropriately loose for YAML parsing. `SpacebridgeReadDb` type alias is correctly typed via `ReturnType`. `EntityCard` interface is flat and minimal. `RepoData` exported from `war-room.tsx` for `page.tsx` cross-import — clean.
+
+**Code simplifier observations**:
+- `page.tsx:42`: `[...new Map(...).values()]` for dedup is idiomatic but slightly opaque; a comment or rename would help. NIT only.
+- `route.ts:31-33`: `for (const row of rows) { ...; if (row.id > lastSeenId) lastSeenId = row.id; }` — the `if` guard is redundant since rows are filtered `gt(events.id, lastSeenId)` and ordered `asc`, so every row's `id` is already greater. Safe to simplify to `lastSeenId = row.id` at end of loop, but current code is correct (just defensive). NIT.
+
+**Test quality**: Tests follow TDD pattern. Integration tests use temp DBs with `Date.now()` suffix (correct isolation per MEMORY SQLite test isolation rule). `db.test.ts` scope narrowing is documented with the upstream bun issue reference (justified). No mock-heavy patterns.
+
+**STYLE: PASS, 2 NITs**
+
+### 8. Classified findings table — DONE
+
+| ID | Severity | Root | File | Summary |
+|----|----------|------|------|---------|
+| R-1 | LOW | CODE | `route.ts:9` | `parseInt` does not guard NaN — silent empty SSE stream on malformed `since` param |
+| R-2 | LOW | CODE | `route.ts:14` / `db.ts` | SQLite DB handle not closed on SSE abort — file descriptor leak under concurrency |
+| R-3 | LOW | CODE | `page.tsx:47` | `projectRoot` from DB used as FS path without sanitization (local context, acceptable) |
+| R-4 | NIT | CODE | `live-feed.tsx:31` | `onerror` → `"reconnecting"` status fires on every transient error, not just disconnect |
+| R-5 | NIT | CODE | `route.ts:33` | Redundant `if (row.id > lastSeenId)` guard — rows already filtered by `gt()` |
+| R-6 | NIT | CODE | `page.tsx:42` | Dedup via `new Map(...).values()` pattern is opaque without a comment |
+| R-7 | NIT | DOC | `nextjs-child.ts:19` | Full `process.env` inheritance by child noted — acceptable for local tool, flag for prod hardening |
+
+**CRITICAL/HIGH findings: ZERO. No feedback-to: execute required.**
+
+### 9. Knowledge-capture — DONE
+
+**D1 (auto-append)**: SSE polling pattern with per-request `lastSeenId` cursor (route.ts) is a clean stateless design — each connection independently tracks its position. No server-side state needed. Validated as correct for SQLite polling over Bun ReadableStream.
+
+**D2 (staging)**: Entity file context is a local daemon tool with no public network exposure — auth/CORS absence is by design (ADR-001 pattern), not an omission. Future entities adding public tunnel access (cloudflared) should add auth middleware at that point.
+
+---
+
+**Review verdict**: PASS. Zero CRITICAL/HIGH findings. Two LOW findings (NaN guard, DB handle leak) and four NITs are all non-blocking for a local daemon tool. Captain may choose to fix R-1 (NaN guard) as a quick one-liner before merge; R-2 (DB handle) is a polish item suitable for a follow-up entity. No execute feedback required.
