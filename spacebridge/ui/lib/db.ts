@@ -11,10 +11,18 @@ import * as schema from "./schema";
 
 export type SpacebridgeReadDb = ReturnType<typeof drizzle<typeof schema>>;
 
-export function openReadOnlyDb(dbPath?: string): SpacebridgeReadDb {
+export interface ReadOnlyDbHandle {
+  db: SpacebridgeReadDb;
+  close(): void;
+}
+
+export function openReadOnlyDb(dbPath?: string): ReadOnlyDbHandle {
   const resolvedPath = dbPath ?? defaultDbPath();
   const sqlite = new Database(resolvedPath, { readonly: true });
-  return drizzle(sqlite, { schema });
+  return {
+    db: drizzle(sqlite, { schema }),
+    close: () => sqlite.close(),
+  };
 }
 
 function defaultDbPath(): string {
