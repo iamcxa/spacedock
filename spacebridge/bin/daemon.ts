@@ -4,7 +4,7 @@
 // writes PID file, handles graceful shutdown via SIGTERM/SIGINT.
 // Called by shim auto-fork logic and by entity 059 CLI wrapper.
 
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { mkdirSync, existsSync, unlinkSync } from "node:fs";
 import * as net from "node:net";
@@ -15,6 +15,8 @@ import { createDb } from "../src/db";
 import { writePidFile, readPidFile, isProcessAlive } from "../src/daemon/pid";
 import { releaseLock } from "../src/daemon/lock";
 import { LeaseCommandSchema } from "../src/domain/lease/schemas";
+import { spawnNextjsChild, shutdownNextjsChild, resolveNextjsServerScript } from "../src/daemon/nextjs-child";
+import type { ChildProcess } from "node:child_process";
 
 // ─── State directory resolution ──────────────────────────────────────────────
 
@@ -142,10 +144,27 @@ async function cmdStart(): Promise<void> {
 
   process.stderr.write(`[${ts()}] spacebridge daemon started (pid: ${process.pid}, socket: ${socketPath})\n`);
 
+  // Spawn Next.js UI child process (skip via SPACEBRIDGE_SKIP_UI=1 for CI / lean tests)
+  let nextjsChild: ChildProcess | null = null;
+  if (process.env.SPACEBRIDGE_SKIP_UI === "1") {
+    process.stderr.write(`[${ts()}] SPACEBRIDGE_SKIP_UI=1 — skipping Next.js UI spawn\n`);
+  } else {
+    try {
+      const pluginRoot = resolve(import.meta.dir, "..");
+      const serverScript = resolveNextjsServerScript(pluginRoot);
+      const dbPath = join(stateDir, "spacebridge.db");
+      nextjsChild = spawnNextjsChild({ serverScript, port: 8420, dbPath, stateDir });
+      process.stderr.write(`[${ts()}] spawned Next.js UI (pid: ${nextjsChild.pid}, port: 8420)\n`);
+    } catch (err) {
+      process.stderr.write(`[${ts()}] WARNING: failed to spawn Next.js UI: ${(err as Error).message}\n`);
+      process.stderr.write(`[${ts()}] Run: cd spacebridge/ui && bun run build\n`);
+    }
+  }
+
   // Signal handlers for graceful shutdown
   const doShutdown = async () => {
     if (janitorTimer) clearInterval(janitorTimer);
-    await shutdown(server, pidPath, socketPath);
+    await shutdown(server, pidPath, socketPath, nextjsChild);
     process.exit(0);
   };
 
@@ -162,7 +181,9 @@ async function shutdown(
   server: ReturnType<typeof createSocketServer>,
   pidPath: string,
   socketPath: string,
+  nextjsChild: ChildProcess | null = null,
 ): Promise<void> {
+  if (nextjsChild) await shutdownNextjsChild(nextjsChild);
   await server.close();
   try { if (existsSync(pidPath)) unlinkSync(pidPath); } catch {}
   try { if (existsSync(socketPath)) unlinkSync(socketPath); } catch {}
