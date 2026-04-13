@@ -1049,3 +1049,17 @@ Detection table at line 54 explicitly routes to `vitest run` when `vitest.config
 ### Gate Decision
 
 All UAT items pass. No failures to route back to execute. Entity is ready to advance.
+
+## Confidence Assessment
+
+| Factor | Weight | Score | Evidence |
+|--------|--------|-------|----------|
+| test_coverage | 25% | 80% | quality test pass (494 tests, 0 fail), ratchet section absent (083 adds this feature -- first-run rule: pass=80%) |
+| type_coverage | 20% | 100% | typecheck pass (both tsconfigs clean), ratchet sub-items absent (first-run rule: treat as pass) |
+| review_severity | 20% | 100% | 0 CRITICAL, 0 HIGH findings (1 LOW F-1 cosmetic -- no deduction) |
+| ac_completeness | 20% | 100% | 8/8 UAT items pass (7 CLI + 1 interactive, 0 skipped-with-ack) |
+| integration_breadth | 15% | 100% | 11/11 tasks DONE, 0 BLOCKED, 5/5 planned files modified |
+
+**Composite**: 95.0% (threshold: 90%)
+**Verdict**: PASS -- advancing to shipped
+**Iteration**: 1 of 3
