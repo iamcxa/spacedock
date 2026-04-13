@@ -2,7 +2,7 @@
 id: 056
 title: "Role-aware lease manager (fmodel core)"
 status: draft
-context_status: awaiting-clarify
+context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started:
 completed:
@@ -75,30 +75,37 @@ note: "Entity 055 archived (SO done, namespace → 050, QO deferred). This entit
 A-1: Synchronous decider processing in daemon -- JS single-threaded event loop provides natural command serialization without explicit locks or queues.
 Confidence: Confident (0.90)
 Evidence: bin/daemon.ts:79-89 -- `onCoordinationRequest` handler runs each request to completion before yielding to event loop; decider is pure synchronous function (no awaits between state read and event apply)
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: Event ordering guaranteed by SQLite autoincrement + single-threaded event loop -- no explicit sequence counter management needed.
 Confidence: Confident (0.95)
 Evidence: schema.ts:28 -- `id: integer("id").primaryKey({ autoIncrement: true })` on entity_leases; all writes go through the daemon's single event loop
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-3: Default lease duration of 5 minutes (300,000ms), configurable via `SPACEBRIDGE_LEASE_DURATION_MS` environment variable.
 Confidence: Confident (0.85)
 Evidence: ipc/coordination-client-stub.ts:45 -- stub uses `300_000` (5 min); daemon.ts:21 -- `SPACEBRIDGE_STATE_DIR` env var pattern establishes precedent for env-based configuration
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-4: Janitor failure is safe -- append-only expire commands mean partial scan leaves no corrupted state; next interval picks up remaining expired leases.
 Confidence: Confident (0.85)
 Evidence: design doc §5.3:499 -- "Janitors run as scheduled commands that produce expire events through the same pipeline"; append-only event model means no rollback-on-failure concern
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-5: New `lease_events` table follows fmodel column pattern already established in schema.ts (id, event_type, aggregate_id, sequence_number, payload, timestamp).
 Confidence: Confident (0.90)
 Evidence: schema.ts:18-23 -- sessions table fmodel columns; schema.ts:37-39 -- entity_leases fmodel columns; same pattern on all 5 tables
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-6: Keep coordination-client-stub.ts for testing; create separate `coordination-client-bridge.ts` for real implementation.
 Confidence: Confident (0.90)
 Evidence: ipc/coordination-client-stub.ts:3 -- ABOUTME explicitly says "noop placeholder for entity 056 (real implementation)"; stub is valuable for unit tests that don't need real coordination
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-7: Inject `entityScanner` dependency into CoordinationClient for `getAvailableWork` -- daemon provides filesystem scanner now, entity 057 (session registry) replaces with DB-backed scanner later.
 Confidence: Confident (0.85)
 Evidence: design doc §5.1:398 -- getAvailableWork returns entities "in the role's phase and not currently leased"; entity 057 depends on 056 per dependency chain. Dependency inversion keeps 056 self-contained while forward-compatible with 057's cached projection.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 ## Option Comparisons
 
@@ -112,6 +119,8 @@ Evidence: design doc §5.1:398 -- getAvailableWork returns entities "in the role
 
 Design doc invariant check: §5.3 explicitly shows event types (acquired, released, extended, expired) implying an event log exists. §3.5 classifies leases as 🟢 full CQRS. Dual table satisfies both. Return value trace: `getAvailableWork` queries snapshot table → returns `EntityRef[]` → shim uses slug to call `acquireEntity` → no downstream consumer depends on event log for reads. Dual table is safe.
 
+→ Selected: Dual table -- captain, 2026-04-13
+
 ### O-2: Idempotency on expired/released leases
 
 | Option | Pros | Cons | Complexity | Recommendation |
@@ -121,6 +130,8 @@ Design doc invariant check: §5.3 explicitly shows event types (acquired, releas
 | Conditional: no-op for extend, error for release | Extend is heartbeat (tolerate staleness); release is intent (must know if lease is gone) | Inconsistent behavior between operations; harder to reason about | Medium | Viable |
 
 Return value trace: `extendLease` returns `void` → shim's periodic timer ignores return → but if lease is already expired, shim should detect and re-acquire. Silent no-op prevents re-acquisition. Fail-with-error lets shim detect and react. Fail is safer.
+
+→ Selected: Fail with typed error (LeaseNotFound / LeaseExpired) -- captain, 2026-04-13
 
 ## Open Questions
 
@@ -132,6 +143,8 @@ Why it matters: FO prompt/skill modifications require changes to clkao/spacedock
 
 Suggested options: (a) Include FO AC as deferred/conditional -- 056 ships with bridge-side complete, FO AC marked as pending-PR2, (b) Exclude FO AC entirely -- create entity 056b or add to 057's scope for FO wiring after PR2, (c) Include and implement a bridge-only FO simulator for testing (mock FO calls getAvailableWork via RPC)
 
+→ Answer: (c) Simulator test -- 056 includes an integration test that simulates FO calling getAvailableWork → acquireEntity → work → releaseEntity over RPC. Proves end-to-end API correctness without PR2. PR2 merge later only needs to wire real FO to the already-validated API. -- captain, 2026-04-13
+
 Q-2: What janitor scan interval should be used? This affects lease expiry latency vs daemon CPU overhead.
 
 Domain: Runnable/Invokable
@@ -139,6 +152,8 @@ Domain: Runnable/Invokable
 Why it matters: Too frequent (1s) wastes CPU scanning when no leases are near expiry. Too infrequent (5min) means orphaned leases block work for minutes. The janitor emits `expire` commands through the decider, so the interval directly affects how quickly other sessions can acquire a lease abandoned by a crashed session.
 
 Suggested options: (a) 30 seconds (reasonable balance -- worst case 30s orphan delay), (b) 10 seconds (aggressive -- responsive but more DB queries), (c) Adaptive -- start at 30s, reduce to 10s when any lease is within 60s of expiry
+
+→ Answer: (a) 30 seconds -- reasonable balance between orphan recovery latency and CPU overhead. Configurable via SPACEBRIDGE_JANITOR_INTERVAL_MS env var (per A-3 pattern). -- captain, 2026-04-13
 
 ## Stage Report: explore
 
@@ -155,3 +170,14 @@ Suggested options: (a) 30 seconds (reasonable balance -- worst case 30s orphan d
 - [x] Scale assessment: confirmed Large
   13 existing files mapped + ~8 new files to create across 4 layers; fmodel aggregate cohesion prevents decomposition despite 3-domain scope
 - [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident >=0.85, no external tech claims, pure fmodel pattern defined in design doc)
+
+## Stage Report: clarify
+
+- [x] Assumptions confirmed: 7 / 7
+  All batch-confirmed by captain, 2026-04-13. Zero reclassified.
+- [x] Options selected: 2 / 2
+  O-1: Dual table (event log + snapshot projection). O-2: Fail with typed error (LeaseNotFound/LeaseExpired).
+- [x] Questions answered: 2 / 2
+  Q-1: Simulator test -- include FO integration test over RPC, no PR2 dependency. Q-2: 30s janitor interval, env-configurable.
+- [x] Sufficiency gate: PASS
+  All assumptions confirmed, all options selected, all questions answered, zero unresolved items.
