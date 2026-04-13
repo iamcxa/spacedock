@@ -10,7 +10,8 @@ import { mkdirSync, existsSync, unlinkSync } from "node:fs";
 import * as net from "node:net";
 import { randomUUID } from "node:crypto";
 import { createSocketServer } from "../src/ipc/socket-server";
-import { createCoordinationClientStub } from "../src/ipc/coordination-client-stub";
+import { createCoordinationClientBridge } from "../src/ipc/coordination-client-bridge";
+import { createDb } from "../src/db";
 import { writePidFile, readPidFile, isProcessAlive } from "../src/daemon/pid";
 import { releaseLock } from "../src/daemon/lock";
 
@@ -53,7 +54,17 @@ async function cmdStart(): Promise<void> {
     }, 200);
   }
 
-  const stub = createCoordinationClientStub();
+  const leaseDurationMs = Number(process.env.SPACEBRIDGE_LEASE_DURATION_MS) || 300_000;
+  const janitorIntervalMs = Number(process.env.SPACEBRIDGE_JANITOR_INTERVAL_MS) || 30_000;
+
+  const db = createDb(join(stateDir, "spacebridge.db"));
+
+  // entityScanner: trivial stub returning [] for 056; entity 057 supplies DB-backed scanner
+  const entityScanner = async () => [];
+
+  const bridge = await createCoordinationClientBridge({ db, entityScanner, leaseDurationMs });
+
+  let janitorTimer: ReturnType<typeof setInterval> | null = null;
 
   const server = createSocketServer({
     socketPath,
@@ -78,8 +89,8 @@ async function cmdStart(): Promise<void> {
     },
     onCoordinationRequest: async (_sessionId, req) => {
       try {
-        const method = req.method as keyof typeof stub;
-        const fn = stub[method];
+        const method = req.method as keyof typeof bridge;
+        const fn = bridge[method];
         if (typeof fn !== "function") return { error: `Unknown coordination method: ${req.method}` };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = await (fn as any)(...(req.args as unknown[]));
@@ -100,10 +111,14 @@ async function cmdStart(): Promise<void> {
   // Write PID file after socket is live
   writePidFile(pidPath, process.pid);
 
+  // Start janitor after socket is live
+  janitorTimer = setInterval(() => { bridge.expireDue(Date.now()); }, janitorIntervalMs);
+
   process.stderr.write(`[${ts()}] spacebridge daemon started (pid: ${process.pid}, socket: ${socketPath})\n`);
 
   // Signal handlers for graceful shutdown
   const doShutdown = async () => {
+    if (janitorTimer) clearInterval(janitorTimer);
     await shutdown(server, pidPath, socketPath);
     process.exit(0);
   };
