@@ -2,7 +2,7 @@
 id: 089
 title: "Inline edit suggestions (comments parity part 2)"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: entity 054 O-2 deferral (2026-04-13)
 started:
 completed:
@@ -32,7 +32,7 @@ note: "Deferred from entity 054 O-2. Captain decided suggestions are v2 scope --
 
 ## Brainstorming Spec
 
-**APPROACH**: Extend 054's comment CQRS domain with 3 new suggestion commands (`add_suggestion`, `accept_suggestion`, `reject_suggestion`) and corresponding events. The suggestion decider is a SEPARATE pure function from the comment decider -- it lives in the same domain directory (`spacebridge/src/domain/comment/suggestion-decider.ts`) but owns its own command/event/state types via Zod schemas. Key architectural split per 054 O-2 rationale: the *domain side* (decider + events) stays pure with zero I/O, while the *application side* has a separate `SuggestionApplier` module at `spacebridge/src/application/suggestion-applier.ts` that reads entity markdown, applies text diff (find `diff_from`, replace with `diff_to` -- first occurrence only, frontmatter-safe), and writes back. This mirrors the existing `applyBodyEdit` pattern at `comments.ts:84-109` (parse frontmatter boundary, replace only in body text, throw on missing `diff_from`). Suggestion events flow through the same `comment_events` table with a `category: 'suggestion'` discriminator (needs clarification -- deferred to explore) or a dedicated `suggestion_events` table. UI extends 054's `CommentThread` component with an inline diff view (from/to) and accept/reject buttons. REST endpoints via Next.js Route Handlers: `POST /api/entities/[slug]/comments/[id]/suggest` (add suggestion), `POST /api/entities/[slug]/suggestions/[id]/accept` (apply + mark accepted), `POST /api/entities/[slug]/suggestions/[id]/reject` (mark rejected). SSE integration: suggestion events appear in the war room feed via the same 053 poll mechanism.
+**APPROACH**: Extend 054's comment CQRS domain with 3 new suggestion commands (`add_suggestion`, `accept_suggestion`, `reject_suggestion`) and corresponding events (✓ confirmed by explore: existing impl at comments.ts:65-132 has exactly these 3 operations with matching semantics). The suggestion decider is a SEPARATE pure function from the comment decider -- it lives in the same domain directory (`spacebridge/src/domain/comment/suggestion-decider.ts`) but owns its own command/event/state types via Zod schemas (✓ confirmed by explore: 054 A-1 + 056 pattern establish per-aggregate pure decider discipline). Key architectural split per 054 O-2 rationale: the *domain side* (decider + events) stays pure with zero I/O, while the *application side* has a separate `SuggestionApplier` module at `spacebridge/src/application/suggestion-applier.ts` that reads entity markdown, applies text diff (find `diff_from`, replace with `diff_to` -- first occurrence only, frontmatter-safe), and writes back (✓ confirmed by explore: existing `applyBodyEdit` at comments.ts:84-109 is the reference implementation -- frontmatter boundary parsing, body-only replace, throw on missing diff_from). Suggestion events flow through the same `comment_events` table with a `category: 'suggestion'` discriminator or a dedicated `suggestion_events` table -- see O-1 for comparison. UI extends 054's `CommentThread` component with an inline diff view (from/to) and accept/reject buttons. REST endpoints via Next.js Route Handlers: `POST /api/entities/[slug]/comments/[id]/suggest` (add suggestion), `POST /api/entities/[slug]/suggestions/[id]/accept` (apply + mark accepted), `POST /api/entities/[slug]/suggestions/[id]/reject` (mark rejected). SSE integration: suggestion events appear in the war room feed via the same 053 poll mechanism.
 
 **ALTERNATIVE**: Implement suggestions as a completely separate domain ("edit proposals") with its own aggregate, its own Drizzle table, and no link to the comment system. -- D-01 Rejected: suggestions are semantically part of the review conversation (a reviewer says "I think this line should be X instead of Y"). Separating them from comments means the UI can't render suggestions inline in comment threads, and the domain model loses the connection between "discussion about a change" and "the proposed change itself." 054 O-2 deferred suggestions to keep the v1 foundation clean, not to permanently separate them from the comment concept.
 
@@ -64,3 +64,78 @@ note: "Deferred from entity 054 O-2. Captain decided suggestions are v2 scope --
 - Entity 054: comment CQRS domain foundation (decider, events table, section-based anchoring, single-level replies)
 - Design doc §3.5 (Scoped fmodel CQRS): comments as 🟢 full CQRS domain
 - Design doc §3.3 (LCD schema discipline): integer PKs, epoch-ms timestamps, text strings
+
+## Assumptions
+
+A-1: Suggestion decider follows 054/056 pattern -- pure function at `spacebridge/src/domain/comment/suggestion-decider.ts`, same structure (commands → decide → events, evolve → state). Separate from comment decider but in the same domain directory.
+Confidence: 🟢 Confident (0.95)
+Evidence: 054 A-1 establishes decider pattern for comment domain. 056 APPROACH establishes it for lease domain. Design doc §3.5 lists both as 🟢 full CQRS. Two consistent precedents → Confident. NOTE: `spacebridge/src/domain/` dir does not exist yet (created by 054/056 in-flight); path is speculative-but-authoritative based on parent entity designs.
+
+A-2: SuggestionApplier replicates `applyBodyEdit` logic -- frontmatter boundary parsing (find second `---`), body-only text replacement (first occurrence of `diff_from`), throw Error on missing `diff_from`.
+Confidence: 🟢 Confident (0.95)
+Evidence: `tools/dashboard/src/comments.ts:84-109` is the reference implementation. Line 93: `if (!bodyPart.includes(diffFrom)) throw new Error("Text not found in entity body: diff_from text not found")`. Line 106: `// Intentionally replaces only the first occurrence`. Proven production code; CQRS version ports the same logic to a separate module.
+
+A-3: Suggestion type has 6 fields: `{ id, comment_id, diff_from, diff_to, status: "pending"|"accepted"|"rejected", timestamp }` -- matching the existing `Suggestion` interface.
+Confidence: 🟢 Confident (0.95)
+Evidence: `tools/dashboard/src/types.ts:136-143` defines the interface verbatim. `comments.ts:70-77` constructs suggestions with exactly these fields. The CQRS version converts these to Zod schemas but preserves the same shape.
+
+A-4: Suggestions are linked to comments via `comment_id` (not standalone). A suggestion is always a reply-to-comment that proposes a text change.
+Confidence: 🟢 Confident (0.95)
+Evidence: `types.ts:138` `comment_id: string`. `comments.ts:67` `input: { comment_id: string; ... }`. `CommentThread` at types.ts:145-148 holds both `comments[]` and `suggestions[]` -- parallel arrays linked by `comment_id`. UI renders suggestions inline within the comment thread that owns them.
+
+A-5: Status machine is `{ pending → accepted, pending → rejected }` with no other transitions. Once accepted or rejected, the suggestion is terminal.
+Confidence: 🟢 Confident (0.90)
+Evidence: `comments.ts:121` sets `"accepted"`, `comments.ts:130` sets `"rejected"`. No code path transitions from accepted to rejected or vice versa. The decider's `decide()` function should reject commands on non-pending suggestions.
+
+## Option Comparisons
+
+### O-1: Suggestion event storage -- shared comment_events table vs dedicated suggestion_events table
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Shared `comment_events` table with `category` discriminator column | Single table for SSE poll query (one SELECT, not two). Simpler schema migration. Comment and suggestion events naturally interleave in chronological order for replay. | Mixes two aggregate event streams in one table -- violates fmodel strict aggregate-per-table pattern from 056. Category discriminator adds a conditional to event deserialization. | Low | ✅ Recommended |
+| Dedicated `suggestion_events` table | Clean aggregate boundary -- suggestion events in their own table, matching 056's per-aggregate pattern. No discriminator needed. | SSE poll needs UNION query or two queries. Schema grows wider. Harder to replay interleaved comment+suggestion history for a single entity. | Medium | Viable |
+
+Return value trace: 053's SSE endpoint polls the `events` table for new events. If suggestions use `comment_events`, the existing poll query picks them up automatically (assuming it queries `comment_events` too). If suggestions use a separate table, the poll query needs modification to include `suggestion_events`.
+
+Design doc invariant check: §3.5 says "comments" is 🟢 full CQRS. Suggestions are conceptually part of the comment domain (reviewer proposes a text change as part of a discussion). Sharing the event table reflects this conceptual unity. §3.3 LCD discipline applies equally to both options. No invariant blocks either choice.
+
+## Open Questions
+
+Q-1: Should the suggestion diff view use a visual diff component (green/red highlighting like GitHub PRs) or a simpler before/after text block?
+
+Domain: User-facing Visual
+
+Why it matters: The diff rendering approach determines whether 089 needs an external dependency (`diff` or `react-diff-viewer` library) or can use inline styling. A complex diff view adds visual polish but also adds a dependency and rendering complexity for multi-line diffs. A simple before/after block is dependency-free but less intuitive for large text changes.
+
+Suggested options:
+- (a) Simple before/after: show `diff_from` in a red-tinted block, `diff_to` in a green-tinted block, stacked vertically. No external deps. Matches the simplicity of the existing dashboard.
+- (b) Inline diff highlighting: use `react-diff-viewer-continued` (active fork) or roll a lightweight char-level diff with `diff` npm package. GitHub PR-style green/red highlighting.
+- (c) Minimal: just show `diff_to` with a "replaces: {diff_from}" tooltip/expandable. Least visual noise, most compact.
+
+## Stage Report: explore
+
+- [x] Files mapped: 10 across domain (3 new), application (2 new), ui (3 new + 1 modify), schema (1 modify)
+  domain: suggestion-decider.ts, suggestion-types.ts, suggestion-decider.test.ts (all new, under spacebridge/src/domain/comment/); application: suggestion-applier.ts, suggestion-applier.test.ts (new, under spacebridge/src/application/); ui: 3 new Route Handler files (suggest, accept, reject), 1 modify CommentThread component; schema: schema.ts (add storage — O-1 decides shape). NOTE: domain/ and application/ dirs do not yet exist — created by 054/056 (in-flight).
+- [x] Assumptions formed: 5 (Confident: 5, Likely: 0, Unclear: 0)
+  A-1 decider pattern (0.95, 2 precedents 054+056), A-2 applyBodyEdit port (0.95, comments.ts:84-109), A-3 Suggestion 6-field type (0.95, types.ts:136-143), A-4 comment_id linkage (0.95, types.ts:138), A-5 terminal status machine (0.90, comments.ts:121+130)
+- [x] Options surfaced: 1
+  O-1 suggestion event storage (shared comment_events ✅ vs dedicated suggestion_events)
+- [x] Questions generated: 1
+  Q-1 diff view rendering approach (visual diff library vs simple before/after blocks)
+- [x] α markers resolved: 1 / 1
+  α-1 (storage strategy: comment_events with discriminator vs suggestion_events) → reclassified as O-1 with codebase-grounded comparison table
+- [x] Scale assessment: confirmed Medium
+  10 files across 4 layers; matches brainstorm estimate
+- [x] Research dispatched: 0 researchers (skipped -- all patterns are internal codebase architecture, no external tech claims; parent entities 054+056 already validated fmodel/Drizzle/Next.js)
+
+## Canonical References
+
+- `tools/dashboard/src/comments.ts:65-81` -- existing `addSuggestion` (reference for CQRS command shape -- A-3)
+- `tools/dashboard/src/comments.ts:84-109` -- existing `applyBodyEdit` (reference for SuggestionApplier -- A-2)
+- `tools/dashboard/src/comments.ts:111-132` -- existing `acceptSuggestion`/`rejectSuggestion` (reference for status machine -- A-5)
+- `tools/dashboard/src/types.ts:136-148` -- `Suggestion` interface + `CommentThread` shape (A-3, A-4)
+- `spacebridge/src/schema.ts:62-80` -- `comments` table with fmodel columns (A-1, O-1)
+- Entity 054 O-2: deferral decision -- "suggestions cross domain boundary" rationale (GUARDRAILS foundation)
+- Entity 054 A-1: comment decider pattern (precedent for A-1)
+- Entity 056 O-1: dual-table persistence (precedent for O-1)
