@@ -1,8 +1,8 @@
 ---
 id: 057
 title: "Multi-root session registry + file watcher"
-status: clarify
-context_status: ready
+status: draft
+context_status: awaiting-clarify
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started:
 completed:
@@ -67,67 +67,38 @@ depends-on: [053]
 A-1: Pure decider + evolve pattern for the session aggregate follows entity 056's lease manager pattern in `spacebridge/src/domain/lease/`.
 Confidence: 🟢 Confident (0.95)
 Evidence: entity 056 APPROACH -- identical fmodel CQRS pattern (decider + evolve + Zod schemas). Design doc §4.3:327 explicitly marks session registry as 🟢 full CQRS. §3.5:257 lists "Session registry" first in the full CQRS table.
-→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: Socket server's existing `onRegister` and `onDisconnect` hooks are the integration points for session registry commands -- no new IPC message types needed.
 Confidence: 🟢 Confident (0.90)
 Evidence: socket-server.ts:20-24 -- `onRegister(session: RegisterPayload, send)` and `onDisconnect(sessionId)` already called on shim connect/disconnect. RegisterPayload (types.ts:44-49) contains projectRoot, sessionId, pid -- matching design doc Session type.
-→ Confirmed: captain, 2026-04-13 (batch)
 
 A-3: Heartbeat IPC handling follows the same pattern as register/rpc-request/coordination-request handlers in socket-server.ts (type check -> extract payload -> call handler -> send ack).
 Confidence: 🟢 Confident (0.90)
 Evidence: socket-server.ts:45-98 -- three existing message type handlers use identical pattern. types.ts:24 already defines `"heartbeat"` as IpcRequestType and `"heartbeat-ack"` as IpcResponseType. Gap: socket-server.ts does NOT handle heartbeat messages yet -- entity 057 adds the handler.
-→ Confirmed: captain, 2026-04-13 (batch)
 
 A-4: `sessions` table serves as snapshot; a new `session_events` table is the append-only event log, mirroring entity 056's dual-table strategy (lease_events + entity_leases).
 Confidence: 🟢 Confident (0.90)
 Evidence: schema.ts:10-23 -- sessions table has fmodel columns (event_type, aggregate_id, sequence_number, payload) as structural placeholders. Entity 056 APPROACH establishes dual-table as the pattern. db.ts:31-44 applies sessions DDL inline.
-→ Confirmed: captain, 2026-04-13 (batch)
 
 A-5: Zod schemas for SessionCommand/SessionEvent use `.passthrough()` per design doc §3.5.
 Confidence: 🟢 Confident (0.95)
 Evidence: Design doc §3.5:251-258 -- explicit `.passthrough()` rule for fmodel schemas. Entities 050 and 056 GUARDRAILS both enforce this. Three consistent usages across entity specs.
-→ Confirmed: captain, 2026-04-13 (batch)
 
 A-6: `RegisterPayload` shape in types.ts maps directly to the design doc's Session type -- no schema translation layer needed for the register command.
 Confidence: 🟢 Confident (0.95)
 Evidence: types.ts:44-49 -- `RegisterPayload { projectRoot, sessionId, pid, protocolVersion }` matches design doc §4.3:328-334 Session type fields (id->sessionId, projectRoot, pid, connected_at derived from timestamp at registration time).
-→ Confirmed: captain, 2026-04-13 (batch)
 
 A-7: Heartbeat timeout detection uses `setInterval` in the daemon process, scanning for `now - last_heartbeat > threshold`, consistent with entity 056's lease janitor pattern.
 Confidence: 🟡 Likely (0.75)
 Evidence: Entity 056 APPROACH -- "janitor runs on setInterval inside the daemon, scanning for leases past expires_at and emitting expire commands". Same timeout-scan-emit pattern applies to session heartbeats. But entity 056 is not yet shipped -- pattern is planned, not proven in code.
-→ Confirmed: captain, 2026-04-13 (batch)
 
 A-8: Session registry is a daemon-internal module -- shims interact via existing IPC messages (register/heartbeat), not via a separate RPC interface like CoordinationClient.
 Confidence: 🟢 Confident (0.85)
 Evidence: socket-server.ts:20-24 -- onRegister/onDisconnect are daemon callbacks, not RPC methods. Entity 053 O-3 decision -- Next.js reads sessions table directly for project_root lookup. No external consumer needs a `SessionRegistryClient` interface.
-→ Confirmed: captain, 2026-04-13 (batch)
 
-A-9: Bun's `import { watch } from "fs"` API supports `{ recursive: true }` directory watching, multiple simultaneous watchers, and dynamic add/remove via `.close()` + re-create.
-Confidence: 🟢 Confident (0.85)
-Evidence: No codebase usage of `fs.watch`. Design doc §4.4:355 specifies "Bun's native fs.watch or chokidar". (✓ research: Bun 1.3.9/macOS实测 -- recursive watching works, multiple watchers independent, dynamic scope viable. Gotcha: macOS FSEvents only emits "rename" events, never "change" -- debounce key should be filename only, not (file, change-type) pair. Watcher silently stops if watched dir deleted -- must proactively .close() on disconnect.)
-→ Confirmed: captain, 2026-04-13 (batch)
-
-A-10: Error handling for malformed IPC messages follows the existing try/catch pattern in socket-server.ts.
-Confidence: 🟢 Confident (0.90)
-Evidence: socket-server.ts:64-78 and 82-98 -- all handlers wrap async operations in try/catch, send error response to caller, socket stays open. Line 100-103: top-level catch logs and continues.
-→ Confirmed: captain, 2026-04-13 (batch)
-
-A-11: Register command is idempotent -- if a session_id already exists in SessionState, the decider emits a `session_reconnected` event (updating socket/pid/timestamp) instead of rejecting. Handles network reconnects where the shim re-registers without explicit disconnect.
-Confidence: 🟢 Confident (0.85)
-Evidence: socket-server.ts:48 -- `sessionSockets.set(sessionId, socket)` already overwrites the socket mapping on duplicate sessionId without checking existence. IPC layer already tolerates re-registration; domain layer should match.
-→ Confirmed: captain, 2026-04-13 (interactive)
-
-A-12: On daemon graceful shutdown (SIGTERM/SIGINT), the registry emits `disconnect` commands for all active sessions through the decider pipeline before process exit. Ensures event log completeness -- restart replay shows 0 active sessions, shims reconnect and re-register naturally.
-Confidence: 🟢 Confident (0.85)
-Evidence: CQRS discipline requires event log completeness for all state transitions. Entity 056 lease janitor establishes the "daemon emits system-initiated events" pattern. Without this, restart creates phantom sessions until heartbeat timeout.
-→ Confirmed: captain, 2026-04-13 (interactive)
-
-A-13: Shim-side heartbeat sender is in-scope for 057 -- socket-client.ts adds a `setInterval` that sends `heartbeat` IPC messages to the daemon at a configurable interval (default 10s). Without shim-side sending, daemon-side heartbeat monitoring (A-7) has no input and all sessions timeout immediately.
-Confidence: 🟢 Confident (0.90)
-Evidence: types.ts:24 -- `"heartbeat"` already defined as IpcRequestType. socket-client.ts exists as the shim-side IPC client. Daemon receiver (A-3) and shim sender are two sides of the same feature -- splitting them across entities makes e2e verification impossible.
-→ Confirmed: captain, 2026-04-13 (interactive)
+A-9: Bun's native `fs.watch` API supports watching directories and emitting file change events suitable for the watcher component.
+Confidence: 🟡 Likely (0.70)
+Evidence: No codebase usage of `fs.watch`. Design doc §4.4:355 specifies "Bun's native fs.watch or chokidar". Bun runtime is the target (design doc §3.1). (pending research: researcher dispatched for Bun fs.watch API validation)
 
 ## Option Comparisons
 
@@ -143,8 +114,6 @@ Return value trace: `discoverWorkflows(root)` returns `Workflow[] = [{dir, commi
 
 Design doc invariant check: §4.3 says "daemon calls discoverWorkflows([...all_distinct_project_roots])" -- the design doc envisions a multi-root API. Option A achieves the same semantic result without modifying the existing single-root implementation. When entity 018 ships, the iteration can be replaced by a single call.
 
-→ Selected: 每個 project root 各呼叫一次 discoverWorkflows，結果取 union (captain, 2026-04-13, interactive)
-
 ### O-2: File watcher events -- how file change events map to the existing `events` table schema
 
 | Option | Pros | Cons | Complexity | Recommendation |
@@ -157,8 +126,6 @@ Return value trace: Entity 053 SSE route handler polls `events` table at 500ms (
 
 Design doc invariant check: §3.5 classifies file change events as 🟡 event-log only (no decider). Both Option A and B satisfy this -- the question is table placement, not fmodel classification. §4.5 confirms single DB. §3.3 LCD discipline: sentinel values are text columns with constant values, which is LCD-compliant.
 
-→ Selected: 用 events table + sentinel 值 (entity="*", stage="watcher") (captain, 2026-04-13, interactive)
-
 ## Open Questions
 
 Q-1: When a file change is detected in a workflow directory, should the watcher emit events for ALL files or only entity-related files?
@@ -168,18 +135,6 @@ Domain: Behavioral/Callable, Organizational/Data-transforming
 Why it matters: The watcher scope is "union of workflow directories" but not every file in a workflow dir is an entity. Emitting events for all file changes creates noise in the SSE feed (git operations, editor temp files, archive moves). Filtering to entity files reduces noise but adds parsing overhead and may miss legitimate changes (README updates, index changes, new entity creation).
 
 Suggested options: (a) All files -- emit for every file change in watched dirs, let the UI filter/render selectively. Simplest watcher, noisiest feed. Debounce handles git burst noise. (b) Markdown files only (`*.md`) -- captures entities + README + docs without non-markdown noise. Simple glob filter, no parsing overhead. (c) Entity files only -- filter to `*.md` files with valid entity frontmatter. Quietest feed, but requires frontmatter parsing on every change event (perf cost). (d) All files with type classification -- emit all but tag each event with a type (entity, docs, config, other) so the UI can filter. More metadata, richer feed.
-
-→ Answer: (b) 僅 Markdown 檔 (*.md) -- 捕捉 entity 檔 + README + docs，過濾掉非 markdown 噪音。簡單 glob filter，零 parsing 開銷。 (captain, 2026-04-13, interactive)
-
-## Canonical References
-
-- `spacebridge/src/ipc/socket-server.ts` -- onRegister/onDisconnect hooks (A-2), heartbeat handler gap (A-3), session socket map (A-11)
-- `spacebridge/src/ipc/types.ts` -- RegisterPayload shape (A-6), heartbeat IPC type (A-3, A-13)
-- `spacebridge/src/schema.ts` -- sessions table fmodel columns (A-4)
-- `spacebridge/src/db.ts` -- inline DDL pattern for new tables (A-4)
-- `spacebridge/src/ipc/coordination-client-stub.ts` -- CoordinationClient interface pattern (A-8 comparison)
-- `tools/dashboard/src/discovery.ts` -- discoverWorkflows single-root API (O-1)
-- `docs/superpowers/specs/2026-04-10-spacebridge-engine-bridge-split-design.md` -- §4.3 session registry, §4.4 file watcher, §3.5 fmodel classification
 
 ## Stage Report: explore
 
@@ -196,27 +151,4 @@ Suggested options: (a) All files -- emit for every file change in watched dirs, 
 - [x] Scale assessment: confirmed Medium
   ~11 files across 5 layers; session registry + file watcher are tightly coupled (watcher scope derives from registry state); no decomposition warranted
 - [x] Research dispatched: 1 researcher for 1 topic (post-brainstorm Step 3.5, Bun fs.watch)
-  A-9 (Bun fs.watch API): confirmed working, Likely->Confident (0.85). macOS FSEvents only emits "rename", debounce key = filename only.
-
-## Stage Report: clarify
-
-- [x] Decomposition: not-applicable
-  Entity is Medium scope, no decomposition recommendation from explore
-- [x] Re-validation: 9 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 1 coverage gap (A-10 added), 0 research re-validated
-  All file:line citations verified against files read this session; A-10 error handling pattern added from Behavioral/Callable template
-- [x] Assumptions confirmed: 13 / 13 (0 corrected)
-  A-1 through A-10 confirmed batch; A-11 (register idempotency), A-12 (graceful shutdown), A-13 (shim heartbeat sender) confirmed interactive
-- [x] Options selected: 2 / 2
-  O-1 per-root iteration + union (recommended); O-2 events table + sentinel values (recommended)
-- [x] Questions answered: 1 / 1
-  Q-1 markdown files only (*.md) -- simple glob filter, zero parsing overhead
-- [x] Open exploration: 3 gray areas surfaced (1 from templates, 1 from directive, 1 via freeform)
-  A-11 register idempotency (template: Behavioral/Callable idempotency); A-12 graceful shutdown (directive-implied); A-13 shim heartbeat sender (captain freeform reflection)
-- [x] Canonical refs added: 7
-  socket-server.ts, types.ts, schema.ts, db.ts, coordination-client-stub.ts, discovery.ts, design doc
-- [x] Context status: ready
-  Gate passed: all 13 assumptions confirmed, all 2 options selected, all 1 Qs answered
-- [x] Handoff mode: loose
-  No auto_advance in frontmatter; captain must say "execute 057" to advance
-- [x] Clarify duration: 7 questions asked, session complete
-  1 batch confirmation + 2 option selections + 1 Q answer + 3 exploration iterations
+  A-9 (Bun fs.watch API): dispatched, pending return. No additional explore-phase researchers needed -- remaining Likely assumption (A-7) is internal pattern, not external tech.

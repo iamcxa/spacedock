@@ -43,8 +43,9 @@ FO (or `/spacedock:uat-resume`) dispatches you with these fields in the prompt:
 3. **Workflow directory** -- so you can locate e2e mappings and the ops config
 4. **Mode** -- either `normal` (full UAT run, first pass through the entity) or `skip-only` (uat-resume re-entry, re-run only items whose prior `## UAT Results` row had status `skipped`)
 5. **Execute base SHA** -- informational; UAT runs against current working tree regardless
+6. **skip_interactive_passed** -- boolean, default false. When true (set by FO during auto-fix iteration re-entry from the pre-ship confidence gate), interactive items whose prior `## UAT Results` row had `status: pass` are auto-passed without captain interaction. Only new or previously-failed interactive items enter Step 4. See `references/confidence-gate.md` Section 9 for the Q-2 resolution that defines this behavior.
 
-If `mode` is absent, treat it as `normal`. If the entity file path is missing, Grep the workflow directory for the slug and proceed -- do NOT ask for clarification (you have no interactive channel before Step 4, and even at Step 4 the channel is for UAT sign-off, not input repair).
+If `mode` is absent, treat it as `normal`. If `skip_interactive_passed` is absent, treat it as `false`. If the entity file path is missing, Grep the workflow directory for the slug and proceed -- do NOT ask for clarification (you have no interactive channel before Step 4, and even at Step 4 the channel is for UAT sign-off, not input repair).
 
 ---
 
@@ -275,6 +276,14 @@ Tally final item statuses. Apply routing rules:
 - **Any `skipped` status with captain ack, no `fail` statuses** -> verdict `pass`, FO advances to `shipped`, AND update entity frontmatter `uat_pending_count: {count of skipped items across history}`. Per spec line 430-431, a skipped UAT item with captain ack does NOT block advance; the count surfaces for later `/spacebridge:uat-audit` listing.
 
 **Skip-only mode verdict.** Recompute `uat_pending_count` as the total count of `status: skipped` rows across the entire `## UAT Results` section (including prior rows you did not rewrite). If all previously-skipped items now have a new `pass` row, the count drops to 0. If some re-runs still failed or were skipped again, the count reflects the surviving skip count.
+
+**Auto-fix iteration re-entry.** When the pre-ship confidence gate (`references/confidence-gate.md`) triggers an auto-fix loop, the entity re-enters the pipeline at execute and flows back through quality → review → UAT. On this re-entry:
+- Mode is `normal` (not skip-only) -- the fix may have changed behavior that automated items must verify.
+- BUT if `skip_interactive_passed: true` is set (input field 6 above): interactive items whose prior `## UAT Results` row had `status: pass` with captain sign-off are **auto-passed** without captain interaction. These items are treated as if the captain said "pass" again.
+- Only automated items (browser, CLI, API) and any NEW interactive items introduced by the fix task, plus any previously-failed interactive items, run fresh.
+- The prior `## UAT Results` section is preserved. New result rows are appended below prior rows (same append-only rule as skip-only mode). Captain reading the section sees the full temporal history.
+
+This follows the Q-2 resolution (entity 087 clarify stage): automated-only re-run on confidence gate auto-fix iteration. See `references/confidence-gate.md` Section 9 for the full specification.
 
 ---
 
