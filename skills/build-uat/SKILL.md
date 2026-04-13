@@ -53,7 +53,7 @@ If `mode` is absent, treat it as `normal`. If the entity file path is missing, G
 Read the entity body and locate `## UAT Spec`. Parse each item into a structured record:
 
 - **id** (e.g. `item-1`, `item-2`) -- must be stable across reruns
-- **type** -- one of `browser`, `cli`, `api`, `interactive`
+- **type** -- one of `browser`, `cli`, `api`, `interactive`, `skill-invocation`
 - **description** -- the captain-authored prose describing what to verify
 - **command / url / flow reference** -- type-specific execution anchor
 
@@ -65,7 +65,7 @@ If the entity has no `## UAT Spec` section, STOP. Append a Stage Report with ver
 
 ## Step 2: Run Automated Items (browser / cli / api)
 
-For each item that is NOT `type: interactive`, and in skip-only mode also NOT in a prior-pass row, execute automation. Skip `type: interactive` entirely -- those run in Step 4 with captain.
+For each item that is NOT `type: interactive`, and in skip-only mode also NOT in a prior-pass row, execute automation. Skip `type: interactive` entirely -- those run in Step 4 with captain. `type: skill-invocation` items run in Step 2d below.
 
 ### 2a -- Browser Items via e2e-pipeline
 
@@ -84,6 +84,26 @@ Run the declared command via Bash. Capture stdout, stderr, and exit code. Record
 ### 2c -- API Items
 
 Run the declared `curl` or `gh` command via Bash. Capture HTTP status code, response body (truncate at 2KB), and exit code. Record evidence verbatim.
+
+### 2d -- Skill Invocation Items
+
+For each `type: skill-invocation` item:
+
+1. **Pre-classify for interactivity.** Read the target skill's SKILL.md and grep for `AskUserQuestion`. If found, the skill is Class 3 (captain-interactive) -- skip runtime invocation and use structural-only validation (sub-step 3 below). Record as `pass` with notes "Class 3 -- structural validation only".
+
+2. **Runtime invocation test (non-Class-3 only).** Invoke the skill via the Skill tool with a minimal probe prompt (e.g., "List your capabilities" or the item's declared command). Capture the output shape: did the skill load? Did it produce structured output? Did it error? Record exit status and first 40 lines of output as evidence.
+
+3. **Structural validation (always runs).** Regardless of runtime test result:
+   - Verify SKILL.md exists at the declared path
+   - Verify frontmatter has `name` and `description` fields
+   - Verify any `references/` paths cited in SKILL.md resolve to existing files
+   - Record each check as pass/fail with file:line evidence
+
+Record a provisional result row: `{item_id} | skill-invocation | {pass|fail-infra|fail-assertion} | {evidence} | {notes}`.
+
+**Infra-level fail conditions for skill-invocation**: Skill tool unavailable, SKILL.md file not found, frontmatter parse error. These route to execute per Step 3 classification.
+
+**Assertion fail conditions**: Runtime invocation produced output but shape does not match expected (per item description), or structural validation found broken references. These route to captain review per Step 3 classification.
 
 For every automated item, record a provisional result row in scratch:
 
@@ -275,6 +295,12 @@ If `mode: skip-only`, include the mode in the message: `"uat-resume: {slug} -- i
 - **NEVER substitute plain text for AskUserQuestion in the sign-off loop.** Plain text feels simpler but lacks the structured-option guarantee (captain can reply with anything), and the option schema is load-bearing for result parsing. The only plain-text moment in Step 4 is the informational evidence summary in 4b and the reason prompt after `skip-with-reason` -- never the judgment call itself.
 - **NEVER dispatch a subagent to handle the interactive loop.** You already ARE the ensign subagent; per `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md`, subagents cannot recursively dispatch Agent. "Keep the orchestrator stateless" is backwards rationalization -- the orchestrator IS the state-holder here by design.
 - **NEVER auto-defer interactive items to `/spacedock:uat-resume` "to keep the pipeline moving".** Auto-defer without captain input is not a skip -- it's abandonment. Real skips require captain to name a reason in Step 4 first.
+
+### Skill Invocation -- Pre-Classify Before Runtime
+
+- **ALWAYS grep for AskUserQuestion in the target SKILL.md before runtime invocation.** Class 3 skills will block automation on interactive prompts. Pre-classification is deterministic and prevents hangs.
+- **NEVER skip structural validation because runtime invocation passed.** Runtime success does not guarantee frontmatter correctness or reference integrity. Structural validation is the baseline; runtime is additive.
+- **NEVER runtime-invoke a skill without the pre-classification step.** Even if the item description says "non-interactive", grep the SKILL.md -- the description may be wrong or stale.
 
 ### Stage Contract and Scope
 
