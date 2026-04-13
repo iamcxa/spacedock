@@ -209,8 +209,8 @@ async function cmdStatus(): Promise<void> {
       while (buf.length >= 4) {
         const len = buf.readUInt32BE(0);
         if (buf.length < 4 + len) break;
-        const jsonStr = buf.slice(4, 4 + len).toString("utf8");
-        buf = buf.slice(4 + len);
+        const jsonStr = buf.subarray(4, 4 + len).toString("utf8");
+        buf = buf.subarray(4 + len);
         try {
           const parsed = JSON.parse(jsonStr) as { id: string; type: string; payload: unknown };
           if (parsed.type === "register-ack") {
