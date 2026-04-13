@@ -2,7 +2,7 @@
 id: 058
 title: "spacebridge share tunnel rebuild"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started:
 completed:
@@ -32,7 +32,7 @@ depends-on: [057]
 
 ## Brainstorming Spec
 
-**APPROACH**: Build the share tunnel as a 4-layer stack on top of the spacebridge daemon and Next.js app. (1) **Domain layer** (`domain/share/`): A pure token manager following fmodel Zod schema discipline (`.passthrough()` per entities 050/056/057) but NOT full CQRS -- share tokens are short-lived CRUD, not event-sourced state. Evolve the existing `share_tokens` table (schema.ts:84-99): make `password_hash` nullable with default `null` (bearer-token entries need no password -- design doc §6.3 "the URL is the credential"), replace `entity_paths` JSON array with a single `entity_slug` text column for entity-scoped access, keep `expires_at` for TTL enforcement. Token generation reuses the proven 192-bit entropy pattern (24 random bytes → 48-char hex, dashboard auth.ts:15-18). The token manager provides `create(entitySlug, ttlHours)` → `{token, url}`, `verify(token)` → `{entitySlug, expiresAt} | null`, `revoke(token)` → `boolean`, `cleanup()` → removes expired tokens. (2) **Tunnel layer** (`tunnel/`): A backend abstraction interface `TunnelProvider { start(localPort): Promise<string>, stop(): Promise<void>, getPublicUrl(): string }` with three implementations: `CloudflaredProvider` (named tunnels via `cloudflared tunnel` CLI), `NgrokProvider` (via `ngrok http` CLI), `TailscaleProvider` (via `tailscale funnel` CLI). The daemon detects which tunnel binary is available at startup and auto-selects, with `--tunnel-backend <name>` CLI override. The tunnel exposes the Next.js app's HTTP port -- share requests route through the tunnel to the same server that serves the war room. (3) **CLI layer** (`bin/spacebridge`): `spacebridge share --entity <slug> [--ttl 7d] [--tunnel-backend cloudflared]` creates a share token via domain layer, starts the tunnel if not running, prints the bearer-token URL. `spacebridge share --revoke <share_id>` revokes a token. `spacebridge share --list` shows active tokens with expiry. (4) **View layer** (Next.js `app/share/[token]/`): A read-only page that validates the bearer token via middleware, renders the entity detail (reusing entity 054's detail component), connects to the SSE feed filtered to the shared entity (reusing entity 053's `/api/events` endpoint with entity-scope query param), and provides a nickname-based comment form that POSTs to the comments API (entity 054). Rate limiting middleware enforces N requests/minute/token at the daemon HTTP layer using an in-memory token-bucket.
+**APPROACH**: Build the share tunnel as a 4-layer stack on top of the spacebridge daemon and Next.js app. (1) **Domain layer** (`domain/share/`): A pure token manager following fmodel Zod schema discipline (`.passthrough()` per entities 050/056/057) but NOT full CQRS -- share tokens are short-lived CRUD, not event-sourced state (✓ confirmed by explore: share_tokens table at schema.ts:82-99 already marked `[plain drizzle]` not `[full CQRS]`). Recreate the `share_tokens` table with bearer-token schema (⚠ contradicted: APPROACH said "evolve" but share_tokens has `password_hash TEXT NOT NULL` + `entity_paths TEXT NOT NULL` as JSON array -- these are structurally incompatible with bearer-token model. Since spacebridge has no production data (entity 050 seed only), clean recreate is simpler than ALTER TABLE. See O-1). Token generation reuses the proven 192-bit entropy pattern (24 random bytes → 48-char hex, dashboard auth.ts:15-18). The token manager provides `create(entitySlug, ttlHours)` → `{token, url}`, `verify(token)` → `{entitySlug, expiresAt} | null`, `revoke(token)` → `boolean`, `cleanup()` → removes expired tokens. (2) **Tunnel layer** (`tunnel/`): A backend abstraction interface `TunnelProvider { start(localPort): Promise<string>, stop(): Promise<void>, getPublicUrl(): string }` with three implementations: `CloudflaredProvider` (named tunnels via `cloudflared tunnel` CLI), `NgrokProvider` (via `ngrok http` CLI), `TailscaleProvider` (via `tailscale funnel` CLI). The daemon detects which tunnel binary is available at startup and auto-selects, with `--tunnel-backend <name>` CLI override. The tunnel exposes the Next.js app's HTTP port -- share requests route through the tunnel to the same server that serves the war room. (3) **CLI layer** (`bin/spacebridge`): `spacebridge share --entity <slug> [--ttl 7d] [--tunnel-backend cloudflared]` creates a share token via domain layer, starts the tunnel if not running, prints the bearer-token URL. `spacebridge share --revoke <share_id>` revokes a token. `spacebridge share --list` shows active tokens with expiry. (4) **View layer** (Next.js `app/share/[token]/`): A read-only page that validates the bearer token via middleware, renders the entity detail (reusing entity 054's detail component), connects to the SSE feed filtered to the shared entity (reusing entity 053's `/api/events` endpoint with entity-scope query param), and provides a nickname-based comment form that POSTs to the comments API (entity 054). Rate limiting middleware enforces N requests/minute/token at the daemon HTTP layer using an in-memory token-bucket.
 
 **ALTERNATIVE**: Keep the password-based auth model from the old dashboard (`ShareRegistry` in `tools/dashboard/src/auth.ts`) and adapt it for SSE transport. The collaborator would still enter a password after opening the share URL, preserving the existing `password_hash NOT NULL` schema and `Bun.password.verify()` flow. -- D-01 Rejected: Design doc §6.3 explicitly chose bearer-token URLs to eliminate authentication friction. The pre-SaaS audience ("send a link to a colleague") requires "it just works" -- a password dialog adds a step and requires out-of-band password sharing. The old model was designed before the SSE-first transport decision; bearer-token + SSE is the coherent pair for tunnel-friendly sharing.
 
@@ -43,7 +43,7 @@ depends-on: [057]
 - Entity-scoped tokens -- share view middleware MUST verify the token's `entity_slug` matches the requested entity. No leakage of other entities, workflow-level data, or daemon internals
 - Rate limiting at the daemon HTTP layer (middleware), NOT at the tunnel layer -- tunnel backends don't all expose rate limiting APIs. Use a simple in-memory token-bucket per share token
 
-**RATIONALE**: Bearer-token URLs eliminate the password dialog friction required by the old dashboard's share system, directly implementing design doc §6.3's "the URL is the credential" mandate. The 4-layer architecture (domain → tunnel → CLI → view) cleanly separates pure token logic (testable with no I/O), tunnel provider abstraction (swappable backends), CLI UX (argument parsing), and web rendering (reuses 053/054 components). Evolving the existing `share_tokens` table rather than creating a new table preserves the 5-table LCD schema established in entity 050 and avoids table proliferation -- entity 060 (cutover) will clean up any legacy columns when the old dashboard is deleted. SSE transport through tunnels is proven viable by entity 053's spike (entity 049 confirmed SSE Route Handlers work in Bun+Next.js) and by the design doc's rationale that all three tunnel providers transparently proxy HTTP/1.1 streaming.
+**RATIONALE**: Bearer-token URLs eliminate the password dialog friction required by the old dashboard's share system, directly implementing design doc §6.3's "the URL is the credential" mandate. The 4-layer architecture (domain → tunnel → CLI → view) cleanly separates pure token logic (testable with no I/O), tunnel provider abstraction (swappable backends), CLI UX (argument parsing), and web rendering (reuses 053/054 components). Recreating the `share_tokens` table with a clean bearer-token schema (see O-1 explore finding) preserves the 5-table count established in entity 050 while eliminating the password_hash + entity_paths columns incompatible with the bearer-token model -- no migration needed since spacebridge has no production data. SSE transport through tunnels is proven viable by entity 053's spike (entity 049 confirmed SSE Route Handlers work in Bun+Next.js) and by the design doc's rationale that all three tunnel providers transparently proxy HTTP/1.1 streaming.
 
 ## Acceptance Criteria
 
@@ -65,3 +65,105 @@ depends-on: [057]
 - `spacebridge/src/schema.ts:84-99` -- existing share_tokens table (needs evolution for bearer-token model)
 - `tools/dashboard/src/auth.ts` -- old ShareRegistry pattern (password-based, being superseded)
 - `tools/dashboard/static/share.js` -- old share view UI (password dialog pattern being replaced)
+- Entity 053 decisions: O-1 `spacebridge/ui/` separate subproject, O-2 poll events table 500ms, O-3 filesystem parse at request time
+- Entity 054 decisions: O-1 single-level replies, O-2 suggestions deferred to v2, O-3 section-based anchoring
+- Entity 057 decisions: O-2 events table + sentinel values (entity="*", stage="watcher") for file change events
+
+## Assumptions
+
+A-1: share_tokens table is recreated with a clean bearer-token schema (not migrated via ALTER TABLE) since spacebridge has no production data -- entity 050 seeded the table but no tokens exist.
+Confidence: 🟢 Confident (0.95)
+Evidence: schema.ts:82 comment `[plain drizzle]` -- not event-sourced, no migration log. db.ts:97 uses `CREATE TABLE IF NOT EXISTS` -- no migration framework. spacebridge/src/schema.test.ts:325 confirms table exists but only uses test fixtures. No production share tokens have ever been created.
+
+A-2: `spacebridge share` CLI communicates with daemon via IPC over the existing unix socket (same pattern as `spacebridge status` which sends RPC over socket-server).
+Confidence: 🟢 Confident (0.90)
+Evidence: bin/daemon.ts:65-77 -- `onRpcRequest` handler already routes by `req.method` (e.g., `"__status"`). Adding `"share_create"`, `"share_revoke"`, `"share_list"` methods follows the same pattern. socket-client.ts provides the shim-side IPC client. bin/daemon.ts:172-230 -- status subcommand already sends RPC over socket and parses response.
+
+A-3: Daemon manages tunnel lifecycle -- starts tunnel on first share create, stops tunnel when all share tokens are revoked/expired.
+Confidence: 🟡 Likely (0.75)
+Evidence: Design doc §6.1:557 -- "Bridge spins up a tunnel." The bridge is the daemon. bin/daemon.ts owns long-lived state and process management (PID file, signal handlers, auto-stop timer). But no tunnel code exists yet -- the lifecycle policy (on-demand vs always-on) is not specified in the design doc.
+
+A-4: Bearer token validation via Next.js middleware querying share_tokens table with Drizzle ORM.
+Confidence: 🟢 Confident (0.90)
+Evidence: Entity 053 O-3 -- filesystem parse at request time shows Next.js reads spacebridge DB directly. schema.ts exports `shareTokens` for Drizzle queries. Entity 053 O-2 -- events table polled at 500ms, demonstrating Next.js → SQLite read pattern. share_tokens query would follow identical pattern.
+
+A-5: Rate limiting uses an in-memory token-bucket Map per share token at the Next.js middleware layer.
+Confidence: 🟡 Likely (0.70)
+Evidence: No rate limiting code exists in spacebridge. Design doc §6.4:582 says "rate-limited at the daemon: N requests per minute per share token" -- confirms per-token granularity. In-memory Map is simplest for single-daemon architecture (design doc §1.2 -- one daemon per machine). Token-bucket is a standard algorithm, no external dependency needed.
+
+A-6: External collaborator comments use `author: "guest:{nickname}"` format in the comments table, consistent with the existing `author` text column that already supports 'captain' | 'fo' | 'guest'.
+Confidence: 🟢 Confident (0.85)
+Evidence: schema.ts:69 -- `author: text("author").notNull()` with no enum constraint. Design doc §6.3:576 -- "Comments attributed to a nickname they choose (not verified)." The `guest:{nickname}` convention distinguishes external nicknames from authenticated roles without schema changes.
+
+A-7: SSE feed for the share view filters events by entity slug using a SQL WHERE clause on the events table `entity` column.
+Confidence: 🟢 Confident (0.90)
+Evidence: schema.ts:47 -- `entity: text("entity").notNull()`. Entity 053 O-2 -- SSE endpoint polls events table at 500ms. Entity 057 O-2 -- file watcher events use sentinel `entity="*"`, which would naturally be excluded by `WHERE entity = ?` (exact match). The share view adds `AND` for token-scoped filtering.
+
+A-8: Share view pages live in `spacebridge/ui/app/share/[token]/` following entity 053's O-1 decision (`spacebridge/ui/` as separate Next.js subproject).
+Confidence: 🟢 Confident (0.95)
+Evidence: Entity 053 O-1 selected `spacebridge/ui/` as the Next.js app root. `spacebridge/ui/` does not exist yet (053 not executed), but the path is authoritative per 053's clarify decisions. Next.js `[token]` dynamic route segment is the standard pattern for bearer-token URL routing.
+
+A-9: Share view comments are flat (single-level, no threading) per entity 054's O-1 decision.
+Confidence: 🟢 Confident (0.95)
+Evidence: Entity 054 O-1 -- "Single-level replies" selected by captain. Share view reuses 054's comments component, inheriting the flat structure. No threading UI needed.
+
+A-10: Lazy token cleanup on `verify()` -- expired tokens are deleted when accessed, consistent with old ShareRegistry pattern.
+Confidence: 🟢 Confident (0.85)
+Evidence: tools/dashboard/src/auth.ts:75-78 -- `get(token)` checks `expires_at < Date.now()`, deletes if expired, returns null. Same pattern applies to the new token manager's `verify()` method. No cron-based cleanup needed for v1.
+
+A-11: Token generation reuses the 192-bit entropy pattern (24 random bytes → 48-char hex string) proven in the old dashboard.
+Confidence: 🟢 Confident (0.95)
+Evidence: tools/dashboard/src/auth.ts:15-18 -- `crypto.getRandomValues(new Uint8Array(24))` → hex encoding. 192 bits provides ~1.58e57 possible tokens, sufficient for pre-SaaS scale. GUARDRAILS bullet 2 mandates ≥192 bits.
+
+## Option Comparisons
+
+### O-1: Schema evolution strategy -- how to transition share_tokens from password-based to bearer-token model
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Recreate share_tokens with clean bearer-token schema (drop password_hash, entity_paths; add entity_slug) | Clean schema, no migration code, no nullable workarounds; entity 050 seed has no production data | Technically drops a table that entity 050 tests verify -- tests need update; if any downstream code depends on old columns it breaks | Low | Recommended |
+| ALTER TABLE to make password_hash nullable, add entity_slug, keep entity_paths | Preserves existing DDL structure; backward compatible with any code referencing old columns | password_hash still in schema even though bearer-token never uses it; entity_paths JSON array is LCD violation for new code; messy hybrid | Medium | Not recommended |
+| Create new share_links table alongside share_tokens | Complete separation; old table untouched; new code gets clean schema | 6th table breaks 5-table LCD count; two share tables is confusing; entity 060 cutover must clean up both | Medium | Not recommended |
+
+Return value trace: `shareTokens` export from schema.ts is imported by schema.test.ts (5 tests verify table structure). db.ts:97 creates the DDL inline. No other file imports `shareTokens` -- no downstream consumers beyond tests. Recreating the table means updating schema.ts + db.ts + schema.test.ts, all co-located.
+
+Design doc invariant check: §3.3 LCD discipline requires text strings, integer PKs, integer timestamps, no JSON for queryable data. The new schema (`entity_slug TEXT NOT NULL` replacing `entity_paths TEXT NOT NULL` JSON array) is MORE LCD-compliant than the current schema. §6.3 bearer-token model has no password_hash requirement. No forward-looking invariant (Postgres migration, multi-machine, SaaS) depends on the old column structure.
+
+### O-2: Tunnel provider auto-detection -- how to select which tunnel backend to use when multiple are installed
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| First-found priority order (cloudflared > ngrok > tailscale) with `--tunnel-backend` override | Zero-config for users with one provider; predictable priority; simple `which` check | May pick wrong provider if user has multiple installed; no persistent preference | Low | Recommended |
+| Config file (`.spacedock/tunnel.toml`) with fallback to first-found | Persistent preference; supports provider-specific config (auth tokens, tunnel names) | Adds config management; overkill for v1 pre-SaaS; another file to maintain | Medium | Viable |
+| Always require `--tunnel-backend` flag, no auto-detect | Explicit, no surprises; user always knows which provider | Poor UX for common case (one provider installed); friction on every share command | Low | Not recommended |
+
+Return value trace: `detect()` returns a `TunnelProvider` instance → passed to daemon's tunnel lifecycle → `provider.start(port)` returns public URL → stored alongside share token. No downstream consumer depends on which provider was selected -- they only consume the URL.
+
+Design doc invariant check: §6.1:558 says "bridge supports multiple backends" -- all three options satisfy this. §6.2:568 says "it should just work" -- Option A best matches this UX requirement. The `--tunnel-backend` override ensures no lock-in.
+
+## Open Questions
+
+Q-1: Where should tunnel provider credentials (cloudflared cert, ngrok auth token) be stored and how should they be configured?
+
+Domain: Runnable/Invokable, Organizational/Data-transforming
+
+Why it matters: cloudflared requires a `cert.pem` or tunnel credentials file for named tunnels, ngrok requires an auth token for persistent tunnels, tailscale requires the device to be logged in. The storage location affects security (plain text vs keychain), portability (per-machine vs per-project), and the CLI UX for initial setup.
+
+Suggested options: (a) Environment variables (`CLOUDFLARED_TOKEN`, `NGROK_AUTHTOKEN`, `TAILSCALE_AUTHKEY`) -- simplest, follows 12-factor convention, each provider's own CLI already reads these. (b) Config file at `~/.spacedock/tunnel.toml` -- persistent, one place for all providers, but adds config management scope. (c) Rely on each provider's own credential storage (cloudflared `~/.cloudflared/`, ngrok `~/.ngrok2/ngrok.yml`, tailscale system auth) -- zero spacebridge-specific config, but requires users to set up each provider independently.
+
+## Stage Report: explore
+
+- [x] Files mapped: 14 across schema(2), daemon(1), domain/share(3 new), tunnel(5 new), view(3 new, depends on 053)
+  schema: schema.ts + db.ts (recreate share_tokens DDL); daemon: bin/daemon.ts (add share RPC handlers); domain/share: types.ts + token-manager.ts + token-manager.test.ts (new); tunnel: provider.ts + cloudflared.ts + ngrok.ts + tailscale.ts + detect.ts (new); view: app/share/[token]/page.tsx + api route + middleware (new, inside spacebridge/ui/ from entity 053)
+- [x] Assumptions formed: 11 (Confident: 9, Likely: 2, Unclear: 0)
+  A-1 through A-2, A-4, A-6 through A-11 Confident (0.85-0.95); A-3 Likely (0.75, tunnel lifecycle not specified in design doc); A-5 Likely (0.70, no rate limiting precedent in codebase)
+- [x] Options surfaced: 2
+  O-1 schema evolution strategy (recreate vs evolve vs new table); O-2 tunnel auto-detection (priority order vs config vs explicit flag)
+- [x] Questions generated: 1
+  Q-1 tunnel provider credentials storage and configuration
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorm
+- [x] Scale assessment: confirmed Medium
+  14 files across 5 layers; 3 modify existing + 11 new. Scope flag present (4 domains) but decomposition not recommended: all 4 layers serve one cohesive flow (CLI → daemon → tunnel → view), breaking them into child entities would create artificial boundaries with tight coupling at every seam.
+- [x] Research dispatched: 1 researcher for 1 topic (post-brainstorm Step 3.5, tunnel CLI validation)
+  Tunnel backend CLIs (cloudflared/ngrok/tailscale): dispatched, pending return. Design doc §6.2 provides baseline confidence; researcher validates programmatic spawning + URL extraction + SSE compatibility.
