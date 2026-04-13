@@ -1,8 +1,8 @@
 ---
 id: 078
 title: "Clarify-stage explore re-validation -- evidence freshness + consistency gates"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: decomposition of entity 077 (cross-phase skepticism)
 started:
 completed:
@@ -66,22 +66,27 @@ parent: 077
 A-1: Evidence freshness check (sub-check 1a) uses the same LLM-judgment pattern as entity 079's build-plan Step 0.5 and explore Step 3.7 -- Read the cited file region, evaluate whether content still supports the claim. Three outcomes: hold (silent), stale (inline `(⚠ stale-evidence: {detail})`), contradicted (new Q-n). This is the third instance of this pattern in the pipeline (explore 3.7, plan 0.5, clarify 1.5).
 Confidence: Confident (0.90)
 Evidence: entity 079 clarify/ready -- A-3 confirmed LLM-judgment semantic comparison. build-explore SKILL.md:181-196 -- Step 3.7 is the original implementation. Three independent instances of the same pattern = Confident.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: Internal consistency check (sub-check 1b) uses LLM runtime analysis to detect contradictions between assumptions, not a static algorithm. The LLM reads all A-n entries and flags semantic contradictions. Contradictions become new Q-n Open Questions prepended to the Step 4 list.
 Confidence: Likely (0.75)
 Evidence: parent 077 A-3 at Likely (0.70). No existing codebase implementation of cross-assumption consistency checking. The closest pattern is explore Step 3.7 which cross-references APPROACH claims against codebase, not A-n entries against each other. Novel check, LLM-judgment feasible but unproven at this specific task.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-3: Option validity check (sub-check 1c) uses LLM comparison of option rows to detect semantic duplicates. Duplicates are merged (keeping the first occurrence) with a `(merged from O-{n}: {original label})` dedup note appended to the surviving option's row.
 Confidence: Likely (0.70)
 Evidence: No existing codebase implementation of option dedup. Build-brainstorm Step 6 self-review (check 2) does verify "APPROACH vs ALTERNATIVE are genuinely different" but that's at brainstorm time, not clarify time, and checks 2 sections not N options. Novel check.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-4: Coverage check (sub-check 1d) reads `references/gray-area-templates.md` (5 domain templates) and cross-references against existing entity body sections. Missing gray areas are classified as Track A (assumption) if codebase precedent exists per hybrid classification, Track C (question) otherwise.
 Confidence: Confident (0.85)
 Evidence: skills/build-explore/references/gray-area-templates.md -- 5 domain templates with structured gray area tables. build-explore SKILL.md Step 4 already does this exact cross-reference during explore; Step 1.5 re-runs it to catch gray areas explore missed. Reuse of existing reference doc = high confidence.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-5: Researcher vs code-explorer disambiguation documentation goes in three files: (1) SO-FO-DISPATCH-SPLIT.md (new subsection), (2) build-explore references (new file or append to existing), (3) agents/science-officer.md (inline update). The content distinguishes breadth-first file mapping (code-explorer) from depth-first claim validation (researcher).
 Confidence: Confident (0.85)
 Evidence: docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md -- already mentions both roles (lines 36, 84-86, 93-94) but lacks formal disambiguation section. agents/science-officer.md lines 44-46, 117-123 -- already references researchers and code-explorers but without explicit role distinction rules.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 ## Option Comparisons
 
@@ -94,6 +99,12 @@ Step 1.5 may find stale evidence, contradictions, duplicate options, or coverage
 | Annotate-and-proceed | Captain sees pre-validated assumptions with inline annotations; no blocking; clarify flow continues; captain decides what matters | Stale evidence could lead to wasted clarify time on an invalid assumption | Low | ✅ Recommended |
 | Block on any issue | Forces resolution before captain interaction; cleanest input for Step 2 | Over-blocking: a stale line number that doesn't change the claim would block the entire session; captain can't override | Medium | Not recommended |
 | Annotate, block only on contradictions | Contradictions are hard blockers (new Q-n), staleness is annotated warning; balanced approach | Adds conditional logic to Step 1.5 (two code paths); complexity for marginal benefit over annotate-and-proceed | Medium | Viable |
+
+→ Selected: Annotate-and-proceed (captain, 2026-04-13, interactive)
+
+## Canonical References
+
+(none cited -- captain confirmed assumptions and selected recommended option without external file references)
 
 ## Stage Report: explore
 
@@ -109,6 +120,25 @@ Step 1.5 may find stale evidence, contradictions, duplicate options, or coverage
   Brainstorming spec contained no α markers
 - [x] Scale assessment: confirmed Medium
   5 files mapped across 3 layers (skill, docs, agent), 5 sub-checks in Step 1.5 + documentation updates
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  entity is Medium scope, 5 sub-checks are cohesive (all in Step 1.5), no split needed
+- [x] Assumptions confirmed: 5 / 5 (0 corrected)
+  A-1 through A-5 all confirmed via batch; A-2, A-3 assessed as "novel but low-risk" (LLM-judgment with captain fallback)
+- [x] Options selected: 1 / 1
+  O-1 Step 1.5 issue handling -- Annotate-and-proceed (recommended)
+- [x] Questions answered: 0 / 0
+  no open questions surfaced by explore
+- [x] Canonical refs added: 0
+  captain confirmed and selected without citing external references
+- [x] Context status: ready
+  gate passed: all 5 assumptions confirmed, 1 option selected, 0 questions, ACs valid (7 criteria, no α markers)
+- [x] Handoff mode: loose
+  captain must say "execute 078" or hand off to First Officer; auto_advance not set
+- [x] Clarify duration: 2 questions asked, session complete
+  1 batch assumption presentation (plain text) + 1 AskUserQuestion (O-1 issue handling)
 
 ## References
 
