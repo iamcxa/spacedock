@@ -211,6 +211,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | Daemon entry point with start/stop/status subcommands | 🔵 planned | 2026-04-12 |
+| spacebridge-nextjs-warroom-sse-feed | execute | Integrate Next.js standalone child-process spawn into cmdStart/shutdown | 🟡 in-flight | 2026-04-13 |
 
 ### spacebridge/src/daemon/auto-fork.test.ts
 
@@ -265,6 +266,84 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | Add __status RPC response type for daemon status query | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/daemon/nextjs-child.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | execute | spawnNextjsChild / shutdownNextjsChild helpers for daemon lifecycle integration | 🟡 in-flight | 2026-04-13 |
+
+### spacebridge/src/daemon/nextjs-child.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | execute | TDD integration tests for spawn + graceful shutdown + SIGKILL fallback | 🟡 in-flight | 2026-04-13 |
+
+### spacebridge/ui/app/api/events/route.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | execute | SSE Route Handler polling events table 500ms, ReadableStream + abort cleanup | 🟡 in-flight | 2026-04-13 |
+
+### spacebridge/ui/app/layout.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | execute | Next.js App Router root layout with shadcn globals.css | 🟡 in-flight | 2026-04-13 |
+
+### spacebridge/ui/app/page.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | execute | War room Server Component fetching entities from filesystem + leases from DB | 🟡 in-flight | 2026-04-13 |
+
+### spacebridge/ui/components/entity-card.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | execute | Server-safe entity card with slug/title/status/stage/lease badges | 🟡 in-flight | 2026-04-13 |
+
+### spacebridge/ui/components/live-feed.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | execute | Client Component SSE EventSource consumer with ScrollArea + auto-scroll | 🟡 in-flight | 2026-04-13 |
+
+### spacebridge/ui/components/war-room.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | execute | Client Component Tabs war room layout with repo grouping | 🟡 in-flight | 2026-04-13 |
+
+### spacebridge/ui/lib/db.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | execute | openReadOnlyDb factory for UI read-only Drizzle access | 🟡 in-flight | 2026-04-13 |
+
+### spacebridge/ui/lib/entity-parse.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | execute | Inline-duplicate of frontmatter-io splitFrontmatter/parseEntity with graceful fallback | 🟡 in-flight | 2026-04-13 |
+
+### spacebridge/ui/lib/entity-scan.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | execute | scanEntitiesForRepo reads docs/build-pipeline/*.md and returns EntityCard[] | 🟡 in-flight | 2026-04-13 |
+
+### spacebridge/ui/next.config.mjs
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | execute | Next.js config with output standalone + reactStrictMode | 🟡 in-flight | 2026-04-13 |
+
+### spacebridge/ui/package.json
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | execute | Next.js 16 + React 19 + Bun subproject package with build/start scripts | 🟡 in-flight | 2026-04-13 |
 
 ### tests/fixtures/pr-review-loop-pipeline/README.md
 
