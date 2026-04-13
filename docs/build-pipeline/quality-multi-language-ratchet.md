@@ -10,7 +10,7 @@ completed:
 verdict:
 score: 0.0
 issue:
-pr:
+pr: "#38"
 intent: feature
 scale: Medium
 project: spacedock
