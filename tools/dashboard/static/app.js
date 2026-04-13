@@ -32,16 +32,35 @@
       var parsed = JSON.parse(raw);
       var result = {};
       Object.keys(parsed).forEach(function (k) {
-        result[k] = new Set(parsed[k]);
+        var val = parsed[k];
+        // Migrate old format (plain array) to new nested { stages, context_status } format
+        if (Array.isArray(val)) {
+          result[k] = { stages: new Set(val), context_status: new Set() };
+        } else {
+          result[k] = {
+            stages: new Set(val.stages || []),
+            context_status: new Set(val.context_status || [])
+          };
+        }
       });
       return result;
     } catch (_) { return {}; }
   })();
 
+  function initDim(wfIdx) {
+    if (!filterState[wfIdx]) {
+      filterState[wfIdx] = { stages: new Set(), context_status: new Set() };
+    }
+  }
+
   function saveFilterState() {
     var serializable = {};
     Object.keys(filterState).forEach(function (k) {
-      serializable[k] = Array.from(filterState[k]);
+      var dim = filterState[k];
+      serializable[k] = {
+        stages: Array.from(dim.stages),
+        context_status: Array.from(dim.context_status)
+      };
     });
     try { sessionStorage.setItem("dashboardFilterState", JSON.stringify(serializable)); } catch (_) {}
   }
@@ -154,18 +173,19 @@
 
       // --- Pipeline Graph (wide screens) ---
       var graphContainer = el("div", { className: "pipeline-graph-container" });
-      var activeFilters = filterState[wfIdx] || new Set();
+      var dim = filterState[wfIdx] || { stages: new Set(), context_status: new Set() };
+      var activeFilters = dim.stages;
 
       var svgGraph = window.SpacedockVisualizer.renderPipelineGraph(
         wf.stages,
         wf.entity_count_by_stage,
         activeFilters,
         function (stageName) {
-          if (!filterState[wfIdx]) filterState[wfIdx] = new Set();
-          if (filterState[wfIdx].has(stageName)) {
-            filterState[wfIdx].delete(stageName);
+          initDim(wfIdx);
+          if (filterState[wfIdx].stages.has(stageName)) {
+            filterState[wfIdx].stages.delete(stageName);
           } else {
-            filterState[wfIdx].add(stageName);
+            filterState[wfIdx].stages.add(stageName);
           }
           saveFilterState();
           fetchWorkflows();
@@ -187,11 +207,11 @@
           el("span", { className: "count", textContent: String(count) })
         ]);
         chip.addEventListener("click", function () {
-          if (!filterState[wfIdx]) filterState[wfIdx] = new Set();
-          if (filterState[wfIdx].has(stage.name)) {
-            filterState[wfIdx].delete(stage.name);
+          initDim(wfIdx);
+          if (filterState[wfIdx].stages.has(stage.name)) {
+            filterState[wfIdx].stages.delete(stage.name);
           } else {
-            filterState[wfIdx].add(stage.name);
+            filterState[wfIdx].stages.add(stage.name);
           }
           saveFilterState();
           fetchWorkflows();
@@ -240,9 +260,17 @@
       card.appendChild(editorContainer);
 
       if (wf.entities.length > 0) {
-        var filters = filterState[wfIdx] || new Set();
-        var filtered = filters.size > 0
-          ? wf.entities.filter(function (e) { return filters.has(e.status); })
+        var filterDim = filterState[wfIdx] || { stages: new Set(), context_status: new Set() };
+        var stageFilters = filterDim.stages;
+        var csFilters = filterDim.context_status;
+        var hasAnyFilter = stageFilters.size > 0 || csFilters.size > 0;
+        var filtered = hasAnyFilter
+          ? wf.entities.filter(function (e) {
+              var stageMatch = stageFilters.size === 0 || stageFilters.has(e.status);
+              var csVal = e.context_status || e["context_status"];
+              var csMatch = csFilters.size === 0 || csFilters.has(csVal) || !csVal;
+              return stageMatch && csMatch;
+            })
           : wf.entities.filter(function (e) { return e.archived !== "true" && e.status !== "shipped"; });
         var sort = sortState[wfIdx] || { column: "id", asc: true };
         var sorted = sortEntities(filtered, sort.column, sort.asc);
