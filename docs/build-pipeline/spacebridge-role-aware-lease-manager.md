@@ -1,14 +1,14 @@
 ---
 id: 056
 title: "Role-aware lease manager (fmodel core)"
-status: draft
+status: explore
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
-started:
+started: 2026-04-13T18:00:00+08:00
 completed:
 verdict:
-score: 0.0
-worktree:
+score: 1.0
+worktree: .worktrees/spacedock-ensign-spacebridge-role-aware-lease-manager
 issue:
 pr:
 intent: feature
