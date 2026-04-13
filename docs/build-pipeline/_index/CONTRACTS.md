@@ -280,90 +280,6 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Schema validation tests -- table creation, LCD compliance, CRUD, fmodel columns | 🔵 planned | 2026-04-12 |
 
-### spacebridge/src/ipc/channel-provider-bridge.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | ChannelProvider bridge forwarding calls to daemon via socket RPC | 🔵 planned | 2026-04-12 |
-
-### spacebridge/src/ipc/channel-provider-bridge.test.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | Tests for ChannelProvider bridge RPC forwarding | 🔵 planned | 2026-04-12 |
-
-### spacebridge/src/ipc/coordination-client-stub.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | CoordinationClient stub returning noop/empty results | 🔵 planned | 2026-04-12 |
-
-### spacebridge/src/ipc/coordination-client-stub.test.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | Tests for CoordinationClient stub methods | 🔵 planned | 2026-04-12 |
-
-### spacebridge/src/ipc/framing.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | IPC length-prefixed framing codec (encode/decode) | 🔵 planned | 2026-04-12 |
-
-### spacebridge/src/ipc/framing.test.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | Tests for framing codec round-trip and edge cases | 🔵 planned | 2026-04-12 |
-
-### spacebridge/src/ipc/index.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | Barrel export for IPC module public API | 🔵 planned | 2026-04-12 |
-
-### spacebridge/src/ipc/integration.test.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | End-to-end integration test wiring server + client + bridge | 🔵 planned | 2026-04-12 |
-
-### spacebridge/src/ipc/socket-client.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | Socket client with reconnect for shim side | 🔵 planned | 2026-04-12 |
-
-### spacebridge/src/ipc/socket-client.test.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | Tests for socket client connect, request, reconnect | 🔵 planned | 2026-04-12 |
-
-### spacebridge/src/ipc/socket-server.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | Socket server wrapping net.createServer for daemon side | 🔵 planned | 2026-04-12 |
-
-### spacebridge/src/ipc/socket-server.test.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | Tests for socket server accept, register, RPC, disconnect | 🔵 planned | 2026-04-12 |
-
-### spacebridge/src/ipc/types.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | Shared IPC message type definitions and payload interfaces | 🔵 planned | 2026-04-12 |
-
-### spacebridge/src/ipc/types.test.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | Type-level tests for IPC message types | 🔵 planned | 2026-04-12 |
-
 ### spacebridge/src/schema.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -375,24 +291,6 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | TypeScript config for spacebridge src | 🔵 planned | 2026-04-12 |
-
-### tools/dashboard/src/channel-provider.test.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | Update mock to verify async-compatible ChannelProvider interface | 🔵 planned | 2026-04-12 |
-
-### tools/dashboard/src/channel-provider.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | Add Promise<T> union to ChannelProvider return types for async bridge support | 🔵 planned | 2026-04-12 |
-
-### tools/dashboard/src/channel.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-unix-socket-ipc-channel-provider | plan | Add await to ChannelProvider call sites (createSnapshot, getChannelMessagesSince, publishEvent) | 🔵 planned | 2026-04-12 |
 
 ## Recently Retired (last 30 days)
 
