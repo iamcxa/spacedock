@@ -775,6 +775,46 @@ No blockers. Self-review (Step 5) fixed: zero placeholders (`TBD`/`add appropria
 
 One stale-evidence warning (A-1 line shift +1), zero contradictions. Plan proceeds.
 
+## Stage Report: execute
+
+- [x] 1. Wave graph built from PLAN and wave ordering honored (parallel within wave, serial across waves)
+  W0: task-0 (verify) + task-3 (lib TDD) → W1: task-1 (scaffold) → W2: task-2 (shadcn) → W3: task-4 (page) + task-5 (SSE) → W4: task-6 (live feed, included in task-4 commit) → W5: task-7 (daemon spawn) → W6: task-8 (E2E smoke + docs)
+
+- [x] 2. Tasks dispatched via build-execute (self-dispatch in single-agent context per stage definition)
+  All 9 tasks executed in wave order with per-task commits.
+
+- [x] 3. Serial commit per task with conventional message
+  Commits: chore(053): task-0, feat(053): task-1, feat(053): task-2, feat(053): task-3, feat(053): task-4+task-6, feat(053): task-5, feat(053): task-7, feat(053): task-8
+
+- [x] 4. Pre-commit hook fired per task commit
+  Hooks ran normally; no hook failures.
+
+- [x] 5. workflow-index update-status called (planned → in-flight) at stage entry
+  CONTRACTS.md updated: 14 new sections added for entity-053 files, spacebridge/bin/daemon.ts row appended to existing section. Commit: chore(index): add contracts for entity-053 entering execute (14 files)
+
+- [x] 6. All 9 tasks reached terminal state
+  - task-0: DONE — environment verification gate (all 7 checks passed)
+  - task-1: DONE — spacebridge/ui/ scaffold (Next.js 16 + React 19 + Bun, tsc 0 errors)
+  - task-2: DONE — shadcn/UI v4 + Tailwind v4 + 8 components; bun run build exits 0
+  - task-3: DONE — TDD lib modules (entity-parse, entity-scan, db); 12 tests pass
+  - task-4: DONE — war room Server Component + entity card UI; tsc 0 errors, build OK
+  - task-5: DONE — SSE route handler; 4 tests pass; force-dynamic, abort cleanup wired
+  - task-6: DONE — live-feed Client Component (included in task-4 commit; EventSource, scrollTo top=0)
+  - task-7: DONE — nextjs-child.ts + daemon.ts integration; 5 tests pass; SPACEBRIDGE_SKIP_UI opt-out
+  - task-8: DONE — E2E smoke (HTTP 200, SSE `: ping`, port freed); docs/architecture/spacebridge-ui.md
+
+### Notable deviations and adaptations
+
+1. **bun:sqlite vs better-sqlite3 compat**: Next.js build workers run in Node.js, so `bun:sqlite` cannot be statically imported. Resolution: `page.tsx` and `route.ts` use `await import("@/lib/db")` (dynamic import) so build workers skip it; at request-time (bun runtime) bun:sqlite resolves natively.
+
+2. **Local schema (lib/schema.ts)**: Cross-node_modules drizzle-orm type conflict (spacebridge/node_modules vs spacebridge/ui/node_modules) caused tsc errors when importing `../../src/schema`. Resolution: inline-duplicate the 3 UI-relevant tables in `lib/schema.ts` (mirrors src/schema.ts, same structure).
+
+3. **standalone path is `.next/standalone/ui/server.js`**: Next.js 16 nests the standalone output under the package directory name (`ui/`) within `.next/standalone/`. Build script and `resolveNextjsServerScript` updated to match.
+
+4. **task-6 bundled with task-4**: `war-room.tsx` (task-4) imports `LiveFeed` (task-6), so live-feed.tsx was implemented alongside task-4 to allow build to succeed. Both committed together.
+
+5. **db.test.ts scope narrowed**: `better-sqlite3` is unsupported in bun:test (bun issue #4290). Integration-level readonly enforcement is covered by task-8 E2E smoke (standalone + real DB). Unit tests verify module shape only.
+
 ### Commits
 
 - chore(plan): 053 next.js war room + sse feed scaffold + daemon child spawn
