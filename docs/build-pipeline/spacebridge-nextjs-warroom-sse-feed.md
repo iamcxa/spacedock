@@ -60,22 +60,67 @@ depends-on: [052]
 
 ## Research Findings
 
-### shadcn/UI + Tailwind v4 + Radix on Bun + Next.js App Router
+### Upstream Constraints
 
-**Confirmed working**: `bunx shadcn@latest init` (without `--bun` flag) on Bun 1.3.x + Next.js 16 + React 19. shadcn CLI v4 (March 2026) defaults to Tailwind v4 with `tw-animate-css`. Radix primitives are pure React -- no Bun Node.js compat layer issues.
+- **Port 8420** is locked by ADR-001 / entity 045 shipping. The Next.js app MUST listen on 8420 when spawned as child process (design doc §3.4; `docs/architecture/ADR-001-dashboard-single-server.md`).
+- **No fmodel domain logic in UI** -- UI reads DB snapshot tables only; fmodel aggregates live in daemon (`spacebridge/src/schema.ts` comment lines 9,42: events is event-log-only; entity_leases / sessions / comments are full CQRS readable).
+- **Drizzle DB is read-only from UI process** -- writes go through daemon's socket coordination layer (entity 052 guardrails). SQLite WAL allows concurrent reads (`spacebridge/src/db.ts:24`).
+- **Next.js standalone output is NOT importable** (entity 052 A-5) -- must be spawned as child process.
+- **SSE, not WebSocket** for realtime transport (design doc §3.4, tunnel compatibility).
+- **No `tailwind.config.js`** in Tailwind v4 -- configuration goes in `globals.css` via `@import "tailwindcss"` + `@theme inline {}`. PostCSS plugin is `@tailwindcss/postcss`.
 
-**Key gotchas for 053 implementation**:
-- G1: Use `bunx shadcn@latest init`, NOT `bunx --bun shadcn@latest init` (the `--bun` flag causes failures)
-- G3: Tailwind v4 requires class names as visible string literals at build time -- no dynamic `className={\`text-${color}-500\`}`. All variants must be complete class strings
-- G5: `tw-animate-css` may need explicit install (`bun add tw-animate-css`) if missing after init
-- G7: Client Components cannot import Server Components -- pass server data as props/children, not via direct import
+No findings -- clarify-confirmed batch (A-1 through A-6) covers all upstream constraints; no additional constraints from CLAUDE.md or DECISIONS.md apply to greenfield `spacebridge/ui/` subtree.
 
-**Tailwind v4 architecture change**: drops `tailwind.config.js` entirely. Configuration via CSS `@theme` + `@import` directives. PostCSS plugin is `@tailwindcss/postcss` (not `tailwindcss`). Greenfield project = no migration concern.
+### Existing Patterns
 
-**Server/Client Component pattern for shadcn**:
-- Non-interactive components (Card, Badge, Separator): usable directly in Server Components
-- Interactive components (Dialog, Sheet, Tabs): have `"use client"`, use as leaf Client Components with server data passed as props
-- Entity list initial render: Server Component fetches from Drizzle, passes to Client Component for interactivity
+- **Daemon subcommand routing**: `spacebridge/bin/daemon.ts` dispatches `start`/`stop`/`status` with `Bun.argv[2]` (lines 258-269). Pattern for extending daemon lifecycle: register async handler, then wire signal handlers. The Next.js child process spawn hooks into `cmdStart()` before / alongside `server.listen()` at line 98.
+- **Frontmatter parsing**: `tools/dashboard/src/frontmatter-io.ts:3-26` provides `splitFrontmatter()` -- line-based YAML key:value extraction, no external YAML dep. `parseEntity()` at line 33 returns `{ frontmatter, tags, body }`. This is the reference for entity file parsing inside the Next.js Server Component. Inline duplicate (per MEMORY `extract-pure-module-pattern`) into `spacebridge/ui/lib/entity-parse.ts` with ABOUTME header rather than cross-importing from `tools/dashboard/`.
+- **SQLite WAL init**: `spacebridge/src/db.ts:22-25` exec's `PRAGMA journal_mode = WAL` after constructing `Database`. The Next.js app opens the same `~/.spacedock/spacebridge.db` path read-only -- set `readonly: true` on `new Database(path, { readonly: true })` so UI process cannot race daemon writes.
+- **State directory resolution**: `spacebridge/bin/daemon.ts:19-22` resolves `SPACEBRIDGE_STATE_DIR ?? ~/.spacedock`. UI process must use the same resolution to find `spacebridge.db`.
+- **IPC socket framing**: `spacebridge/src/ipc/framing.ts` 4-byte length-prefixed JSON frames. The UI process does NOT use this -- it reads the SQLite DB directly and does not speak the socket protocol. Scope boundary: all UI↔daemon data crosses via the shared DB file, not the socket.
+
+### Library/API Surface
+
+- **Next.js 16 App Router + React 19 + Bun 1.3.x**: validated by entity 049 V2 (SSE Route Handler via `ReadableStream`) and V4-V5 (`next build --output standalone` → `bun run .next/standalone/server.js` serves correctly). Required post-build copy step: `cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public` (A-6).
+- **shadcn/UI v4 + Tailwind v4 + Radix on Bun**: `bunx shadcn@latest init` (no `--bun` flag -- G1 gotcha). Tailwind v4 CSS-only config (`@theme inline {}` in `globals.css`). `tw-animate-css` may need explicit `bun add` if missing after init (G5). Radix primitives are pure React.
+- **SSE Route Handler pattern** (Next.js App Router):
+  ```ts
+  export async function GET(req: Request) {
+    const stream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        const send = (evt: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(evt)}\n\n`));
+        const interval = setInterval(pollAndPush, 500);
+        req.signal.addEventListener("abort", () => { clearInterval(interval); controller.close(); });
+      }
+    });
+    return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } });
+  }
+  ```
+  Reference: entity 049 V2. The `req.signal.abort` handler is the cleanup path when client disconnects.
+- **Drizzle read queries**: `db.select().from(events).where(gt(events.id, lastSeenId)).orderBy(asc(events.id))` -- incremental poll using `id` as monotonic cursor. No need for `timestamp`-based polling (id ordering is sufficient with WAL).
+- **`child_process.spawn`** (node:child_process): daemon spawns Next.js standalone server. Use `{ stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, PORT: "8420", SPACEBRIDGE_DB_PATH: dbPath } }`. On daemon shutdown, call `child.kill("SIGTERM")` and await a timeout-gated exit.
+
+### Known Gotchas
+
+- **G1 (shadcn)**: `bunx --bun shadcn@latest init` fails; use `bunx shadcn@latest init` (no flag).
+- **G3 (Tailwind v4)**: Dynamic class names (`text-${color}-500`) don't work; JIT scanner needs complete literals. All variant styling must use static class strings.
+- **G5 (Tailwind v4)**: `tw-animate-css` may not install automatically; `bun add tw-animate-css` if missing.
+- **G7 (RSC boundary)**: Client Components cannot import Server Components. Entity data fetched in a Server Component must be passed as **props/children** to Client Components, never via direct import.
+- **Post-build copy**: Next.js standalone does NOT auto-copy `.next/static/` or `public/`. Required: `cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public` after every `next build` (entity 049 Results).
+- **SQLite concurrent access**: UI process must open DB with `{ readonly: true }` -- otherwise SQLite attempts to upgrade WAL checkpoint permissions and can race with daemon writer. WAL is one-writer-many-readers by design.
+- **Empty frontmatter graceful fallback**: entity files in real repos have varying completeness; parser must handle missing `status`, `title`, `id` fields without throwing. Test against a fixture corpus that includes malformed entries.
+- **Event poll cursor persistence**: each SSE client maintains its own `lastSeenId` in the request handler closure -- do NOT share across connections. Multiple concurrent clients each poll independently; SQLite WAL makes this cheap.
+- **Next.js standalone PORT env**: standalone server respects `PORT` env var; pass `PORT=8420` in `spawn()` env. Default is 3000 which would violate ADR-001.
+- **Child process stdio**: capture stderr so daemon can log Next.js boot errors; if stdio is fully ignored, a Next.js crash is silent.
+
+### Reference Examples
+
+- **Entity 049** (`docs/build-pipeline/spacebridge-nextjs-bun-spike.md`): end-to-end Next.js + Bun + SSE + fmodel spike. V2 = SSE Route Handler, V4-V5 = standalone build and run. **Use V2 SSE handler as the direct pattern for `app/api/events/route.ts`.**
+- **Entity 052** (`docs/build-pipeline/spacebridge-daemon-lifecycle.md`, shipped): A-5 rules child process composition; Q-1 chose direct-import-plus-child-process hybrid. **Use as the reference for the `spawn()` integration into `cmdStart()` / `shutdown()`.**
+- **Entity 050** (`docs/build-pipeline/spacebridge-plugin-drizzle-schema.md`, shipped): `spacebridge/src/schema.ts` defines `events`, `entity_leases`, `sessions` tables; `spacebridge/src/db.ts` factory. **Use as the read-only data source for Server Component entity fetching and SSE poll query.**
+- **`tools/dashboard/src/frontmatter-io.ts`**: 40-line stdlib YAML frontmatter parser. **Inline-duplicate into `spacebridge/ui/lib/entity-parse.ts`** with ABOUTME header (per MEMORY extract-pure-module-pattern).
+- **shadcn Server/Client split**: Non-interactive (`Card`, `Badge`, `Separator`, `Skeleton`): Server-Component-safe. Interactive (`Tabs`, `ScrollArea`, `Tooltip`, `Button`): emit `"use client"`, use as leaf Client Components with server data passed as props.
 
 ## References
 
@@ -267,3 +312,483 @@ app/api/events/route.ts (Route Handler -- SSE endpoint, polls events table 500ms
   Component hierarchy, layout pattern (2-column desktop), v1 component set, empty/loading/error states, accessibility notes.
 - [x] Sufficiency gate: PASS
   All assumptions confirmed, all options selected, all questions answered, UI Spec produced, zero unresolved items.
+
+## PLAN
+
+Plan goal: scaffold `spacebridge/ui/` Next.js App Router app (shadcn v4 + Tailwind v4 + React 19 on Bun), implement war room Server Component + SSE Route Handler + live feed Client Component, integrate Next.js standalone child-process spawn into `spacebridge/bin/daemon.ts`, and ship with a validated UAT matrix.
+
+<task id="task-0" model="sonnet" wave="0" skills="" test_first="false">
+  <read_first>
+    - spacebridge/package.json
+    - spacebridge/bin/daemon.ts
+    - spacebridge/src/db.ts
+    - spacebridge/src/schema.ts
+    - tools/dashboard/src/frontmatter-io.ts
+    - docs/build-pipeline/spacebridge-nextjs-warroom-sse-feed.md
+  </read_first>
+
+  <action>
+  Environment verification gate. Run and record outputs:
+  1. `test ! -d spacebridge/ui && echo "MISSING_OK"` -- confirm `spacebridge/ui/` does NOT yet exist (greenfield scaffold target).
+  2. `test -f spacebridge/bin/daemon.ts && echo "OK"` -- confirm daemon entry point present.
+  3. `test -f spacebridge/src/db.ts && grep -n "journal_mode = WAL" spacebridge/src/db.ts` -- confirm WAL enabled (expected line 24 post Step 0.5 re-validation).
+  4. `grep -n "^export function splitFrontmatter" tools/dashboard/src/frontmatter-io.ts` -- confirm frontmatter parser at line 3 for inline-duplicate source.
+  5. `test -f spacebridge/src/schema.ts && grep -n "export const events\|export const entityLeases\|export const sessions" spacebridge/src/schema.ts` -- confirm 3 target tables.
+  6. `which bun && bun --version` -- confirm Bun 1.3.x in environment.
+  7. `grep -n "port.*8420\|8420" docs/architecture/*.md 2>/dev/null || echo "no ADR hit (expected -- ADR-001 reference by entity 045 / dashboard)"` -- confirm port 8420 not already bound by existing service config in this worktree.
+  If any check fails, STOP and escalate via feedback-to: captain.
+  </action>
+
+  <acceptance_criteria>
+    - Every check above emits its expected output. Record results in commit body.
+    - `spacebridge/ui/` does not exist before Task 1 starts.
+  </acceptance_criteria>
+
+  <files_modified>
+    - (none -- verification only, no writes)
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1" skills="" test_first="false">
+  <read_first>
+    - spacebridge/package.json
+    - .gitignore
+  </read_first>
+
+  <action>
+  Scaffold `spacebridge/ui/` as a Next.js App Router project with React 19 + Bun. Concretely:
+  1. `mkdir -p spacebridge/ui`
+  2. Create `spacebridge/ui/package.json` with:
+  ```json
+  {
+    "name": "spacebridge-ui",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+      "dev": "next dev -p 8420",
+      "build": "next build && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public",
+      "start": "bun run .next/standalone/server.js"
+    },
+    "dependencies": {
+      "next": "^16.0.0",
+      "react": "^19.0.0",
+      "react-dom": "^19.0.0",
+      "drizzle-orm": "^0.40.0"
+    },
+    "devDependencies": {
+      "@types/node": "*",
+      "@types/react": "^19.0.0",
+      "@types/react-dom": "^19.0.0",
+      "bun-types": "^1.3.11",
+      "typescript": "^5.4.0"
+    }
+  }
+  ```
+  3. Create `spacebridge/ui/tsconfig.json` (Next.js App Router strict, moduleResolution bundler, jsx preserve, paths `"@/*": ["./*"]`).
+  4. Create `spacebridge/ui/next.config.mjs` with `{ output: "standalone", reactStrictMode: true }`.
+  5. Create minimal `spacebridge/ui/app/layout.tsx` (Server Component, root layout with html/body, metadata title "Spacebridge War Room") and `spacebridge/ui/app/page.tsx` with a placeholder "<main>Loading war room...</main>" (filled in Task 3).
+  6. Create `spacebridge/ui/public/` as empty dir with `.gitkeep` so `public/` copy step in build script doesn't fail.
+  7. Add `spacebridge/ui/.next` and `spacebridge/ui/node_modules` to `.gitignore` (append).
+  8. Run `cd spacebridge/ui && bun install` to populate `bun.lock`.
+  9. Verify: `cd spacebridge/ui && bunx tsc --noEmit` must pass (zero errors).
+  </action>
+
+  <acceptance_criteria>
+    - `test -f spacebridge/ui/package.json spacebridge/ui/tsconfig.json spacebridge/ui/next.config.mjs spacebridge/ui/app/layout.tsx spacebridge/ui/app/page.tsx` all succeed.
+    - `cd spacebridge/ui && bunx tsc --noEmit` exits 0.
+    - `.gitignore` contains lines matching `spacebridge/ui/.next` and `spacebridge/ui/node_modules`.
+    - `grep -q "output.*standalone" spacebridge/ui/next.config.mjs` matches.
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/package.json
+    - spacebridge/ui/tsconfig.json
+    - spacebridge/ui/next.config.mjs
+    - spacebridge/ui/app/layout.tsx
+    - spacebridge/ui/app/page.tsx
+    - spacebridge/ui/public/.gitkeep
+    - spacebridge/ui/bun.lock
+    - .gitignore
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="2" skills="" test_first="false">
+  <read_first>
+    - spacebridge/ui/package.json
+    - spacebridge/ui/app/layout.tsx
+  </read_first>
+
+  <action>
+  Initialize shadcn/UI v4 + Tailwind v4 + Radix and install the v1 component set. Steps:
+  1. `cd spacebridge/ui && bunx shadcn@latest init` (NOT `--bun` flag per G1). Accept defaults: New York style, Neutral base color, use CSS variables.
+  2. Verify `spacebridge/ui/components.json` created (shadcn config).
+  3. Verify `spacebridge/ui/app/globals.css` contains `@import "tailwindcss";` and `@theme inline {}` block (Tailwind v4 CSS-only config; NO `tailwind.config.js` should be generated).
+  4. If `tw-animate-css` missing after init (G5), run `cd spacebridge/ui && bun add tw-animate-css`.
+  5. Install v1 component set (from UI Spec): `cd spacebridge/ui && bunx shadcn@latest add card badge separator skeleton tabs scroll-area tooltip button`.
+  6. Verify each component generated a file under `spacebridge/ui/components/ui/`: `card.tsx`, `badge.tsx`, `separator.tsx`, `skeleton.tsx`, `tabs.tsx`, `scroll-area.tsx`, `tooltip.tsx`, `button.tsx`.
+  7. Update `spacebridge/ui/app/layout.tsx` to import `./globals.css`.
+  8. Verify: `cd spacebridge/ui && bunx tsc --noEmit` exits 0; `cd spacebridge/ui && bun run build` succeeds (produces `.next/standalone/server.js`).
+  </action>
+
+  <acceptance_criteria>
+    - `ls spacebridge/ui/components/ui/` lists exactly 8 expected files: card.tsx, badge.tsx, separator.tsx, skeleton.tsx, tabs.tsx, scroll-area.tsx, tooltip.tsx, button.tsx.
+    - `spacebridge/ui/components.json` exists.
+    - `grep -q '@import "tailwindcss"' spacebridge/ui/app/globals.css` matches.
+    - `test ! -f spacebridge/ui/tailwind.config.js spacebridge/ui/tailwind.config.ts` (Tailwind v4 has no JS config).
+    - `cd spacebridge/ui && bun run build` exits 0 and `test -f .next/standalone/server.js` succeeds.
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/components.json
+    - spacebridge/ui/app/globals.css
+    - spacebridge/ui/app/layout.tsx
+    - spacebridge/ui/components/ui/card.tsx
+    - spacebridge/ui/components/ui/badge.tsx
+    - spacebridge/ui/components/ui/separator.tsx
+    - spacebridge/ui/components/ui/skeleton.tsx
+    - spacebridge/ui/components/ui/tabs.tsx
+    - spacebridge/ui/components/ui/scroll-area.tsx
+    - spacebridge/ui/components/ui/tooltip.tsx
+    - spacebridge/ui/components/ui/button.tsx
+    - spacebridge/ui/lib/utils.ts
+    - spacebridge/ui/package.json
+    - spacebridge/ui/bun.lock
+    - spacebridge/ui/postcss.config.mjs
+  </files_modified>
+</task>
+
+<task id="task-3" model="sonnet" wave="0" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - tools/dashboard/src/frontmatter-io.ts
+    - spacebridge/src/schema.ts
+    - spacebridge/src/db.ts
+  </read_first>
+
+  <action>
+  Create pure data-access + parsing modules under `spacebridge/ui/lib/` following the MEMORY extract-pure-module-pattern (inline-duplicate with ABOUTME, no cross-import from `tools/dashboard/`). TDD: write Bun test fixtures first, then implementation.
+
+  Files:
+  1. `spacebridge/ui/lib/entity-parse.ts`: `splitFrontmatter(text)` and `parseEntity(text)` ported from `tools/dashboard/src/frontmatter-io.ts:3-40`. Keep the exact contract: line-based key:value extraction, returns `{ frontmatter, tags, body }`. Graceful fallback: if no frontmatter, return `{ frontmatter: {}, tags: [], body: text }` (do NOT throw -- real repos have malformed files).
+  2. `spacebridge/ui/lib/entity-scan.ts`: `scanEntitiesForRepo(projectRoot: string): Promise<EntityCard[]>` -- reads `{projectRoot}/docs/build-pipeline/*.md`, calls `parseEntity`, returns `{ slug, title, status, stage, id, repoLabel }[]`. Use `node:fs/promises` `readdir` + `readFile`. Skip files that fail to parse (log warning to console, do not throw).
+  3. `spacebridge/ui/lib/db.ts`: `openReadOnlyDb(dbPath?: string)` factory that opens `~/.spacedock/spacebridge.db` (or `SPACEBRIDGE_DB_PATH` env override) with `new Database(path, { readonly: true })`, wraps in Drizzle. Re-export schema from the daemon's `spacebridge/src/schema.ts` via relative import `../../src/schema`.
+  4. Tests (TDD RED first):
+     - `spacebridge/ui/lib/entity-parse.test.ts` -- 4 cases: valid frontmatter, missing frontmatter (returns empty fm), malformed (no closing `---` -- returns empty fm per graceful rule), multi-line body preserved.
+     - `spacebridge/ui/lib/entity-scan.test.ts` -- fixture dir with 2 valid entity files + 1 malformed; assert valid ones parsed, malformed skipped, no throw.
+     - `spacebridge/ui/lib/db.test.ts` -- open DB at tmp path, assert readonly prevents INSERT (catches `SQLITE_READONLY`), assert `select().from(events)` returns empty array for a fresh DB.
+  5. Run: `cd spacebridge/ui && bun test lib/` -- all tests must pass.
+  </action>
+
+  <acceptance_criteria>
+    - `cd spacebridge/ui && bun test lib/` exits 0 with 3 test files, all passing.
+    - <automated>MISSING</automated>spacebridge/ui/lib/entity-parse.test.ts, <automated>MISSING</automated>spacebridge/ui/lib/entity-scan.test.ts, <automated>MISSING</automated>spacebridge/ui/lib/db.test.ts each exist after Wave 0 completes.
+    - `grep -q "readonly: true" spacebridge/ui/lib/db.ts` matches.
+    - `grep -q "ABOUTME" spacebridge/ui/lib/entity-parse.ts` matches.
+    - `spacebridge/ui/lib/entity-parse.ts` does NOT import from `tools/dashboard/`.
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/lib/entity-parse.ts
+    - spacebridge/ui/lib/entity-parse.test.ts
+    - spacebridge/ui/lib/entity-scan.ts
+    - spacebridge/ui/lib/entity-scan.test.ts
+    - spacebridge/ui/lib/db.ts
+    - spacebridge/ui/lib/db.test.ts
+  </files_modified>
+</task>
+
+<task id="task-4" model="sonnet" wave="3" skills="" test_first="false">
+  <read_first>
+    - spacebridge/ui/lib/entity-parse.ts
+    - spacebridge/ui/lib/entity-scan.ts
+    - spacebridge/ui/lib/db.ts
+    - spacebridge/ui/components/ui/card.tsx
+    - spacebridge/ui/components/ui/badge.tsx
+    - spacebridge/ui/app/page.tsx
+  </read_first>
+
+  <action>
+  Implement the war room page (Server Component) and entity card UI. Files:
+  1. `spacebridge/ui/app/page.tsx` -- Server Component that:
+     a. Opens read-only DB via `openReadOnlyDb()`.
+     b. Queries `sessions` table: `select().from(sessions)` to get connected repos (distinct `projectRoot`).
+     c. For each session, calls `scanEntitiesForRepo(projectRoot)` (Promise.all).
+     d. Queries `entity_leases` table once: `select().from(entityLeases).where(gt(entityLeases.expiresAt, Date.now()))` for active leases.
+     e. Groups entities by `projectRoot`, joins lease data into each card by `entitySlug`.
+     f. Renders `<WarRoom>` component (Client Component boundary) with data passed as props.
+     g. Empty state: if `sessions.length === 0`, render `<EmptyState />` with guidance text per UI Spec.
+  2. `spacebridge/ui/components/war-room.tsx` -- Client Component (`"use client"`) receiving `{ repos: RepoData[] }` prop. Renders `<Tabs>` with "All" + one tab per repo. Under each tab, `<RepoSection>` with collapsible entity grid.
+  3. `spacebridge/ui/components/entity-card.tsx` -- Server-safe component (no `"use client"`) wrapping `<Card>` + `<Badge>` + `<Tooltip>`. Displays slug, title, status badge, stage badge, optional lease owner badge (role from `entity_leases.role`). Links `href={`/entity/${slug}`}` (route placeholder for entity 054).
+  4. `spacebridge/ui/components/empty-state.tsx` -- Full-page empty state per UI Spec.
+  5. `spacebridge/ui/components/repo-section.tsx` -- Server-safe collapsible grid wrapper (default expanded, HTML `<details>` element -- no JS state needed).
+  6. Verify: `cd spacebridge/ui && bunx tsc --noEmit` exits 0; `cd spacebridge/ui && bun run build` succeeds.
+  </action>
+
+  <acceptance_criteria>
+    - `test -f spacebridge/ui/app/page.tsx spacebridge/ui/components/war-room.tsx spacebridge/ui/components/entity-card.tsx spacebridge/ui/components/empty-state.tsx spacebridge/ui/components/repo-section.tsx` all succeed.
+    - `grep -q '"use client"' spacebridge/ui/components/war-room.tsx` matches (Client Component for Tabs interactivity).
+    - `grep -L '"use client"' spacebridge/ui/components/entity-card.tsx spacebridge/ui/components/empty-state.tsx spacebridge/ui/components/repo-section.tsx` returns all three (no `"use client"` -- Server-safe).
+    - `cd spacebridge/ui && bunx tsc --noEmit` exits 0.
+    - `cd spacebridge/ui && bun run build` exits 0.
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/app/page.tsx
+    - spacebridge/ui/components/war-room.tsx
+    - spacebridge/ui/components/entity-card.tsx
+    - spacebridge/ui/components/empty-state.tsx
+    - spacebridge/ui/components/repo-section.tsx
+  </files_modified>
+</task>
+
+<task id="task-5" model="sonnet" wave="3" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - spacebridge/ui/lib/db.ts
+    - spacebridge/src/schema.ts
+  </read_first>
+
+  <action>
+  Implement SSE Route Handler at `spacebridge/ui/app/api/events/route.ts` polling events table every 500ms (O-2 decision). TDD: write integration test first.
+
+  1. Test `spacebridge/ui/app/api/events/route.test.ts`:
+     - Open temp DB, pre-insert 2 rows into `events` table.
+     - Call `GET(new Request("http://localhost/api/events"))`, cast to `Response`.
+     - Assert `Content-Type: text/event-stream`, `Cache-Control: no-cache`.
+     - Read first `N` bytes from response body (use `response.body.getReader()`), assert SSE format `data: {...}\n\n` and contains the 2 pre-inserted event records.
+     - Insert a 3rd row after reader created; assert next chunk contains the new row (within 1 second -- poll interval 500ms + 500ms slack).
+     - Abort the request; assert no further data (interval cleaned up).
+  2. Implementation `spacebridge/ui/app/api/events/route.ts`:
+     - `export async function GET(req: Request)` returning `new Response(stream, { headers })`.
+     - `ReadableStream` with `start(controller)` initializing `lastSeenId = 0` (from query param `?since=N` optional).
+     - Poll fn: `db.select().from(events).where(gt(events.id, lastSeenId)).orderBy(asc(events.id)).limit(100)` -- for each row, encode `data: {JSON.stringify(row)}\n\n` and `controller.enqueue`. Update `lastSeenId` to highest id seen.
+     - `setInterval(pollFn, 500)`.
+     - `req.signal.addEventListener("abort", () => { clearInterval(interval); controller.close(); })`.
+     - Initial flush: send a `: ping\n\n` comment to confirm stream open, then immediately run pollFn once so clients get backlog.
+     - Opens DB via `openReadOnlyDb()` per-request (cheap; SQLite WAL handles concurrent reads).
+  3. Add `export const dynamic = "force-dynamic"` to disable Next.js static optimization for this route.
+  4. Verify: `cd spacebridge/ui && bun test app/api/events/` exits 0; `cd spacebridge/ui && bunx tsc --noEmit` exits 0.
+  </action>
+
+  <acceptance_criteria>
+    - <automated>MISSING</automated>spacebridge/ui/app/api/events/route.test.ts exists after Wave 0 completes (test file created here in Wave 3 alongside impl).
+    - `cd spacebridge/ui && bun test app/api/events/route.test.ts` exits 0 with 3+ assertions (content-type, backlog flush, live push within 1s, abort cleanup).
+    - `grep -q "text/event-stream" spacebridge/ui/app/api/events/route.ts` matches.
+    - `grep -q 'dynamic = "force-dynamic"' spacebridge/ui/app/api/events/route.ts` matches.
+    - `grep -q "req.signal.addEventListener" spacebridge/ui/app/api/events/route.ts` matches (abort cleanup wired).
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/app/api/events/route.ts
+    - spacebridge/ui/app/api/events/route.test.ts
+  </files_modified>
+</task>
+
+<task id="task-6" model="sonnet" wave="4" skills="" test_first="false">
+  <read_first>
+    - spacebridge/ui/components/war-room.tsx
+    - spacebridge/ui/components/ui/scroll-area.tsx
+    - spacebridge/ui/app/api/events/route.ts
+  </read_first>
+
+  <action>
+  Implement the live feed Client Component. File: `spacebridge/ui/components/live-feed.tsx`.
+  1. `"use client"` directive.
+  2. `useState<FeedEntry[]>([])` for rolling buffer (cap at 200 entries to bound DOM size).
+  3. `useEffect(() => { const es = new EventSource("/api/events"); es.onmessage = e => { const evt = JSON.parse(e.data); setEntries(prev => [evt, ...prev].slice(0, 200)); }; es.onerror = () => { setStatus("reconnecting"); }; es.onopen = () => { setStatus("connected"); }; return () => es.close(); }, [])`.
+  4. Render: `<ScrollArea>` wrapping newest-first entry list. Each `<FeedEntry>` shows event type icon, entity slug, timestamp (relative, via small inline `formatRelative(ts)` helper), detail.
+  5. When `status === "reconnecting"` show banner "Reconnecting..." above entries.
+  6. Integrate `<LiveFeed />` into `war-room.tsx` right column (two-column layout per UI Spec).
+  7. Auto-scroll: since render is newest-first, the newest is at `scrollTop = 0`. Add a ref + `useEffect([entries.length], () => scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }))`. Per MEMORY "auto-scroll direction gotcha" -- explicitly scroll to 0, NOT scrollHeight.
+  8. Verify: `cd spacebridge/ui && bunx tsc --noEmit` exits 0; `cd spacebridge/ui && bun run build` exits 0.
+  </action>
+
+  <acceptance_criteria>
+    - `test -f spacebridge/ui/components/live-feed.tsx` succeeds.
+    - `grep -q '"use client"' spacebridge/ui/components/live-feed.tsx` matches.
+    - `grep -q "EventSource" spacebridge/ui/components/live-feed.tsx` matches.
+    - `grep -q "scrollTo" spacebridge/ui/components/live-feed.tsx && grep -q "top: 0" spacebridge/ui/components/live-feed.tsx` matches (auto-scroll to newest at top).
+    - `grep -q "LiveFeed" spacebridge/ui/components/war-room.tsx` matches (integrated into page).
+    - `cd spacebridge/ui && bun run build` exits 0.
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/components/live-feed.tsx
+    - spacebridge/ui/components/war-room.tsx
+  </files_modified>
+</task>
+
+<task id="task-7" model="sonnet" wave="5" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - spacebridge/bin/daemon.ts
+    - spacebridge/ui/next.config.mjs
+    - spacebridge/ui/package.json
+  </read_first>
+
+  <action>
+  Integrate Next.js standalone child-process spawn into `spacebridge/bin/daemon.ts`. TDD: write integration test first.
+
+  1. Test `spacebridge/src/daemon/nextjs-child.test.ts`:
+     - Covers `spawnNextjsChild(opts)` and `shutdownNextjsChild(child, timeoutMs)` helpers.
+     - Mock/stub with a fake standalone server script (e.g., small `bun` script that listens on `process.env.PORT`, logs "ready" to stderr, handles SIGTERM).
+     - Assert spawn returns a child handle with `.pid > 0`, child listens on the provided PORT.
+     - Assert `shutdownNextjsChild` sends SIGTERM and resolves within `timeoutMs` on graceful exit.
+     - Assert if child does not exit within `timeoutMs`, helper sends SIGKILL and still resolves.
+  2. Implementation `spacebridge/src/daemon/nextjs-child.ts`:
+     - `spawnNextjsChild({ serverScript, port, dbPath, stateDir }): ChildProcess` using `child_process.spawn("bun", ["run", serverScript], { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, PORT: String(port), SPACEBRIDGE_DB_PATH: dbPath, SPACEBRIDGE_STATE_DIR: stateDir } })`. Pipe child stderr to daemon stderr with `[nextjs]` prefix.
+     - `shutdownNextjsChild(child, timeoutMs = 5000): Promise<void>` sends SIGTERM, races `child.once("exit")` vs `setTimeout(timeoutMs).then(() => child.kill("SIGKILL"))`.
+     - `resolveNextjsServerScript(pluginRoot: string): string` returns `${pluginRoot}/ui/.next/standalone/server.js`. Throws a clear error if path does not exist (hint: run `cd spacebridge/ui && bun run build` first).
+  3. Modify `spacebridge/bin/daemon.ts`:
+     - In `cmdStart()`, after `server.listen()` (line 98), add:
+       ```ts
+       const pluginRoot = resolve(import.meta.dir, "..");
+       const serverScript = resolveNextjsServerScript(pluginRoot);
+       const dbPath = join(stateDir, "spacebridge.db");
+       const nextjsChild = spawnNextjsChild({ serverScript, port: 8420, dbPath, stateDir });
+       process.stderr.write(`[${ts()}] spawned Next.js UI (pid: ${nextjsChild.pid}, port: 8420)\n`);
+       ```
+     - In `shutdown()` (top-of-function), add `await shutdownNextjsChild(nextjsChild)` BEFORE `server.close()`. Capture `nextjsChild` via closure (refactor `cmdStart` to hold ref; or move `shutdown` inside `cmdStart`).
+     - Allow opt-out via env `SPACEBRIDGE_SKIP_UI=1` (skip spawn -- useful in CI and for lean tests). Skip emits a stderr note.
+  4. Update `spacebridge/bin/daemon.ts` imports: `import { spawnNextjsChild, shutdownNextjsChild, resolveNextjsServerScript } from "../src/daemon/nextjs-child"` and add `import { resolve } from "node:path"`.
+  5. Verify: `cd spacebridge && bun test src/daemon/nextjs-child.test.ts` exits 0; `cd spacebridge && bunx tsc --noEmit` exits 0.
+  </action>
+
+  <acceptance_criteria>
+    - <automated>MISSING</automated>spacebridge/src/daemon/nextjs-child.test.ts exists after Wave 0 completes (test file created in Wave 5 alongside implementation).
+    - `cd spacebridge && bun test src/daemon/nextjs-child.test.ts` exits 0 with spawn + graceful shutdown + timeout-SIGKILL assertions.
+    - `grep -q "spawnNextjsChild\|nextjs-child" spacebridge/bin/daemon.ts` matches (daemon wired).
+    - `grep -q "SPACEBRIDGE_SKIP_UI" spacebridge/bin/daemon.ts` matches (opt-out supported).
+    - `cd spacebridge && bunx tsc --noEmit` exits 0.
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/src/daemon/nextjs-child.ts
+    - spacebridge/src/daemon/nextjs-child.test.ts
+    - spacebridge/bin/daemon.ts
+  </files_modified>
+</task>
+
+<task id="task-8" model="sonnet" wave="6" skills="" test_first="false">
+  <read_first>
+    - spacebridge/ui/package.json
+    - spacebridge/bin/daemon.ts
+    - spacebridge/src/daemon/nextjs-child.ts
+  </read_first>
+
+  <action>
+  End-to-end smoke validation + documentation. Steps:
+  1. `cd spacebridge/ui && bun run build` -- confirm standalone artifact built (includes post-copy of `.next/static` and `public/`).
+  2. `cd spacebridge && SPACEBRIDGE_STATE_DIR=$(mktemp -d) bun run bin/daemon.ts start &` -- start daemon in background, capture `$!` as DAEMON_PID.
+  3. `sleep 3 && curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8420/` -- assert HTTP 200 from war room.
+  4. `timeout 2 curl -N -s http://127.0.0.1:8420/api/events | head -c 200` -- assert streaming output begins with `: ping` (comment) or `data: ` (event).
+  5. `kill -TERM $DAEMON_PID && wait $DAEMON_PID` -- assert daemon shuts down cleanly (exit 0) and Next.js child is reaped (no lingering processes on 8420: `lsof -iTCP:8420 -sTCP:LISTEN` returns empty).
+  6. Record results inline in commit body.
+  7. Update `spacebridge/.claude-plugin/plugin.json` if a UI entry-point field is relevant (otherwise skip and note no change needed).
+  8. Append a "War Room UI" section to `docs/architecture/` (or create `docs/architecture/spacebridge-ui.md` if absent) documenting: spawn lifecycle, port 8420 lock, SPACEBRIDGE_SKIP_UI, required pre-build step before daemon start.
+  </action>
+
+  <acceptance_criteria>
+    - Commit body records: HTTP 200 from `/`, SSE stream opens on `/api/events`, daemon graceful shutdown reaps child process, port 8420 is freed after daemon exit.
+    - `test -f docs/architecture/spacebridge-ui.md` succeeds.
+    - `grep -q "SPACEBRIDGE_SKIP_UI\|war room" docs/architecture/spacebridge-ui.md` matches.
+  </acceptance_criteria>
+
+  <files_modified>
+    - docs/architecture/spacebridge-ui.md
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+
+- [ ] Navigate to `http://127.0.0.1:8420/` with daemon running and at least 1 connected session -- war room renders entity cards grouped by repo within 2 seconds (AC-1 coverage).
+- [ ] With an active lease on an entity (acquired via entity 056 API or direct DB insert), reload the page -- the owner session badge with role label appears on that entity's card (AC-2 coverage).
+- [ ] Open 3 browser tabs on the war room simultaneously -- trigger a stage transition event (insert into `events` table) -- all 3 tabs' live feed panel renders the new entry within 1 second (AC-4, AC-6 coverage).
+- [ ] Refresh (F5) the war room page -- full state loads without console errors, entity cards match current DB state, no hydration mismatch warning in console (AC-5 coverage).
+- [ ] Start daemon with zero connected sessions -- war room shows the empty-state guidance panel, no entity cards rendered (AC-7 coverage).
+- [ ] Disconnect network (or kill daemon), observe live feed banner shows "Reconnecting..."; restart daemon and confirm feed resumes and banner clears.
+
+### CLI
+
+- [ ] `cd spacebridge/ui && bun run build` exits 0; `test -f spacebridge/ui/.next/standalone/server.js` succeeds; `test -f spacebridge/ui/.next/standalone/.next/static/` succeeds (post-copy step worked) (AC-8 coverage).
+- [ ] `cd spacebridge/ui && bun run start` (standalone) starts server on port 8420, war room renders against a pre-seeded DB at `$SPACEBRIDGE_DB_PATH` (AC-8 coverage).
+- [ ] `SPACEBRIDGE_STATE_DIR=$(mktemp -d) bun run spacebridge/bin/daemon.ts start` logs "spawned Next.js UI (pid: X, port: 8420)" to stderr; `SPACEBRIDGE_SKIP_UI=1 bun run spacebridge/bin/daemon.ts start` logs the skip note and does NOT spawn UI (port 8420 remains unbound).
+- [ ] `bun run spacebridge/bin/daemon.ts stop` triggers graceful shutdown; within 5 seconds `lsof -iTCP:8420 -sTCP:LISTEN` returns empty (child reaped).
+
+### API
+
+- [ ] `curl -N -s http://127.0.0.1:8420/api/events` streams `data: {...}\n\n` framed SSE records as events are inserted into the `events` table (AC-3 coverage).
+- [ ] `curl -s -I http://127.0.0.1:8420/api/events` headers include `Content-Type: text/event-stream` and `Cache-Control: no-cache` (AC-3 coverage).
+- [ ] Disconnect SSE client (close curl) -- server-side `req.signal` abort path fires; verify no goroutine / interval leak (check daemon stderr has no ongoing poll logs after disconnect).
+
+### Interactive
+
+None -- 053 is fully observable via browser + CLI + API UAT; no captain-interactive steps required within 053 scope. (Captain approval of overall UAT matrix handled by build-uat skill, not a line item here.)
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1 War room renders entity cards from all connected repos | task-4 | `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8420/` (returns 200) + browser visual | pending | -- |
+| AC-2 Entity with active lease shows owner session badge with role | task-4 | browser UAT -- acquire lease, reload, assert badge visible | pending | -- |
+| AC-3 SSE endpoint `/api/events` streams events to EventSource clients | task-5 | `curl -N http://127.0.0.1:8420/api/events` shows `data: ` frames | pending | -- |
+| AC-4 New stage transition event appears in live feed within 1 second | task-5, task-6 | insert event → observe feed in ≤1s (browser + SSE assertion in `route.test.ts`) | pending | -- |
+| AC-5 F5 refresh loads full state from Server Component, no hydration mismatch | task-4 | browser UAT -- refresh, open devtools console, assert no hydration warning | pending | -- |
+| AC-6 3 browser tabs connected to SSE all receive a given event | task-5, task-6 | open 3 tabs, insert event, assert all 3 feeds update | pending | -- |
+| AC-7 Empty-state guidance renders when zero connected sessions | task-4 | start daemon with no shims, browser UAT -- assert empty state | pending | -- |
+| AC-8 `next build` → `bun run .next/standalone/server.js` serves war room correctly | task-2, task-8 | `bun run build && bun run start` then `curl :8420/` returns 200 | pending | -- |
+
+## Stage Report: plan
+
+status: passed
+plan-checker verdict: PASS (inline self-review, no dispatch)
+iteration count: 1
+knowledge capture: skipped -- no findings met D1/D2 threshold (all research either validated by upstream SO/explore researchers, already present in shipped entity 049/050/052 memories, or pertain to entity-053-specific integration rather than reusable patterns)
+workflow-index append: executed -- 37 rows appended to docs/build-pipeline/_index/CONTRACTS.md across 8 tasks (file-deduped; the spacebridge/bin/daemon.ts row appended to an existing section, the other 36 rows inserted as new sections alphabetically).
+
+### Plan-checker self-review (inline)
+
+```yaml
+issues:
+  - dimension: 6d
+    task: task-3
+    severity: nit
+    description: Wave 0 convention -- Task 3 is labeled wave: 0 because it creates test infrastructure (lib/*.test.ts files referenced by later tasks via <automated>MISSING</automated>). Task 5 and Task 7 also create test files in their own waves -- those are task-adjacent tests, not cross-task Wave 0 infrastructure. Acceptance criteria use <automated>MISSING</automated>{test_file_path} sentinel for forward references across waves.
+    fix_hint: Documented in task action text. Not a blocker; Wave 0 carries the lib/ tests, later tasks carry their own colocated tests.
+  - dimension: 3
+    task: task-2
+    severity: nit
+    description: Task 2 wave:2 reads from Task 1 (wave:1) outputs. Task 2 does not read from Wave 0 (Task 3). Task 3 (wave:0) is independent of Task 2 -- it only needs Task 1's tsconfig.json. This is valid: Wave 0 runs alongside or before Wave 1 on its own dependency path.
+    fix_hint: Wave numbers reflect logical dependency layers, not strict ordering. Wave 0 test infrastructure + Wave 1 scaffold can both run first; Wave 2 (shadcn) depends on Wave 1 only.
+```
+
+No blockers. Self-review (Step 5) fixed: zero placeholders (`TBD`/`add appropriate`/`similar to Task N`/`as needed`/`fill in` — grep-clean), type/signature consistency across tasks verified, wave dependency sanity verified (Wave 0 emits test files, Wave 1 scaffolds Next.js, Wave 2 adds shadcn, Wave 3 adds page+SSE in parallel since files don't overlap, Wave 4 wires live feed, Wave 5 integrates daemon child spawn, Wave 6 E2E smoke), Validation Map completeness verified (8 ACs → 8 rows).
+
+### Step 0.5 -- Assumption Evidence Re-Validation
+
+- A-1 `spacebridge/src/db.ts:23` WAL PRAGMA: **(⚠ stale-evidence: spacebridge/src/db.ts:23 -- WAL PRAGMA now at line 24 due to guard reformatting; semantic claim holds: WAL is enabled for file DBs)**
+- A-2 entity 049 build/run + entity 052 A-5: holds -- external entity references, unchanged.
+- A-3 shadcn `bunx shadcn@latest init` no `--bun` flag: holds -- research finding, unchanged.
+- A-4 Server/Client Component rules: holds -- Next.js framework rule, unchanged.
+- A-5 `tools/dashboard/src/frontmatter-io.ts` parser: holds -- verified `splitFrontmatter` present at line 3, `parseEntity` at line 33.
+- A-6 post-build copy step: holds -- external entity 049 reference, unchanged.
+
+One stale-evidence warning (A-1 line shift +1), zero contradictions. Plan proceeds.
+
+### Commits
+
+- chore(plan): 053 next.js war room + sse feed scaffold + daemon child spawn
+- chore(index): add contracts for entity-053 entering plan (8 tasks, ~29 files)
+
+### Completion checklist
+
+1. Research findings produced -- DONE (5 canonical subsections under `## Research Findings`: Upstream Constraints, Existing Patterns, Library/API Surface, Known Gotchas, Reference Examples).
+2. PLAN produced -- DONE (9 tasks: Task 0 environment verification + Tasks 1-8 implementation; all tasks carry id/model/wave/skills/read_first/action/acceptance_criteria/files_modified; Task 0 satisfies plan-write-discipline requirement; Wave 0 = test infrastructure; test_first tasks include superpowers:test-driven-development skill).
+3. UAT Spec produced -- DONE (4 categories: Browser/CLI/API/Interactive; Interactive documented as "None" with rationale).
+4. Validation Map produced -- DONE (8 rows, one per AC, linking Requirement → Task → Command → Status).
+5. Plan-checker pass within ≤3 iterations -- DONE (iteration 1, inline self-review, no blockers; nits documented).
+6. workflow-index append called -- DONE (see Step 9a summary: 8 append calls covering 8 tasks and ~29 files; executed unconditionally via Skill("spacedock:workflow-index", ...) before Stage Report commit).
+
+### Dispatch Gaps
+
+None. Pre-populated research from SO (explore Step 3.5 / Step 5.5) covered shadcn+Tailwind+Radix+Bun. Remaining 4 subsections populated inline via Read/Grep on current repo state.
