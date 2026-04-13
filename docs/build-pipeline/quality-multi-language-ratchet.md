@@ -2,6 +2,7 @@
 id: 083
 title: "Multi-language coverage ratchet -- type-check and test count never regress"
 status: draft
+context_status: pending
 source: decomposition of entity 074 (pipeline verification quality uplift)
 started:
 completed:
@@ -17,23 +18,36 @@ depends-on: []
 parent: 074
 ---
 
-## Problem
+## Directive
 
-Quality stage is hardwired to `bun test`, `bun lint`, `bunx tsc --noEmit`, `bun build` with no runner detection or language auto-detection. Entity 052 created `spacebridge/bin/daemon.ts` outside tsconfig's `include` — the file was never type-checked and quality reported PASS. Test count can regress without detection. No Python type-checking at all.
+> Quality stage is hardwired to `bun test`, `bun lint`, `bunx tsc --noEmit`, `bun build` with no runner detection or language auto-detection. Entity 052 created `spacebridge/bin/daemon.ts` outside tsconfig's `include` — the file was never type-checked and quality reported PASS. Test count can regress without detection. No Python type-checking at all.
+>
+> Three changes: (1) Ratchet 1 -- type coverage: auto-detect languages, zero uncovered source files per language, TS gets enhanced checks (strict mode, `as any` count, `@ts-ignore` count). (2) Ratchet 2 -- test count: runner-agnostic detection, `count(current) >= count(baseline)`. (3) Plan-checker dimension 8 -- warn when new source files lack test pairing or type-check config coverage.
+>
+> Captain framing: "覆蓋率是基本功，不可以比上一次少" + "ts 部分要特別增強，recce 是 ts+python 各半且開發頻率很高"
 
-## Scope
+## Captain Context Snapshot
 
-### Ratchet 1: Type Coverage (zero uncovered source files)
+- **Repo**: main @ f748d5f
+- **Session**: No recent session context (entity created via decompose(074) at 59990ee)
+- **Domain**: Runnable / Invokable, Organizational / Data-transforming
+- **Related entities**: 074 -- Pipeline verification quality uplift (epic), 085 -- Stage Report evidence + confidence gate (draft, depends-on: [083])
+- **Created**: 2026-04-13T12:35:00Z
 
-Per-language auto-detection: TS (tsc --listFiles vs find *.ts), Python (pyright/ruff), Go (go vet), Rust (cargo check). TS gets enhanced checks: strict mode verification, `as any` count ratchet, `@ts-ignore` count ratchet.
+## Brainstorming Spec
 
-### Ratchet 2: Test Count (never decrease, runner-agnostic)
+**APPROACH**: Restructure build-quality SKILL.md to support multi-language ratchets. Step 0.5 (new) auto-detects project languages by scanning for config files (tsconfig.json → TS, pyproject.toml/setup.py → Python, go.mod → Go, Cargo.toml → Rust). Steps 1-4 become language-aware: instead of hardwired `bun test`/`bun lint`/`tsc`/`bun build`, each step runs the detected runner for each language. Step 4.5 (new) runs two ratchet checks per detected language: (a) type coverage — every source file must be covered by at least one type-check config; (b) test count — `count(current) >= count(baseline)` using main branch as baseline. TS gets three enhanced sub-ratchets: strict mode verification, `as any` cast count, `@ts-ignore` count. ops.config.json schema gains optional `ratchet_baselines` key for persisting baseline counts between runs. Separately, plan-checker-prompt.md gains dimension 8: for every task with source files in `files_modified`, check test file pairing and type-check config coverage.
 
-Auto-detect test runner from project config (bun/vitest/jest/mocha/node --test for TS; pytest for Python; go test for Go; cargo test for Rust). Ratchet checks `count(current) >= count(baseline)`.
+**ALTERNATIVE**: Instead of restructuring build-quality Steps 1-4 inline, add a new Step 5.5 "ratchet check" that runs independently after all existing checks, leaving Steps 1-4 as-is (still hardwired to bun). -- D-01 Rejected: this leaves the hardwired bun commands intact, meaning overhaul portability is still broken for non-bun projects. The ratchet check would pass on type coverage while Steps 1-4 fail on missing `bun` binary. The restructuring must touch Steps 1-4 to make them runner-aware, not just add a new step.
 
-### Plan-Checker Dimension 8
+**GUARDRAILS**:
+- Runner detection is auto, not config-driven — detect from project files, not user settings. ops.config.json stores baselines, not runner choices
+- The ratchet invariant is language-agnostic: same rule (never regress), different tools per language. If a project migrates runners, the ratchet continues working
+- TS gets enhanced ratchets (as-any, ts-ignore, strict) because captain explicitly requested it for recce (TS+Python 50/50). Other languages get basic type + test count only
+- Overhaul portability: quality stage must work without assuming bun. A vitest project, a jest project, and a bun project all get the same ratchet invariant
+- Ratchet failures are `fail` verdicts — same routing as existing quality failures (`feedback-to: execute`)
 
-For every task with source files in `files_modified`: is there a test file paired? Is the source path within a type-check config? If outside, is there a task to update config?
+**RATIONALE**: Inline restructuring of Steps 1-4 is correct because the root cause is hardwired commands, not missing ratchet checks. Adding a ratchet step on top of hardwired commands gives a "pass type ratchet but fail bun test" incoherence for non-bun projects. The auto-detection pattern (scan for config files → select runner → run command → extract count) is well-established in CI tools (GitHub Actions, GitLab CI) and the command table in parent 074's directive provides the exhaustive mapping. Dimension 8 in plan-checker catches missing test/type coverage at plan time, before execute creates the gap — shifting left on a mechanical invariant.
 
 ## Acceptance Criteria
 
@@ -47,6 +61,7 @@ For every task with source files in `files_modified`: is there a test file paire
 ## References
 
 - Parent entity 074: pipeline verification quality uplift
-- `skills/build-quality/SKILL.md`: Steps 1-4 restructuring target
+- Entity 085 (Stage Report evidence + confidence gate): depends on this entity's ratchet results for scoring
+- `skills/build-quality/SKILL.md`: Steps 1-4 restructuring + Step 4.5 ratchet insertion
 - `skills/build-plan/references/plan-checker-prompt.md`: dimension 8 addition
 - Captain framing: "覆蓋率是基本功，不可以比上一次少" + "ts 部分要特別增強，recce 是 ts+python 各半且開發頻率很高"
