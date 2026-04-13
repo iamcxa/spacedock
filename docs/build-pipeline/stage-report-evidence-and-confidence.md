@@ -1,7 +1,7 @@
 ---
 id: 085
 title: "Stage Report evidence minimums + pre-ship confidence gate"
-status: draft
+status: epic
 source: decomposition of entity 074 (pipeline verification quality uplift)
 started:
 completed:
@@ -15,6 +15,7 @@ scale: Medium
 project: spacedock
 depends-on: [082, 083]
 parent: 074
+children: [086, 087, 088]
 context_status: explored
 ---
 
