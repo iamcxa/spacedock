@@ -93,6 +93,7 @@ ts_ignore: {pass|fail} (current={N} <= baseline={M})
 - Score = max(0%, 100% - (c × 25%) - (h × 15%))
 - MEDIUM, LOW, NIT severity findings → informational only, no score deduction
 - Empty findings table or no `### Findings` section → 100%
+- `## Stage Report: review` section entirely absent (stage skipped via profile) → treat as 0 CRITICAL, 0 HIGH → 100%
 
 **Parsing pattern:** `grep -c "^| CRITICAL" Stage_Report_review` and `grep -c "^| HIGH" Stage_Report_review`.
 
