@@ -161,3 +161,31 @@ APPROACH: Use REST polling for real-time updates (contradicted: src/server.ts:42
 Format: `(contradicted: {evidence} -- see Q-{n})`
 
 Always links to the relevant open question or option comparison. Used when exploration found evidence that challenges the brainstorming spec's claim.
+
+### Research Evidence
+
+Research annotations are written by Step 5.5 (explore-phase research dispatch) and Step 3.5 (SO post-brainstorm research dispatch). Two sub-formats depending on the outcome:
+
+**Confirmed research** -- appended to the assumption's `Evidence:` line when a researcher validates the assumption:
+
+```
+A-4: Socket bind timing is safe for async initialization.
+Confidence: Confident (0.90)
+Evidence: src/server.ts:55 -- bind deferred to listen() call (✓ research: MDN/net.Server -- listen() is non-blocking, emits 'listening' event; safe for async init)
+```
+
+Format: `(✓ research: {source} -- {finding})`
+
+Grep compatibility: `grep '✓ research:' entity.md` finds all confirmed research annotations.
+
+**Contradicted research** -- when a researcher contradicts an assumption, two changes are made:
+1. Append to the assumption's `Evidence:` line: `(⚠ research contradicted: {source} -- {finding} -- see Research Findings)`
+2. Write a `## Research Findings` subsection with the full 5-domain treatment so the conflict context is preserved for clarify.
+
+```
+A-5: Next.js standalone server.js is importable and hookable.
+Confidence: Unclear (0.30)
+Evidence: docs/deployment.md:12 -- describes standalone output (⚠ research contradicted: Next.js docs/GitHub -- standalone server.js is NOT importable; it is a self-contained executable -- see Research Findings)
+```
+
+The `## Research Findings` subsection for contradictions uses the 5-domain format (Upstream Constraints / Existing Patterns / Library/API Surface / Known Gotchas / Reference Examples) from `skills/build-research/SKILL.md`, so clarify has full context on why the assumption was contradicted.
