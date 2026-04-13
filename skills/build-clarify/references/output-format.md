@@ -108,6 +108,65 @@ process them identically.
 **Arrow style rule:** All annotation arrows use → (U+2192 unicode), never -> (ASCII). This
 matches all other annotation sections throughout build-clarify and build-explore outputs.
 
+## Annotation: Step 1.5 Re-Validation
+
+Step 1.5 produces five annotation types that may appear on assumption Evidence lines or below option tables. All use double dash (`--`), never em dash.
+
+### 1a -- Evidence Freshness annotations
+
+Appended inline after the `Evidence:` line of an assumption. One line, no blank line separator.
+
+```markdown
+Evidence: tools/dashboard/src/server.ts:142 -- existing stage filter uses ?status= param
+(⚠ stale-evidence: line 142 now shows body-param filtering; claim still plausible, semantics preserved)
+```
+
+```markdown
+Evidence: skills/build-clarify/SKILL.md:91 -- Step 1 has no validation logic
+(⚠ contradicted: SKILL.md:91-108 now includes validation logic added by entity 076 -- see Q-4)
+```
+
+### 1c -- Option Validity annotation
+
+Appended below an option table (one blank line separator) when sub-check 1c merges duplicate options.
+
+```markdown
+(⚠ dedup: merged "Real-time push using SSE endpoint" and "Server-Sent Events via Bun.serve" -- see dedup note)
+```
+
+### 1e -- Research Re-Validation annotations
+
+Appended inline after a `(✓ research: ...)` annotation on an assumption's Evidence line.
+
+```markdown
+(✓ research: bun.sh/docs/api/websockets -- WebSocket upgrade confirmed in Bun 1.0+)
+(⚠ stale-research: bun.sh/docs/api/websockets now documents breaking API change in 1.1 -- verify upgrade path)
+```
+
+```markdown
+(✓ research: RFC 7230 -- HTTP/1.1 chunked transfer encoding supports streaming)
+(⚠ research-contradicted: cited RFC section now shows limitation for target use case -- see Q-5)
+```
+
+### New A-n / Q-n entries from sub-checks 1b and 1d
+
+Items created by sub-checks 1b (contradiction-detected questions) and 1d (coverage gaps) use the SAME format as explore-created items. Downstream parsers (build-plan, FO, status script) process them identically.
+
+### Stage Report metric for Step 1.5
+
+The `## Stage Report: clarify` section includes a `Re-validation` metric line between `Decomposition` and `Assumptions confirmed`:
+
+```markdown
+- [x] Re-validation: {n} assumptions checked, {n} stale, {n} contradicted, {n} options deduped, {n} coverage gaps, {n} research re-validated
+  e.g., "5 assumptions checked, 1 stale (A-2 line shifted), 0 contradicted, 0 deduped, 1 coverage gap (A-6 added), 0 research re-validated"
+```
+
+Rules:
+- Use `- [x]` checklist format per parser contract.
+- All six counts are mandatory -- use `0` rather than omitting.
+- Appears AFTER `Decomposition` and BEFORE `Assumptions confirmed`.
+- If Step 1.5 was skipped (empty case or resume case), write: `- [x] Re-validation: skipped (empty case)` or `- [x] Re-validation: skipped (resume case)`.
+
 ## Section: Canonical References
 
 Build-clarify CREATES this section (if not already present) during Step 4. It is append-only
@@ -140,6 +199,8 @@ Written as the LAST new section at the end of Step 6 (Commit). Appended AFTER ex
 
 - [x] Decomposition: {accepted|modified|rejected|not-applicable}
   e.g., "not-applicable -- entity is Small scope, no children proposed"
+- [x] Re-validation: {n} assumptions checked, {n} stale, {n} contradicted, {n} options deduped, {n} coverage gaps, {n} research re-validated
+  e.g., "5 assumptions checked, 1 stale (A-2 line shifted), 0 contradicted, 0 deduped, 1 coverage gap (A-6 added), 0 research re-validated"
 - [x] Assumptions confirmed: {n} / {total} ({n corrected})
   e.g., "A-1, A-2, A-4 confirmed via batch; A-3 corrected captain cited src/foo.ts"
 - [x] Options selected: {n} / {total}
