@@ -161,3 +161,226 @@ The `skills/build-explore/SKILL.md` Step 7 (line 161) and `skills/build-clarify/
   `auto_advance:` field is empty in frontmatter; captain must explicitly say "execute 047" for First Officer to transition status: clarify -> plan
 - [x] Clarify duration: 4 captain interactions, session complete
   1 plain-text assumption batch (rendered as 1 AskUserQuestion per captain's "use Claude UI" directive) + 1 option (O-1) + 2 questions (Q-1, Q-2); all via AskUserQuestion in Chinese; subagent AskUserQuestion bubbling WORKED on all 4 calls (Task 4 SO routing smoke test passed)
+
+## Research Findings
+
+### Upstream Constraints
+
+- GUARDRAILS (entity body line 49): "Must not break rendering of existing entities (no parser changes, no frontend changes -- only skill spec doc updates)" -- all 4 target files are skill spec docs, no dashboard code changes permitted.
+- GUARDRAILS (entity body line 52): "No dashboard code changes (tools/dashboard/** stays untouched)" -- confirmed, parser and renderer already support detail lines and blank-line markdown.
+- Q-1 answer (entity body line 74): scope expanded to include SKILL.md drift fix. Q-2 answer (entity body line 84): exemplar-based detail line style guidance.
+- CONTRACTS.md: `clarify-open-exploration-loop` (✅ final) modified `skills/build-clarify/SKILL.md` and `skills/build-clarify/references/output-format.md`. `phase-e-plan-4-dogfood-trailofbits-integration` (✅ final) modified `skills/build-explore/SKILL.md`. No in-flight entities touch any of the 4 target files.
+
+### Existing Patterns
+
+- `skills/build-explore/references/output-format.md:125-143` -- Stage Report example already uses `- [x]` checklist format with 2-space-indent detail lines. Matches parser contract at `frontmatter-io.ts:140,157-158`.
+- `skills/build-clarify/references/output-format.md:198-228` -- Stage Report: clarify example already uses `- [x]` checklist format with 2-space-indent detail lines and explicit "Detail lines (optional, Tier 1 rendering)" paragraph.
+- `skills/build-explore/SKILL.md:320-337` -- Step 7 example already uses `- [x]` checklist format with detail lines. Fixed by `phase-e-plan-4-dogfood-trailofbits-integration`.
+- `skills/build-clarify/SKILL.md:396-417` -- Step 6 example already uses `- [x]` checklist format with detail lines. Fixed by `clarify-open-exploration-loop`.
+- `skills/build-explore/references/output-format.md:95` -- Open Questions blank-line separation rule already present: "MUST be separated from the next by exactly one blank line so markdown renders them as distinct paragraphs."
+- `skills/build-clarify/references/output-format.md:80` -- Answer blank-line rule already present: "Append after Suggested options with exactly one blank line separating them (markdown paragraph break)."
+- Entity 008 (`_archive/dashboard-standalone-plugin.md:255-268`) -- production Stage Report with checklist + detail lines predates Phase D, confirming the parser has always supported this format.
+
+### Library/API Surface
+
+No findings -- entity scope is skill spec documentation only, no library dependencies.
+
+### Known Gotchas
+
+- The Brainstorming Spec's ⚠ contradicted annotation (entity body line 43) claims SKILL.md:161 and SKILL.md:286 "still contain stale flat-format Stage Report examples." This was accurate at entity creation (2026-04-10) but is NOW STALE -- both SKILL.md files were updated by concurrent entities between 2026-04-10 and 2026-04-13. The plan must not re-apply already-landed fixes.
+- Context lake insight for `skills/build-clarify/SKILL.md` is also stale -- references "lines 282-293" with OLD flat format, but current content at lines 396-417 shows correct format.
+
+### Reference Examples
+
+- Entity 047 itself (this entity) -- Stage Report: explore (lines 131-144) and Stage Report: clarify (lines 148-163) both use the correct checklist + detail format, demonstrating the output shape the plan must preserve.
+- Entity 008 (archived) -- the original production exemplar for checklist + detail lines.
+
+## PLAN
+
+**Goal:** Verify all rendering hotfixes are already landed, add the Q-2 exemplar-based detail line style subsection to both output-format.md files, and run cross-file consistency checks.
+
+**Scope revision note:** The original 3 fixes (detail lines, blank-line separation, SKILL.md drift) were all landed by concurrent entities before this plan stage ran. The plan scope reduces to: (1) mechanical verification that all fixes are in place, (2) the Q-2 exemplar subsection (the one remaining deliverable), and (3) cross-file consistency grep.
+
+<task id="task-0" model="haiku" wave="0">
+  <read_first>
+    - skills/build-explore/references/output-format.md
+    - skills/build-clarify/references/output-format.md
+    - skills/build-explore/SKILL.md
+    - skills/build-clarify/SKILL.md
+  </read_first>
+
+  <action>
+  Environment verification -- confirm all 4 target files contain the expected format patterns:
+
+  1. `grep '\- \[x\]' skills/build-explore/references/output-format.md` -- must match >=6 lines (Stage Report example)
+  2. `grep '\- \[x\]' skills/build-clarify/references/output-format.md` -- must match >=8 lines (Stage Report example)
+  3. `grep '\[x\]' skills/build-explore/SKILL.md` -- must match >=7 lines (Step 7 example)
+  4. `grep '\[x\]' skills/build-clarify/SKILL.md` -- must match >=10 lines (Step 6 example)
+  5. `grep 'Detail lines' skills/build-explore/references/output-format.md` -- must match >=1 (detail line docs)
+  6. `grep 'Detail lines' skills/build-clarify/references/output-format.md` -- must match >=1 (detail line docs)
+  7. `grep 'blank line' skills/build-explore/references/output-format.md` -- must match >=1 (Open Questions blank-line rule)
+  8. `grep 'blank line' skills/build-clarify/references/output-format.md` -- must match >=1 (Answer blank-line rule)
+  9. `grep 'exemplar\|canonical.*detail' skills/build-explore/references/output-format.md` -- must match 0 (exemplar subsection NOT yet present)
+  10. `grep 'exemplar\|canonical.*detail' skills/build-clarify/references/output-format.md` -- must match 0 (exemplar subsection NOT yet present)
+
+  If checks 1-8 pass and 9-10 confirm absence, proceed. If any of 1-8 fail, STOP and report which fix is missing.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c '\- \[x\]' skills/build-explore/references/output-format.md` returns >= 6
+    - `grep -c '\- \[x\]' skills/build-clarify/references/output-format.md` returns >= 8
+    - `grep -c '\[x\]' skills/build-explore/SKILL.md` returns >= 7
+    - `grep -c '\[x\]' skills/build-clarify/SKILL.md` returns >= 10
+    - `grep -c 'Detail lines' skills/build-explore/references/output-format.md` returns >= 1
+    - `grep -c 'Detail lines' skills/build-clarify/references/output-format.md` returns >= 1
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1">
+  <read_first>
+    - skills/build-explore/references/output-format.md
+  </read_first>
+
+  <action>
+  Add a "Canonical detail line exemplars" paragraph to `skills/build-explore/references/output-format.md`, placed immediately after the existing "Detail lines (optional, Tier 1 rendering)" paragraph (currently at line 143).
+
+  The new paragraph should read:
+
+  ```
+  **Canonical detail line exemplars:** When writing detail lines, match the style demonstrated by entity 008 (dashboard-standalone-plugin) and entity 047 (entity-body-rendering-hotfixes). Entity 008's Stage Report: explore shows layer-breakdown detail (e.g., "23 dashboard source files + 9 dashboard test files...grouped into 7 layers"). Entity 047's Stage Report: explore shows summary-with-IDs detail (e.g., "A-1 parser extracts detail, A-2 frontend renders .item-detail span..."). Authors should match whichever exemplar fits their metric type -- layer breakdowns for file counts, ID lists for assumption/question counts, prose summaries for scale assessments.
+  ```
+
+  This implements Q-2's answer (exemplar-based) by naming specific entities as canonical style references.
+  </action>
+
+  <acceptance_criteria>
+    - `grep 'Canonical detail line exemplars' skills/build-explore/references/output-format.md` finds exactly 1 match
+    - `grep 'entity 008' skills/build-explore/references/output-format.md` finds at least 1 match in the exemplar paragraph
+    - `grep 'entity 047' skills/build-explore/references/output-format.md` finds at least 1 match in the exemplar paragraph
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-explore/references/output-format.md
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="1">
+  <read_first>
+    - skills/build-clarify/references/output-format.md
+  </read_first>
+
+  <action>
+  Add a "Canonical detail line exemplars" paragraph to `skills/build-clarify/references/output-format.md`, placed immediately after the existing "Detail lines (optional, Tier 1 rendering)" paragraph (currently at line 228).
+
+  The new paragraph should read:
+
+  ```
+  **Canonical detail line exemplars:** When writing detail lines, match the style demonstrated by entity 047 (entity-body-rendering-hotfixes). Entity 047's Stage Report: clarify shows decision-audit detail (e.g., "A-1 through A-5 all Confident-level with file:line evidence; captain confirmed entire batch"). For clarify, detail should capture the decision: which option was selected, which assumptions were corrected, which refs were cited. Authors should match this decision-audit style for clarify detail lines.
+  ```
+
+  This mirrors task-1's exemplar subsection for the build-clarify output format, consistent with Q-2's answer.
+  </action>
+
+  <acceptance_criteria>
+    - `grep 'Canonical detail line exemplars' skills/build-clarify/references/output-format.md` finds exactly 1 match
+    - `grep 'entity 047' skills/build-clarify/references/output-format.md` finds at least 1 match in the exemplar paragraph
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-clarify/references/output-format.md
+  </files_modified>
+</task>
+
+<task id="task-3" model="haiku" wave="2">
+  <read_first>
+    - skills/build-explore/references/output-format.md
+    - skills/build-clarify/references/output-format.md
+    - skills/build-explore/SKILL.md
+    - skills/build-clarify/SKILL.md
+  </read_first>
+
+  <action>
+  Cross-file consistency verification. Run mechanical grep comparisons to confirm:
+
+  1. Stage Report format in `skills/build-explore/references/output-format.md` (checklist example) matches the format in `skills/build-explore/SKILL.md` Step 7 (both use `- [x]` with detail lines).
+  2. Stage Report format in `skills/build-clarify/references/output-format.md` (checklist example) matches the format in `skills/build-clarify/SKILL.md` Step 6 (both use `- [x]` with detail lines).
+  3. Open Questions format in `skills/build-explore/references/output-format.md` contains the blank-line separation rule.
+  4. Answer format in `skills/build-clarify/references/output-format.md` contains the blank-line separation rule.
+  5. Both output-format.md files now contain a "Canonical detail line exemplars" paragraph.
+  6. No file in skills/build-explore/ or skills/build-clarify/ uses the OLD flat bullet format (`^- [A-Z][a-z]+ [a-z]+:` without `[x]` prefix) inside a Stage Report example.
+
+  Produce a pass/fail result per check. If all pass, verification complete.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c 'Canonical detail line exemplars' skills/build-explore/references/output-format.md` returns 1
+    - `grep -c 'Canonical detail line exemplars' skills/build-clarify/references/output-format.md` returns 1
+    - `grep 'blank line' skills/build-explore/references/output-format.md` finds the Open Questions separation rule
+    - `grep 'blank line' skills/build-clarify/references/output-format.md` finds the Answer separation rule
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+- [ ] Dashboard Stage Report card for entity 047 shows detail text under each checklist item (load entity 047 in dashboard UI after plan stage commits)
+- [ ] Dashboard entity body for entity 047 Open Questions section renders Q-1 and Q-2 with visible spacing between fields (Domain, Why it matters, Suggested options, Answer each on distinct lines)
+- [ ] Spot-check 3 active entities in dashboard UI -- Stage Report and body sections render correctly (no regression)
+
+### CLI
+- [ ] `grep -c 'Canonical detail line exemplars' skills/build-explore/references/output-format.md` returns 1
+- [ ] `grep -c 'Canonical detail line exemplars' skills/build-clarify/references/output-format.md` returns 1
+- [ ] `grep -c '\- \[x\]' skills/build-explore/SKILL.md` returns >= 7 (Step 7 example uses checklist format)
+- [ ] `grep -c '\[x\]' skills/build-clarify/SKILL.md` returns >= 10 (Step 6 example uses checklist format)
+
+### API
+None
+
+### Interactive
+- [ ] Captain confirms detail lines render correctly in dashboard Stage Report cards
+- [ ] Captain confirms Open Questions render as distinct paragraphs, not wall of text
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1: build-explore (and build-clarify) emit Stage Report sections where each `- [x] {metric}` item has an optional 2-space indented line below it containing concrete detail | task-0 | `grep -c '\- \[x\]' skills/build-explore/references/output-format.md` returns >= 6 | pending | -- |
+| AC-2: Dashboard Stage Report card visually shows the detail text below each checklist item | task-3 | Browser: load entity 047 in dashboard UI, confirm detail strings render under each metric | pending | -- |
+| AC-3: Running build-explore on any entity produces an Open Questions section where each Q-n's fields render as distinct markdown paragraphs | task-0 | `grep 'blank line' skills/build-explore/references/output-format.md` finds separation rule | pending | -- |
+| AC-4: No existing active entity's rendering regresses | task-3 | Browser: spot-check 3 active entities in dashboard UI | pending | -- |
+
+## Stage Report: plan
+
+- [x] Research findings: 5 subsections populated via inline serial research (0 researchers dispatched -- Small scale, all assumptions Confident, no external tech)
+  Upstream Constraints: 4 findings (GUARDRAILS, Q-1/Q-2 answers, CONTRACTS.md status); Existing Patterns: 7 findings (all 4 target files already fixed by concurrent entities); Library/API: none; Known Gotchas: 2 (stale brainstorm claim, stale context lake insight); Reference Examples: 2 (entity 047, entity 008)
+- [x] Plan tasks: 4 tasks across 3 waves (wave 0: verification, wave 1: exemplar additions, wave 2: consistency check)
+  task-0 env verification (haiku, wave 0); task-1 explore output-format exemplar (sonnet, wave 1); task-2 clarify output-format exemplar (sonnet, wave 1); task-3 cross-file consistency (haiku, wave 2)
+- [x] Scope revision: original 3 fixes pre-empted by concurrent entities, reduced to verification + Q-2 exemplar subsection
+  Fix 1 (detail lines) landed by Phase D Tasks 1-3; Fix 2 (blank-line separation) landed by Phase D Tasks 1-3; Fix 3 (SKILL.md drift) landed by clarify-open-exploration-loop + phase-e-plan-4-dogfood-trailofbits-integration
+- [x] UAT spec: 3 browser items, 4 CLI items, 0 API items, 2 interactive items
+  browser: dashboard Stage Report detail, Open Questions spacing, regression spot-check; CLI: exemplar grep counts, checklist format grep counts; interactive: captain visual confirmation
+- [x] Validation map: 4 rows covering all 4 acceptance criteria, all pending
+  AC-1 -> task-0; AC-2 -> task-3; AC-3 -> task-0; AC-4 -> task-3
+- [x] Plan-checker verdict: PASS (after 1 revision iteration)
+  0 blockers, 0 warnings across all 8 dimensions; inline check (no Agent dispatch available in ensign context)
+- [x] Knowledge capture: skipped -- no findings met D1/D2 threshold
+  Concurrent pre-emption pattern already captured in MEMORY.md (Main Branch Moves During Execution, Dogfood Validation Must Follow Fixes)
+- [x] Workflow-index append: 2 append calls, covering 2 tasks and 2 files, all successful
+  skills/build-explore/references/output-format.md (new section) + skills/build-clarify/references/output-format.md (appended row); commit f12e6f2
+- [x] Assumption re-validation (Step 0.5): 5 assumptions checked, 0 stale, 0 contradicted
+  A-1 through A-5 all evidence holds at cited file:line locations; A-4 entity 008 moved to _archive/ but content matches
+
+### Plan-checker final output
+```yaml
+issues: []
+```
+
+### Commits
+- chore(index): add contracts for entity-body-rendering-hotfixes entering plan (2 files)
+- chore(plan): entity-body-rendering-hotfixes verify + exemplar subsections
