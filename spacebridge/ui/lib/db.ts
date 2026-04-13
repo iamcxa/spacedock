@@ -1,9 +1,11 @@
 // ABOUTME: Read-only Drizzle DB factory for spacebridge UI process.
 // Opens ~/.spacedock/spacebridge.db (or SPACEBRIDGE_DB_PATH env) with readonly:true.
-// Uses better-sqlite3 + drizzle-orm/better-sqlite3 for Next.js Node.js runtime compat.
+// Uses bun:sqlite + drizzle-orm/bun-sqlite — works in bun:test and bun-run Next.js standalone.
+// IMPORTANT: This module must only be imported dynamically (await import) from Server Components
+// and Route Handlers — never statically — so Next.js build workers (Node.js) don't fail on bun:sqlite.
 // SQLite WAL is one-writer-many-readers — UI process must never write.
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { Database } from "bun:sqlite";
+import { drizzle } from "drizzle-orm/bun-sqlite";
 import { homedir } from "node:os";
 import * as schema from "./schema";
 

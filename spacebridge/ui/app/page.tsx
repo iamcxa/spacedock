@@ -1,15 +1,17 @@
-import { openReadOnlyDb } from "@/lib/db";
 import { scanEntitiesForRepo } from "@/lib/entity-scan";
 import { sessions, entityLeases } from "@/lib/schema";
 import { gt } from "drizzle-orm";
 import { WarRoom, type RepoData } from "@/components/war-room";
 import { EmptyState } from "@/components/empty-state";
 
+export const dynamic = "force-dynamic";
+
 export default async function Page() {
   let connectedSessions: { projectRoot: string; sessionId: string }[] = [];
   let leaseMap: Record<string, { role: string; sessionId: string }> = {};
 
   try {
+    const { openReadOnlyDb } = await import("@/lib/db");
     const db = openReadOnlyDb();
     connectedSessions = db.select({
       projectRoot: sessions.projectRoot,
@@ -37,7 +39,6 @@ export default async function Page() {
     );
   }
 
-  // Deduplicate by projectRoot
   const uniqueRoots = [...new Map(connectedSessions.map((s) => [s.projectRoot, s])).values()];
 
   const repoDataList = await Promise.all(
