@@ -66,6 +66,7 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Correct pr-review-toolkit bundling claim at line 183 | ✅ final | 2026-04-12 |
 | review-stage-parallel-skill-dispatch | execute | Add dispatch: debate-driven to review stage YAML + update prose | 🟡 in-flight | 2026-04-12 |
+| pre-ship-confidence-gate | plan | Document confidence gate in uat and shipped stage definitions | 🔵 planned | 2026-04-13 |
 
 ### docs/overhaul/recipes/phase-e-plan-3-build-pipeline.yaml
 
@@ -84,6 +85,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | kc-pr-flow-mod-integration | shipped | Create pr-review-loop library mod with skill-delegating 3-hook design | ✅ final | 2026-04-12 |
+| pre-ship-confidence-gate | plan | Add confidence display and < 90% PR blocking to merge hook | 🔵 planned | 2026-04-13 |
 
 ### mods/workflow-index-maintainer.md
 
@@ -97,12 +99,19 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | review-stage-parallel-skill-dispatch | execute | Unbind single-entity mode from bare mode -- only skip teams in -p pipe mode | 🟡 in-flight | 2026-04-12 |
 
+### references/confidence-gate.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| pre-ship-confidence-gate | plan | New reference doc: 5-factor pre-ship confidence scoring specification | 🔵 planned | 2026-04-13 |
+
 ### references/first-officer-shared-core.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | kc-pr-flow-mod-integration | shipped | Update FO shared core for layered mod scanning and pr-review-loop reference | ✅ final | 2026-04-12 |
 | review-stage-parallel-skill-dispatch | execute | Clarify team creation policy in single-entity mode section | 🟡 in-flight | 2026-04-12 |
+| pre-ship-confidence-gate | plan | Add Pre-Ship Confidence Gate subsection to Completion and Gates + Merge steps | 🔵 planned | 2026-04-13 |
 
 ### skills/build-brainstorm/SKILL.md
 
@@ -159,6 +168,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Replace trailofbits-as-agents with 4 wrapper agent dispatches; remove TBD block | ✅ final | 2026-04-12 |
 | review-stage-parallel-skill-dispatch | execute | Add FO Guidance section for debate-driven reviewer dispatch; restructure for two-phase model | 🟡 in-flight | 2026-04-12 |
 | quality-goal-backward-regression | plan | Insert Step 1e goal-backward verification in pre-scan | 🔵 planned | 2026-04-13 |
+
+### skills/build-uat/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| pre-ship-confidence-gate | plan | Add skip_interactive_passed input and auto-fix iteration re-entry docs | 🔵 planned | 2026-04-13 |
 
 ### skills/code-explorer/SKILL.md
 
