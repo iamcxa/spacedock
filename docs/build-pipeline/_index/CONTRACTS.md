@@ -146,12 +146,6 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add dimension 6d test_first validation sub-rule for test file and TDD skill checks | in-flight | 2026-04-12 |
 
-### skills/build-uat/SKILL.md
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| uat-evidence-and-recording | plan | CLI e2e recording + inline evidence writing in build-uat Steps 0, 2b, 5, 7a | 🔵 planned | 2026-04-13 |
-
 ### skills/build-quality/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |

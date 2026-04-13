@@ -53,7 +53,7 @@ If `mode` is absent, treat it as `normal`. If the entity file path is missing, G
 Read the entity body and locate `## UAT Spec`. Parse each item into a structured record:
 
 - **id** (e.g. `item-1`, `item-2`) -- must be stable across reruns
-- **type** -- one of `browser`, `cli`, `api`, `interactive`
+- **type** -- one of `browser`, `cli`, `api`, `interactive`, `skill-invocation`
 - **description** -- the captain-authored prose describing what to verify
 - **command / url / flow reference** -- type-specific execution anchor
 
@@ -80,7 +80,7 @@ This probe runs once per UAT session. The flag is consumed by Step 2b only. Brow
 
 ## Step 2: Run Automated Items (browser / cli / api)
 
-For each item that is NOT `type: interactive`, and in skip-only mode also NOT in a prior-pass row, execute automation. Skip `type: interactive` entirely -- those run in Step 4 with captain.
+For each item that is NOT `type: interactive`, and in skip-only mode also NOT in a prior-pass row, execute automation. Skip `type: interactive` entirely -- those run in Step 4 with captain. `type: skill-invocation` items run in Step 2d below.
 
 ### 2a -- Browser Items via e2e-pipeline
 
@@ -109,6 +109,26 @@ Two execution paths depending on e2e-pipeline availability (from Step 1.5):
 ### 2c -- API Items
 
 Run the declared `curl` or `gh` command via Bash. Capture HTTP status code, response body (truncate at 2KB), and exit code. Record evidence verbatim.
+
+### 2d -- Skill Invocation Items
+
+For each `type: skill-invocation` item:
+
+1. **Pre-classify for interactivity.** Read the target skill's SKILL.md and grep for `AskUserQuestion`. If found, the skill is Class 3 (captain-interactive) -- skip runtime invocation and use structural-only validation (sub-step 3 below). Record as `pass` with notes "Class 3 -- structural validation only".
+
+2. **Runtime invocation test (non-Class-3 only).** Invoke the skill via the Skill tool with a minimal probe prompt (e.g., "List your capabilities" or the item's declared command). Capture the output shape: did the skill load? Did it produce structured output? Did it error? Record exit status and first 40 lines of output as evidence.
+
+3. **Structural validation (always runs).** Regardless of runtime test result:
+   - Verify SKILL.md exists at the declared path
+   - Verify frontmatter has `name` and `description` fields
+   - Verify any `references/` paths cited in SKILL.md resolve to existing files
+   - Record each check as pass/fail with file:line evidence
+
+Record a provisional result row: `{item_id} | skill-invocation | {pass|fail-infra|fail-assertion} | {evidence} | {notes}`.
+
+**Infra-level fail conditions for skill-invocation**: Skill tool unavailable, SKILL.md file not found, frontmatter parse error. These route to execute per Step 3 classification.
+
+**Assertion fail conditions**: Runtime invocation produced output but shape does not match expected (per item description), or structural validation found broken references. These route to captain review per Step 3 classification.
 
 For every automated item, record a provisional result row in scratch:
 
@@ -357,6 +377,12 @@ If `mode: skip-only`, include the mode in the message: `"uat-resume: {slug} -- i
 - **NEVER dispatch a subagent to handle the interactive loop.** You already ARE the ensign subagent; per `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md`, subagents cannot recursively dispatch Agent. "Keep the orchestrator stateless" is backwards rationalization -- the orchestrator IS the state-holder here by design.
 - **NEVER auto-defer interactive items to `/spacedock:uat-resume` "to keep the pipeline moving".** Auto-defer without captain input is not a skip -- it's abandonment. Real skips require captain to name a reason in Step 4 first.
 
+### Skill Invocation -- Pre-Classify Before Runtime
+
+- **ALWAYS grep for AskUserQuestion in the target SKILL.md before runtime invocation.** Class 3 skills will block automation on interactive prompts. Pre-classification is deterministic and prevents hangs.
+- **NEVER skip structural validation because runtime invocation passed.** Runtime success does not guarantee frontmatter correctness or reference integrity. Structural validation is the baseline; runtime is additive.
+- **NEVER runtime-invoke a skill without the pre-classification step.** Even if the item description says "non-interactive", grep the SKILL.md -- the description may be wrong or stale.
+
 ### Stage Contract and Scope
 
 - **Captain judgment is scoped to Step 4.** Steps 1-3 run fully automated; Step 4 is the only captain-facing moment. Do NOT ask the captain to approve mapping choices, flow generation, or classification -- those are orchestrator decisions.
@@ -364,3 +390,9 @@ If `mode: skip-only`, include the mode in the message: `"uat-resume: {slug} -- i
 - **Never invoke build-review, build-plan, or build-execute from within UAT.** You are a leaf orchestrator above e2e-pipeline; upward routing goes through FO via the Stage Report's `feedback-to` field.
 - **Never edit source code.** Your Write/Edit scope is strictly the entity body (UAT Results, Stage Report, frontmatter `uat_pending_count`) and nothing else.
 - **Use `--` (double dash)** everywhere. Never `—` (em dash). Matches the rest of the build skill family.
+
+### Evidence Minimum
+
+- **NEVER write `## Stage Report: uat` without a per-item evidence entry in `### automated evidence`.** Every automated item (browser, cli, api) must have an entry showing its item id, type, and at least one evidence artifact. Browser items: screenshot path or markdown image reference. CLI items: stdout snippet (first/last 20 lines) or transcript block reference. API items: HTTP status code and response body snippet. An item entry that says only "pass" or "automation ran successfully" is not evidence -- it is a claim without proof.
+- **NEVER write a captain decision row without the captain's verbatim answer.** Every row in `### captain decisions` must include the captain's actual choice (pass/fail/skip) and, for skip decisions, the verbatim reason string. A decision row that says "captain approved" without specifying which option was selected erases the audit trail of what the captain actually decided.
+- **NEVER write `### automated evidence` without artifact references for browser items.** Browser item evidence must include at least one of: screenshot path (`.e2e/screenshots/{item-id}.png`), video path (`.e2e/videos/{item-id}.webm`), or trace path (`.e2e/traces/{item-id}.zip`). Inline markdown image syntax (`![{item-id}](path)`) is preferred per entity 082 alignment. A browser item marked pass with no visual artifact cannot be audited.

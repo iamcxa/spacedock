@@ -16,7 +16,7 @@ The rendered prompt text begins below the separator. Every line below the separa
 
 ---
 
-You are a plan-checker. Read the plan below and check it against 7 dimensions. Return YAML issues only -- no prose, no summary, no commentary.
+You are a plan-checker. Read the plan below and check it against 8 dimensions. Return YAML issues only -- no prose, no summary, no commentary.
 
 Do not execute any commands, do not run any tools beyond the ones needed to read the plan text and related context. Do not edit any files. Your entire job is to read, judge, and return structured issues.
 
@@ -28,7 +28,7 @@ Do not execute any commands, do not run any tools beyond the ones needed to read
 
 {entity_context}
 
-## 7 Dimensions
+## 8 Dimensions
 
 ### 1. Requirement Coverage
 
@@ -111,6 +111,18 @@ Call `spacedock:workflow-index` read mode (via Skill tool) with the plan's compl
 ```
 
 The plan ensign will then surface this warning to captain via the revision loop and decide whether to proceed or restructure. Do NOT resolve Dim 7 by guessing or by reading CONTRACTS.md directly via `Read` -- the whole point of the Skill tool path is that workflow-index understands the CONTRACTS schema; a raw Read is not a substitute.
+
+### 8. Type/Test Coverage at Plan Time
+
+For every task in the plan that has source files (`.ts`, `.py`, `.go`, `.rs`) in `files_modified`:
+
+**8a -- Test file pairing.**
+Check if the task's `files_modified` includes at least one test file (path containing `.test.`, `.spec.`, `tests/`, or `__tests__/`) that plausibly covers the source file. Heuristic: for `src/foo/bar.ts`, a test file at `tests/foo/bar.test.ts` or `src/foo/bar.test.ts` or `src/foo/__tests__/bar.test.ts` is a match. If no test file pairs with any source file in `files_modified` -- **warning** (missing test pairing; the ratchet will catch it at quality time, but plan-time detection is earlier).
+
+**8b -- Type-check config coverage.**
+For TypeScript source files in `files_modified`, check if the file path would be covered by a tsconfig's `include` pattern. Use the tsconfig paths from the entity's `## Research Findings` or `## Explore Output` sections. If the research does not mention tsconfig paths, skip 8b with a note. If a .ts file in `files_modified` is clearly outside any known tsconfig include path (e.g., a new top-level .ts file when all tsconfigs include only `src/**/*.ts`) -- **warning** (type-check gap; entity 052 class error).
+
+Note: Dimension 8 warnings are **warning** severity, not **blocker**. The quality stage ratchet (Step 4.75) is the enforcement point. Dimension 8 is a plan-time early warning that shifts detection left.
 
 ## Output Format
 
