@@ -10,7 +10,7 @@ verdict:
 score: 0.0
 worktree:
 issue:
-pr:
+pr: "#41"
 intent: feature
 scale: Medium
 project: spacedock
