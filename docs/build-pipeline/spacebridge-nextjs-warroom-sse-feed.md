@@ -10,7 +10,7 @@ verdict:
 score: 1.0
 worktree: .worktrees/spacedock-ensign-spacebridge-nextjs-warroom-sse-feed
 issue:
-pr:
+pr: "#44"
 intent: feature
 scale: Medium
 project: spacedock
