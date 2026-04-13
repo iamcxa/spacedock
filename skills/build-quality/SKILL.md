@@ -84,6 +84,22 @@ Capture exit code, stdout, and stderr. Record the last 40 lines of combined outp
 
 **No scope narrowing.** Even if execute only touched one file, you run the full suite. Even if the previous quality run failed on two tests and execute reported DONE, you run the full suite. Re-entry after a fix still runs the **bun test full suite** -- that is the whole point of the quality gate.
 
+**Runner-aware execution.** If Step 0.5 detected multiple languages, run the test command for EACH detected language sequentially. Record per-language test output. The overall Step 1 verdict is `fail` if ANY language's test command fails. Per-language results are recorded as sub-sections in the evidence snippet:
+
+```
+#### typescript
+command: bun test
+exit_code: 0
+output: {snippet}
+
+#### python
+command: pytest
+exit_code: 0
+output: {snippet}
+```
+
+If Step 0.5 produced only the legacy default (single TypeScript), run `bun test` exactly as before -- no behavioral change for single-language projects.
+
 **Verdict for this check:**
 - Exit code 0 and no failing-test lines → `pass`
 - Non-zero exit or any failing test → `fail`
@@ -99,6 +115,8 @@ bun lint
 ```
 
 Capture exit code and the full lint output. Record it verbatim in the evidence snippet. Do NOT run `bun lint --fix`. Do NOT restrict to changed files. The pre-commit hook already handles `--fix` on changed files during execute commits; your job is the project-wide invariant check.
+
+**Runner-aware execution.** If Step 0.5 detected multiple languages, run the lint command for EACH detected language sequentially. Record per-language lint output. The overall Step 2 verdict is `fail` if ANY language's lint command fails. Per-language results are recorded as sub-sections in the evidence snippet (same shape as Step 1). If Step 0.5 produced only the legacy default (single TypeScript), run `bun lint` exactly as before -- no behavioral change for single-language projects.
 
 **Verdict for this check:**
 - Exit code 0 → `pass`
@@ -116,6 +134,8 @@ bunx tsc --noEmit
 
 Capture exit code and the full type-check output. Record every `error TS####` line verbatim. Do NOT attempt to narrow by file. Do NOT restrict to incremental mode; you run the cold, full-project check.
 
+**Runner-aware execution.** If Step 0.5 detected multiple languages, run the typecheck command for EACH detected language sequentially. For TypeScript, run `bunx tsc --noEmit -p {tsconfig_path}` for EACH detected tsconfig.json (there may be multiple: spacebridge/tsconfig.json, tools/dashboard/tsconfig.json). Record per-language typecheck output. The overall Step 3 verdict is `fail` if ANY language's typecheck command fails. Per-language results are recorded as sub-sections in the evidence snippet (same shape as Step 1). If Step 0.5 produced only the legacy default (single TypeScript), run `bunx tsc --noEmit` exactly as before -- no behavioral change for single-language projects.
+
 **Verdict for this check:**
 - Exit code 0 and no `error TS` lines → `pass`
 - Non-zero exit or any `error TS` line → `fail`
@@ -131,6 +151,8 @@ bun build
 ```
 
 If the project does not define a `build` script, run the equivalent entry-point build command documented in the project CLAUDE.md (e.g. `bun run build` against a named entry point). Record evidence verbatim.
+
+**Runner-aware execution.** If Step 0.5 detected multiple languages, run the build command for EACH detected language sequentially. Record per-language build output. The overall Step 4 verdict is `fail` if ANY language's build command fails. Per-language results are recorded as sub-sections in the evidence snippet (same shape as Step 1). If Step 0.5 produced only the legacy default (single TypeScript), run `bun build` exactly as before -- no behavioral change for single-language projects.
 
 **Verdict for this check:**
 - Exit code 0 with no reported errors → `pass`
