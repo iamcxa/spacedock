@@ -413,6 +413,53 @@ Suggested options: (a) Full test suite -- just run `bun test` (entire project). 
 | AC-3: Regression gate queries CONTRACTS.md for overlapping entities | Task 2, Task 4 | `grep 'CONTRACTS.md' skills/build-quality/SKILL.md` + pressure test `regression-gate-cross-entity-classification` | pending |
 | AC-4: Regression gate failure routes feedback-to: execute with cross-entity-regression tag | Task 2, Task 4 | `grep 'cross-entity-regression' skills/build-quality/SKILL.md` + pressure test `regression-gate-cross-entity-classification` | pending |
 
+## Stage Report: execute
+
+**Ran at**: 2026-04-13T04:04:50Z
+**HEAD**: d71756f
+**Branch**: spacedock-ensign/quality-goal-backward-regression
+
+### Tasks
+
+| Task | Status | Commit SHA | Description |
+|------|--------|------------|-------------|
+| task-1 | DONE | 5ba4a69 | Add Step 1e goal-backward verification to `skills/build-review/SKILL.md` |
+| task-2 | DONE | 5ba4a69 | Add Step 4.5 regression gate to `skills/build-quality/SKILL.md` |
+| task-3 | DONE | d71756f | Create `tests/pressure/build-review-goal-backward.yaml` (2 cases) |
+| task-4 | DONE | d71756f | Create `tests/pressure/build-quality-regression-gate.yaml` (2 cases) |
+
+### Acceptance Criteria Verification
+
+| AC | Verify Command | Result |
+|----|---------------|--------|
+| AC-1: goal-backward pre-scan in build-review | `grep -c '1e -- Goal-Backward' skills/build-review/SKILL.md` → 1 | PASS |
+| AC-1: goal-backward >= 5 occurrences | `grep -c 'goal-backward' skills/build-review/SKILL.md` → 5 | PASS |
+| AC-2: orphan CRITICAL CODE in Step 1e | `grep 'CRITICAL' skills/build-review/SKILL.md` + Step 1e content | PASS |
+| AC-3: Step 4.5 in build-quality | `grep -c 'Step 4.5' skills/build-quality/SKILL.md` → 7 | PASS |
+| AC-3: CONTRACTS.md query in Step 4.5 | `grep -c 'CONTRACTS.md' skills/build-quality/SKILL.md` → 13 | PASS |
+| AC-4: cross-entity-regression classification | `grep -c 'cross-entity-regression' skills/build-quality/SKILL.md` → 6 | PASS |
+| Pressure test task-3 | `test -f tests/pressure/build-review-goal-backward.yaml` + 2 cases | PASS |
+| Pressure test task-4 | `test -f tests/pressure/build-quality-regression-gate.yaml` + 2 cases | PASS |
+| README.md index updated | `grep 'build-review-goal-backward\|build-quality-regression-gate' tests/pressure/README.md` | PASS |
+
+### Wave Graph Execution
+
+- **Wave 1** (parallel): task-1 + task-2 → committed together at 5ba4a69
+- **Wave 2** (serial due to README.md overlap): task-3 then task-4 → committed together at d71756f
+
+### Notes
+
+- Merged main (be942e5 → d71756f merge) before starting; picked up entities 078, 079, 080 changes including CONTRACTS.md updates and new skill references
+- Wave 2 tasks share `tests/pressure/README.md` so executed serially; both pressure test YAMLs created before single commit
+
+## Files Modified
+
+- `skills/build-review/SKILL.md` -- Step 1e inserted (goal-backward verification), Step 1 header updated to "five checks", Stage Report pre-scan shape updated, Rules section added "Goal-Backward Verification Runs Every Time" subsection
+- `skills/build-quality/SKILL.md` -- Step 4.5 inserted (Regression Gate), Step 6 per-check verdict shape updated (regression subsection), Stage Report shape updated (regression row), Rules section added "Regression Gate -- No Re-Execution" subsection
+- `tests/pressure/build-review-goal-backward.yaml` -- NEW: 2 pressure test cases (goal-backward-unmet-ac, goal-backward-orphan-detection)
+- `tests/pressure/build-quality-regression-gate.yaml` -- NEW: 2 pressure test cases (regression-gate-step1-green-autopass, regression-gate-cross-entity-classification)
+- `tests/pressure/README.md` -- file index updated (27 → 31 unique scenarios)
+
 ## References
 
 - Parent entity 077: cross-phase skepticism validation gates
