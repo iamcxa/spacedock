@@ -2,6 +2,7 @@
 id: 078
 title: "Clarify-stage explore re-validation -- evidence freshness + consistency gates"
 status: draft
+context_status: pending
 source: decomposition of entity 077 (cross-phase skepticism)
 started:
 completed:
@@ -17,30 +18,38 @@ depends-on: [075]
 parent: 077
 ---
 
-## Problem
+## Directive
 
-Build-clarify currently presents explore's assumptions, options, and questions to the captain without verifying that explore's evidence is still valid or internally consistent. The captain is forced to be the skeptic instead of the decision-maker.
+> Build-clarify currently presents explore's assumptions, options, and questions to the captain without verifying that explore's evidence is still valid or internally consistent. The captain is forced to be the skeptic instead of the decision-maker.
+>
+> Insert a new Step 1.5 in build-clarify between Step 1 (Load Entity State) and Step 2 (Assumption Batch Confirmation) with five sub-checks: (1) evidence freshness -- re-read file:line citations, (2) internal consistency -- cross-reference assumptions for contradictions, (3) option validity -- verify options are genuinely different, (4) coverage check -- run domain templates for missed gray areas, (5) research re-validation -- verify 075 researcher findings against current codebase.
+>
+> Additionally, document the researcher vs code-explorer disambiguation in SO agent and reference docs.
+>
+> Scope: `skills/build-clarify/SKILL.md` Step 1.5 insertion + reference doc updates. Child of entity 077 (cross-phase skepticism). Complementary to entity 076 (Step 4.5 interactive exploration loop -- that is captain-driven, this is automated pre-validation).
 
-## Scope
+## Captain Context Snapshot
 
-### Clarify Step 1.5: Explore Re-Validation
+- **Repo**: main @ 0c0671b
+- **Session**: No recent session context (entity created via decompose(077) at 468882a)
+- **Domain**: Runnable / Invokable, Readable / Textual
+- **Related entities**: 077 -- Cross-phase skepticism validation gates (epic/awaiting-clarify), 075 -- Research dispatch architecture (plan/ready), 076 -- Clarify open exploration loop (plan/ready), 079 -- Plan-stage assumption re-validation (clarify/ready), 080 -- Execute-stage staleness detection (clarify/ready), 081 -- Goal-backward verification + regression gate (clarify/ready)
+- **Created**: 2026-04-13T11:30:00Z
 
-Insert a new Step 1.5 in build-clarify between Step 1 (Load Entity State) and Step 2 (Assumption Batch Confirmation):
+## Brainstorming Spec
 
-- **Evidence freshness**: re-read each assumption's `file:line` citation, verify it still says what explore claimed
-- **Internal consistency**: cross-reference A-1~A-N for contradictions (A-1 says X, A-3 implies not-X)
-- **Option validity**: verify options in comparison tables are genuinely different approaches, not rephrased versions
-- **Coverage check**: run domain templates against entity spec, identify gray areas explore missed
-- **Research re-validation**: if 075 researchers annotated findings, verify research conclusions against current codebase state
+**APPROACH**: Insert a Step 1.5 ("Explore Re-Validation") in `skills/build-clarify/SKILL.md` between Step 1 (Load Entity State, line 91) and Step 2 (Assumption Batch Confirmation, line 113). Step 1.5 runs five automated sub-checks before any captain interaction: (1a) **Evidence freshness** -- for each assumption's `Evidence: {file}:{line}` citation, `Read` the cited region and verify the content still supports the claim using the same LLM-judgment pattern as explore Step 3.7 (proven in entity 079). Staleness annotated inline as `(⚠ stale-evidence: {detail})`. (1b) **Internal consistency** -- LLM reads all A-n entries and flags semantic contradictions as new Q-n Open Questions, prepended to the question list for Step 4. (1c) **Option validity** -- for each `## Option Comparisons` table, verify options are genuinely different approaches (not rephrased versions). Duplicates merged with dedup note. (1d) **Coverage check** -- read `references/gray-area-templates.md` and cross-reference domain templates against the entity's `## Assumptions` + `## Open Questions`, adding missing gray areas as new A-n or Q-n entries. (1e) **Research re-validation** -- if assumptions carry `(✓ research: ...)` annotations (entity 075 format), re-read cited evidence and verify research conclusions still hold. Additionally, update SO-FO-DISPATCH-SPLIT.md, build-explore references, and science-officer agent.md with researcher vs code-explorer disambiguation rules.
 
-Captain's role shifts from "verifier" to "decision-maker" -- clarify does the homework, captain picks directions.
+**ALTERNATIVE**: Instead of an automated pre-validation step, add a "validation prompt" at the start of Step 2 that asks the captain: "Before we review assumptions, should I re-verify the evidence?" -- making re-validation captain-initiated rather than automatic. -- D-01 Rejected: this defeats the purpose of shifting the captain from "verifier" to "decision-maker". If the captain has to decide whether to verify, they're still in verifier mode. Automated pre-validation removes the burden entirely -- the captain sees pre-validated assumptions with freshness timestamps and focuses on decisions, not verification.
 
-### Researcher vs Code-Explorer Documentation
+**GUARDRAILS**:
+- Fractional step numbering (Step 1.5) -- no renumbering of existing Steps 0-6 (proven pattern from entity 076 A-1)
+- Entity 075 decisions are authoritative -- research re-validation uses 075's annotation format `(✓ research: {source} -- {finding})` and dispatch architecture
+- Entity 076 is complementary, not overlapping -- 076 is Step 4.5 (captain-driven interactive exploration), 078 is Step 1.5 (automated pre-validation). Do not duplicate 076's interactive loop in 078's automated check
+- Evidence freshness uses the same LLM-judgment pattern proven in entity 079 (plan-stage re-validation) -- semantic comparison, not mechanical hash
+- New gray areas discovered by coverage check are Track A (assumption) if codebase precedent exists, Track C (question) if genuinely open -- same hybrid classification rules as build-explore
 
-Add clear usage rules to SO agent and skill reference docs:
-- Code-Explorer: breadth-first file mapping ("What files exist and what layer are they?"). Internal only.
-- Researcher: depth-first claim validation ("Is this claim true?"). Internal + external.
-- Document in: SO-FO-DISPATCH-SPLIT.md, build-explore references, science-officer agent.md
+**RATIONALE**: Automated pre-validation is correct because the captain's time is the scarcest resource in the clarify loop. Every assumption the captain manually re-verifies ("wait, is this file:line citation still accurate?") is time NOT spent making decisions. Entity 079 proved that LLM-judgment evidence freshness checks work for the plan stage; 078 generalizes the same pattern to the clarify stage, one phase earlier. The five sub-checks (freshness, consistency, validity, coverage, research) map directly to the five ways explore output can be wrong: stale evidence, internal contradictions, duplicate options, missed gray areas, and outdated research. Each sub-check is independently valuable -- if any one catches a problem, it saves a full clarify round-trip.
 
 ## Acceptance Criteria
 
@@ -57,6 +66,7 @@ Add clear usage rules to SO agent and skill reference docs:
 - Parent entity 077: cross-phase skepticism validation gates
 - Entity 075 (research dispatch): authoritative decisions on researcher dispatch
 - Entity 076 (clarify open exploration loop): complementary clarify enhancement (Step 4.5 interactive, this is Step 1.5 automated)
-- `skills/build-clarify/SKILL.md`: insertion point for Step 1.5
+- Entity 079 (plan-stage re-validation): proven pattern for LLM-judgment evidence freshness checks
+- `skills/build-clarify/SKILL.md`: insertion point for Step 1.5 (between line 91 Step 1 and line 113 Step 2)
 - `skills/build-explore/references/gray-area-templates.md`: domain templates for coverage check
-- GSD `discuss-phase.md:492-496`: prior decisions as "revisit or keep?"
+- `docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md`: researcher vs code-explorer documentation target
