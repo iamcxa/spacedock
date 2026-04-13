@@ -1,7 +1,7 @@
 ---
 id: 080
 title: "Execute-stage staleness detection -- file hash pre-check before wave dispatch"
-status: plan
+status: execute
 context_status: ready
 source: decomposition of entity 077 (cross-phase skepticism)
 started: 2026-04-13T13:00:00Z
