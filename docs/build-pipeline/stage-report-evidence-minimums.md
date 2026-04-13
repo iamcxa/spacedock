@@ -278,9 +278,9 @@ Captain reads each new `### Evidence Minimum` subsection and confirms: (a) rules
 
 | AC | Task | Verify command | Status | Last run |
 |----|------|---------------|--------|----------|
-| AC-1: execute Stage Report includes per-task commit SHA, files changed count, test evidence per AC | task-1 | `grep 'files_changed count' skills/build-execute/SKILL.md && grep 'AC verification' skills/build-execute/SKILL.md` | pending | -- |
-| AC-2: all 4 stage skills have documented evidence minimum requirement | task-1, task-2, task-3, task-4 | `grep -rl '### Evidence Minimum' skills/build-execute/SKILL.md skills/build-quality/SKILL.md skills/build-review/SKILL.md skills/build-uat/SKILL.md \| wc -l` returns 4 | pending | -- |
-| AC-3: each SKILL.md Rules section has NEVER phrasing making omission a Rules violation | task-1, task-2, task-3, task-4 | `grep -c 'NEVER write.*without' skills/build-execute/SKILL.md skills/build-quality/SKILL.md skills/build-review/SKILL.md skills/build-uat/SKILL.md` each returns >= 2 | pending | -- |
+| AC-1: execute Stage Report includes per-task commit SHA, files changed count, test evidence per AC | task-1 | `grep 'files_changed count' skills/build-execute/SKILL.md && grep 'AC verification' skills/build-execute/SKILL.md` | pass | 2026-04-13 |
+| AC-2: all 4 stage skills have documented evidence minimum requirement | task-1, task-2, task-3, task-4 | `grep -rl '### Evidence Minimum' skills/build-execute/SKILL.md skills/build-quality/SKILL.md skills/build-review/SKILL.md skills/build-uat/SKILL.md \| wc -l` returns 4 | pass | 2026-04-13 |
+| AC-3: each SKILL.md Rules section has NEVER phrasing making omission a Rules violation | task-1, task-2, task-3, task-4 | `grep -c 'NEVER write.*without' skills/build-execute/SKILL.md skills/build-quality/SKILL.md skills/build-review/SKILL.md skills/build-uat/SKILL.md` each returns >= 2 | pass | 2026-04-13 |
 
 ## Stage Report: plan
 
@@ -310,3 +310,42 @@ Captain reads each new `### Evidence Minimum` subsection and confirms: (a) rules
 - `skills/build-quality/SKILL.md`: Stage Report evidence target
 - `skills/build-review/SKILL.md`: Stage Report evidence target
 - `skills/build-uat/SKILL.md`: Stage Report evidence target
+
+## Stage Report: execute
+
+### Per-task summary
+
+| Task | Status | Model | Commit SHA | Files | Action |
+|------|--------|-------|------------|-------|--------|
+| task-1 | DONE | sonnet | efb253e (1 file) | 1 | Add ### Evidence Minimum subsection to build-execute/SKILL.md Rules |
+| task-2 | DONE | sonnet | dd7e32c (1 file) | 1 | Add ### Evidence Minimum subsection to build-quality/SKILL.md Rules |
+| task-3 | DONE | sonnet | 53da7ed (1 file) | 1 | Add ### Evidence Minimum subsection to build-review/SKILL.md Rules |
+| task-4 | DONE | sonnet | 763fc8a (1 file) | 1 | Add ### Evidence Minimum subsection to build-uat/SKILL.md Rules |
+
+### AC verification
+
+| AC | Verify command | Result |
+|----|----------------|--------|
+| AC-1: execute Stage Report includes per-task commit SHA, files changed count, test evidence per AC | `grep 'files_changed count' skills/build-execute/SKILL.md && grep 'AC verification' skills/build-execute/SKILL.md` | pass -- both terms found at lines 416-417 |
+| AC-2: all 4 stage skills have documented evidence minimum requirement | `grep -rl '### Evidence Minimum' skills/build-execute/SKILL.md skills/build-quality/SKILL.md skills/build-review/SKILL.md skills/build-uat/SKILL.md \| wc -l` | pass -- returns 4 |
+| AC-3: each SKILL.md Rules section has NEVER phrasing making omission a Rules violation | `grep -c 'NEVER write.*without'` per file | pass -- execute: 3, quality: 2, review: 3, uat: 3 (all >= 2) |
+
+### Files Modified
+
+- `skills/build-execute/SKILL.md` -- commit efb253e (+6 lines, ### Evidence Minimum subsection)
+- `skills/build-quality/SKILL.md` -- commit dd7e32c (+6 lines, ### Evidence Minimum subsection)
+- `skills/build-review/SKILL.md` -- commit 53da7ed (+6 lines, ### Evidence Minimum subsection)
+- `skills/build-uat/SKILL.md` -- commit 763fc8a (+6 lines, ### Evidence Minimum subsection)
+
+### Checklist
+
+- [x] All PLAN tasks executed per wave ordering -- wave 1, all 4 tasks DONE
+- [x] Per-task commits on feature branch with conventional message format -- 4 commits on `spacedock-ensign/stage-report-evidence-minimums`
+- [x] Acceptance criteria verified per task -- all 3 ACs pass (see AC verification table)
+- [x] ## Files Modified section -- 4 files listed above
+- [x] ## Stage Report: execute written with per-task summary rows -- this section
+- [x] workflow-index update-status called (planned → in-flight) -- commit a9ceae6, 4 rows updated
+
+### Knowledge capture
+
+No D1/D2 patterns identified. Entity is purely additive text to Rules sections; no architectural decisions, no novel patterns beyond what the plan specified.
