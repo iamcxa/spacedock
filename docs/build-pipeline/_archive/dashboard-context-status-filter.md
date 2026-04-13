@@ -6,12 +6,12 @@ context_status: ready
 source: /build
 created: 2026-04-09T22:15:00+08:00
 started: 2026-04-13T14:25:00Z
-completed:
-verdict:
-score:
-worktree: .worktrees/spacedock-ensign-dashboard-context-status-filter
+completed: 2026-04-13T16:08:35Z
+verdict: PASSED
+score: 0.95
+worktree:
 issue:
-pr:
+pr: "#43"
 intent: feature
 scale: Small
 project: spacedock
