@@ -2,7 +2,7 @@
 id: 080
 title: "Execute-stage staleness detection -- file hash pre-check before wave dispatch"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: decomposition of entity 077 (cross-phase skepticism)
 started:
 completed:
@@ -34,7 +34,7 @@ parent: 077
 
 ## Brainstorming Spec
 
-**APPROACH**: Insert a per-wave staleness pre-check inside build-execute's Step 4 wave loop. Before dispatching wave N's tasks, compare each task's `files_modified` targets against a baseline git state using `git diff --name-only {baseline} -- {file}`. The baseline for wave 0/1 is the plan-approval commit SHA (captured from `## Stage Report: plan` or the most recent `chore(plan):` commit in git log). For wave N>1, the baseline advances to the post-wave-(N-1) commit SHA (the serial commit from the prior wave's last task), so that expected intra-entity modifications by earlier waves don't trigger false positives. Two outcomes: (a) **files unchanged** -- proceed silently; (b) **files changed** -- emit a `⚠ stale-files: {list}` warning in execute output, log to Stage Report, and proceed with caution (default behavior -- staleness is a warning, not a blocker per parent 077 GUARDRAILS).
+**APPROACH**: Insert a per-wave staleness pre-check inside build-execute's Step 4 wave loop (✓ confirmed by explore: build-execute SKILL.md:122-165 -- Step 4 is the wave loop; Step 4b per-task execution is the inner loop where pre-check inserts before each wave). Before dispatching wave N's tasks, compare each task's `files_modified` targets against a baseline git state using `git diff --name-only {baseline} -- {file}` (✓ confirmed by explore: build-execute SKILL.md:24 -- `git diff` in tool list; line 148 -- `git log` already used for teammate detection). The baseline for wave 0/1 is `execute_base_sha` (✓ confirmed by explore: build-execute SKILL.md:146,258 -- already tracked; functionally equivalent to plan-approval state for source files since intervening `chore(index):` commits only touch CONTRACTS.md). For wave N>1, the baseline advances to the post-wave-(N-1) commit SHA (the serial commit from the prior wave's last task), so that expected intra-entity modifications by earlier waves don't trigger false positives. Two outcomes: (a) **files unchanged** -- proceed silently; (b) **files changed** -- emit a `⚠ stale-files: {list}` warning in execute output, log to Stage Report, and proceed with caution (default behavior -- staleness is a warning, not a blocker per parent 077 GUARDRAILS).
 
 **ALTERNATIVE**: Check staleness once at stage entry (new Step 2.5) rather than per-wave -- a single `git diff` between plan-approval SHA and current HEAD for all `files_modified` across the entire plan. -- D-01 Rejected: single entry check misses inter-wave drift. FO daemon commits and parallel entity execution can modify files between waves. Per-wave checking at the narrowest window catches drift that a one-shot entry check would miss. The per-wave approach is also consistent with how wave dependency checks already work (Step 1 validates `read_first` paths per wave, not globally).
 
@@ -52,6 +52,43 @@ parent: 077
 - [ ] Given a plan with `files_modified` targets, when execute starts wave 1, then the pre-check compares each target file's current git hash against the plan-approval commit SHA and warns if any file changed (how to verify: modify a `files_modified` target between plan and execute, run execute, verify `⚠ stale-files:` warning in output listing the changed file)
 - [ ] Given wave 1 completed and modified `src/server.ts`, when execute starts wave 2 with a task targeting `src/config.ts`, then the pre-check uses wave 1's final commit SHA as baseline, not plan-approval SHA (how to verify: confirm wave 2 pre-check does not flag `src/server.ts` as stale despite it changing since plan-time)
 - [ ] Given a stale file detected, when the warning is emitted, then execute proceeds with task dispatch (not halted) and the staleness is logged in `## Stage Report: execute` (how to verify: run execute with stale files, verify tasks still execute AND Stage Report contains stale-files warning)
+
+## Assumptions
+
+A-1: Files not present at baseline SHA are skipped by the pre-check -- they are new files the plan will create. `git diff --name-only {baseline} -- {new-file}` returns empty for files that didn't exist at baseline, so no false positive occurs.
+Confidence: Confident (0.90)
+Evidence: git semantics -- `git diff` between a SHA and working tree for a non-existent-at-SHA file shows it as added (expected), not modified (stale). The pre-check filters for modifications only, not additions.
+
+A-2: Use `execute_base_sha` (already tracked by build-execute) as the wave 0/1 baseline rather than extracting plan-approval SHA separately. These are functionally equivalent for source files because the only intervening commits are `chore(index):` which touch CONTRACTS.md only.
+Confidence: Confident (0.90)
+Evidence: build-execute SKILL.md:146,258 -- `execute_base_sha` captured at stage entry; line 95 -- `chore(index):` commits only modify `docs/build-pipeline/_index/CONTRACTS.md`
+
+A-3: In worktree execution (the standard FO dispatch path), concurrent entities are isolated on separate branches. The per-wave pre-check only detects external drift in main-branch execution (no worktree), which occurs when FO daemon ships other entities to main between waves.
+Confidence: Confident (0.85)
+Evidence: build-execute SKILL.md:10 -- execute runs on worktree branch; entity frontmatter `worktree:` field tracks the branch. Git branches are isolated -- commits on branch A don't appear on branch B until merge.
+
+A-4: Stale-file warnings are collected in orchestrator memory during the wave loop and written to `## Stage Report: execute` under `### Findings` > `#### Stale-file detections` (new subsection following the existing 4-subsection pattern: Skill suggestions, Scope observations, Pre-existing failures, Unresolved scope gaps).
+Confidence: Likely (0.75)
+Evidence: build-execute SKILL.md:272-280 -- Stage Report `### Findings` section has 4 existing subsections. Adding a 5th for stale-file detections follows the same pattern. Per-task summary (line 264) records per-task status; stale-file warnings are per-wave, fitting better under Findings.
+
+A-5: `git diff --name-only {baseline} -- {files}` is the right detection mechanism -- binary changed/unchanged, lightest possible check. No need for `--stat` or full diff content. The warning reports WHICH files changed, not HOW they changed.
+Confidence: Confident (0.90)
+Evidence: git semantics -- `--name-only` returns file paths only with zero content overhead. The staleness check needs a boolean signal per file (changed or not), not a content diff. Consistent with parent 077 A-4 "binary file content comparison."
+
+## Stage Report: explore
+
+- [x] Files mapped: 1 across skill/config layer
+  build-execute SKILL.md (sole insertion target -- Step 4 wave loop, Stage Report format)
+- [x] Assumptions formed: 5 (Confident: 4, Likely: 1)
+  A-1 new-file skip (0.90), A-2 execute_base_sha baseline (0.90), A-3 worktree isolation (0.85), A-4 Stage Report findings subsection (0.75), A-5 git diff --name-only (0.90)
+- [x] Options surfaced: 0
+  All gray areas resolved to Track A assumptions with git semantics or codebase precedent
+- [x] Questions generated: 0
+  No genuinely open questions -- entity scope is narrow (per-wave git diff insertion) with clear git-level mechanics
+- [x] α markers resolved: 0 / 0
+  Brainstorming spec contained no α markers (decomposition-born entity with well-defined scope from parent 077)
+- [x] Scale assessment: confirmed Small
+  1 file mapped, single insertion point within Step 4 wave loop
 
 ## References
 
