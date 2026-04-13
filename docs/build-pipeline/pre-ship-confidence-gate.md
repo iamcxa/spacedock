@@ -1,7 +1,7 @@
 ---
 id: 087
 title: "Pre-ship confidence gate -- 5-factor scoring with auto-fix loop"
-status: draft
+status: clarify
 source: decomposition of entity 085 (stage report evidence and confidence)
 started:
 completed:
@@ -15,7 +15,7 @@ scale: Medium
 project: spacedock
 depends-on: [082, 083]
 parent: 085
-context_status: explored
+context_status: ready
 ---
 
 ## Directive
@@ -57,18 +57,22 @@ context_status: explored
 A-1: The confidence gate inserts into FO's UAT→shipped routing logic. After FO reads UAT verdict = pass, it runs confidence scoring before advancing to shipped. No new pipeline stage needed.
 Confidence: Confident (0.90)
 Evidence: build-uat SKILL.md:186 -- "All items pass → verdict pass, no feedback-to, FO advances entity to shipped." README.md:397 -- "shipped" is terminal stage, mod-driven. Gate intercepts the FO transition, not the stage graph.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: All 5 factor data sources already exist in Stage Reports produced by prior stages. No new data collection needed -- the gate is a pure reader/scorer.
 Confidence: Confident (0.85)
 Evidence: quality Stage Report has test/type/lint/build verdicts per check (SKILL.md:159). Review Stage Report has classified findings table (SKILL.md:279). Execute Stage Report has per-task status + commit SHAs (SKILL.md:52). UAT Stage Report has per-item pass/fail/skipped (SKILL.md:197).
+→ Confirmed: captain, 2026-04-13 (batch)
 
-A-3: Factor weights stored in ops.config.json alongside existing `coverage_threshold` (quality SKILL.md:144) and entity 083's `ratchet_baselines`.
+A-3: Factor weights stored in ops.config.json `confidence_weights` key. ops.config.json does NOT exist yet -- entity 083 (ratchet) will create it and write `ratchet_baselines` on first quality pass. build-quality SKILL.md:144 already has the read-path logic (graceful skip when absent). 087 adds a second consumer key to a file 083 creates.
 Confidence: Likely (0.75)
-Evidence: build-quality SKILL.md:144 -- ops.config.json read for coverage_threshold. Entity 083 A-2 confirmed ops.config.json for baseline storage. Adding `confidence_weights` follows same pattern.
+Evidence: build-quality SKILL.md:144 -- ops.config.json read logic exists but file is absent (Glob confirmed). Entity 083 A-2/A-4 -- ops.config.json creation + ratchet_baselines write confirmed by captain. 087 follows same pattern: add key, read on gate entry.
+→ Corrected by captain, 2026-04-13 (batch): "ops.config.json 尚未存在，083 會建立它。087 只是多加一個 key，不是寫入已存在的檔案"
 
 A-4: Auto-fix loop is a full pipeline re-entry: execute→quality→review→UAT→confidence. Each iteration dispatches 4 stages. With 3-iteration cap, max 12 stage dispatches for a stubborn gap.
 Confidence: Confident (0.85)
 Evidence: Pipeline README stage ordering is linear. There is no shortcut path that skips stages. FO dispatches stages in order per profile.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 ## Option Comparisons
 
@@ -82,6 +86,8 @@ When confidence < 90%, how does the gate dispatch the fix?
 | Captain-assisted fix | Gate presents breakdown, captain writes fix task, controls iteration | Breaks automation; captain must be present; defeats "auto" in auto-fix | Low | Viable |
 | Targeted stage re-entry | Only re-run the stage that produced low score | Skips intermediate stages; fix might introduce review issues that get missed; violates stage ordering contract | Medium | Not recommended |
 
+→ Selected: Full pipeline re-entry (captain, 2026-04-13, interactive)
+
 ## Open Questions
 
 Q-1: How is "integration breadth" (15% factor) computed? The APPROACH says "execute Stage Report files_modified coverage vs PLAN files_modified" -- does this mean (files actually modified / files planned to modify)?
@@ -92,6 +98,8 @@ Why it matters: This factor's definition determines whether it catches partially
 
 Suggested options: (a) Ratio: count(files_modified in execute Stage Report) / count(files_modified in PLAN) -- simple percentage, (b) Binary: all planned files modified = 100%, any missing = 0% -- harsh but simple, (c) Weighted by task importance: critical-path tasks' files weighted higher than polish tasks
 
+→ Answer: Weighted by task criticality -- critical-path task files weighted higher than polish tasks. The PLAN's task schema already distinguishes wave ordering (wave 0 = foundation, higher waves = incremental). Use wave position as a proxy for criticality: wave 0 files contribute more to the integration breadth score than later-wave files. (captain, 2026-04-13, interactive)
+
 Q-2: Does the auto-fix loop reset the UAT stage? If UAT already passed with captain sign-off, does the fix iteration require captain to re-approve all UAT items?
 
 Domain: Runnable/Invokable
@@ -99,6 +107,12 @@ Domain: Runnable/Invokable
 Why it matters: If UAT re-runs after a fix, captain must re-approve interactive items -- expensive and potentially annoying. If UAT is skipped or only re-runs automated items, interactive verification may be stale.
 
 Suggested options: (a) Full UAT re-run including interactive items -- captain re-approves everything, (b) Automated-only re-run -- skip interactive items that already passed, captain only reviews new/changed items, (c) UAT skip -- trust prior UAT pass, only re-run quality and review for the fix diff
+
+→ Answer: Automated-only re-run -- skip interactive items that already passed with captain sign-off. Captain only reviews new/changed items from the fix. Prior-pass interactive items remain valid. Least disruptive while still verifying the fix didn't break automated checks. (captain, 2026-04-13, interactive)
+
+## Canonical References
+
+(none cited)
 
 ## Stage Report: explore
 
@@ -115,6 +129,29 @@ Suggested options: (a) Full UAT re-run including interactive items -- captain re
 - [x] Scale assessment: confirmed Medium
   5 files mapped; FO routing modification + ops.config schema + scoring logic
 - [x] Research dispatched: 0 researchers (skipped -- all assumptions on internal architecture, no external tech claims)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  entity is Medium scope, no children proposed
+- [x] Re-validation: 4 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  all evidence holds; A-3 wording corrected (ops.config.json not yet created)
+- [x] Assumptions confirmed: 4 / 4 (1 corrected)
+  A-1 FO routing, A-2 data sources, A-4 full re-entry confirmed batch; A-3 corrected -- ops.config.json doesn't exist yet, 083 creates it
+- [x] Options selected: 1 / 1
+  O-1 full pipeline re-entry for auto-fix dispatch (recommended)
+- [x] Questions answered: 2 / 2
+  Q-1 integration breadth weighted by task criticality (wave position proxy); Q-2 automated-only UAT re-run on fix iteration
+- [x] Open exploration: 0 gray areas surfaced (0 from templates, 0 from CONTRACTS, 0 from directive, 0 via freeform)
+  FO routing, scoring factors, and auto-fix mechanism all resolved
+- [x] Canonical refs added: 0
+  no external file references cited
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected, all Qs answered
+- [x] Handoff mode: loose
+  auto_advance not set; captain must say "execute 087" when ready
+- [x] Clarify duration: 4 questions asked, session complete
+  1 batch + 1 option + 2 Qs
 
 ## Problem
 
