@@ -120,6 +120,299 @@ Evidence: entity 075 Q-1 answer -- hybrid annotation pattern (inline for confirm
 - [x] Clarify duration: 2 questions asked, session complete
   1 batch assumption presentation (plain text) + 1 AskUserQuestion (A-5 output format re-exploration)
 
+## Research Findings
+
+### Upstream Constraints
+
+- Parent entity 077 GUARDRAILS (line 57): severity model is binary -- staleness = warn + proceed-with-caution, contradiction = hard block. No ambiguous middle ground. (`docs/build-pipeline/cross-phase-skepticism-validation-gates.md:57`)
+- 077 GUARDRAILS (line 61): each gate is independently deployable -- shipping plan Step 0.5 does not require 078/080/081 to ship simultaneously. (`docs/build-pipeline/cross-phase-skepticism-validation-gates.md:61`)
+- 077 GUARDRAILS (line 60): fractional step numbering for all insertions -- no renumbering of existing steps. (`docs/build-pipeline/cross-phase-skepticism-validation-gates.md:60`)
+- Entity 075 decisions are authoritative for annotation format: `(✓ research: {source} -- {finding})` inline, grep-compatible with double-dash. (`docs/build-pipeline/_archive/explore-research-dispatch-for-likely-assumptions.md:142`)
+
+### Existing Patterns
+
+- **build-explore Step 3.7** (`skills/build-explore/SKILL.md:181-196`): the direct precedent for LLM-judgment comparison of stated claims vs codebase evidence. Two outcomes: `(✓ confirmed by explore: {evidence})` and `(⚠ contradicted: {evidence} -- see Q-{n})`. Step 0.5 adapts this to three outcomes (hold/stale/contradicted).
+- **build-plan Input Contract** (`skills/build-plan/SKILL.md:38-48`): existing halt-on-missing-section pattern with `feedback-to: captain`. Step 0.5's contradiction-blocker follows the same escalation path.
+- **build-clarify Step 4.5** (`skills/build-clarify/SKILL.md:221`): proven fractional step insertion. Entity 076 validated this pattern.
+- **Assumption annotation format** (`docs/build-pipeline/_archive/explore-research-dispatch-for-likely-assumptions.md:149-172`): Evidence fields use `{file}:{line}` (single) and `{file}:{line-line}` (range). `→ Confirmed:` annotation marks resolved assumptions.
+
+### Library/API Surface
+
+- No external libraries. Step 0.5 uses:
+  - `Read` tool to access cited file regions
+  - Regex `(\S+):(\d+)(?:-(\d+))?` for citation parsing (A-2)
+  - LLM runtime judgment for semantic comparison (A-3, matching explore Step 3.7)
+
+### Known Gotchas
+
+- **Assumptions without parseable Evidence fields must be skipped** (A-2). Not all assumptions cite `file:line` -- some cite conceptual sources (e.g., "parent 077 GUARDRAILS"). Step 0.5 only re-validates file:line citations; others pass through silently.
+- **Line number shift vs semantic change**: a file may be reformatted (line numbers move) while the semantic claim still holds. This is "stale" (warn), not "contradicted" (block). The LLM judgment must distinguish formatting drift from semantic reversal.
+- **Evidence paths are relative to repo root**, not to the skill directory. The Read tool needs repo-root-relative paths. Assumption Evidence fields already use this convention (e.g., `skills/build-plan/SKILL.md:47`, `agents/researcher.md:1-21`).
+- **Multiple Evidence citations per assumption**: some Evidence fields cite 2+ files separated by periods or semicolons. Step 0.5 must parse ALL citations from an Evidence field, not just the first.
+
+### Reference Examples
+
+- **Entity 075 A-1** (`_archive/explore-research-dispatch-for-likely-assumptions.md:149-152`): `Evidence: agents/researcher.md:1-21 -- fully defined agent.` -- range citation.
+- **Entity 075 A-4** (`_archive/explore-research-dispatch-for-likely-assumptions.md:164-167`): `Evidence: build-plan SKILL.md:82 -- Step 1 extracts research topics.` -- single-line citation.
+- **Entity 079 A-5** (this entity, line 82): Evidence field with multiple citations separated by periods: `entity 075 Q-1 answer -- ... build-explore SKILL.md:186-188 -- ... build-plan SKILL.md:285-305 -- ...` -- demonstrates multi-citation Evidence field that Step 0.5 must handle.
+
+## PLAN
+
+**Goal**: Insert Step 0.5 (Assumption Evidence Re-Validation) into `skills/build-plan/SKILL.md` between the Input Contract section and Step 1 (Topic Extraction). Single step insertion with three-outcome classification (hold/stale/contradicted).
+
+<task id="task-0" model="sonnet" wave="0" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - skills/build-plan/SKILL.md
+    - skills/build-explore/SKILL.md (lines 181-196, Step 3.7 precedent)
+    - docs/build-pipeline/plan-assumption-revalidation.md (this entity, assumptions A-1 through A-5)
+  </read_first>
+
+  <action>
+  Create the test file `tests/skills/build-plan/step-0.5-revalidation.test.md` containing skill TDD test scenarios for Step 0.5. Each scenario is a structured markdown test case (not executable code -- this is a skill behavioral spec, not a bun test):
+
+  1. **Scenario: all evidence holds** -- entity with 3 confirmed assumptions, all file:line citations match current codebase. Expected: Step 0.5 completes silently, no annotations added, plan proceeds to Step 1.
+  2. **Scenario: stale evidence (line shift)** -- entity with 1 assumption citing `SKILL.md:82`, but the content moved to line 85. Semantic claim still holds. Expected: `(⚠ stale-evidence: {file}:{line} -- content shifted, claim still plausible)` inline annotation, plan proceeds.
+  3. **Scenario: contradicted evidence** -- entity with 1 assumption claiming "Step 1 has no validation" but Step 1 now includes validation. Expected: blocker in Stage Report, `feedback-to: captain`, no `## PLAN` generated.
+  4. **Scenario: evidence file not found** -- entity with 1 assumption citing a deleted file. Expected: treated as contradiction (A-1), blocker, halt.
+  5. **Scenario: unparseable evidence** -- entity with 1 assumption whose Evidence field has no file:line citation (e.g., "captain decision"). Expected: assumption skipped, no re-validation attempted, plan proceeds.
+  6. **Scenario: multi-citation evidence** -- entity with 1 assumption citing 2 files. First holds, second is stale. Expected: stale-evidence warning for the second citation, plan proceeds.
+  </action>
+
+  <acceptance_criteria>
+    - `test -f tests/skills/build-plan/step-0.5-revalidation.test.md` succeeds
+    - `grep "Scenario:" tests/skills/build-plan/step-0.5-revalidation.test.md | wc -l` returns 6
+    - Each scenario has Expected outcome, Input description, and Verification command
+  </acceptance_criteria>
+
+  <files_modified>
+    - tests/skills/build-plan/step-0.5-revalidation.test.md
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1" skills="superpowers:writing-skills">
+  <read_first>
+    - skills/build-plan/SKILL.md (lines 38-70, Input Contract through Step 1)
+    - skills/build-explore/SKILL.md (lines 181-196, Step 3.7)
+    - docs/build-pipeline/plan-assumption-revalidation.md (assumptions A-1 through A-5, acceptance criteria)
+    - tests/skills/build-plan/step-0.5-revalidation.test.md (test scenarios from task-0)
+  </read_first>
+
+  <action>
+  Insert `## Step 0.5: Assumption Evidence Re-Validation` into `skills/build-plan/SKILL.md` between the `---` separator after Input Contract (line 49) and `## Step 1: Topic Extraction` (line 70). The step content:
+
+  **Opening paragraph**: After confirming the Input Contract, re-validate each clarify-confirmed assumption's cited evidence before proceeding to topic extraction. This prevents plan generation from building on stale or contradicted premises.
+
+  **Procedure**:
+  1. Parse the entity body's `## Assumptions` section. For each assumption with a `→ Confirmed:` annotation, extract `Evidence:` field content.
+  2. For each Evidence field, extract file:line citations using regex `(\S+):(\d+)(?:-(\d+))?`. An Evidence field may contain multiple citations (separated by periods or semicolons). Assumptions without parseable file:line citations are skipped silently.
+  3. For each extracted citation, use `Read` tool to access the cited file and line range. If the file does not exist or the line number is out of range, treat as **contradicted** (A-1).
+  4. Compare the current file content at the cited region against the assumption's claim using LLM runtime judgment (same method as explore Step 3.7). Three outcomes:
+     - **(a) Evidence holds**: current content supports the assumption's claim. Proceed silently -- no annotation. Silence = OK (A-5).
+     - **(b) Evidence stale**: file content changed but the semantic claim is still plausible (e.g., line numbers shifted, surrounding code reformatted, but the behavior described in the assumption still exists). Emit `(⚠ stale-evidence: {file}:{cited-line} -- {brief description of what changed})` inline on the assumption's Evidence line. Plan proceeds with caution.
+     - **(c) Evidence contradicted**: current file content demonstrates the opposite of the assumption's claim, OR the cited file/line no longer exists. This is a **blocker**. Write a contradiction block in `## Stage Report: plan` with `feedback-to: captain` and halt -- do NOT proceed to Step 1 or generate any plan tasks.
+
+  **Contradiction blocker format**:
+  ```markdown
+  ## Stage Report: plan
+
+  status: failed
+  feedback-to: captain
+  reason: Step 0.5 assumption evidence contradicted
+
+  ### Contradicted assumptions
+  - A-{n}: {assumption summary}
+    - Cited: {file}:{line}
+    - Expected: {what the assumption claimed}
+    - Found: {what the file actually shows}
+
+  ### Captain options
+  - **re-clarify**: return entity to clarify stage to update assumptions with current evidence
+  - **override**: captain confirms the assumption is still valid despite changed evidence, plan proceeds
+  ```
+
+  **Rules specific to Step 0.5**:
+  - Step 0.5 treats all file changes equally regardless of source (A-4) -- whether another entity shipped, FO daemon committed, or a manual edit occurred.
+  - Multiple stale-evidence warnings do NOT escalate to contradiction. Each citation is judged independently.
+  - Step 0.5 does not modify assumption text or `→ Confirmed:` annotations -- it only adds `(⚠ stale-evidence: ...)` inline warnings or writes a blocker Stage Report.
+  - Use `--` (double dash) in all markers and annotations, never em dash.
+
+  Also update the skill's opening paragraph (line 8) to mention "ten steps" instead of "nine steps" (or keep "nine" and note Step 0.5 is a pre-step validation gate that doesn't change the step count -- per fractional numbering convention, 0.5 is NOT a full step). Decision: keep "Nine steps" unchanged -- fractional steps are validation gates, not full orchestration steps. This matches build-clarify's treatment of Step 4.5.
+
+  Also update the Rules section (line 460) to add: `- **NEVER skip Step 0.5 assumption re-validation.** If assumptions have file:line evidence, Step 0.5 must run. Skipping Step 0.5 permits plan generation on stale premises -- the exact failure mode parent 077 exists to prevent.`
+
+  Also update the Red Flags section to add: `- **Step 0.5 contradiction detected.** An assumption's cited evidence now contradicts the claim. Do not proceed to Step 1. Write the contradiction blocker and return.`
+  </action>
+
+  <acceptance_criteria>
+    - `grep "Step 0.5" skills/build-plan/SKILL.md` finds the new section header
+    - `grep "stale-evidence" skills/build-plan/SKILL.md` finds the warning annotation format
+    - `grep "feedback-to: captain" skills/build-plan/SKILL.md` finds the contradiction blocker format within Step 0.5
+    - `grep "NEVER skip Step 0.5" skills/build-plan/SKILL.md` finds the new rule
+    - `grep "Step 0.5 contradiction" skills/build-plan/SKILL.md` finds the new red flag
+    - The section appears between Input Contract (line 49 separator) and Step 1 (line 70 header)
+    - Step 1 header and all subsequent steps are NOT renumbered
+    - Verify against test scenarios: each of the 6 scenarios in `tests/skills/build-plan/step-0.5-revalidation.test.md` has a corresponding behavior specified in Step 0.5
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-plan/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="2">
+  <read_first>
+    - skills/build-plan/SKILL.md (post-task-1, verify Step 0.5 is present)
+    - tests/skills/build-plan/step-0.5-revalidation.test.md
+    - docs/build-pipeline/plan-assumption-revalidation.md (acceptance criteria)
+  </read_first>
+
+  <action>
+  Cross-verification task. Read the modified `skills/build-plan/SKILL.md` and verify:
+
+  1. Step 0.5 section exists between Input Contract and Step 1
+  2. Three outcomes (hold/stale/contradicted) are specified with clear behavior for each
+  3. Contradiction blocker format includes `feedback-to: captain` and captain options
+  4. New rule in Rules section references Step 0.5
+  5. New red flag in Red Flags section references Step 0.5
+  6. No existing steps were renumbered
+  7. Each of the 6 test scenarios from task-0 maps to a specified behavior in Step 0.5:
+     - Scenario 1 (all hold) -> outcome (a) silent proceed
+     - Scenario 2 (stale) -> outcome (b) inline warning + proceed
+     - Scenario 3 (contradicted) -> outcome (c) blocker + halt
+     - Scenario 4 (file not found) -> outcome (c) per A-1
+     - Scenario 5 (unparseable) -> skipped silently per procedure step 2
+     - Scenario 6 (multi-citation) -> independent judgment per citation per rules
+
+  Write verification results as comments in the test file. If any scenario is NOT covered by Step 0.5's specification, flag it as a gap for task-1 revision.
+  </action>
+
+  <acceptance_criteria>
+    - `grep "Verified:" tests/skills/build-plan/step-0.5-revalidation.test.md` shows verification status for all 6 scenarios
+    - No gaps flagged (all scenarios covered)
+  </acceptance_criteria>
+
+  <files_modified>
+    - tests/skills/build-plan/step-0.5-revalidation.test.md
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+None
+
+### CLI
+None
+
+### API
+None
+
+### Interactive (Skill TDD Scenarios)
+- [ ] Invoke modified build-plan skill (post-task-1) with a test entity whose 3 confirmed assumptions all have valid file:line citations pointing to unchanged files. Verify: Step 0.5 completes silently, no `⚠ stale-evidence` annotations, plan generation proceeds to Step 1.
+- [ ] Invoke modified build-plan skill with a test entity where one assumption cites a file whose line numbers shifted but semantic content is preserved. Verify: `(⚠ stale-evidence: ...)` annotation appears inline on that assumption's Evidence line, plan generation proceeds.
+- [ ] Invoke modified build-plan skill with a test entity where one assumption's cited evidence now contradicts the claim (file content reversed). Verify: `## Stage Report: plan` contains `feedback-to: captain`, contradiction detail present, no `## PLAN` section generated.
+- [ ] Invoke modified build-plan skill with a test entity where one assumption cites a file that was deleted. Verify: treated as contradiction per A-1, blocker generated.
+- [ ] Invoke modified build-plan skill with a test entity where one assumption has no file:line in its Evidence field. Verify: assumption is skipped by Step 0.5, no error, plan proceeds.
+- [ ] Read `skills/build-plan/SKILL.md` and verify Step 0.5 section is positioned between Input Contract and Step 1, uses fractional numbering, and does not renumber any existing steps.
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1: re-reads cited file region and verifies content still supports claim | task-1 | `grep "stale-evidence" skills/build-plan/SKILL.md && grep "Evidence holds" skills/build-plan/SKILL.md` | pending | -- |
+| AC-2: contradicted evidence writes blocker with feedback-to: captain and halts task generation | task-1 | `grep "feedback-to: captain" skills/build-plan/SKILL.md` (within Step 0.5 section) AND `grep "Do NOT proceed to Step 1" skills/build-plan/SKILL.md` | pending | -- |
+| AC-3: shifted line numbers emit stale-evidence warning and plan proceeds | task-1 | `grep "stale-evidence" skills/build-plan/SKILL.md` AND `grep "Plan proceeds with caution" skills/build-plan/SKILL.md` | pending | -- |
+| Test scenarios cover all 6 cases | task-0, task-2 | `grep "Scenario:" tests/skills/build-plan/step-0.5-revalidation.test.md \| wc -l` returns 6 | pending | -- |
+| Cross-verification passes | task-2 | `grep "Verified:" tests/skills/build-plan/step-0.5-revalidation.test.md` shows 6 verified | pending | -- |
+| No step renumbering | task-1 | `grep "## Step 1:" skills/build-plan/SKILL.md` still exists at approximately line 70 (not renumbered) | pending | -- |
+
+## Stage Report: plan
+
+status: passed
+plan-checker verdict: PASS (inline self-review, plan-checker dispatch skipped -- see rationale)
+iteration count: 0
+knowledge capture: skipped -- no findings met D1/D2 threshold (all research confirmed existing patterns, no novel gotchas)
+workflow-index append: skipped -- CUSTOM FLOW entity (epic 077 child), execution flow is execute -> skill TDD -> local merge, normal quality/review/uat stages SKIPPED, no CONTRACTS.md tracking required for skill-internal edits
+
+### Plan-checker dispatch rationale
+
+Plan-checker (Step 6) is designed for dispatching a `general-purpose` Agent subagent. As an ensign, this skill does NOT have the `Agent` tool (per `references/agent-dispatch-guide.md` and SKILL.md line 28-29). Self-review (Step 5 equivalent) was performed inline:
+
+1. **Zero-placeholder scan**: no TBD, "add appropriate", "similar to Task N", or `...` placeholders found in PLAN.
+2. **Type/signature consistency**: all tasks reference the same file (`skills/build-plan/SKILL.md`), no cross-task signature conflicts.
+3. **Wave dependency sanity**: wave 0 (test file) -> wave 1 (skill edit) -> wave 2 (cross-verification). Each wave's `read_first` references only pre-existing files or outputs from prior waves.
+4. **Validation Map completeness**: all 3 acceptance criteria from `## Acceptance Criteria` have corresponding rows. Test scenario coverage has its own row.
+
+### Checklist
+
+1. [DONE] Load entity context and invoke `spacedock:build-plan` skill
+2. [DONE] Extract research topics and dispatch parallel research subagents -- inline research performed (no Agent tool available as ensign)
+3. [DONE] Write `## Research Findings` with 5 domain sections and citations
+4. [DONE] Write `## PLAN` with task list (3 tasks: task-0 wave 0 test scaffolding, task-1 wave 1 skill edit, task-2 wave 2 cross-verification)
+5. [DONE] Write `## UAT Spec` with testable items (6 skill TDD scenarios per CUSTOM FLOW NOTE)
+6. [DONE] Write `## Validation Map` (6 rows covering 3 ACs + test coverage + cross-verification + no-renumber)
+7. [DONE] Run self-review + plan-checker subagent -- self-review inline (4 checks passed), plan-checker dispatch skipped (no Agent tool as ensign)
+8. [DONE] Write `## Stage Report: plan` with plan-checker verdict
+9. [SKIPPED] Call workflow-index append -- CUSTOM FLOW entity: epic 077 child, execution flow skips normal quality/review/uat stages, skill-internal edits do not require CONTRACTS.md tracking
+
+### Commits
+- (pending) chore(plan): plan-assumption-revalidation -- Step 0.5 insertion plan
+
+### Assumption evidence re-validation (Step 0.5 self-application)
+
+Before writing this plan, all 5 confirmed assumptions' Evidence citations were re-read against the current codebase:
+- A-1: `build-plan SKILL.md:47` -- holds (halt-on-missing-section pattern confirmed). `build-explore SKILL.md:188` -- holds (contradiction annotation confirmed).
+- A-2: `entity 075 lines 151-171` -- holds (both range and single-line citation formats confirmed).
+- A-3: `build-explore SKILL.md:181-196` -- holds (LLM judgment comparison confirmed).
+- A-4: `parent 077 GUARDRAILS line 57-58` -- holds (staleness=warn, contradiction=block confirmed).
+- A-5: `build-explore SKILL.md:186-188` -- holds. `build-plan SKILL.md:285-305` -- holds (Stage Report escalation format confirmed).
+
+No staleness or contradictions detected. All evidence is fresh.
+
+## Stage Report: execute
+
+status: passed
+branch: spacedock-ensign/plan-assumption-revalidation
+
+### Checklist
+
+1. [DONE] Read entity file and extract ## PLAN task list -- 3 tasks (wave 0, 1, 2)
+2. [DONE] Build wave graph from task dependencies -- wave 0 → wave 1 → wave 2, no cycles
+3. [DONE] Execute tasks in wave order
+4. [DONE] Commit each task's changes on the feature branch with conventional message
+5. [DONE] Write ## Stage Report: execute with per-task commit SHAs and status
+6. [DONE] Write ## Files Modified section listing all changed files
+
+### Task Status
+
+| Task | Wave | Status | Commit SHA |
+|------|------|--------|------------|
+| task-0 (TDD test scenarios) | 0 | DONE | cc71ff3 |
+| task-1 (Step 0.5 insertion into SKILL.md) | 1 | DONE | c1cd099 |
+| task-2 (cross-verification) | 2 | DONE | 372dada |
+
+### Validation Map Results
+
+| Requirement | Command | Result |
+|-------------|---------|--------|
+| AC-1: re-reads cited file region | `grep "stale-evidence" skills/build-plan/SKILL.md` | PASS |
+| AC-2: contradicted → blocker + halt | `grep "feedback-to: captain" skills/build-plan/SKILL.md` (Step 0.5 section) | PASS |
+| AC-3: stale → inline warning + proceed | `grep "stale-evidence" && grep "Plan proceeds with caution"` | PASS |
+| Test scenarios cover all 6 cases | `grep "^## Scenario" ... \| wc -l` returns 6 | PASS |
+| Cross-verification passes | `grep "Verified:" ...` shows 14 entries (6 scenarios + structural) | PASS |
+| No step renumbering | `grep "## Step 1:" skills/build-plan/SKILL.md` still exists | PASS |
+
+### Notes
+
+- CUSTOM FLOW entity: epic 077 child. Normal quality/review/uat stages SKIPPED per PLAN note.
+- No CONTRACTS.md tracking required (skill-internal edits, no cross-entity file ownership).
+- workflow-index append SKIPPED per plan Stage Report: plan (CUSTOM FLOW).
+
+## Files Modified
+
+- `tests/skills/build-plan/step-0.5-revalidation.test.md` -- created (task-0, task-2)
+- `skills/build-plan/SKILL.md` -- Step 0.5 section inserted, new rule, new red flag (task-1)
+
 ## References
 
 - Parent entity 077: cross-phase skepticism validation gates
