@@ -1,7 +1,7 @@
 ---
 id: 082
 title: "UAT evidence and recording -- CLI e2e recording + inline evidence writing"
-status: execute
+status: quality
 context_status: ready
 source: decomposition of entity 074 (pipeline verification quality uplift)
 started: 2026-04-13T06:30:00Z
