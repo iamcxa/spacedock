@@ -75,6 +75,119 @@ children:
 
 **Changes:** This is an advanced capability. Build-uat SKILL.md could support a `type: simulation` UAT item that dispatches debate-driven agents. Alternatively, this could be a separate post-UAT stage or a forge enhancement. Design decision needed during clarify.
 
+### Gap 6: Multi-Language Coverage Ratchet — type-check and test count never regress
+
+**Current:** Quality stage runs `bun test` and `tsc --noEmit` mechanically but doesn't enforce coverage baselines. Entity 052 created `spacebridge/bin/daemon.ts` outside tsconfig's `include: ["src/**/*.ts"]` — the file was never type-checked and quality stage reported PASS. Test count can also regress without detection. No Python type-checking at all.
+
+**Root cause:** Type-check and test coverage are mechanical/baseline requirements (基本功), not heuristic discoveries. They should be enforced as never-regress invariants across ALL languages in the project, not optional quality improvements.
+
+**Design principle:** The ratchet is language-agnostic — same rule (never regress), different tools per language. Quality stage auto-detects which languages are present and runs the appropriate ratchet checks.
+
+**Target — two ratchets per language:**
+
+#### Ratchet 1: Type Coverage (zero uncovered source files)
+
+| Language | Tool | Check | Enhanced behavior |
+|----------|------|-------|-------------------|
+| **TypeScript** (primary) | `tsc --listFiles` vs `find *.ts` | Every .ts file covered by at least one tsconfig include | **TS-enhanced:** also verify `strict: true` in all tsconfigs; flag any `// @ts-ignore` or `as any` count increases (ratchet on cast count) |
+| **Python** | `pyright --outputjson` or `ruff check --select ANN` | Type error count never increases; annotation coverage never decreases | Start with `ruff check --select ANN --statistics` (zero-config); graduate to `pyright` when project has `py.typed` |
+| **Go** | `go vet ./...` | Vet error count never increases | Built-in, no extra config |
+| **Rust** | `cargo check` | Warning count never increases | Built-in, no extra config |
+
+**TS enhanced ratchet (high priority for recce-like projects):**
+```bash
+# Standard: zero uncovered files
+ALL_TS=$(find . -name '*.ts' -not -path '*/node_modules/*' -not -name '*.d.ts')
+COVERED=$(tsc --listFiles -p tsconfig.json)
+UNCOVERED=$(comm -23 <(sort <<< "$ALL_TS") <(sort <<< "$COVERED"))
+# UNCOVERED must be 0
+
+# Enhanced: as-any cast count ratchet
+BASELINE_CASTS=$(git stash -q && grep -r "as any" --include='*.ts' -l | wc -l && git stash pop -q)
+CURRENT_CASTS=$(grep -r "as any" --include='*.ts' -l | wc -l)
+# CURRENT_CASTS <= BASELINE_CASTS (can reduce, can't add)
+
+# Enhanced: ts-ignore count ratchet
+BASELINE_IGNORES=$(git stash -q && grep -r "@ts-ignore\|@ts-expect-error" --include='*.ts' | wc -l && git stash pop -q)
+CURRENT_IGNORES=$(grep -r "@ts-ignore\|@ts-expect-error" --include='*.ts' | wc -l)
+# CURRENT_IGNORES <= BASELINE_IGNORES
+```
+
+#### Ratchet 2: Test Count (never decrease, runner-agnostic)
+
+The ratchet must work regardless of which test runner the project uses. Quality stage auto-detects the runner from project config, not hardcoded assumptions.
+
+**TypeScript test runner detection (priority order):**
+
+| Signal | Runner | Count command |
+|--------|--------|---------------|
+| `bunfig.toml` or `bun.lock` | `bun test` | `bun test 2>&1 \| grep -o '[0-9]* pass'` |
+| `vitest.config.*` or `vite.config.*` with test | `vitest` | `vitest run --reporter=json \| jq '.numPassedTests'` |
+| `jest.config.*` or `package.json[jest]` | `jest` | `jest --json \| jq '.numPassedTests'` |
+| `package.json scripts.test` contains `mocha` | `mocha` | `mocha --reporter json \| jq '.stats.passes'` |
+| None of above | `node --test` | `node --test 2>&1 \| grep "# pass" \| awk '{print $3}'` |
+
+**Other languages:**
+
+| Language | Detection | Runner | Count command |
+|----------|-----------|--------|---------------|
+| **Python** | `pyproject.toml` / `setup.py` / `pytest.ini` | `pytest` | `pytest --co -q \| tail -1 \| awk '{print $1}'` |
+| **Go** | `go.mod` | `go test` | `go test -count=1 -v ./... 2>&1 \| grep -c "=== RUN"` |
+| **Rust** | `Cargo.toml` | `cargo test` | `cargo test -- --list 2>&1 \| grep -c ": test"` |
+
+**Key principle:** The ratchet checks `count(current) >= count(baseline)` — it never references a specific test runner in the rule itself. The runner is a detection detail, not a constraint. If a project migrates from jest to vitest, the ratchet continues working.
+
+```bash
+# Runner-agnostic test ratchet
+detect_test_runner()  # returns: {command, count_extractor}
+BASELINE = run_on_main(runner.command, runner.count_extractor)
+CURRENT = run_on_head(runner.command, runner.count_extractor)
+if CURRENT < BASELINE:
+  FAIL "test count regressed: $CURRENT < $BASELINE (runner: $runner.name)"
+```
+
+**Overhaul portability:** When `/spacedock:overhaul` installs the build flow into a new project, the quality stage must work without assuming bun. The ratchet auto-detects from the project's actual toolchain. A Next.js project using vitest, a Bun project using bun test, and a legacy project using jest all get the same ratchet invariant — just with different detection paths.
+
+#### Implementation across stages
+
+| Stage | What to add |
+|-------|-------------|
+| **Plan** (plan-checker dimension 8) | For every task with source files in `files_modified`: (a) is there a test file paired? (b) is the source path within a type-check config (tsconfig/pyproject/go.mod)? (c) if outside, is there a task to update config? Language-agnostic check. |
+| **Quality** (build-quality) | Auto-detect languages → run per-language ratchets. TS gets enhanced checks (as-any count, ts-ignore count, strict mode). FAIL on any regression. |
+| **Execute** (task-execution) | When creating source files outside existing type-check scope, warn in acceptance_criteria output. |
+
+#### Cross-project applicability
+
+This pipeline serves multiple projects with different language mixes:
+
+| Project | Languages | Ratchet priority |
+|---------|-----------|-----------------|
+| **Spacedock** | TypeScript (primary) + Python (scripts) | TS full + Python basic |
+| **Recce** | TypeScript + Python (50/50, high frequency) | **TS full + Python full** — both need pyright + pytest ratchet |
+| **Carlove** | TypeScript (Expo) | TS full |
+
+For Recce specifically: since it's TS+Python at equal weight with high dev frequency, the Python ratchet should be at the same maturity as TS from day 1 — not "start with ruff, graduate later." Pyright + pytest --cov from the start.
+
+**Captain framing:** "覆蓋率是機械性操作，不是啟發式的發現，這種基本功類型的要求應該要盡可能達成。不追求高度 coverage，但不可以比上一次少。" + "ts 部分要特別增強，因為 recce 是 ts+python 各半且開發頻率很高"
+
+### Gap 7: Pre-ship Confidence Gate (< 90% auto-iterate)
+
+**Current:** After UAT, entities advance directly to shipped with no holistic confidence assessment. Entities 051 (75%) and 052 (70%) shipped with known gaps.
+
+**Target:** Insert a confidence check between UAT and shipped. Five factors scored 0-100%:
+
+| Factor | Weight | What it checks |
+|--------|--------|----------------|
+| Test coverage | 25% | New files have tests, test count ratchet passed |
+| Type coverage | 20% | All .ts covered by tsconfig, tsc clean |
+| Review severity | 20% | Fix cycle count, max severity found |
+| AC completeness | 20% | UAT pass/skip/fail ratio |
+| Integration breadth | 15% | E2e tests present? Upstream/downstream integration tested? |
+
+If composite < 90%, auto-iterate: identify which factors pull score down, dispatch targeted fix ensigns (add tests, fix tsconfig, run e2e), re-verify, re-score. Only advance to shipped when >= 90%.
+
+**Changes:** This can be a sub-step of UAT (Step 6.5) or a new lightweight stage between uat and shipped. Design decision during clarify.
+
 ## Acceptance Criteria
 
 - CLI UAT items produce e2e-flow recordings (.cast or equivalent) when e2e-pipeline is available (how to verify: run a CLI UAT item, check for .cast file in artifacts)
@@ -82,9 +195,18 @@ children:
 - All 4 stage reports (execute, quality, review, uat) have minimum evidence requirements documented in their respective SKILL.md Rules sections (how to verify: grep "evidence minimum" or equivalent in each SKILL.md)
 - When diff contains `skills/*/SKILL.md`, review stage runs forge audit AND uat stage runs skill invocation test (how to verify: create test entity with a SKILL.md change, observe forge + invocation in pipeline output)
 - At least one example of debate-driven skill simulation exists as a UAT item type or forge test mode (how to verify: SKILL.md documents `type: simulation` or equivalent, with dispatch protocol)
+- Quality stage auto-detects project languages and runs per-language ratchets (how to verify: project with TS+Python, quality runs both tsc + pyright checks)
+- TS ratchet: 0 uncovered .ts files + `as any` count never increases + `@ts-ignore` count never increases (how to verify: add `as any` cast, run quality, observe FAIL)
+- Python ratchet: pyright error count never increases + pytest count never decreases (how to verify: add untyped function in .py file, run quality, observe regression warning)
+- Test count ratchet: per-language test count >= main baseline (how to verify: delete a test, run quality, observe FAIL)
+- Plan-checker dimension 8: warns when new source files (any language) lack test pairing or type-check config coverage (how to verify: plan with .ts task and no test, run plan-checker, observe WARN)
+- Pre-ship confidence gate blocks shipping below 90% and auto-dispatches fix ensigns for identified gaps (how to verify: ship an entity with low type coverage, observe auto-fix cycle before PR creation)
+- Recce project gets TS full + Python full ratchets from day 1 (pyright + pytest --cov, not ruff-only) (how to verify: run pipeline on recce, both ratchets fire)
 
 ## Notes
 
 - Entity 073 (review-skill-creation-discipline) is a subset of Gap 4. If 074 ships first, 073 can be archived as absorbed.
 - Gap 5 (debate-driven simulation) may be deferred to a separate entity if design complexity warrants it.
-- Captain framing: "跑過 e2e 的要給我看證據，把 report 寫到 entity 中，包含圖片顯示與報告"
+- Gap 6 (coverage ratchet) is the highest-priority gap — it prevents the class of errors seen in entity 052 (daemon.ts not type-checked). Multi-language design ensures the pipeline works for recce (TS+Python 50/50) and future Go/Rust projects.
+- Gap 7 (confidence gate) is the architectural container — gaps 1-6 are the specific checks; gap 7 is the aggregation + auto-iteration mechanism.
+- Captain framing: "跑過 e2e 的要給我看證據" + "skill 要跑 forge 做測試" + "覆蓋率是基本功，不可以比上一次少" + "ts 部分要特別增強，recce 是 ts+python 各半且開發頻率很高"

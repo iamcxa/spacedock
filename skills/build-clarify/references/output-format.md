@@ -82,6 +82,32 @@ Rules:
 - If captain typed freeform, record the full response verbatim.
 - Include captain identifier, ISO date, `(interactive)` suffix.
 
+## Annotation: Open Exploration Item
+
+Step 4.5 creates items in the SAME A-n/Q-n format as explore (per Q-1 answer), appended to
+the existing `## Assumptions` or `## Open Questions` sections with numbering continuing from
+explore's last entry.
+
+The annotation is written inline (assumption confirmed or question answered in the same
+iteration), so the annotation line (`→ Confirmed:` or `→ Answer:`) always appears
+immediately with mode `(interactive)`.
+
+Example showing A-6 created by Step 4.5 when explore produced A-1 through A-5:
+
+```markdown
+A-6: WebSocket reconnection uses exponential backoff
+Confidence: Confident (0.90)
+Evidence: captain domain knowledge -- standard practice for production WS clients
+→ Confirmed: captain, 2026-04-13 (interactive)
+```
+
+Note: items created by Step 4.5 are indistinguishable from explore-created items by format.
+This is intentional (per Q-1 answer) -- downstream parsers (build-plan, FO, status script)
+process them identically.
+
+**Arrow style rule:** All annotation arrows use → (U+2192 unicode), never -> (ASCII). This
+matches all other annotation sections throughout build-clarify and build-explore outputs.
+
 ## Section: Canonical References
 
 Build-clarify CREATES this section (if not already present) during Step 4. It is append-only
@@ -120,6 +146,8 @@ Written as the LAST new section at the end of Step 6 (Commit). Appended AFTER ex
   e.g., "O-1 Filter UI placement -- Second chip row per workflow card (recommended)"
 - [x] Questions answered: {n} / {total}
   e.g., "Q-1 persisted via client-side filterState; Q-2 always-visible spec interpretation"
+- [x] Open exploration: {n} gray areas surfaced ({n} from templates, {n} from CONTRACTS, {n} from directive, {n} via freeform)
+  e.g., "3 gray areas surfaced (1 from templates, 1 from CONTRACTS, 0 from directive, 1 via freeform)"
 - [x] Canonical refs added: {n}
   e.g., "entity 009 app.js:244-246; ADR-001 single-server architecture"
 - [x] Context status: ready
@@ -127,7 +155,7 @@ Written as the LAST new section at the end of Step 6 (Commit). Appended AFTER ex
 - [x] Handoff mode: {loose|tight}
   e.g., "loose means captain must say 'execute {slug}'; tight means auto_advance: true in frontmatter"
 - [x] Clarify duration: {n} questions asked, session complete
-  e.g., "4 AskUserQuestion calls (1 batch + 1 option + 2 Qs)"
+  e.g., "7 AskUserQuestion calls (1 batch + 1 option + 2 Qs + 3 exploration iterations)"
 ```
 
 Rules:
