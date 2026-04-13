@@ -154,3 +154,29 @@ grep "status: failed" {entity_file}             # must return 0 matches
 | 4 (file not found) | A-1 (missing evidence = contradiction), AC-2 | Outcome (c) per A-1 |
 | 5 (unparseable) | A-2 (no file:line → skip silently) | Skipped silently |
 | 6 (multi-citation) | A-2 (multiple citations), A-5 (independent per-citation judgment) | Per-citation independent |
+
+---
+
+## Cross-Verification Results
+
+Verified against `skills/build-plan/SKILL.md` Step 0.5 (post-task-1, commit c1cd099).
+Verified: 2026-04-13 by task-2 cross-verification.
+
+| Scenario | Step 0.5 Coverage | Verified: |
+|----------|-------------------|-----------|
+| 1 (all hold) | Procedure step 4 outcome (a): "Proceed silently -- no annotation. Silence = OK." | Verified: COVERED -- SKILL.md:80 |
+| 2 (stale line shift) | Procedure step 4 outcome (b): "Emit `(⚠ stale-evidence: ...)` inline on assumption's Evidence line. Plan proceeds with caution." | Verified: COVERED -- SKILL.md:81 |
+| 3 (contradicted) | Procedure step 4 outcome (c): blocker Stage Report format with `feedback-to: captain`, `reason: Step 0.5 assumption evidence contradicted`, Cited/Expected/Found fields, captain options (re-clarify/override). Halt -- no Step 1. | Verified: COVERED -- SKILL.md:82-102 |
+| 4 (file not found) | Procedure step 3: "If the file does not exist or the line number is out of range, treat as contradicted (A-1 -- same severity as semantic contradiction)." | Verified: COVERED -- SKILL.md:78 |
+| 5 (unparseable) | Procedure step 2: "Assumptions without parseable file:line citations are skipped silently -- no re-validation attempted, no annotation." | Verified: COVERED -- SKILL.md:77 |
+| 6 (multi-citation mixed) | Rules: "Multiple citations in one Evidence field are each evaluated independently. A mix of hold and stale in one field produces a stale annotation (proceed); only a contradicted citation in any field triggers a blocker." | Verified: COVERED -- SKILL.md:109 |
+
+**Structural checks**:
+- Verified: Step 0.5 appears between Output Contract `---` separator (line 68) and `## Step 1:` (line 113) -- correct position
+- Verified: `## Step 1: Topic Extraction` header is NOT renumbered -- still `Step 1` at SKILL.md:113
+- Verified: No existing steps (Step 1 through Step 9) were renumbered -- fractional numbering convention maintained
+- Verified: `NEVER skip Step 0.5` rule added to Rules section -- SKILL.md:513
+- Verified: `Step 0.5 contradiction detected` red flag added to Red Flags section -- SKILL.md:526
+- Verified: All `--` (double dash) in annotations, no em dash found in Step 0.5 section
+
+**Gaps**: None. All 6 scenarios have explicit specification coverage in Step 0.5.
