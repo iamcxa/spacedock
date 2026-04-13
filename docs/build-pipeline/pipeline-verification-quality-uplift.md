@@ -1,7 +1,7 @@
 ---
 id: 074
 title: Pipeline Verification Quality Uplift — Review + UAT Evidence & Skill Testing
-status: draft
+status: epic
 context_status: awaiting-clarify
 source: captain observation during 050/068 pipeline run
 created: 2026-04-12T16:30:00+08:00
@@ -17,7 +17,7 @@ scale: Large
 project: spacedock
 auto_advance:
 parent:
-children:
+children: [082, 083, 084, 085]
 ---
 
 ## Directive
