@@ -369,6 +369,50 @@ Before writing this plan, all 5 confirmed assumptions' Evidence citations were r
 
 No staleness or contradictions detected. All evidence is fresh.
 
+## Stage Report: execute
+
+status: passed
+branch: spacedock-ensign/plan-assumption-revalidation
+
+### Checklist
+
+1. [DONE] Read entity file and extract ## PLAN task list -- 3 tasks (wave 0, 1, 2)
+2. [DONE] Build wave graph from task dependencies -- wave 0 → wave 1 → wave 2, no cycles
+3. [DONE] Execute tasks in wave order
+4. [DONE] Commit each task's changes on the feature branch with conventional message
+5. [DONE] Write ## Stage Report: execute with per-task commit SHAs and status
+6. [DONE] Write ## Files Modified section listing all changed files
+
+### Task Status
+
+| Task | Wave | Status | Commit SHA |
+|------|------|--------|------------|
+| task-0 (TDD test scenarios) | 0 | DONE | cc71ff3 |
+| task-1 (Step 0.5 insertion into SKILL.md) | 1 | DONE | c1cd099 |
+| task-2 (cross-verification) | 2 | DONE | 372dada |
+
+### Validation Map Results
+
+| Requirement | Command | Result |
+|-------------|---------|--------|
+| AC-1: re-reads cited file region | `grep "stale-evidence" skills/build-plan/SKILL.md` | PASS |
+| AC-2: contradicted → blocker + halt | `grep "feedback-to: captain" skills/build-plan/SKILL.md` (Step 0.5 section) | PASS |
+| AC-3: stale → inline warning + proceed | `grep "stale-evidence" && grep "Plan proceeds with caution"` | PASS |
+| Test scenarios cover all 6 cases | `grep "^## Scenario" ... \| wc -l` returns 6 | PASS |
+| Cross-verification passes | `grep "Verified:" ...` shows 14 entries (6 scenarios + structural) | PASS |
+| No step renumbering | `grep "## Step 1:" skills/build-plan/SKILL.md` still exists | PASS |
+
+### Notes
+
+- CUSTOM FLOW entity: epic 077 child. Normal quality/review/uat stages SKIPPED per PLAN note.
+- No CONTRACTS.md tracking required (skill-internal edits, no cross-entity file ownership).
+- workflow-index append SKIPPED per plan Stage Report: plan (CUSTOM FLOW).
+
+## Files Modified
+
+- `tests/skills/build-plan/step-0.5-revalidation.test.md` -- created (task-0, task-2)
+- `skills/build-plan/SKILL.md` -- Step 0.5 section inserted, new rule, new red flag (task-1)
+
 ## References
 
 - Parent entity 077: cross-phase skepticism validation gates
