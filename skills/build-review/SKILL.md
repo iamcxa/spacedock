@@ -199,7 +199,10 @@ When the condition is met, run two sub-checks:
 - Read each diff-touched `skills/*/SKILL.md` and verify: frontmatter has `name` and `description` fields, skill directory contains SKILL.md, any `references/` paths cited in SKILL.md exist on disk.
 - Record findings with the same severity mapping. Log "forge-audit: inline fallback (Skill invocation failed: {error})" in the pre-scan summary.
 
-**(2) Test existence sub-check.** For each skill path `skills/{name}/SKILL.md` in the diff, grep the diff for corresponding test files matching `skills/{name}/tests/*` or `tests/*{name}*`. If NO test file is present in the diff for a skill that has a new or modified SKILL.md, produce a finding: severity HIGH, root CODE, source `pre-scan:test-existence`, description "Skill {name} SKILL.md modified but no test file in diff -- skill may ship without tests (entity-068-class gap)".
+**(2) Test existence sub-check.** For each skill path `skills/{name}/SKILL.md` in the diff, check whether the SKILL.md is a **new file** (added by the diff) or a **modification of an existing file**:
+
+- **New skill** (SKILL.md added by diff): grep the diff for corresponding test files matching `skills/{name}/tests/*` or `tests/*{name}*`. If NO test file is present, produce a finding: severity HIGH, root CODE, source `pre-scan:test-existence`, description "New skill {name} SKILL.md added but no test file in diff -- skill shipping without tests (entity-068-class gap)".
+- **Existing skill modification** (SKILL.md modified, not new): check whether `skills/{name}/tests/` directory exists on disk. If the directory exists, grep the diff for test files -- if SKILL.md changed substantially but no test file updated, produce a finding: severity MEDIUM, root CODE, source `pre-scan:test-existence`, description "Skill {name} SKILL.md modified but no test file updated in diff -- verify tests cover new behavior". If the directory does NOT exist, this is a spec-only skill with no executable tests by design -- produce NO finding (NIT/DOC noise would fire on every skill-spec entity).
 
 ---
 

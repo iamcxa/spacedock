@@ -854,3 +854,96 @@ No D1/D2 patterns meet threshold. The F-2/F-3 observation about Step 1f over-fir
 4. Knowledge capture invoked -- DONE
    No D1/D2 candidates at threshold. Capture mode pass-through.
 5. Verdict: FAILED -- F-1 MEDIUM/DOC routes to execute for one-line count fix at `skills/build-review/SKILL.md:360`
+
+## Skill TDD Verification
+
+**Ran at**: 2026-04-13T09:00:00+08:00
+**Agent**: sonnet (skill TDD ensign)
+**Phase**: GREEN -- verify shipped content against TDD tests
+
+---
+
+### Test 1 -- Retrieval: build-review Step 1f
+
+| Check | Pattern | Result | Evidence |
+|-------|---------|--------|----------|
+| Step 1f exists | `Step 1f` | PASS | Lines 186, 383, 391 |
+| Skill file condition | `skills/*/SKILL.md` trigger condition | PASS | Line 188: "contains any path matching `skills/*/SKILL.md`" |
+| Forge validate command | `validate-only` route referenced | PASS | Line 192: "Invoke `kc-plugin-forge` via the Skill tool with route `validate-only`" |
+
+**Test 1 verdict: PASS -- all 3 checks found.**
+
+---
+
+### Test 2 -- Retrieval: build-uat skill-invocation
+
+| Check | Pattern | Result | Evidence |
+|-------|---------|--------|----------|
+| skill-invocation in type enum | type enum includes it | PASS | Line 56: "one of `browser`, `cli`, `api`, `interactive`, `skill-invocation`" |
+| Step 2d exists | `2d` section header | PASS | Line 88: "### 2d -- Skill Invocation Items" |
+| Class 3 / interactive pre-classification | AskUserQuestion grep before invocation | PASS | Line 92: "grep for `AskUserQuestion`. If found, the skill is Class 3" |
+
+**Test 2 verdict: PASS -- all 3 checks found.**
+
+---
+
+### Test 3 -- Application: mock scenarios
+
+**Scenario 1**: Diff contains `skills/new-feature/SKILL.md`. Should Step 1f trigger?
+- Answer: **YES** -- build-review SKILL.md line 188 condition: "any path matching `skills/*/SKILL.md`". Pattern matches. Step 1f fires.
+
+**Scenario 2**: Diff contains only `src/app.ts`. Should Step 1f trigger?
+- Answer: **NO** -- condition explicitly requires `skills/*/SKILL.md` in the diff. `src/app.ts` does not match. "skip Step 1f entirely -- no output, no finding, no log line" (line 188).
+
+**Scenario 3**: UAT Spec has `type: skill-invocation, skill: spacedock:build-brainstorm`. How does the ensign test it?
+- Step 2d (line 90-106): (1) Pre-classify -- grep `spacedock:build-brainstorm`'s SKILL.md for `AskUserQuestion`. If absent (build-brainstorm is non-interactive), proceed to runtime test. (2) Runtime invocation -- invoke via Skill tool with minimal probe, capture output shape (loaded? structured output? error?). (3) Structural validation -- verify SKILL.md exists, frontmatter has `name` + `description`, any `references/` paths resolve. Record provisional row: `item_id | skill-invocation | pass|fail-infra|fail-assertion | evidence | notes`.
+
+**Scenario 4**: skill-invocation targets a Class 3 (captain-interactive) skill. What happens?
+- Pre-classify finds `AskUserQuestion` in SKILL.md (line 92). Runtime invocation is **skipped**. Only structural validation runs (sub-step 3: SKILL.md exists, frontmatter, references). Record as `pass` with notes "Class 3 -- structural validation only" (line 92). No hang risk.
+
+**Test 3 verdict: PASS -- all 4 scenarios correctly derivable from shipped skill content.**
+
+---
+
+### Test 4 -- Gap Check
+
+**Gap 1: Forge tool unavailable -- graceful skip or hard fail?**
+- build-review SKILL.md lines 198-200: explicit `**Fallback**` block. If `kc-plugin-forge` Skill invocation fails (tool unavailable, agent dispatch error, timeout), fall back to inline structural checks (frontmatter fields, SKILL.md exists, references/ paths resolve). Log "forge-audit: inline fallback (Skill invocation failed: {error})". Rules block (line 386): "**NEVER block review on forge failure.**"
+- **Result: GRACEFUL SKIP via documented fallback. No hard fail.**
+
+**Gap 2: Spec-only edits to existing skills -- does test existence sub-check over-fire?**
+- Step 1f line 202: "for a skill that has a **new or modified** SKILL.md" -- the condition does not distinguish new skill creation from spec-only modification of an existing skill.
+- Entity 084's own review stage (F-2, F-3) observed this: both `build-review` and `build-uat` SKILL.md were modified, no test file in diff, triggering HIGH/CODE findings -- immediately reclassified to NIT/DOC because "spec-skills" have no executable test files by design.
+- **REAL GAP IDENTIFIED**: The test existence sub-check fires identically on NEW skill creation (where it catches the entity-068-class gap) and on SPEC-ONLY edits of existing skills (where it produces false positives). The rule should scope to `new` skill SKILL.md files or explicitly note that existing skills with no `tests/` directory are expected (spec-only skills). Current wording causes predictable NIT/DOC noise on every skill-modifying entity.
+- **Recommendation**: Add a qualification to Step 1f sub-check (2): "If the skill path appears in the diff as a new file (not modification of existing), apply full HIGH/CODE finding. If modification of an existing skill whose `skills/{name}/tests/` directory does not exist, downgrade to NIT/DOC with note 'spec-only skill -- no test directory by design'." This would eliminate the false positive while preserving the signal for genuinely new skills.
+
+**Gap 3: skill-invocation item with non-existent skill namespace -- error handling?**
+- build-uat SKILL.md line 104: "**Infra-level fail conditions for skill-invocation**: Skill tool unavailable, SKILL.md file not found, frontmatter parse error."
+- Structural validation sub-step (line 96): "Verify SKILL.md exists at the declared path" -- if the namespace doesn't exist, this check fails. The result row is `fail-infra`, which routes to execute per Step 3 classification (line 127: "These route to execute per Step 3 classification").
+- **Result: HANDLED -- missing namespace → SKILL.md not found → fail-infra → feedback-to: execute. No crash risk.**
+
+---
+
+### Gap Fix
+
+**Gap 2** requires a skill file edit. `skills/build-review/SKILL.md` Step 1f sub-check (2) updated to distinguish new skill creation from existing skill modification:
+
+- **New skill** (SKILL.md added by diff): HIGH/CODE finding if no test file in diff (preserves entity-068 gap detection)
+- **Existing skill modification** (SKILL.md modified): check if `skills/{name}/tests/` directory exists on disk. If yes and no test file updated in diff: MEDIUM/CODE finding. If directory absent (spec-only skill by design): NO finding.
+
+This eliminates the predictable NIT/DOC false positive that fires on every skill-spec entity (including this one -- F-2 and F-3 in Stage Report: review).
+
+---
+
+### Summary
+
+| Test | Result | Notes |
+|------|--------|-------|
+| Test 1 -- build-review Step 1f retrieval | PASS | All 3 checks found at correct lines |
+| Test 2 -- build-uat skill-invocation retrieval | PASS | All 3 checks found at correct lines |
+| Test 3 -- mock scenario application | PASS | All 4 scenarios correctly derivable from skill content |
+| Test 4 -- Gap 1 (forge unavailable) | PASS | Graceful fallback documented |
+| Test 4 -- Gap 2 (spec-only edits) | GAP FOUND + FIXED | Step 1f test-existence now distinguishes new vs. modified skills |
+| Test 4 -- Gap 3 (missing namespace) | PASS | fail-infra → execute routing covered |
+
+**Overall verdict: GREEN with one gap fixed.** Skill content is retrievable, scenarios are correctly derivable, gaps 1 and 3 are handled. Gap 2 was a real false-positive issue -- fix committed to `skills/build-review/SKILL.md`.
