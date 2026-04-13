@@ -1,8 +1,8 @@
 ---
 id: 080
 title: "Execute-stage staleness detection -- file hash pre-check before wave dispatch"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: decomposition of entity 077 (cross-phase skepticism)
 started:
 completed:
@@ -58,22 +58,31 @@ parent: 077
 A-1: Files not present at baseline SHA are skipped by the pre-check -- they are new files the plan will create. `git diff --name-only {baseline} -- {new-file}` returns empty for files that didn't exist at baseline, so no false positive occurs.
 Confidence: Confident (0.90)
 Evidence: git semantics -- `git diff` between a SHA and working tree for a non-existent-at-SHA file shows it as added (expected), not modified (stale). The pre-check filters for modifications only, not additions.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: Use `execute_base_sha` (already tracked by build-execute) as the wave 0/1 baseline rather than extracting plan-approval SHA separately. These are functionally equivalent for source files because the only intervening commits are `chore(index):` which touch CONTRACTS.md only.
 Confidence: Confident (0.90)
 Evidence: build-execute SKILL.md:146,258 -- `execute_base_sha` captured at stage entry; line 95 -- `chore(index):` commits only modify `docs/build-pipeline/_index/CONTRACTS.md`
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-3: In worktree execution (the standard FO dispatch path), concurrent entities are isolated on separate branches. The per-wave pre-check only detects external drift in main-branch execution (no worktree), which occurs when FO daemon ships other entities to main between waves.
 Confidence: Confident (0.85)
 Evidence: build-execute SKILL.md:10 -- execute runs on worktree branch; entity frontmatter `worktree:` field tracks the branch. Git branches are isolated -- commits on branch A don't appear on branch B until merge.
+→ Confirmed: captain, 2026-04-13 (batch)
 
-A-4: Stale-file warnings are collected in orchestrator memory during the wave loop and written to `## Stage Report: execute` under `### Findings` > `#### Stale-file detections` (new subsection following the existing 4-subsection pattern: Skill suggestions, Scope observations, Pre-existing failures, Unresolved scope gaps).
-Confidence: Likely (0.75)
-Evidence: build-execute SKILL.md:272-280 -- Stage Report `### Findings` section has 4 existing subsections. Adding a 5th for stale-file detections follows the same pattern. Per-task summary (line 264) records per-task status; stale-file warnings are per-wave, fitting better under Findings.
+A-4: Stale-file warnings are collected in orchestrator memory during the wave loop and written to `## Stage Report: execute` as a new top-level `### Stale-file warnings` subsection alongside `### Per-task summary` and `### BLOCKED escalations` -- same hierarchy level, wave-scoped. NOT under `### Findings` (which holds per-task findings from task-executor returns). Format: `- wave {N}: ⚠ stale-files [{file1}, {file2}] -- baseline {sha}, current {sha}`.
+Confidence: Confident (0.85)
+Evidence: build-execute SKILL.md:264-280 -- Per-task summary (line 264) and BLOCKED escalations (line 268) are top-level subsections. Stale-file warnings are per-wave (not per-task), matching the same hierarchy. Captain selected "New top-level subsection" over Findings subsection and inline approaches.
+→ Corrected by captain, 2026-04-13 (interactive): "New top-level `### Stale-file warnings` subsection at same hierarchy as `### Per-task summary` and `### BLOCKED escalations`, not under `### Findings` which is task-scoped"
 
 A-5: `git diff --name-only {baseline} -- {files}` is the right detection mechanism -- binary changed/unchanged, lightest possible check. No need for `--stat` or full diff content. The warning reports WHICH files changed, not HOW they changed.
 Confidence: Confident (0.90)
 Evidence: git semantics -- `--name-only` returns file paths only with zero content overhead. The staleness check needs a boolean signal per file (changed or not), not a content diff. Consistent with parent 077 A-4 "binary file content comparison."
+→ Confirmed: captain, 2026-04-13 (batch)
+
+## Canonical References
+
+(none cited -- captain confirmed/corrected assumptions without external file references)
 
 ## Stage Report: explore
 
@@ -89,6 +98,25 @@ Evidence: git semantics -- `--name-only` returns file paths only with zero conte
   Brainstorming spec contained no α markers (decomposition-born entity with well-defined scope from parent 077)
 - [x] Scale assessment: confirmed Small
   1 file mapped, single insertion point within Step 4 wave loop
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  entity is Small scope, no children proposed
+- [x] Assumptions confirmed: 5 / 5 (1 corrected)
+  A-1, A-2, A-3, A-5 confirmed via batch; A-4 corrected -- stale-file warnings as top-level `### Stale-file warnings` subsection (not under `### Findings`)
+- [x] Options selected: 0 / 0
+  no option comparisons surfaced by explore
+- [x] Questions answered: 0 / 0
+  no open questions surfaced by explore
+- [x] Canonical refs added: 0
+  captain confirmed/corrected without citing external references
+- [x] Context status: ready
+  gate passed: all 5 assumptions resolved, 0 options, 0 questions, ACs valid (3 criteria, no α markers)
+- [x] Handoff mode: loose
+  captain must say "execute 080" or hand off to First Officer; auto_advance not set
+- [x] Clarify duration: 2 questions asked, session complete
+  1 batch assumption presentation (plain text) + 1 AskUserQuestion (A-4 Stage Report location correction)
 
 ## References
 
