@@ -32,7 +32,7 @@ depends-on: [052]
 
 ## Brainstorming Spec
 
-**APPROACH**: Create a Next.js App Router application at `spacebridge/app/` (or `spacebridge/ui/`) using React 19, shadcn/UI + Tailwind CSS + Radix primitives as the component library (captain directive). The app has two main surfaces: (1) **War room page** (`/`) — a Server Component that fetches entity data from the spacebridge Drizzle DB on initial render, displaying entity cards grouped by connected repo. Each card shows slug, title, status, current stage, and an owner session badge (from entity 056's lease data). (2) **Live feed panel** — a Client Component that connects to an SSE endpoint (`/api/events`) via `EventSource`, rendering new events (stage transitions, comments, file changes) as they arrive. The SSE endpoint is a Next.js Route Handler using streaming `Response` with `ReadableStream` (proven by entity 049 V2 spike). The daemon (`bin/daemon.ts`) spawns the Next.js standalone server as a child process on port 8420 (entity 052 A-5 decision), managing its lifecycle (spawn on daemon start, SIGTERM on daemon stop). Entity data comes from two sources: (a) Drizzle DB tables (`events`, `entity_leases`, `sessions`) for persistent state, (b) entity markdown files parsed from connected sessions' `project_root` paths for entity content/frontmatter. File watcher events from the daemon are debounced per design doc §4.4 before being pushed to the SSE stream. The app is built with `next build --output standalone` and the standalone directory is the deployable artifact (entity 049 ruling).
+**APPROACH**: Create a Next.js App Router application at `spacebridge/app/` (or `spacebridge/ui/`) using React 19, shadcn/UI + Tailwind CSS v4 + Radix primitives as the component library (captain directive) (✓ research: shadcn CLI v4 supports Bun via `bunx shadcn@latest init` -- no `--bun` flag; Tailwind v4 default; Radix pure React, no Bun compat issues; non-interactive shadcn components work in Server Components). The app has two main surfaces: (1) **War room page** (`/`) — a Server Component that fetches entity data from the spacebridge Drizzle DB on initial render, displaying entity cards grouped by connected repo. Each card shows slug, title, status, current stage, and an owner session badge (from entity 056's lease data). (2) **Live feed panel** — a Client Component that connects to an SSE endpoint (`/api/events`) via `EventSource`, rendering new events (stage transitions, comments, file changes) as they arrive. The SSE endpoint is a Next.js Route Handler using streaming `Response` with `ReadableStream` (proven by entity 049 V2 spike). The daemon (`bin/daemon.ts`) spawns the Next.js standalone server as a child process on port 8420 (entity 052 A-5 decision), managing its lifecycle (spawn on daemon start, SIGTERM on daemon stop). Entity data comes from two sources: (a) Drizzle DB tables (`events`, `entity_leases`, `sessions`) for persistent state, (b) entity markdown files parsed from connected sessions' `project_root` paths for entity content/frontmatter. File watcher events from the daemon are debounced per design doc §4.4 before being pushed to the SSE stream. The app is built with `next build --output standalone` and the standalone directory is the deployable artifact (entity 049 ruling).
 
 **ALTERNATIVE**: Use the existing vanilla JS IIFE dashboard architecture (`tools/dashboard/static/*`) extended with new features, served directly by Bun.serve() instead of Next.js. -- D-01 Rejected: the vanilla JS dashboard has no component model, no type safety, no SSR, and uses inline CSS that doesn't scale. Entity 049 spike confirmed Next.js + Bun works. The captain's directive explicitly calls for shadcn/UI + Tailwind + Radix evaluation, which requires React. The design doc §3 explicitly says "Next.js App Router" for the bridge UI. Maintaining two UI stacks (old vanilla + new Next.js) creates migration debt.
 
@@ -57,6 +57,25 @@ depends-on: [052]
 - [ ] Given 3 browser tabs connected to SSE simultaneously, when an event occurs, then all 3 receive it (how to verify: open 3 tabs, trigger event, assert all feeds updated)
 - [ ] Given the daemon has no connected sessions, when the war room loads, then it shows an empty state with guidance (how to verify: start daemon with no shims, open browser, assert empty state rendered)
 - [ ] Given the Next.js app is built with `next build`, when `bun run .next/standalone/server.js` is executed, then the standalone server starts and serves the war room correctly (how to verify: build, run standalone, assert page renders)
+
+## Research Findings
+
+### shadcn/UI + Tailwind v4 + Radix on Bun + Next.js App Router
+
+**Confirmed working**: `bunx shadcn@latest init` (without `--bun` flag) on Bun 1.3.x + Next.js 16 + React 19. shadcn CLI v4 (March 2026) defaults to Tailwind v4 with `tw-animate-css`. Radix primitives are pure React -- no Bun Node.js compat layer issues.
+
+**Key gotchas for 053 implementation**:
+- G1: Use `bunx shadcn@latest init`, NOT `bunx --bun shadcn@latest init` (the `--bun` flag causes failures)
+- G3: Tailwind v4 requires class names as visible string literals at build time -- no dynamic `className={\`text-${color}-500\`}`. All variants must be complete class strings
+- G5: `tw-animate-css` may need explicit install (`bun add tw-animate-css`) if missing after init
+- G7: Client Components cannot import Server Components -- pass server data as props/children, not via direct import
+
+**Tailwind v4 architecture change**: drops `tailwind.config.js` entirely. Configuration via CSS `@theme` + `@import` directives. PostCSS plugin is `@tailwindcss/postcss` (not `tailwindcss`). Greenfield project = no migration concern.
+
+**Server/Client Component pattern for shadcn**:
+- Non-interactive components (Card, Badge, Separator): usable directly in Server Components
+- Interactive components (Dialog, Sheet, Tabs): have `"use client"`, use as leaf Client Components with server data passed as props
+- Entity list initial render: Server Component fetches from Drizzle, passes to Client Component for interactivity
 
 ## References
 
