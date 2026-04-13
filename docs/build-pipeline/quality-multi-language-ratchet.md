@@ -886,3 +886,59 @@ notes: workflow-index update-status (planned → in-flight) skipped -- CONTRACTS
 - Dependencies (tools/dashboard and spacebridge) were installed via `bun install` before running quality checks (standard initialization step)
 - Entity 083 is a plan-stage feature (restructuring build-quality skill to support multi-language coverage ratchets). No code in the main project changed; only skill documentation and test fixtures were modified.
 - Quality stage verifies the skill documentation and tests themselves are consistent with the project infrastructure.
+
+## Stage Report: review
+
+**Verdict**: PASSED with one LOW finding (no routing required)
+**Ran at**: 2026-04-13T15:00:00Z
+**Diff scope**: dbf82f0..HEAD
+**Files reviewed**: 6 (quality-multi-language-ratchet.md +753, build-quality/SKILL.md +182/-4, build-plan/SKILL.md +2, plan-checker-prompt.md +16/-2, tests/pressure/build-quality-ratchet.yaml +97 new, tests/pressure/README.md +3/-1)
+
+### Checklist
+
+1. **Pre-scan completed** -- DONE
+   - CLAUDE.md compliance: no prohibited patterns; `--` used throughout, no em dashes introduced.
+   - Stale refs: none detected. ops.config.json absent confirmed. Entity file frontmatter not modified. agents/ and references/ directories not modified.
+   - Plan consistency: 10 tasks executed, all marked DONE in execute stage report.
+
+2. **Diff reviewed for correctness, completeness, and plan adherence** -- DONE
+   - All 5 files listed in the plan (+ entity doc itself) modified as specified.
+   - Step numbering in build-quality SKILL.md: 0.5, 1, 2, 3, 4, 4.5, 4.75, 5, 6, 6.5, 7 -- correct monotonic order, 11 steps confirmed.
+   - plan-checker-prompt.md: 8 dimensions confirmed, §8 present with 8a/8b sub-dimensions, entity 052 cited.
+   - build-plan SKILL.md: dimension 8 row added to both numbered list (Step 6) and reference table.
+   - Pressure test YAML: 2 cases, correct schema (skill, target_path, test_cases), citations cite correct SKILL.md section (Ratchet Discipline), expected_answer B for both.
+   - Ratchet Discipline rules: 5 NEVER rules covering all four cornercases identified in brainstorming spec.
+   - Baseline update rule correctly gated on overall quality pass in both Step 4.75 prose and Step 7 "Baseline update" paragraph.
+
+3. **Findings classified** -- DONE
+   One finding identified:
+
+   | # | Severity | Root | Location | Description |
+   |---|----------|------|----------|-------------|
+   | F-1 | LOW | DOC | skills/build-plan/SKILL.md:488 | Prose says "all 7 dimensions" but table now has 8. The dimension table and numbered list were updated (task-7), but the prose reference on line 488 ("The full plan-checker prompt template, including all 7 dimensions") was not updated to "8 dimensions". This creates a count mismatch between prose and table in the same file. No routing required -- the table is authoritative; the prose is informational and the mismatch is cosmetic. |
+
+4. **Knowledge capture** -- SKIPPED
+   No findings meet the D1/D2 threshold. F-1 is a minor prose-count mismatch, not a reusable pattern. All ratchet mechanics are already captured in the entity body and SKILL.md itself.
+
+5. **Verdict**: PASSED
+   All plan tasks executed. Ratchet logic is correct and internally consistent. Cross-file consistency verified (step ordering, category counts, dimension numbering). Pressure tests correctly target the two highest-pressure scenarios identified in brainstorming (baseline update temptation, tsc trust temptation). One LOW cosmetic finding (prose count mismatch in build-plan SKILL.md) does not block advance -- execute can fix as a fix-forward commit if captain deems necessary.
+
+### Findings Detail
+
+**F-1 (LOW/DOC): build-plan/SKILL.md prose says "7 dimensions", table says 8**
+
+File: `skills/build-plan/SKILL.md:488`
+Current text: "The full plan-checker prompt template, including all 7 dimensions and YAML output format..."
+Expected: "...including all 8 dimensions..."
+
+Task-7 AC specified "Update any prose that says '7 dimensions' to '8 dimensions' in the Step 6 description" but the diff shows only the table row was added; the prose on line 488 was not updated. The task-9 consistency verification did not catch this because its grep checked "8 dimensions" in the file -- which returns true (the reference table section header says "8 Dimensions"), masking the prose mismatch on 488.
+
+Routing recommendation: no reroute to execute needed. The mismatch is cosmetic -- any reader following the reference table (the canonical source) sees 8 dimensions. Fix can be applied by FO as a one-line fix-forward before PR, or deferred to next entity touching that file.
+
+### Summary for FO
+
+- All 6 ACs are addressed by implemented tasks.
+- Step numbering, Stage Report categories (7: test, lint, typecheck, build, regression, ratchet, coverage), and plan-checker dimension count (8) are all correct in authoritative locations.
+- One cosmetic prose mismatch (F-1) in build-plan/SKILL.md:488 -- "7 dimensions" should be "8 dimensions". No blocking issue.
+- Pressure test scenarios correctly cover the two ratchet invariants most at risk of LLM non-compliance.
+- PASSED. Recommend advance to next stage.
