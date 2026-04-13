@@ -127,3 +127,289 @@ Suggested options: (a) Always visible (spec interpretation) -- legacy entities b
 - [x] Context status: ready
 - [x] Handoff mode: loose
 - [x] Clarify duration: 4 captain interactions (1 batch + 1 option + 2 Qs), session complete
+
+## Research Findings
+
+### Upstream Constraints
+
+- **CLAUDE.md**: No dashboard-specific rules beyond standard conventions (strict types in TS, existing patterns in JS). No new runtime dependencies allowed (Guardrails). (CLAUDE.md, project root)
+- **DECISIONS.md**: Empty -- no active decisions constraining dashboard filter behavior. (docs/build-pipeline/_index/DECISIONS.md)
+- **Phase A schema**: `context_status` field introduced in entity frontmatter schema. Defined values observed in the wild: `pending`, `explored`, `awaiting-clarify`, `ready`, and empty/missing (pre-Phase-A legacy). (docs/build-pipeline/README.md:243)
+
+### Existing Patterns
+
+- **filterState mechanism**: `filterState` is a plain object keyed by workflow index (integer), where each value is a `Set` of active filter strings. Loaded from `sessionStorage.getItem("dashboardFilterState")` at IIFE init (app.js:28-38), saved via `saveFilterState()` (app.js:41-47). Filters are per-workflow, not global. (tools/dashboard/static/app.js:28-47)
+- **Stage chip rendering**: Stage chips rendered in `.stage-pipeline` div per workflow card (app.js:180-200). Each chip toggles a stage name in `filterState[wfIdx]` Set on click, then calls `saveFilterState(); fetchWorkflows();` to re-render. (tools/dashboard/static/app.js:180-200)
+- **Filter application**: At app.js:244-246, when `filters.size > 0`, entities filtered by `filters.has(e.status)`. When `filters.size === 0`, default filter hides archived and shipped entities. This is purely client-side on pre-fetched `/api/workflows` response. (tools/dashboard/static/app.js:244-246)
+- **Pipeline graph also has filter click**: `renderPipelineGraph` in visualizer.js accepts `activeFilters` Set and `onStageClick` callback (visualizer.js:267). The graph and chip row are two views of the same filter state. (tools/dashboard/static/visualizer.js:262-286)
+- **CSS chip styling**: `.stage-chip` (style.css:63-70) is the base chip, `.stage-chip--active` (style.css:72-75) adds blue border+background highlight. `.stage-pipeline` (style.css:56-61) is flex container with wrap. (tools/dashboard/static/style.css:56-80)
+
+### Library/API Surface
+
+- **No external libraries involved**. All filtering is vanilla JS. `sessionStorage` is the persistence layer. Entity data comes from `/api/workflows` endpoint which returns full entity objects including all frontmatter fields via the `...fields` spread in `scanEntities()` (parsing.ts:153). (tools/dashboard/src/parsing.ts:152-163)
+- **Entity type**: `Entity` interface in types.ts has `[key: string]: string` index signature (types.ts:25), so `context_status` is accessible as `entity.context_status` or `entity["context_status"]` without type changes. (tools/dashboard/src/types.ts:16-26)
+
+### Known Gotchas
+
+- **filterState key collision**: The current `filterState[wfIdx]` stores a single Set mixing stage names. If we store `context_status` values in the same Set, a context_status value that happens to match a stage name (e.g., both could theoretically be "pending") would cause ambiguous filter behavior. The filterState structure must be extended to support two dimensions -- either nested object `{stages: Set, context_status: Set}` or a separate key like `filterState["cs_" + wfIdx]`. The nested object approach is cleaner and matches the AND-across-dimensions, OR-within-dimension semantics from A-4.
+- **Legacy entities without context_status**: Per Q-2 resolution, entities without `context_status` field must remain visible (wildcard/always-visible semantics) when any context_status filter is active. The filter predicate must handle `undefined`/empty `context_status` specially.
+- **Zero-filter default must be preserved**: Per A-3, when NO filters are active (neither stage nor context_status), the default behavior of hiding archived/shipped entities must continue unchanged.
+
+### Reference Examples
+
+- **Stage chip click handler** (app.js:189-198): The toggle pattern is `Set.has(name) ? Set.delete(name) : Set.add(name)`, followed by `saveFilterState(); fetchWorkflows();`. The context_status chip handler will follow this identical pattern, just targeting a different dimension within the filterState. (tools/dashboard/static/app.js:189-198)
+- **Chip DOM construction** (app.js:185-188): `el("span", { className: chipClass }, [stage.name, el("span", { className: "count", textContent: String(count) })])`. The context_status chips will use the same DOM pattern with a distinguishing CSS class for visual differentiation.
+
+## PLAN
+
+Goal: Add context_status filter chips as a second chip row per workflow card, extending the existing client-side filterState mechanism with two-dimensional (stage x context_status) AND/OR filtering.
+
+<task id="task-0" model="sonnet" wave="0">
+  <read_first>
+    - tools/dashboard/static/app.js
+    - tools/dashboard/static/style.css
+    - tools/dashboard/src/types.ts
+    - tools/dashboard/src/parsing.ts
+  </read_first>
+
+  <action>
+  Environment verification. Confirm all files the plan will modify exist and contain the expected structures:
+  1. `grep -n "filterState" tools/dashboard/static/app.js` -- confirm filterState is at lines 28-47
+  2. `grep -n "stage-chip" tools/dashboard/static/style.css` -- confirm chip CSS at lines 63-75
+  3. `grep -n "stage-pipeline" tools/dashboard/static/app.js` -- confirm chip row rendering
+  4. `grep -c "context_status" tools/dashboard/static/app.js` -- confirm 0 (no existing implementation)
+  5. Verify entity objects have context_status available: `grep "fields" tools/dashboard/src/parsing.ts | head -5`
+  If any check fails, STOP and report.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -n "filterState" tools/dashboard/static/app.js | head -3` shows filterState definition around line 28
+    - `grep -c "context_status" tools/dashboard/static/app.js` returns 0
+    - `grep -n "stage-pipeline" tools/dashboard/static/app.js` returns at least 1 match
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1">
+  <read_first>
+    - tools/dashboard/static/app.js
+  </read_first>
+
+  <action>
+  Extend the filterState data structure in app.js to support two-dimensional filtering (stage + context_status). The current filterState stores `{[wfIdx]: Set}` where the Set contains stage names.
+
+  Refactor to: `{[wfIdx]: { stages: Set, context_status: Set }}`.
+
+  Changes required in app.js:
+  1. **loadFilterState() (lines 28-38)**: Update deserialization to handle the new nested structure. For backward compatibility with existing sessionStorage data, detect the old format (array of strings) and migrate it to `{ stages: [...], context_status: [] }` on load.
+  2. **saveFilterState() (lines 41-47)**: Update serialization to write `{ stages: Array.from(set), context_status: Array.from(set) }` per workflow index.
+  3. **Stage chip click handler (lines 164-168 and 190-196)**: Change from `filterState[wfIdx].has/add/delete(stageName)` to `filterState[wfIdx].stages.has/add/delete(stageName)`. Ensure `filterState[wfIdx]` is initialized as `{ stages: new Set(), context_status: new Set() }` when missing.
+  4. **Filter application (lines 243-246)**: Replace the single-dimension filter with two-dimensional AND logic:
+     ```javascript
+     var stageFilters = dim.stages;
+     var csFilters = dim.context_status;
+     var hasAnyFilter = stageFilters.size > 0 || csFilters.size > 0;
+     var filtered = hasAnyFilter
+       ? wf.entities.filter(function (e) {
+           var stageMatch = stageFilters.size === 0 || stageFilters.has(e.status);
+           var csVal = e.context_status || e["context_status"];
+           var csMatch = csFilters.size === 0 || csFilters.has(csVal) || !csVal;
+           return stageMatch && csMatch;
+         })
+       : wf.entities.filter(function (e) { return e.archived !== "true" && e.status !== "shipped"; });
+     ```
+     Key semantics:
+     - Within-dimension: OR (any selected chip matches) per A-4
+     - Across-dimension: AND (stage x context_status intersection) per A-4
+     - `!csVal` in csMatch implements Q-2 resolution: entities without context_status are always visible when a context_status filter is active
+     - Zero-filter default unchanged per A-3
+  5. **activeFilters variable (line 157 and 243)**: Update references from `filterState[wfIdx] || new Set()` to extract the stages dimension: `var dim = filterState[wfIdx] || { stages: new Set(), context_status: new Set() }; var activeFilters = dim.stages;`
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "context_status" tools/dashboard/static/app.js` returns at least 5 (new references)
+    - `grep "stages:" tools/dashboard/static/app.js` confirms nested structure
+    - `grep "csMatch" tools/dashboard/static/app.js` confirms two-dimensional filter logic
+    - `bun test` from repo root passes (no regressions in server-side tests)
+  </acceptance_criteria>
+
+  <files_modified>
+    - tools/dashboard/static/app.js
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="2">
+  <read_first>
+    - tools/dashboard/static/app.js
+    - tools/dashboard/static/style.css
+  </read_first>
+
+  <action>
+  Add context_status chip row rendering in app.js, directly below the existing stage chip row (`.stage-pipeline` div). This implements the captain-selected "second chip row per workflow card" option.
+
+  Insert after the stage pipeline `card.appendChild(pipeline);` block (around line 201):
+
+  1. **Compute context_status counts**: Iterate `wf.entities` to count occurrences of each `context_status` value. Include a count for entities with missing/empty context_status (label: "unset"). Use the known values: `["pending", "explored", "awaiting-clarify", "ready"]` plus any additional values found in the entities.
+     ```javascript
+     var csValues = ["pending", "explored", "awaiting-clarify", "ready"];
+     var csCounts = {};
+     var csUnsetCount = 0;
+     wf.entities.forEach(function (e) {
+       var cs = e.context_status || e["context_status"];
+       if (!cs) { csUnsetCount++; return; }
+       csCounts[cs] = (csCounts[cs] || 0) + 1;
+       if (csValues.indexOf(cs) === -1) csValues.push(cs);
+     });
+     ```
+
+  2. **Render chip row**: Create a `.context-status-pipeline` div (new CSS class, same flex layout as `.stage-pipeline`). For each value in `csValues` with count > 0, render a chip using the same DOM pattern as stage chips but with class `context-chip` (instead of `stage-chip`) and `context-chip--active` for active state.
+
+  3. **Click handler**: On chip click, toggle the value in `filterState[wfIdx].context_status` Set (created by task-1), then `saveFilterState(); fetchWorkflows();`.
+
+  4. **Add a "context" label** before the chips: a small `span` with text "context:" in muted color to visually distinguish from the stage row above.
+
+  Add CSS in style.css:
+  1. `.context-status-pipeline` -- same layout as `.stage-pipeline` (flex, gap, wrap, margin-bottom)
+  2. `.context-chip` -- similar to `.stage-chip` but with a distinct color scheme (use `#d2a8ff` purple tint to differentiate from the blue stage chips)
+  3. `.context-chip--active` -- active state with purple border/background (`#d2a8ff33` bg, `#d2a8ff` border) to visually distinguish from blue stage active state
+  4. `.context-chip .count` -- bold count in purple (`#d2a8ff`) matching the chip color
+  5. `.context-label` -- small muted label (`font-size: 0.65rem; color: #8b949e; margin-right: 0.25rem; align-self: center;`)
+  </action>
+
+  <acceptance_criteria>
+    - `grep "context-status-pipeline" tools/dashboard/static/app.js` returns at least 1 match
+    - `grep "context-chip" tools/dashboard/static/app.js` returns at least 1 match
+    - `grep "context-chip" tools/dashboard/static/style.css` returns at least 3 matches (base, active, count)
+    - `grep "context-status-pipeline" tools/dashboard/static/style.css` returns at least 1 match
+    - `bun test` from repo root passes (no regressions)
+  </acceptance_criteria>
+
+  <files_modified>
+    - tools/dashboard/static/app.js
+    - tools/dashboard/static/style.css
+  </files_modified>
+</task>
+
+<task id="task-3" model="sonnet" wave="3">
+  <read_first>
+    - tools/dashboard/static/app.js
+    - tools/dashboard/static/style.css
+  </read_first>
+
+  <action>
+  End-to-end verification and edge case hardening:
+
+  1. **Backward compatibility**: Verify that loading old-format sessionStorage data (plain array) gracefully migrates to the new nested `{ stages: [...], context_status: [] }` format. Test by manually checking the migration path in `loadFilterState()`.
+
+  2. **Zero-filter default**: Confirm that when both `stages.size === 0` and `context_status.size === 0`, the default filter behavior (hiding archived + shipped) is preserved exactly.
+
+  3. **Legacy entity visibility**: Confirm that entities without `context_status` field remain visible when any context_status filter chip is active (Q-2 resolution: always-visible / wildcard semantics). The `!csVal` condition in the filter predicate must handle both `undefined` and empty string `""`.
+
+  4. **Combined filter**: Verify that selecting stage=plan AND context_status=ready shows only entities matching BOTH conditions (AND across dimensions, per A-4).
+
+  5. **Responsive CSS**: Verify the `.context-status-pipeline` row has the same responsive behavior as `.stage-pipeline` at narrow screens. Check if style.css has a media query for `.stage-pipeline` at line 609 and add matching rule for `.context-status-pipeline`.
+
+  Run `bun test` from the repo root to verify no regressions across all 342+ tests.
+  </action>
+
+  <acceptance_criteria>
+    - `bun test` from repo root passes with 0 failures
+    - `grep -c "context_status" tools/dashboard/static/app.js` returns at least 8
+    - `grep "csMatch" tools/dashboard/static/app.js` confirms legacy entity handling with `!csVal`
+  </acceptance_criteria>
+
+  <files_modified>
+    - tools/dashboard/static/app.js
+    - tools/dashboard/static/style.css
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+- [ ] Dashboard loads and displays workflow cards with both stage chip row and context_status chip row
+- [ ] Clicking a context_status chip (e.g., "ready") highlights it and filters the entity table to show only entities with that context_status
+- [ ] Entities without context_status remain visible when any context_status filter is active (Q-2: always-visible)
+- [ ] Clicking a second context_status chip adds it to the filter (OR within dimension)
+- [ ] Selecting both a stage chip and a context_status chip filters by intersection (AND across dimensions)
+- [ ] Zero-filter default: when no chips are active, archived and shipped entities are hidden
+- [ ] Context_status chip counts accurately reflect entity counts per value
+- [ ] Filter state persists across page reloads via sessionStorage
+- [ ] Context_status chips are visually distinct from stage chips (purple vs blue color scheme)
+
+### CLI
+None
+
+### API
+None
+
+### Interactive
+- [ ] Captain confirms filter behavior matches expected semantics by clicking through chips on the live dashboard
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1: Selecting context_status: pending shows only entities with context_status: pending | task-2, task-1 | Browser: click "pending" context chip, verify filtered entities | pending | -- |
+| AC-2 (amended per Q-2): Entities without context_status appear when context_status filter is active (always-visible) | task-1, task-3 | Browser: activate "ready" chip, verify legacy entities still visible | pending | -- |
+| AC-3: Multiple filters combine: stage + context_status shows intersection | task-1, task-3 | Browser: select stage=plan + context_status=ready, verify intersection | pending | -- |
+| No regressions | task-1, task-2, task-3 | `bun test` from repo root | pending | -- |
+
+## Stage Report: plan
+
+- [x] **Load and execute spacedock:build-plan skill**: DONE
+- [x] **Produce ## Research Findings with evidence-backed findings per topic**: DONE (5 subsections with file:line citations)
+- [x] **Produce ## PLAN with task breakdown, wave assignments, files_modified per task, model hints**: DONE (4 tasks across waves 0-3)
+- [x] **Produce ## UAT Spec with testable items**: DONE (Browser + Interactive categories populated; CLI/API = None)
+- [x] **Produce ## Validation Map linking each Acceptance Criterion to plan tasks**: DONE (3 ACs + regression check)
+- [x] **Run self-review + plan-checker (up to 3 revision iterations)**: DONE with noted dispatch gap (see below)
+- [x] **Append to CONTRACTS.md via workflow-index skill (unconditional)**: DONE (2 file sections added: tools/dashboard/static/app.js, tools/dashboard/static/style.css)
+- [x] **Write ## Stage Report: plan**: DONE (this section)
+
+status: passed
+plan-checker verdict: PASS (inline self-check; see Dispatch Gap)
+iteration count: 1 (no revisions needed)
+knowledge capture: skipped -- no findings met D1/D2 threshold; the 2D filter AND/OR pattern is entity-specific and will be naturally documented in app.js
+workflow-index append: 1 append call, covering 4 tasks and 2 unique files (app.js, style.css), both successful
+
+### Dispatch Gaps
+
+- **Research dispatch**: This ensign was invoked without FO pre-dispatching researcher teammates. Per SKILL.md Step 2 fallback, performed inline serial research in own context using Read/Grep/Glob across: tools/dashboard/static/app.js, tools/dashboard/static/style.css, tools/dashboard/static/visualizer.js, tools/dashboard/src/parsing.ts, tools/dashboard/src/types.ts, docs/build-pipeline/_index/CONTRACTS.md, docs/build-pipeline/_index/DECISIONS.md, docs/build-pipeline/README.md. All 5 research subsections are populated with verbatim file:line citations.
+- **Plan-checker dispatch**: Ensign subagent does not have Agent tool access (per memory: subagent-cannot-nest-agent-dispatch.md). Performed inline 8-dimension self-check instead of dispatching the plan-checker. Results below.
+
+### Inline Plan-Check (8 dimensions)
+
+```yaml
+issues:
+  - dimension: plan_checker_dispatch
+    severity: warning
+    description: "Plan-checker not dispatched as subagent (ensign lacks Agent tool); inline 8-dimension self-check performed instead"
+    fix_hint: "FO or captain may optionally re-run plan-checker as a separate dispatch to get independent verification"
+  - dimension: type_test_coverage
+    severity: warning
+    description: "Static JS (app.js) and CSS (style.css) modifications lack unit test pairing; dashboard static files are tested via browser UAT, not bun:test"
+    fix_hint: "This matches existing dashboard patterns; browser UAT spec covers behavioral verification"
+```
+
+All 8 dimensions evaluated:
+1. Requirement Coverage: PASS -- all 3 ACs covered by at least one task
+2. Task Completeness: PASS -- all tasks have required fields
+3. Dependency Correctness: PASS -- linear wave 0 -> 1 -> 2 -> 3, no cycles
+4. Context Compliance: PASS -- respects Q-1 (client-side), Q-2 (legacy always-visible), A-1..A-4; no CLAUDE.md/DECISIONS.md violations
+5. Research Coverage: PASS -- every read_first entry traces to a Research Finding with file:line citation
+6. Validation Sampling: PASS -- every task has runnable acceptance criteria; 3-consecutive-window check passes; no Wave 0 test creation required (no <automated>MISSING</automated> refs, no test_first tasks)
+7. Cross-Entity Coherence: PASS -- tools/dashboard/static/app.js and tools/dashboard/static/style.css have no other entity rows in CONTRACTS.md
+8. Type/Test Coverage: WARNING -- no unit test pairing for static JS/CSS (matches existing dashboard pattern)
+
+### Key Context from Clarify
+
+- **Q-1 answer (client-side)**: Plan follows entity 009's client-side filterState pattern at app.js:244-246. No backend changes.
+- **Q-2 answer (always-visible)**: Entities without context_status remain visible when context_status filter is active. AC-2 text in the entity body still has the original "hidden" wording -- plan/execute stages treat Q-2 resolution as authoritative. Validation Map row for AC-2 is annotated "amended per Q-2".
+- **Option selected (second chip row per workflow card)**: Context chips render below existing `.stage-pipeline` row with distinct purple color scheme to visually differentiate from blue stage chips.
+
+### Commits
+- chore(index): add contracts for entity-dashboard-context-status-filter entering plan (2 files)
+- chore(plan): dashboard-context-status-filter add research findings, 4-task plan, UAT spec, validation map
+
