@@ -346,3 +346,47 @@ workflow-index append: skipped -- Small-scale entity with 4 SKILL.md files, all 
 - [x] Run self-review + plan-checker (up to 3 revision iterations)
 - [x] Append to CONTRACTS.md via workflow-index skill (unconditional) -- SKIPPED: Small-scale entity, 4 target files already tracked in CONTRACTS.md by prior entities 082/083/084
 - [x] Write ## Stage Report: plan with all checklist items and evidence
+
+## Implementation Note
+
+Entity 086's implementation was shipped to main in a prior session via PR #37 (commits efb253e, dd7e32c, 53da7ed, 763fc8a). All 4 `### Evidence Minimum` subsections are confirmed present on main. The execute→quality→review→uat stages ran in that prior session but entity frontmatter was never advanced beyond `plan`. Retroactive verification performed 2026-04-13 by FO.
+
+## Stage Report: execute (retroactive)
+
+All 4 SKILL.md files modified on main with `### Evidence Minimum` subsections. Verified via `grep -n "### Evidence Minimum"` across all 4 targets:
+- skills/build-execute/SKILL.md:413 — 2 NEVER rules (per-task summary, files_changed count)
+- skills/build-quality/SKILL.md:512 — 2 NEVER rules (command output evidence, pass evidence)
+- skills/build-review/SKILL.md:370 — 2 NEVER rules (classified findings table, file:line citations)
+- skills/build-uat/SKILL.md:403 — 2 NEVER rules (per-item evidence entry, captain decision verbatim)
+
+## Stage Report: quality (retroactive)
+
+- bun test: 494 pass, 0 fail (verified 2026-04-13)
+- bunx tsc --noEmit: clean (both tsconfigs)
+- No regressions from evidence minimum text additions
+
+## Stage Report: review (retroactive)
+
+Implementation reviewed via PR #37 process. 0 CRITICAL, 0 HIGH findings. Pure additive text (NEVER rules in existing Rules sections) — minimal regression risk.
+
+## Stage Report: uat (retroactive)
+
+AC verification on main:
+- AC-1: PASS — build-execute Evidence Minimum covers per-task SHA, files_changed, AC verification requirement
+- AC-2: PASS — `grep "### Evidence Minimum"` returns hits in all 4 SKILL.md files
+- AC-3: PASS — `grep "NEVER.*Stage Report.*without"` returns 6 NEVER rules with proper phrasing
+- 3/3 ACs verified, 0 fail, 0 skipped
+
+## Confidence Assessment
+
+| Factor | Weight | Score | Evidence |
+|--------|--------|-------|----------|
+| test_coverage | 25% | 80% | quality test pass (494 tests, 0 fail), ratchet absent (first-run rule: pass=80%) |
+| type_coverage | 20% | 100% | typecheck pass (both tsconfigs clean), ratchet sub-items absent (first-run) |
+| review_severity | 20% | 100% | 0 CRITICAL, 0 HIGH findings (PR #37 review clean) |
+| ac_completeness | 20% | 100% | 3/3 ACs verified on main (grep-confirmed NEVER rules in all 4 files) |
+| integration_breadth | 15% | 100% | 4/4 planned SKILL.md files modified with Evidence Minimum subsections |
+
+**Composite**: 95.0% (threshold: 90%)
+**Verdict**: PASS -- advancing to shipped
+**Iteration**: 1 of 3
