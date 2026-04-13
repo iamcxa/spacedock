@@ -2,7 +2,7 @@
 id: 083
 title: "Multi-language coverage ratchet -- type-check and test count never regress"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: decomposition of entity 074 (pipeline verification quality uplift)
 started:
 completed:
@@ -57,6 +57,51 @@ parent: 074
 - [ ] Given a test file deleted, when test count ratchet runs, then it detects count decreased and FAILs (how to verify: delete a test, run quality, observe test count regression FAIL)
 - [ ] Given a plan with a new .ts source file but no paired test file, when plan-checker dimension 8 runs, then it warns about missing test pairing (how to verify: plan with .ts task and no test, run plan-checker, observe WARN)
 - [ ] Given a project migrating from jest to vitest, when test count ratchet runs, then it auto-detects vitest and continues working (how to verify: switch runner config, run quality, ratchet still fires)
+
+## Assumptions
+
+A-1: build-quality Steps 1-4 are hardwired to bun commands (SKILL.md:46-109). Restructuring to runner-agnostic requires: (a) Step 0.5 language detection from config files, (b) Steps 1-4 parameterized by detected runner, (c) Step 4.5 ratchet checks using detected runner's count commands. This is a significant restructuring, not a simple insertion.
+Confidence: Confident (0.90)
+Evidence: build-quality SKILL.md:46 (`bun test`), 64 (`bun lint`), 80 (`bunx tsc --noEmit`), 96 (`bun build`) -- all hardwired. No abstraction layer exists.
+
+A-2: ops.config.json currently has only one key (`coverage_threshold`, SKILL.md:114). Ratchet baselines need persistent storage between runs. ops.config.json is the natural location — add `ratchet_baselines: { type_coverage: {}, test_count: {} }` keyed by language.
+Confidence: Likely (0.75)
+Evidence: build-quality SKILL.md:114 -- ops.config.json read for coverage_threshold. No schema doc exists. Adding keys is low-risk but schema ownership is unclear.
+
+A-3: plan-checker-prompt.md has 7 dimensions (ending at dimension 7, line ~147). Dimension 8 (type/test coverage) follows the same format — a heading, description, check instructions, and output format block.
+Confidence: Confident (0.85)
+Evidence: parent 074 code-explorer finding -- plan-checker-prompt.md:19 defines 7 dimensions. Dimension 8 is absent. Same insertion pattern as dimensions 1-7.
+
+A-4: The ratchet uses `main` branch as baseline for count comparison. `git stash` + run on main + `git stash pop` pattern (from parent 074's directive) gives the baseline counts. Alternative: persist baselines in ops.config.json and compare against stored values.
+Confidence: Likely (0.70)
+Evidence: parent 074 directive lines 106-113 -- `git stash` pattern for baseline. This is fragile (stash conflicts, dirty worktree). Persisted baselines in ops.config.json are more reliable but require a "baseline update" workflow.
+
+## Option Comparisons
+
+### O-1: Ratchet baseline source
+
+How does the ratchet know what "last time" was?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Git stash + run on main | No persistent state needed; always compares against latest main | Fragile (stash conflicts, dirty worktree, slow for large test suites); runs test suite twice | Medium | Not recommended |
+| Persisted baselines in ops.config.json | Fast (no re-run); reliable; updates atomically on quality pass | Needs "baseline update" step on quality pass; first run needs bootstrap | Low | ✅ Recommended |
+| Git notes on main HEAD | No extra files; standard git mechanism | Obscure; easy to lose on force-push; not widely understood | Medium | Not recommended |
+
+## Stage Report: explore
+
+- [x] Files mapped: 2 across config layer
+  build-quality SKILL.md (Steps 1-4 restructuring target), plan-checker-prompt.md (dimension 8 addition)
+- [x] Assumptions formed: 4 (Confident: 2, Likely: 2)
+  A-1 hardwired commands (0.90), A-2 ops.config baseline storage (0.75), A-3 plan-checker dim 8 (0.85), A-4 baseline source (0.70)
+- [x] Options surfaced: 1
+  O-1 ratchet baseline source (git stash vs persisted vs git notes)
+- [x] Questions generated: 0
+  No genuinely open questions -- captain framing in parent 074 already resolved language prioritization
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorming spec
+- [x] Scale assessment: confirmed Medium
+  2 files mapped, significant restructuring of Steps 1-4 + new Step 0.5 + Step 4.5 + plan-checker dimension 8
 
 ## References
 

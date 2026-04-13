@@ -2,7 +2,7 @@
 id: 082
 title: "UAT evidence and recording -- CLI e2e recording + inline evidence writing"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: decomposition of entity 074 (pipeline verification quality uplift)
 started:
 completed:
@@ -51,6 +51,35 @@ parent: 074
 - [ ] Given a CLI UAT item, when build-uat Step 2b runs with e2e-pipeline available, then it produces a .cast recording file AND text evidence (how to verify: run a CLI UAT item, check for .cast file in artifacts alongside stdout capture)
 - [ ] Given a completed UAT stage, when the entity file is read, then evidence is inline (markdown images for browser items, transcript blocks for CLI items) not just path references (how to verify: read entity file after UAT, see rendered evidence without opening external files)
 - [ ] Given e2e-pipeline is not installed, when a CLI UAT item runs, then it falls back to text-only evidence with no error (how to verify: run UAT without e2e-pipeline, confirm graceful fallback)
+
+## Assumptions
+
+A-1: Step 2b (lines 80-82) is the CLI item execution block — currently 3 lines ("Run command, capture stdout/stderr/exit code, record evidence"). The e2e-pipeline recording hook inserts before the Bash command, and artifact collection inserts after. Step 2a (browser items, lines 66-78) already uses `Skill` tool with e2e-pipeline — the CLI extension follows the same dispatch pattern.
+Confidence: Confident (0.90)
+Evidence: build-uat SKILL.md:80-82 -- Step 2b. Lines 66-78 -- Step 2a browser items already invoke e2e-pipeline:e2e-flow and e2e-pipeline:e2e-test via Skill tool.
+
+A-2: e2e-pipeline availability detection uses `ToolSearch` probe at Step 0 (or Step 2 entry) — same pattern build-uat already uses for AskUserQuestion (line 21-23). If ToolSearch returns empty for e2e-pipeline skills, set a flag and skip recording throughout the session.
+Confidence: Confident (0.85)
+Evidence: build-uat SKILL.md:21-23 -- ToolSearch pattern for AskUserQuestion. Same probe pattern works for e2e-pipeline skill detection.
+
+A-3: Step 5 evidence writing (line 94) currently writes provisional result rows. Inline evidence changes the output format from path references to markdown image syntax (browser) and fenced transcript blocks (CLI). The `## UAT Results` table shape at line 136 shows the current format — the evidence column needs to expand from one-line snippets to multi-line inline content.
+Confidence: Likely (0.75)
+Evidence: build-uat SKILL.md:94 -- "Do NOT append to ## UAT Results yet -- Step 5 does the canonical write." Line 136 -- `item-3 (cli) pass -- stdout matched "Created X"`. Line 220 -- Stage Report evidence shape: `item-2 (cli): stdout snippet`.
+
+## Stage Report: explore
+
+- [x] Files mapped: 1 across config layer
+  build-uat SKILL.md (sole insertion target -- Steps 2b and 5)
+- [x] Assumptions formed: 3 (Confident: 2, Likely: 1)
+  A-1 Step 2b insertion (0.90), A-2 e2e-pipeline detection (0.85), A-3 Step 5 inline format (0.75)
+- [x] Options surfaced: 0
+  All gray areas resolved to Track A with codebase precedent from Step 2a browser items
+- [x] Questions generated: 0
+  No open questions -- CLI recording follows established browser item pattern
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorming spec
+- [x] Scale assessment: confirmed Medium
+  1 primary file but changes span Steps 0, 2b, 5, and Stage Report format — multiple insertion points within one file
 
 ## References
 
