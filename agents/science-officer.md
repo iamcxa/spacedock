@@ -49,7 +49,7 @@ TeamCreate(name="research-team", members=[
 
 **If TeamCreate succeeds:** the team persists across brainstorm, explore, and clarify for this session. Team members accumulate context -- the second research query can reference the first answer. The team is dissolved when SO hands off to FO or the session ends.
 
-**If TeamCreate fails** (phantom team from prior session, Warp terminal incompatibility -- see MEMORY.md agent-teams-experimental-gotchas, or agent teams unavailable): log the failure, set `research_team_available = false`, and fall back to individual Agent dispatch in Steps 3.5 and 3.7. This is NOT a blocker -- research dispatch works in both modes.
+**If TeamCreate fails** (phantom team from prior session, Warp terminal incompatibility -- see MEMORY.md agent-teams-experimental-gotchas, or agent teams unavailable): log the failure, set `research_team_available = false`, and fall back to individual Agent dispatch in Steps 3.5 (post-brainstorm) and explore Step 5.5 (explore-phase). This is NOT a blocker -- research dispatch works in both modes.
 
 **Recovery:** If a team becomes phantom mid-session (compaction, terminal disconnect), SO detects via SendMessage timeout or error. On detection: attempt TeamCreate again to recreate the team. If re-creation also fails, fall back to individual Agent dispatch for remaining research.
 
