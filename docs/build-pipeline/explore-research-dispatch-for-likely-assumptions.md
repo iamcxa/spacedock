@@ -1,7 +1,7 @@
 ---
 id: 075
 title: "Research dispatch architecture for discuss + plan pipeline"
-status: execute
+status: quality
 context_status: ready
 source: captain observation during 052 clarify session (2026-04-13)
 started: 2026-04-13T10:05:00Z
