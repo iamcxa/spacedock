@@ -10,7 +10,7 @@ verdict:
 score: 1.0
 worktree: .worktrees/spacedock-ensign-spacebridge-role-aware-lease-manager
 issue:
-pr:
+pr: "#45"
 intent: feature
 scale: Large
 project: spacedock
