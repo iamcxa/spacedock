@@ -410,6 +410,12 @@ All of these mean: re-dispatch the BLOCKED task at the next model tier up, inclu
 - **Use `--` (double dash)** everywhere. Never `—` (em dash). Matches the rest of the build skill family.
 - **Preserve task ids verbatim** in the Stage Report. Do not rephrase or abbreviate them.
 
+### Evidence Minimum
+
+- **NEVER write `## Stage Report: execute` without a per-task summary row for every task in `## PLAN`.** Each row must include: task id, terminal status (DONE/BLOCKED), model tier used, commit SHA (for DONE tasks), and one-line action summary. A Stage Report that omits tasks or lacks commit SHAs is incomplete evidence -- downstream quality stage cannot verify what execute actually shipped.
+- **NEVER write a per-task DONE row without the files_changed count.** After the commit SHA, include `({N} files)` showing how many files the task's commit touched. This is the mechanical cross-check against the plan's `files_modified` list -- if the count diverges, the task either under-delivered or touched unplanned files. Capture via `git diff-tree --no-commit-id --name-only -r {sha} | wc -l`.
+- **NEVER write `## Stage Report: execute` without an AC verification section.** After the per-task summary, include a `### AC verification` table with columns `AC | Verify command | Result` showing one row per acceptance criterion from `## Acceptance Criteria`. Each row must contain the actual verify command run and its pass/fail result. A Stage Report without AC verification is a self-assessment without evidence.
+
 ---
 
 ## Red Flags -- STOP and escalate instead

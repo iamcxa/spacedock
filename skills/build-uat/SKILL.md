@@ -22,7 +22,7 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
   ```
   ToolSearch(query: "select:AskUserQuestion", max_results: 1)
   ```
-- `Skill` -- invoke e2e-pipeline skills (`e2e-pipeline:e2e-map`, `e2e-pipeline:e2e-flow`, `e2e-pipeline:e2e-test`) for browser items, and `spacedock:knowledge-capture` at Step 7 when gotchas surfaced.
+- `Skill` -- invoke e2e-pipeline skills (`e2e-pipeline:e2e-map`, `e2e-pipeline:e2e-flow`, `e2e-pipeline:e2e-test`) for browser items AND for CLI items when e2e-pipeline is available (recording mode), and `spacedock:knowledge-capture` at Step 7 when gotchas surfaced.
 - `Bash` -- run CLI / API items (declared commands, `curl`, `gh`). Also used for git commit and ISO timestamp capture.
 - `Read` -- open the entity file to parse `## UAT Spec` and, on skip-only mode re-entry, parse the prior `## UAT Results` rows.
 - `Grep` / `Glob` -- locate the entity file if the workflow directory is passed but the absolute entity path is not.
@@ -53,7 +53,7 @@ If `mode` is absent, treat it as `normal`. If the entity file path is missing, G
 Read the entity body and locate `## UAT Spec`. Parse each item into a structured record:
 
 - **id** (e.g. `item-1`, `item-2`) -- must be stable across reruns
-- **type** -- one of `browser`, `cli`, `api`, `interactive`
+- **type** -- one of `browser`, `cli`, `api`, `interactive`, `skill-invocation`
 - **description** -- the captain-authored prose describing what to verify
 - **command / url / flow reference** -- type-specific execution anchor
 
@@ -63,9 +63,24 @@ If the entity has no `## UAT Spec` section, STOP. Append a Stage Report with ver
 
 ---
 
+## Step 1.5: Detect e2e-pipeline Availability
+
+Probe for e2e-pipeline CLI recording capability via ToolSearch:
+
+```
+ToolSearch(query: "select:e2e-pipeline:e2e-flow", max_results: 1)
+```
+
+- **Found**: set `e2e_recording_available = true`. CLI items in Step 2b will invoke e2e-pipeline:e2e-flow with `cli_only: true` to produce .cast recordings alongside text evidence.
+- **Not found (empty result)**: set `e2e_recording_available = false`. CLI items proceed with text-only evidence (current behavior). Log: "e2e-pipeline not available -- CLI items will use text-only evidence."
+
+This probe runs once per UAT session. The flag is consumed by Step 2b only. Browser items in Step 2a already probe e2e-pipeline independently (their failure mode is infra-level fail, not graceful fallback, because browser items require e2e-pipeline by design).
+
+---
+
 ## Step 2: Run Automated Items (browser / cli / api)
 
-For each item that is NOT `type: interactive`, and in skip-only mode also NOT in a prior-pass row, execute automation. Skip `type: interactive` entirely -- those run in Step 4 with captain.
+For each item that is NOT `type: interactive`, and in skip-only mode also NOT in a prior-pass row, execute automation. Skip `type: interactive` entirely -- those run in Step 4 with captain. `type: skill-invocation` items run in Step 2d below.
 
 ### 2a -- Browser Items via e2e-pipeline
 
@@ -79,11 +94,41 @@ For each browser item:
 
 ### 2b -- CLI Items
 
-Run the declared command via Bash. Capture stdout, stderr, and exit code. Record the last 40 lines of combined output (or the entire output if shorter) as evidence.
+Two execution paths depending on e2e-pipeline availability (from Step 1.5):
+
+**If `e2e_recording_available`**: e2e-pipeline executes the command inside an asciinema recording session. Do NOT run a separate Bash call -- e2e-test already runs the command.
+
+1. Invoke `Skill` tool with `e2e-pipeline:e2e-flow` passing `cli_only: true` and the item's declared command as the source description. This generates a CLI-only flow YAML with `Execute external` steps.
+2. Invoke `Skill` tool with `e2e-pipeline:e2e-test` to execute the flow. The e2e-pipeline Phase 2.5 runs `asciinema rec` which executes the command and produces a `.cast` recording file. Capture stdout, stderr, exit code from the e2e-test result, plus the `.cast` file path and any derived media paths (gif, mp4).
+3. Record both text evidence (stdout/stderr, last 40 lines) and `.cast` path in the provisional result row. Text evidence is the primary (for pass/fail evaluation), `.cast` is supplementary (for captain review). Pass/fail is determined by the command's exit code and stdout/stderr assertions from the e2e-test execution.
+
+**If NOT `e2e_recording_available`**: run the declared command via Bash directly. Capture stdout, stderr, and exit code. Record the last 40 lines of combined output (or the entire output if shorter) as text evidence. No warning, no error -- this is the baseline path.
+
+**Recording failure is non-blocking.** If e2e-pipeline invocation fails (skill error, asciinema not installed, .cast file not produced), fall back to the NOT-available path: run the command via Bash directly and proceed with text-only evidence. A recording failure does NOT change the item's pass/fail status.
 
 ### 2c -- API Items
 
 Run the declared `curl` or `gh` command via Bash. Capture HTTP status code, response body (truncate at 2KB), and exit code. Record evidence verbatim.
+
+### 2d -- Skill Invocation Items
+
+For each `type: skill-invocation` item:
+
+1. **Pre-classify for interactivity.** Read the target skill's SKILL.md and grep for `AskUserQuestion`. If found, the skill is Class 3 (captain-interactive) -- skip runtime invocation and use structural-only validation (sub-step 3 below). Record as `pass` with notes "Class 3 -- structural validation only".
+
+2. **Runtime invocation test (non-Class-3 only).** Invoke the skill via the Skill tool with a minimal probe prompt (e.g., "List your capabilities" or the item's declared command). Capture the output shape: did the skill load? Did it produce structured output? Did it error? Record exit status and first 40 lines of output as evidence.
+
+3. **Structural validation (always runs).** Regardless of runtime test result:
+   - Verify SKILL.md exists at the declared path
+   - Verify frontmatter has `name` and `description` fields
+   - Verify any `references/` paths cited in SKILL.md resolve to existing files
+   - Record each check as pass/fail with file:line evidence
+
+Record a provisional result row: `{item_id} | skill-invocation | {pass|fail-infra|fail-assertion} | {evidence} | {notes}`.
+
+**Infra-level fail conditions for skill-invocation**: Skill tool unavailable, SKILL.md file not found, frontmatter parse error. These route to execute per Step 3 classification.
+
+**Assertion fail conditions**: Runtime invocation produced output but shape does not match expected (per item description), or structural validation found broken references. These route to captain review per Step 3 classification.
 
 For every automated item, record a provisional result row in scratch:
 
@@ -168,10 +213,52 @@ Append a `## UAT Results` section to the entity body (or, in skip-only mode, APP
 ```
 | item | type | status | evidence | notes | re-attempt |
 | ---- | ---- | ------ | -------- | ----- | ---------- |
-| item-1 | browser | pass | .e2e/screenshots/item-1.png | -- | 0 |
-| item-2 | cli | skipped | -- | captain: no staging db available | 0 |
+| item-1 | browser | pass | ![item-1](../../../.e2e/screenshots/item-1.png) | -- | 0 |
+| item-2 | cli | pass | (see transcript below) | -- | 0 |
+| item-3 | api | pass | HTTP 200 `{"id": "abc"}` | -- | 0 |
+| item-4 | cli | skipped | -- | captain: no staging db available | 0 |
 | ...
 ```
+
+**Inline evidence rules by type:**
+
+- **Browser items**: markdown image syntax `![{item-id}]({relative-path-to-screenshot})`. If multiple screenshots exist, list them on consecutive lines within the cell. Path is relative to the entity file location.
+- **CLI items**: If `.cast` recording exists, reference it: `[recording]({relative-path-to-cast-file})`. Always include a fenced transcript block immediately after the UAT Results table under a `### Evidence: {item-id}` sub-heading:
+  ```
+  ### Evidence: {item-id}
+
+  ```terminal
+  $ {command}
+  {first 20 lines of stdout/stderr}
+  [... truncated ({total_lines} lines total) ...]
+  {last 20 lines of stdout/stderr}
+  ```
+
+  Recording: `{relative-path-to-cast-file}` (if available)
+  ```
+  Cap transcript blocks at 20 lines from the start and 20 lines from the end. If total output is <= 40 lines, include it all without truncation marker.
+- **API items**: inline the HTTP status code and first 5 lines of response body in the evidence cell. Truncate response body at 512 characters with `[truncated]` marker.
+- **Interactive items**: captain's verbatim answer from Step 4.
+
+**Machine-parseability constraint (entity 085 dependency).** Every `### Evidence: {item-id}` block uses a consistent structure: fenced `terminal` code block for CLI, markdown image for browser, inline for API. Entity 085's confidence gate can parse these by scanning for `### Evidence:` headers and extracting the block type from the fence language tag or image syntax.
+
+**`## E2E Evidence` section (appended after `## UAT Results`).** After writing all UAT Results rows and per-item `### Evidence:` blocks, append a summary table:
+
+```
+## E2E Evidence
+
+| Item | Type | Artifact | Path |
+| ---- | ---- | -------- | ---- |
+| item-1 | browser | screenshot | .e2e/screenshots/item-1.png |
+| item-1 | browser | video | .e2e/reports/20260413/verification.mp4 |
+| item-2 | cli | cast-recording | .e2e/reports/20260413/recording.cast |
+| item-2 | cli | transcript | (inline in ### Evidence: item-2) |
+| item-3 | api | response | (inline in evidence cell) |
+```
+
+Every automated item gets at least one row. `transcript` and `response` artifacts with path `(inline in ...)` indicate the evidence is embedded in the entity body, not in a separate file. Browser items may have multiple rows (screenshot + video + trace). This table is the single machine-readable artifact index for the entity -- entity 085's confidence gate reads this table to score evidence completeness.
+
+In skip-only mode, append new artifact rows to the existing `## E2E Evidence` table without rewriting prior rows (same rule as `## UAT Results`).
 
 **Skip-only mode preservation.** In skip-only mode, you MUST NOT rewrite prior rows. Append only the new rows for items that were re-run. The resulting `## UAT Results` section will contain: (a) the original rows from the first UAT pass, unchanged, followed by (b) the new rows for re-runs. Captain reading the section can see the temporal history. `item-1 | browser | pass | ... | 0` from the first pass stays; a new row `item-1 | browser | pass | ... | 1` (if it happened to be re-run) appears below.
 
@@ -216,10 +303,24 @@ Append this section to the entity body exactly:
 - uat_pending_count (post-run): {n}
 
 ### automated evidence
-- item-1 (browser): .e2e/screenshots/item-1.png, .e2e/traces/item-1.zip
-- item-2 (cli): stdout snippet
-- item-3 (api): HTTP 200, body snippet
-- ...
+
+For each automated item, write an inline evidence block matching the format from Step 5:
+
+- **Browser items**: `item-{n} (browser): PASS/FAIL` followed by markdown image `![item-{n}]({screenshot-path})` on the next line
+- **CLI items**: `item-{n} (cli): PASS/FAIL` followed by a summary line (`exit={code}, {line_count} lines captured`) and `.cast` path if available: `recording: {cast-path}`
+- **API items**: `item-{n} (api): PASS/FAIL -- HTTP {status}, body: {first 80 chars of response}`
+
+Example:
+```
+### automated evidence
+- item-1 (browser): PASS
+  ![item-1](../../../.e2e/screenshots/item-1.png)
+- item-2 (cli): PASS -- exit=0, 15 lines captured
+  recording: ../../../.e2e/reports/20260413/recording.cast
+- item-3 (api): PASS -- HTTP 200, body: {"status":"ok","count":3}
+```
+
+The Stage Report `### automated evidence` is a compact summary. The full transcript blocks live in `## UAT Results` (Step 5). The Stage Report references them implicitly -- a reader needing full evidence scrolls up to `## UAT Results` and the `### Evidence: {item-id}` sub-headings.
 
 ### captain decisions
 - item-1: pass (interactive)
@@ -276,6 +377,12 @@ If `mode: skip-only`, include the mode in the message: `"uat-resume: {slug} -- i
 - **NEVER dispatch a subagent to handle the interactive loop.** You already ARE the ensign subagent; per `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md`, subagents cannot recursively dispatch Agent. "Keep the orchestrator stateless" is backwards rationalization -- the orchestrator IS the state-holder here by design.
 - **NEVER auto-defer interactive items to `/spacedock:uat-resume` "to keep the pipeline moving".** Auto-defer without captain input is not a skip -- it's abandonment. Real skips require captain to name a reason in Step 4 first.
 
+### Skill Invocation -- Pre-Classify Before Runtime
+
+- **ALWAYS grep for AskUserQuestion in the target SKILL.md before runtime invocation.** Class 3 skills will block automation on interactive prompts. Pre-classification is deterministic and prevents hangs.
+- **NEVER skip structural validation because runtime invocation passed.** Runtime success does not guarantee frontmatter correctness or reference integrity. Structural validation is the baseline; runtime is additive.
+- **NEVER runtime-invoke a skill without the pre-classification step.** Even if the item description says "non-interactive", grep the SKILL.md -- the description may be wrong or stale.
+
 ### Stage Contract and Scope
 
 - **Captain judgment is scoped to Step 4.** Steps 1-3 run fully automated; Step 4 is the only captain-facing moment. Do NOT ask the captain to approve mapping choices, flow generation, or classification -- those are orchestrator decisions.
@@ -283,3 +390,9 @@ If `mode: skip-only`, include the mode in the message: `"uat-resume: {slug} -- i
 - **Never invoke build-review, build-plan, or build-execute from within UAT.** You are a leaf orchestrator above e2e-pipeline; upward routing goes through FO via the Stage Report's `feedback-to` field.
 - **Never edit source code.** Your Write/Edit scope is strictly the entity body (UAT Results, Stage Report, frontmatter `uat_pending_count`) and nothing else.
 - **Use `--` (double dash)** everywhere. Never `—` (em dash). Matches the rest of the build skill family.
+
+### Evidence Minimum
+
+- **NEVER write `## Stage Report: uat` without a per-item evidence entry in `### automated evidence`.** Every automated item (browser, cli, api) must have an entry showing its item id, type, and at least one evidence artifact. Browser items: screenshot path or markdown image reference. CLI items: stdout snippet (first/last 20 lines) or transcript block reference. API items: HTTP status code and response body snippet. An item entry that says only "pass" or "automation ran successfully" is not evidence -- it is a claim without proof.
+- **NEVER write a captain decision row without the captain's verbatim answer.** Every row in `### captain decisions` must include the captain's actual choice (pass/fail/skip) and, for skip decisions, the verbatim reason string. A decision row that says "captain approved" without specifying which option was selected erases the audit trail of what the captain actually decided.
+- **NEVER write `### automated evidence` without artifact references for browser items.** Browser item evidence must include at least one of: screenshot path (`.e2e/screenshots/{item-id}.png`), video path (`.e2e/videos/{item-id}.webm`), or trace path (`.e2e/traces/{item-id}.zip`). Inline markdown image syntax (`![{item-id}](path)`) is preferred per entity 082 alignment. A browser item marked pass with no visual artifact cannot be audited.
