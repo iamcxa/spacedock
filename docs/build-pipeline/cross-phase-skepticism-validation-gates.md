@@ -1,13 +1,13 @@
 ---
 id: 077
 title: "Cross-phase skepticism -- validation gates between pipeline stages"
-status: epic
-context_status: awaiting-clarify
+status: shipped
+context_status: ready
 source: GSD distillation during 075 clarify session (2026-04-13); GSD verify-phase.md, execute-phase.md
-started:
-completed:
-verdict:
-score: 0.0
+started: 2026-04-13T13:00:00Z
+completed: 2026-04-13T04:30:00Z
+verdict: PASSED
+score: 0.95
 worktree:
 issue:
 pr:

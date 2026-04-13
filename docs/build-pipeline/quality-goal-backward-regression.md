@@ -1,7 +1,7 @@
 ---
 id: 081
 title: "Goal-backward verification + regression gate -- semantic quality checks"
-status: execute
+status: shipped
 context_status: ready
 source: decomposition of entity 077 (cross-phase skepticism)
 started: 2026-04-13T13:00:00Z

@@ -1,7 +1,7 @@
 ---
 id: 079
 title: "Plan-stage assumption re-validation -- verify clarify evidence before task generation"
-status: execute
+status: shipped
 context_status: ready
 source: decomposition of entity 077 (cross-phase skepticism)
 started: 2026-04-13T13:00:00Z
