@@ -17,7 +17,7 @@ This skill is loaded by the ensign during the `explore` stage of the build pipel
 - `Glob` -- find files by pattern when grep is too broad
 - `Bash` -- git commands, file counting, and shell pipelines for mapping
 **NOT available (see `references/agent-dispatch-guide.md`):**
-- `Agent` -- you run as an ensign subagent (or SO-direct), which may or may not have the Agent tool depending on context. SO-direct mode HAS Agent (SO is the main session); ensign mode does NOT. Step 2 handles both cases.
+- `Agent` -- you run as an ensign subagent (or SO-direct), which may or may not have the Agent tool depending on context. SO-direct mode HAS Agent (SO is the main session); ensign mode does NOT. Step 2 handles Mode A/B for code-explorer dispatch. Step 5.5 uses the same pattern: SO-direct mode dispatches `spacedock:researcher` via Agent; ensign mode reads pre-dispatched results from the entity body.
 - `AskUserQuestion` -- this skill is non-interactive. Write findings to the entity body; build-clarify handles captain interaction.
 
 **Mode-dependent Write/Edit:**
@@ -222,6 +222,76 @@ For each remaining gray area from Step 4 (including contradictions from Step 3.7
 
 ---
 
+## Step 5.5: Research Dispatch for External Technology Assumptions
+
+After hybrid classification (Step 5), scan Track A assumptions (Likely and Unclear confidence) and Track B options for external technology dependencies that require validation beyond codebase grep.
+
+**Dispatch criteria:** An assumption or option qualifies for research when:
+- It involves library compatibility, API behavior, platform specifics, or protocol details
+- It is NOT purely codebase architecture (internal module interactions, code structure)
+- Confidence is Likely (0.50-0.79) or Unclear (0.20-0.49) for Track A; any confidence for Track B options involving library choice
+
+**Research depth scaling:**
+- SKIP all research: ALL assumptions Confident >=0.95 AND no external tech claims AND Small scale
+- Lightweight (1 researcher, targeted): assumptions 0.85-0.94 Confident
+- Standard (1-2 researchers, parallel): assumptions 0.70-0.84 Likely
+- Deep (2-3 researchers, parallel + continuation): assumptions <0.70 Unclear
+
+**Cap: max 3 researchers per explore step** (entity scope total across brainstorm + explore max 5).
+
+### Mode A -- SO-direct (has Agent tool)
+
+Dispatch `spacedock:researcher` per qualifying topic:
+
+```
+Agent(
+  subagent_type="spacedock:researcher",
+  model="sonnet",
+  prompt="""
+  ## Topic
+  {assumption statement}
+
+  ## Description
+  Validate whether {technology claim}. Current confidence: {score}. Evidence so far: {existing evidence line}.
+
+  ## Entity Context
+  {paths from Step 2 mapping relevant to this assumption}
+
+  ## Scope Constraint
+  Focus on: {specific library/API/platform behavior}. Do NOT investigate codebase architecture.
+  """
+)
+```
+
+If a research team was created at session start (SO Step 1.5), use `SendMessage` to route topics to existing team members instead of individual Agent dispatch.
+
+### Mode B -- Ensign (no Agent tool)
+
+Research results were pre-dispatched by FO before invoking the ensign. Read results from entity body `## Research Findings` section or from pre-populated research annotations on assumption Evidence lines. If no pre-dispatched results are available, skip Step 5.5 and log in Stage Report: "Step 5.5 skipped -- no pre-dispatched research available in ensign mode."
+
+### Checkpoint/Continuation
+
+If a researcher outputs `## CHECKPOINT REACHED` with partial findings (hit context limits mid-investigation), spawn a continuation researcher with the partial findings as input context. The continuation researcher picks up where the first left off. Only applicable in Mode A (SO-direct) where Agent tool is available.
+
+### Synthesis and Annotation
+
+After researchers return:
+1. Validate all expected findings are present (one per dispatched topic)
+2. Check for contradictions between parallel results
+3. **Confirmed findings:** upgrade assumption confidence per `references/hybrid-classification-heuristic.md` § "Research Upgrade Path" and append `(✓ research: {source} -- {finding})` to the Evidence line
+4. **Contradicted findings:** write `## Research Findings` subsection with full 5-domain treatment; reclassify assumption to Track B or escalate to Open Question. Append `(⚠ research contradicted: {source} -- {finding} -- see Research Findings)` to the Evidence line
+5. **Two researchers contradict each other:** write both as an Open Question with cited findings verbatim -- same rule as build-plan's contradiction handling. Do NOT silently resolve.
+
+### Cross-Phase Skepticism
+
+Explore-phase researchers also re-validate brainstorm annotations marked `(✓ confirmed by explore: ...)`. If a researcher's deeper investigation contradicts an earlier explore confirmation, escalate to Open Question. Each phase is a skeptic of the previous phase, not a consumer -- do not assume prior annotations are infallible.
+
+### Cross-Entity Research Dedup
+
+Before dispatching researchers, SO greps sibling entity bodies for `(✓ research: ...)` annotations matching the current topic. If a prior entity already researched the same technology question, reference the prior finding instead of re-dispatching: write `(✓ research: entity-{id} -- {prior finding})` citing the cross-entity source.
+
+---
+
 ## Step 6: Write to Entity Body
 
 Read `references/output-format.md` for the exact section formats.
@@ -262,9 +332,11 @@ Write `## Stage Report: explore` as the LAST section of the entity body with exa
   α-1 (protocol), α-2 (storage) resolved via codebase; α-3 (state) escalated to Q-3
 - [x] Scale assessment: revised from Small to Medium
   initial Small was Brainstorming Spec estimate; 14-file breadth + 3 open questions push to Medium
+- [x] Research dispatched: 2 researchers for 2 topics
+  A-4 (socket bind timing): confirmed, Likely->Confident (0.90); A-5 (daemon composition): contradicted, escalated to Q-3
 ```
 
-Six items, always in this order. Each item MUST use checklist format (`- [x]` for done, `- [ ]` for pending, `- [ ] SKIP: ...` or `- [ ] FAIL: ...` for partial stages) -- this is the parser contract defined at `tools/dashboard/src/frontmatter-io.ts:140`. Flat bullet format (`- {metric}`) is a drift bug; the dashboard will render the Stage Report card as empty. The FO and status script parse these fields. Keep field names exact. Detail lines (2-space indent, one line per metric) are optional but recommended -- see `references/output-format.md` for full field rules.
+Seven items, always in this order. The seventh item (`Research dispatched`) is new as of entity 075. Use `- [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident, no external tech claims)` when Step 5.5 is skipped. Each item MUST use checklist format (`- [x]` for done, `- [ ]` for pending, `- [ ] SKIP: ...` or `- [ ] FAIL: ...` for partial stages) -- this is the parser contract defined at `tools/dashboard/src/frontmatter-io.ts:140`. Flat bullet format (`- {metric}`) is a drift bug; the dashboard will render the Stage Report card as empty. The FO and status script parse these fields. Keep field names exact. Detail lines (2-space indent, one line per metric) are optional but recommended -- see `references/output-format.md` for full field rules.
 
 ---
 
