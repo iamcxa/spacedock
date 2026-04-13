@@ -2,7 +2,7 @@
 id: 054
 title: "Entity detail page + comments API (parity part 1)"
 status: draft
-context_status: awaiting-clarify
+context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started:
 completed:
@@ -73,26 +73,32 @@ depends-on: [053]
 A-1: Comment decider follows 056's lease decider pattern -- pure function at `spacebridge/src/domain/comment/decider.ts`, same structure (commands → decide → events, evolve → state).
 Confidence: 🟢 Confident (0.95)
 Evidence: entity 056 APPROACH establishes the pattern; design doc §3.5 classifies both leases and comments as 🟢 full CQRS; schema.ts:60-80 comments table already has fmodel columns (event_type, aggregate_id, sequence_number, payload)
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: Dual-table persistence -- `comments` table (snapshot projection, already in schema.ts) + new `comment_events` table (append-only event log). Same pattern as 056 O-1 (selected: dual table).
 Confidence: 🟢 Confident (0.95)
 Evidence: entity 056 O-1 captain selected dual table. schema.ts:62-80 comments table exists. Pattern is established and consistent.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-3: Detail page at `/entity/[slug]` -- standard Next.js App Router dynamic route in `spacebridge/ui/app/entity/[slug]/page.tsx`.
 Confidence: 🟢 Confident (0.95)
 Evidence: entity 053 O-1 selected `spacebridge/ui/` as the Next.js app directory. Dynamic routes are core Next.js App Router feature, proven by 049 spike.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-4: Entity body rendering via `react-markdown` (or `@next/mdx`) -- renders markdown to React components, compatible with Server Components.
 Confidence: 🟢 Confident (0.85)
 Evidence: react-markdown is the standard React markdown renderer, works with RSC. Entity body is markdown with YAML frontmatter. The frontmatter is already parsed separately (A-5 in 053); body needs markdown→HTML rendering.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-5: Auto-resolve is event-driven -- when a `stage_transition` event is written to events table, the comment domain processes it as a command that triggers `comment_resolved` events for all comments anchored to the previous stage.
 Confidence: 🟢 Confident (0.85)
 Evidence: design doc §3.5 -- comments listed as full CQRS with "auto-resolve on stage advance" in the scope. The decider can accept a `resolve_by_stage_advance` command type that bulk-resolves by section_heading matching.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-6: Comment reply threading uses `parent_id` field on the comments snapshot table -- flat storage with parent reference, not nested JSON.
 Confidence: 🟢 Confident (0.90)
 Evidence: schema.ts:62-80 comments table doesn't have a parent_id column yet, but addReply in comments.ts:29+ stores replies in a `thread: []` array. The CQRS version uses a flat table with parent_id for SQL queryability + LCD discipline. Requires adding `parent_id` column to comments table.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 ## Option Comparisons
 
@@ -106,6 +112,8 @@ Evidence: schema.ts:62-80 comments table doesn't have a parent_id column yet, bu
 
 Design doc invariant check: the current dashboard's `comment.thread[]` is single-level. Entity 054 is "parity part 1" -- matching existing capability. Deeper threading is a future enhancement, not parity. Return value trace: `GET /api/entities/[slug]/comments` returns flat list with parent_id → UI groups by parent → single-level nesting renders cleanly in a Card component.
 
+→ Selected: Single-level replies -- captain, 2026-04-13
+
 ### O-2: Suggestions (inline edit proposals) scope
 
 | Option | Pros | Cons | Complexity | Recommendation |
@@ -115,6 +123,8 @@ Design doc invariant check: the current dashboard's `comment.thread[]` is single
 | Suggestion commands in comment domain, apply logic in separate module | Clean domain boundary; comment domain only stores suggestions, a separate module applies edits | Still complex; partial parity but cleaner architecture | Medium | Viable |
 
 Design doc invariant check: design doc §3.5 lists "Comments + replies (with auto-resolve)" as the 🟢 CQRS scope. Suggestions are not mentioned. Current dashboard's suggestions are a convenience feature, not a core coordination primitive. Entity title says "parity part 1" — suggestions can be part 2.
+
+→ Selected: Defer suggestions to v2 -- captain, 2026-04-13. Open a separate draft entity to track suggestions scope and relationship to 054.
 
 ### O-3: Comment anchoring strategy
 
@@ -126,6 +136,8 @@ Design doc invariant check: design doc §3.5 lists "Comments + replies (with aut
 
 Design doc invariant check: schema.ts:66-67 has `selected_text` and `section_heading` fields — both exist. The current dashboard uses section_heading for anchoring and selected_text for highlight context. This is proven and stable. Line-based is a v2 enhancement.
 
+→ Selected: Section-based anchoring -- captain, 2026-04-13
+
 ## Open Questions
 
 Q-1: Should the entity detail page include a stage history timeline (showing all stage transitions with timestamps), or is that a v2 feature?
@@ -135,6 +147,55 @@ Domain: User-facing Visual
 Why it matters: The directive mentions "stage history timeline" but the events table may not have comprehensive stage transition data yet (depends on what FO writes during dispatch). Including it in v1 means querying the events table for `type: 'stage_transition'` events for this entity. Excluding it simplifies the detail page to: header + body + comments.
 
 Suggested options: (a) Include -- query events table for stage transitions, render as a vertical timeline component. Data is available since FO writes stage events. (b) Exclude -- detail page is header + body + comments only. Stage history added when more event types are consistently written. (c) Minimal -- show current stage + previous stage only (from frontmatter, no events query).
+
+→ Answer: (a) Include -- query events table for stage_transition events, render as vertical timeline. FO already writes stage events so data is available. Makes the detail page complete. -- captain, 2026-04-13
+
+## UI Spec
+
+### Design System
+- Inherits from entity 053: shadcn/UI + Tailwind CSS v4 + Radix (same `spacebridge/ui/` app)
+- Additional shadcn components needed beyond 053's Standard set: **Textarea** (comment input), **Avatar** (author attribution), **Collapsible** (comment threads)
+
+### Component Hierarchy
+```
+app/entity/[slug]/page.tsx (Server Component -- fetch entity markdown + events + comments)
+├── <EntityHeader> (Server Component -- Card with title, status Badge, stage Badge, owner Badge)
+├── <StageTimeline> (Server Component -- vertical timeline from events table)
+│   └── <TimelineEntry> (stage name + timestamp + duration)
+├── <EntityBody> (Server Component -- react-markdown rendered body)
+│   └── <SectionWithComments> (section heading + markdown content + anchored comments)
+│       └── <CommentThread> (Client Component -- "use client" for reply form)
+│           ├── <Comment> (Card -- author Avatar, content, timestamp, resolve button)
+│           └── <ReplyForm> (Textarea + Button -- POST to /api/.../reply)
+└── <AddCommentForm> (Client Component -- select section, write comment, POST)
+
+app/api/entities/[slug]/comments/route.ts (GET list, POST add)
+app/api/entities/[slug]/comments/[id]/reply/route.ts (POST reply)
+app/api/entities/[slug]/comments/[id]/resolve/route.ts (POST resolve)
+```
+
+### Layout Pattern
+- **Desktop**: Single-column, full-width content. Entity header at top, stage timeline below header (horizontal or vertical), markdown body with inline comments anchored per section, add-comment form at bottom.
+- **Mobile (v1)**: Same single-column, natural responsive behavior. No special mobile treatment.
+
+### Key Interactions
+- Click entity card in war room → navigate to `/entity/[slug]`
+- Comment form: select section heading from dropdown → write content → submit
+- Reply: click "Reply" on comment → inline reply form expands (Collapsible)
+- Resolve: click "Resolve" → comment visually dimmed, `resolved: true`
+- Auto-resolve: when stage advances, resolved comments show "Auto-resolved: stage advanced" badge
+- New comments from other sessions appear via SSE → page revalidation or client-side append
+
+### Empty / Loading / Error States
+- **No comments**: "No comments yet. Be the first to comment on this entity." prompt
+- **Loading**: Skeleton for entity body and comment threads
+- **Entity not found**: 404 page with "Entity not found" message and back-to-war-room link
+- **Comment submit error**: Toast notification with error message, form retains input
+
+### Comment Attribution
+- `captain`: displayed as "Captain" with distinct avatar color
+- `fo`: displayed as "First Officer" with role badge
+- `guest`: displayed as nickname (from tunnel share link) with guest badge
 
 ## Stage Report: explore
 
@@ -151,3 +212,16 @@ Suggested options: (a) Include -- query events table for stage transitions, rend
 - [x] Scale assessment: confirmed Medium
   ~15 files across 4 layers; cohesive "detail view + comments domain" unit; decomposition not recommended
 - [x] Research dispatched: 0 researchers (skipped -- all patterns established by 056/053, no external tech claims)
+
+## Stage Report: clarify
+
+- [x] Assumptions confirmed: 6 / 6
+  All batch-confirmed by captain, 2026-04-13. Zero reclassified.
+- [x] Options selected: 3 / 3
+  O-1: Single-level replies. O-2: Defer suggestions to v2 (open separate entity). O-3: Section-based anchoring.
+- [x] Questions answered: 1 / 1
+  Q-1: Include stage history timeline -- query events table for stage_transition events.
+- [x] UI Spec produced: yes
+  Component hierarchy (detail page + comment threads + route handlers), layout pattern (single-column), comment attribution model, additional shadcn components (Textarea, Avatar, Collapsible).
+- [x] Sufficiency gate: PASS
+  All assumptions confirmed, all options selected, all questions answered, UI Spec produced, zero unresolved items.
