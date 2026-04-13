@@ -769,4 +769,67 @@ The test suite fails on a pre-existing race condition in `src/daemon/integration
    - `bun test src/daemon/daemon-coordination.test.ts src/ipc/fo-simulator.integration.test.ts src/ipc/coordination-concurrent.test.ts`: **6 pass, 0 fail**
    - Full suite: 385 pass, 23 fail — all 23 failures are pre-existing Channel/Dashboard/Event Pipeline tests unrelated to 056 changes (same set as before this feedback round)
 
+## Stage Report: review (round 2)
 
+### Checklist
+
+1. **Verify R-1 fix adequacy (janitor .catch wrapper)** — DONE
+2. **Verify R-2 fix adequacy (LeaseCommandSchema.safeParse wired at IPC boundary)** — DONE
+3. **Verify any new tests cover the fixes** — DONE
+4. **Check for NEW findings introduced by fix commits** — DONE
+5. **Classified findings table** — No new findings
+
+### Verification Detail
+
+**R-1** (`daemon.ts:137-141`): `setInterval` callback now chains `.catch((err: unknown) => { process.stderr.write(...) })` on the `bridge.expireDue(Date.now())` Promise. `expireDue` return type is `Promise<number>` (confirmed at `coordination-client-bridge.ts:23`), so `.catch` correctly intercepts all async rejections. Error message uses `(err as Error).message`. Fix is structurally correct and complete.
+
+No new test added for R-1. The janitor error path requires injecting a rejection into `expireDue`, which would need a mock bridge — not present in this suite. The existing AC-5 janitor integration test (`daemon-coordination.test.ts:96-128`) covers the happy path. Omission is acceptable: defensive stderr write does not alter observable behaviour under normal conditions.
+
+**R-2** (`daemon.ts:94-112`): `onCoordinationRequest` builds a typed `rawCmd` object from positional args for each of the three mutable methods (`acquireEntity`, `releaseEntity`, `extendLease`) and calls `LeaseCommandSchema.safeParse(rawCmd)` before dispatching. Parse failure returns `{ error: "Invalid coordination args: ..." }` immediately. `getAvailableWork` is explicitly skipped (it takes no LeaseCommand). Coverage: all three mutable methods are handled; the `rawCmd !== undefined` guard prevents a false-positive safeParse on unknown methods.
+
+One edge case reviewed: for `releaseEntity` and `extendLease`, `args[0]` is cast as `{ token?: string }`. If `args[0]` is a non-object (e.g., a raw string), `tok?.token` returns `undefined`, which makes `token: undefined` — `ReleaseCommandSchema` and `ExtendCommandSchema` both require `token: z.string()`, so safeParse rejects it. The Zod boundary handles this correctly; no extra guard needed.
+
+**R-2 test** (`daemon-coordination.test.ts:146-163`): Live daemon spawned, `acquireEntity` called with numeric `entitySlug: 42` (violates `z.string()` in `AcquireCommandSchema`). Asserts `resp.error` is defined and contains `"Invalid coordination args"`. Confirmed passing: `bun test src/daemon/daemon-coordination.test.ts` → 4 pass, 0 fail, 10 expect() calls, 2.66s.
+
+### Findings Table
+
+No new findings. Deferred NITs N-1 through N-4 not re-flagged per round 2 scope.
+
+### Verdict
+
+PASS — R-1 and R-2 fixes are correct and complete. R-2 integration test validates the invalid-args path end-to-end through a live daemon process. No regressions introduced by the fix commits.
+
+## Stage Report: uat
+
+### UAT Items
+
+| Item | Type | Command / Method | Result | Evidence |
+|---|---|---|---|---|
+| UAT-1 | cli | `bun bin/daemon.ts start` + `status` + `stop` | DONE | `daemon running (pid: 33794, uptime: 2s, sessions: 1)` — STATE_DIR contains spacebridge.db, spacebridge.db-shm, spacebridge.db-wal, spacebridge.pid, spacebridge.sock — stop exited cleanly |
+| UAT-2 | cli | `cd spacebridge && bun test` | DONE | 177 pass, 0 fail, 471 expect() calls — 22 files — all 056 new test files present (decider.test.ts, evolve.test.ts, persistence.test.ts, coordination-client-bridge.test.ts, daemon-coordination.test.ts, fo-simulator.integration.test.ts, coordination-concurrent.test.ts, replay.integration.test.ts, schemas.test.ts) |
+| UAT-3 | cli | `cd repo-root && bun test` | DONE | 385 pass, 23 fail — all 23 failures are pre-existing Channel/Dashboard/Event Pipeline tests confirmed unrelated to 056 (same set present on unmodified main). 0 new failures introduced. |
+| UAT-4 | cli | `grep -E 'serial\|timestamptz\|datetime\|RETURNING' spacebridge/drizzle/*.sql` | DONE | exit code 1 — 0 matches across 0000_parallel_thing.sql and 0001_zippy_masked_marvel.sql — AC-10 satisfied |
+| UAT-5 | cli | `test -f coordination-client-stub.ts && bun test coordination-client-stub.test.ts` | DONE | stub file exists — 5 pass, 0 fail, 14 expect() calls — A-6 preserved |
+| UAT-6 | api | `bun test spacebridge/src/daemon/daemon-coordination.test.ts` | DONE | 4 pass, 0 fail, 10 expect() calls, 2.71s — janitor expiry case at T>600ms with 100ms interval passes |
+| UAT-7 | api | `bun test spacebridge/src/ipc/coordination-concurrent.test.ts` | DONE | 1 pass, 0 fail, 3 expect() calls — one acquireEntity succeeds, other rejects with LeaseConflict |
+| UAT-8 | interactive | Captain sign-off on simulator-only FO satisfaction | PENDING — awaiting captain response |
+
+### Per-item classification
+
+- UAT-1: DONE — daemon lifecycle fully functional
+- UAT-2: DONE — full spacebridge test suite passes (177/177)
+- UAT-3: DONE — repo-root regression clean (pre-existing failures confirmed pre-existing via git stash + branch history; 0 new failures)
+- UAT-4: DONE — LCD discipline enforced on migration SQL
+- UAT-5: DONE — stub preserved and independently tested
+- UAT-6: DONE — janitor expiry integration verified under real time
+- UAT-7: DONE — concurrent acquire conflict resolution correct
+- UAT-8: PENDING — captain confirmation required
+
+### Additional integration evidence (from spacebridge/ targeted runs)
+
+- FO simulator: `bun test src/ipc/fo-simulator.integration.test.ts` → 1 pass, 0 fail, 9 expect() calls (AC-7/AC-8: getAvailableWork excludes leased entities, releaseEntity returns to pool)
+- Replay: `bun test src/domain/lease/replay.integration.test.ts` → 2 pass, 0 fail, 5 expect() calls (AC-6: daemon restart reconstructs state)
+
+### Summary
+
+7 of 8 UAT items DONE. UAT-8 interactive sign-off is pending captain reply. No infra failures encountered — all executed items used assertion-class verification against live daemon subprocess or pure bun:test. Zero 056-introduced regressions confirmed across both spacebridge/ (177 pass) and repo-root (385 pass, 23 pre-existing unrelated failures).
