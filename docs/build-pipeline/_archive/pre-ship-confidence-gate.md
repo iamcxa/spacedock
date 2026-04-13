@@ -4,9 +4,9 @@ title: "Pre-ship confidence gate -- 5-factor scoring with auto-fix loop"
 status: shipped
 source: decomposition of entity 085 (stage report evidence and confidence)
 started: 2026-04-13T09:05:00Z
-worktree: .worktrees/spacedock-ensign-pre-ship-confidence-gate
-completed:
-verdict:
+worktree:
+completed: 2026-04-13T13:20:00Z
+verdict: PASSED
 score: 0.0
 worktree:
 issue:
