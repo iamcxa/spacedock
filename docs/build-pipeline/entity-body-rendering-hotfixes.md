@@ -413,3 +413,21 @@ issues: []
   Build process applies to bundled assets; this entity has no source code contributions
 - [x] Evidence-backed verdict: ALL MECHANICAL CHECKS PASS
   JUSTIFICATION: Quality stage verifies that code changes don't break the project. This entity (047) is a documentation/spec entity with zero code modifications. `git diff --name-only main` reports: 2 reference docs (skills/build-*/references/output-format.md), 2 entity spec files (entity-body-rendering-hotfixes.md + index entries), 0 source code files. Skipping code-focused tools (test, lint, tsc, build) is correct and expected for documentation-only entities. No regressions possible — markdown documentation cannot fail linters or break tests.
+
+## Stage Report: review
+
+- [x] Pre-scan: DONE
+  CLAUDE.md compliance: no fabricated version numbers, no destructive ops, no ad-hoc TODO files. Stale refs: the `⚠ contradicted` annotation in the Brainstorming Spec (line 43) is acknowledged as stale by Research Findings (line 190) — pre-existing, not introduced by this entity. The `entity 075` forward reference in the pre-existing output-format.md line 147 is not in the diff and not introduced by 047. No MEMORY.md or import-graph issues. Plan consistency: execute report matches plan tasks (task-0 through task-3, 2 files modified), quality report correctly skips all code checks for a doc-only entity.
+- [x] Diff review: DONE
+  2 paragraphs added (4 lines total): one to `skills/build-explore/references/output-format.md` after "Detail lines" at line 143, one to `skills/build-clarify/references/output-format.md` after "Detail lines" at line 228. Placement verified: each paragraph is inserted directly after the `Detail lines` paragraph it extends, before the next distinct section ("Seven items..." / "## Frontmatter Updates"). Both paragraphs are semantically correct and match the plan task-1 and task-2 prescriptions verbatim.
+- [x] Findings classified: DONE
+  See findings table below.
+- [x] Verdict: PASS — no CRITICAL/HIGH findings; entity cleared for UAT
+
+| # | Severity | Location | Finding |
+|---|----------|----------|---------|
+| F-1 | NIT | `skills/build-clarify/references/output-format.md:230` | The exemplar paragraph repeats "For clarify, detail should capture the decision: which option was selected, which assumptions were corrected, which refs were cited." — this guidance already appears verbatim in the preceding "Detail lines" paragraph (line 228). Mild duplication; no correctness impact. |
+| F-2 | NIT | `skills/build-explore/references/output-format.md:145` | The exemplar for entity 008 cites the entity by name ("dashboard-standalone-plugin") but the entity is archived at `docs/build-pipeline/_archive/`. Authors following the reference must navigate to `_archive/` — a minor discoverability gap. The exemplar content itself was verified accurate against the archive. |
+
+**Verdict: PASS**
+No CRITICAL or HIGH findings. 2 NITs noted (redundant wording, archive discoverability) — neither blocks shipping. The diff is small (4 lines, 2 paragraphs), correctly placed, content-accurate, and plan-adherent. UAT checklist items (browser + CLI + interactive captain confirmation) remain as the next gate.
