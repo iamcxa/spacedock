@@ -413,6 +413,21 @@ None
 - [x] Workflow-index append: 2 append calls, covering 4 tasks and 2 files, all successful
   skills/build-clarify/SKILL.md (tasks 1,3,4), skills/build-clarify/references/output-format.md (tasks 2,3)
 
+## Stage Report: execute
+
+- [x] Wave 0 (env verify): DONE -- d59a8df
+  all 5 files confirmed present; Step 4:/Step 5: each return 1 match; 0 in-flight conflicts on SKILL.md; workflow-index updated planned→in-flight (2 contract rows)
+- [x] Wave 1 task-1 (insert Step 4.5): DONE -- 17e7a9d
+  79 lines inserted between Step 4 `---` and Step 5; all 8 acceptance_criteria pass (seen-topics x6, Complete x3, gray-area-templates.md ref, CONTRACTS.md ref, Step 5 still present)
+- [x] Wave 1 task-2 (output-format.md): DONE -- 0f28f51
+  `## Annotation: Open Exploration Item` section added with A-6 example; all 3 acceptance_criteria pass
+- [x] Wave 2 task-3 (stage report metric sync): DONE -- 7bbdbf4
+  `Open exploration:` metric line added after Questions answered in both SKILL.md and output-format.md; duration example updated to show exploration iterations; all 3 acceptance_criteria pass
+- [x] Wave 2 task-4 (resume case update): DONE -- 47454bb
+  Step 1 resume case now routes to Step 4.5; Step 5 loop-back includes Step 4.5; `skip to Step 5` reference removed; all 3 acceptance_criteria pass
+- [x] Deviations: none
+- [x] BLOCKED escalations: none
+
 ## Stage Report: clarify
 
 - [x] Decomposition: not-applicable
