@@ -181,3 +181,344 @@ Suggested options: (a) 30 seconds (reasonable balance -- worst case 30s orphan d
   Q-1: Simulator test -- include FO integration test over RPC, no PR2 dependency. Q-2: 30s janitor interval, env-configurable.
 - [x] Sufficiency gate: PASS
   All assumptions confirmed, all options selected, all questions answered, zero unresolved items.
+
+## Research Findings
+
+### Domain 1 -- Upstream Constraints (fmodel CQRS + design doc)
+
+- **Design doc §5.1 (Role-aware CoordinationClient API)** -- interface is frozen: four methods (`getAvailableWork(role) : EntityRef[]`, `acquireEntity(slug, role, sessionId) : LeaseToken`, `releaseEntity(token, outcome) : void`, `extendLease(token) : void`). The stub at `spacebridge/src/ipc/coordination-client-stub.ts:25-30` already matches exactly -- Task 5's real client must preserve this exact signature to stay drop-in compatible with `daemon.ts:56` and any future engine caller.
+- **Design doc §5.3 (Bridge implementation)** -- mandates a pure `decider(cmd, state) -> events` function with switch over command types (`acquire | release | extend | expire`) plus an `evolve(state, event) -> state` reducer. Event variants: `acquired | released | extended | expired`. Conflict detection is on `(entity_slug, role)` pair; same entity with different roles is valid (e.g., SO + FO on same entity).
+- **Design doc §3.3 (LCD schema discipline)** -- required for the new `lease_events` table: `integer PRIMARY KEY AUTOINCREMENT`, `text` strings, `integer` epoch-ms timestamps, **no** `serial | timestamptz | datetime | RETURNING`. Verify mechanically via grep, per AC-10.
+- **Design doc §3.5 (Scoped fmodel CQRS)** -- leases classified 🟢 full CQRS → event log is mandatory (AC-6 replay); dual-table strategy per O-1 keeps existing `entity_leases` as fast-read snapshot while `lease_events` is source of truth.
+- **Engine-freeze invariant (MEMORY: engine-freeze-as-skill-design-invariant)** -- 056 must not require changes to clkao/spacedock engine. Bridge-side is self-contained. FO integration is satisfied via the **simulator test** (Q-1 answer), not by editing FO prompts.
+
+### Domain 2 -- Existing Patterns (spacebridge codebase)
+
+- **Test isolation pattern** -- every test passes explicit `dbPath` (`join(TMP, "test.db")` or `:memory:`) to `createDb()`. Default `~/.spacedock/spacebridge.db` must never touch tests (MEMORY: Test Isolation for SQLite Servers). Applies to decider/evolve integration tests, replay test, janitor test, FO simulator test.
+- **Schema application layering** -- `spacebridge/src/db.ts:30` applies `CREATE TABLE IF NOT EXISTS` inline so callers never need `drizzle-kit migrate` at runtime. New `lease_events` table must be added both to `schema.ts` (Drizzle definition) **and** to `db.ts:applySchema()` (idempotent CREATE TABLE). The drizzle migration SQL is kept in sync via `bunx drizzle-kit generate` (entity 050 precedent: `drizzle/0000_parallel_thing.sql`).
+- **fmodel-compatible columns** -- every existing table already has `event_type`, `aggregate_id`, `sequence_number`, `payload` as opt-in placeholders (`schema.ts:19-23, 36-39, 54-57, 76-79`). `entity_leases` already has these columns ready; the lease snapshot projection can use them directly without schema changes to that table.
+- **IPC routing pattern** -- `socket-server.ts:82-98` already routes `coordination-request` messages to `onCoordinationRequest(sessionId, req)` and funnels errors through `{ error: string }` response. `daemon.ts:79-89` currently passes `req.method` and `req.args` to `stub[method](...args)` via dynamic dispatch. Task 5 swaps the `stub` for a real client that delegates to the in-process decider (no socket hop within daemon; the client *is* the daemon-side handler).
+- **Daemon lifecycle hooks** -- `daemon.ts:31` `cmdStart` is the only place to wire a janitor. `setInterval` must be tied to SIGTERM/SIGINT via `shutdown()` at `daemon.ts:120` (currently closes socket + unlinks files; must also `clearInterval` on the janitor). Env var pattern (`SPACEBRIDGE_STATE_DIR`, `SPACEBRIDGE_AUTO_STOP`) is the precedent for `SPACEBRIDGE_LEASE_DURATION_MS` and `SPACEBRIDGE_JANITOR_INTERVAL_MS`.
+- **Coordination response error protocol** -- `socket-server.ts:90-96` already serializes thrown errors to `{ error: (err as Error).message }`. The real client must throw named error subclasses (`LeaseConflict`, `LeaseNotFound`, `LeaseExpired`) so the socket layer surfaces the class name in `message`. Reconstruction on the shim side is out of scope for 056 (shim-side is stub-consumer only).
+
+### Domain 3 -- Library / API Surface (Zod + Drizzle + Bun)
+
+- **Zod is NOT yet a dependency** (`spacebridge/package.json:5-12` -- only `drizzle-orm`, `drizzle-kit`, `@types/node`, `bun-types`). Task 1 adds `zod` at latest compatible version. Use `.passthrough()` per design doc §3.5 and GUARDRAILS. No version pin fabrication -- install via `bun add zod` and let the resolver pick.
+- **Drizzle SQLite table definition** -- follow `schema.ts:27-40` (`entityLeases`) as the template. `sqliteTable("lease_events", { id, aggregateId, sequenceNumber, eventType, payload, timestamp, ... })`. Keep fmodel columns first-class (not opaque) on this table since it **is** the event log.
+- **drizzle-kit generate** -- entity 050's `drizzle/0000_parallel_thing.sql` shows the output format. Running `bunx drizzle-kit generate` after editing `schema.ts` should produce a `0001_*.sql` with the new `lease_events` table. If drizzle-kit generates redundant migrations for existing tables, trim to only the new table (precedent: entity 050 kept a clean single-file migration).
+- **Bun test + bun:sqlite** -- `describe / test / expect` from `bun:test`. Use `beforeEach` to create fresh `:memory:` DB per test to avoid cross-test pollution. Pure-decider tests need no DB at all -- `assert.deepEqual(decide(cmd, state), events)` suffices (design doc §5.3).
+- **Unix socket integration testing** -- `src/daemon/integration.test.ts` (311 lines) and `src/ipc/integration.test.ts` (301 lines) are the precedent. They spawn the daemon subprocess via `Bun.spawn(["bun", "bin/daemon.ts", "start"], { env: { SPACEBRIDGE_STATE_DIR: TMP, SPACEBRIDGE_AUTO_STOP: "1" } })` and connect via `createSocketClient`. Tasks 6 and 7 reuse this exact pattern.
+
+### Domain 4 -- Known Gotchas (cross-cutting)
+
+- **var Hoisting in Closures (MEMORY)** -- avoid `var` in janitor `setInterval` callbacks. Use `const/let`. The janitor closure accesses daemon state + db -- must be lexically captured, no re-declaration.
+- **Main branch moves during execution (MEMORY)** -- prefer fix-forward commits over `--amend`. The plan has 7 tasks; daemon tasks run serially, so mid-plan commits may interleave with FO daemon background work on other entities. Do not amend past the current HEAD.
+- **Schema drift between `schema.ts` and `db.ts:applySchema`** -- any table added to Drizzle must also be added to `applySchema` or callers get "no such table" at runtime. Task 2 must modify both.
+- **Janitor race with active acquire** -- if janitor scans at T=0 and acquire happens at T=1 on the same expired lease, the expire command arrives at the decider after the acquire. Because the decider is synchronous and runs on a single event loop (A-1, A-2), the later command sees the state produced by the earlier. Expire of a no-longer-expired lease must be a no-op (idempotent: if state says "not expired anymore" or "already released", skip). Task 3 decider must handle this explicitly.
+- **Expired-lease idempotency semantics (O-2)** -- captain selected "fail with typed error". `extendLease`/`releaseEntity` on an expired or released lease throws `LeaseNotFound` or `LeaseExpired` (named error classes). `expire` command from janitor is the exception (idempotent no-op). Tests must cover both paths.
+- **Drizzle IF NOT EXISTS vs migration parity** -- `db.ts:applySchema` uses `CREATE TABLE IF NOT EXISTS`; migration SQL from drizzle-kit uses bare `CREATE TABLE`. Parity is enforced by convention (schema.ts is the single source), not by a mechanical check. Validation map item: grep confirms both files mention `lease_events`.
+- **Event replay ordering** -- replay must use `ORDER BY sequence_number ASC` on `lease_events`. Autoincrement `id` doubles as sequence_number per A-5. Skipping the ORDER BY risks state corruption under concurrent writes (though A-1/A-2 prevent concurrency today, future-proofing is cheap).
+
+### Domain 5 -- Reference Examples (in-repo precedents)
+
+- **fmodel column usage (entity 050)** -- `schema.ts:18-23` sessions table shows the exact column shape to repeat for `lease_events`. Event_type becomes the discriminator; aggregate_id is the lease's `entity_slug:role` composite; sequence_number is monotonic per aggregate; payload is the Zod-serialized event body.
+- **Integration-test daemon spawn (entity 052)** -- `src/daemon/integration.test.ts` shows `Bun.spawn` pattern with `SPACEBRIDGE_STATE_DIR` for test isolation and `SPACEBRIDGE_AUTO_STOP=1` for cleanup.
+- **CoordinationClient consumer wiring (entity 052)** -- `bin/daemon.ts:79-89` shows the single injection point. Swap `stub` → `createCoordinationClientBridge({ db, entityScanner, leaseDuration, now })` with an identical interface.
+- **Pure-function testability precedent (MEMORY: extract-pure-module-pattern)** -- decider is the canonical case for this pattern. `src/domain/lease/decider.ts` + `src/domain/lease/decider.test.ts` with no imports from db/socket/fs layers satisfies GUARDRAIL-1 ("zero I/O").
+
+## PLAN
+
+Overall strategy: 7 tasks across 3 waves. Wave 1 is foundation (add Zod + types + schema). Wave 2 is the pure domain (decider + evolve + unit tests) in parallel with persistence/projection helpers. Wave 3 is integration (bridge client, daemon wiring + janitor, FO simulator test).
+
+| Task | Wave | Model | Summary |
+|---|---|---|---|
+| T1 | 1 | haiku | Add zod dep + define lease types and Zod schemas |
+| T2 | 1 | haiku | Add `lease_events` table to schema.ts + db.ts + generate drizzle migration |
+| T3 | 2 | sonnet | Pure decider (acquire / release / extend / expire) + conflict + idempotency |
+| T4 | 2 | sonnet | Pure evolve function + replay helper + snapshot projection writer |
+| T5 | 3 | sonnet | Real CoordinationClient bridge (wires decider + persistence + entityScanner) |
+| T6 | 3 | sonnet | Daemon integration: swap stub → bridge, mount janitor, env-config durations |
+| T7 | 3 | sonnet | FO simulator integration test over unix socket + concurrent acquire + replay test |
+
+### Task 1 -- Zod dep + lease types/schemas
+
+- **model**: haiku
+- **wave**: 1
+- **skills hint**: (none required — mechanical dep add + type definitions)
+- **read_first**:
+  - `spacebridge/package.json` (dep list)
+  - `spacebridge/src/ipc/coordination-client-stub.ts` (canonical Role / EntityRef / LeaseToken types)
+  - Design doc §5.3 (event shapes) in `docs/superpowers/specs/2026-04-10-spacebridge-engine-bridge-split-design.md`
+- **action**:
+  1. `cd spacebridge && bun add zod` (do not hand-write a version).
+  2. Create `spacebridge/src/domain/lease/types.ts` exporting: `Role`, `EntityRef`, `LeaseToken`, `LeaseState` (= `{ leases: Map<key, LeaseToken> }` where `key = ${entity_slug}::${role}`), `LeaseCommand` (tagged union: `acquire | release | extend | expire`), `LeaseEvent` (`acquired | released | extended | expired`). Re-export `Role`, `EntityRef`, `LeaseToken` from `coordination-client-stub.ts` to avoid duplication (import + re-export).
+  3. Create `spacebridge/src/domain/lease/schemas.ts` with Zod schemas for each command and event variant; all use `.passthrough()` per §3.5 + GUARDRAIL-2. Export `parseCommand` / `parseEvent` helpers.
+  4. Create named error classes: `LeaseConflict`, `LeaseNotFound`, `LeaseExpired`, all extending `Error` with `name` set.
+- **acceptance_criteria**:
+  - `bun test` in `spacebridge/` still passes (no regressions on existing tests).
+  - New files exist with ABOUTME comments per repo convention.
+  - `import { z } from "zod"` resolves; Zod schemas reject malformed commands (spot check via a 1-2 line test file `schemas.test.ts` using `expect(() => parseCommand({})).toThrow()`).
+  - `LeaseConflict` / `LeaseNotFound` / `LeaseExpired` `instanceof Error` is true and `.name` reflects the class.
+- **files_modified**:
+  - `spacebridge/package.json` (add zod)
+  - `spacebridge/bun.lock` (generated)
+  - `spacebridge/src/domain/lease/types.ts` (new)
+  - `spacebridge/src/domain/lease/schemas.ts` (new)
+  - `spacebridge/src/domain/lease/errors.ts` (new)
+  - `spacebridge/src/domain/lease/schemas.test.ts` (new, minimal)
+
+### Task 2 -- `lease_events` table + migration
+
+- **model**: haiku
+- **wave**: 1
+- **skills hint**: (none)
+- **read_first**:
+  - `spacebridge/src/schema.ts` (existing 5 tables, LCD pattern)
+  - `spacebridge/src/db.ts` (applySchema inline CREATE TABLE mirror)
+  - `spacebridge/drizzle/0000_parallel_thing.sql` (migration format precedent)
+  - `spacebridge/drizzle.config.ts`
+- **action**:
+  1. In `schema.ts`, add `leaseEvents` table: columns `id (pk autoinc)`, `aggregateId text notNull` (= `${entitySlug}::${role}`), `sequenceNumber integer notNull`, `eventType text notNull` (acquired/released/extended/expired), `payload text notNull` (JSON-serialized event body), `timestamp integer notNull` (epoch-ms), plus the standard fmodel quartet already used elsewhere (kept consistent even though partly redundant on this specific table -- repo convention).
+  2. In `db.ts:applySchema`, mirror with `CREATE TABLE IF NOT EXISTS lease_events (...)` matching the Drizzle definition exactly.
+  3. Run `cd spacebridge && bunx drizzle-kit generate` to produce `drizzle/0001_<name>.sql`. Review for any spurious rewrites; keep only the `CREATE TABLE lease_events` + indexes.
+  4. Add `schema.test.ts` case exercising insert + query of a `lease_events` row (follow existing patterns in `schema.test.ts:1-?`).
+- **acceptance_criteria**:
+  - `bun test spacebridge/src/schema.test.ts` passes including a new `lease_events` insert/query case.
+  - `grep -E 'serial|timestamptz|datetime|RETURNING' spacebridge/drizzle/*.sql` returns 0 matches (AC-10).
+  - `createDb(":memory:")` followed by a `drizzle.insert(leaseEvents).values(...)` round-trip succeeds.
+- **files_modified**:
+  - `spacebridge/src/schema.ts`
+  - `spacebridge/src/db.ts`
+  - `spacebridge/src/schema.test.ts`
+  - `spacebridge/drizzle/0001_<generated>.sql` (new, drizzle-kit output)
+
+### Task 3 -- Pure decider
+
+- **model**: sonnet
+- **wave**: 2
+- **skills hint**: `superpowers:test-driven-development` (TDD: write decider tests first, then impl)
+- **read_first**:
+  - `spacebridge/src/domain/lease/types.ts` (from Task 1)
+  - `spacebridge/src/domain/lease/errors.ts` (from Task 1)
+  - Design doc §5.3:484-496 (decider signature + switch structure)
+  - MEMORY: `extract-pure-module-pattern.md` (pure module discipline)
+- **action**:
+  1. Write `spacebridge/src/domain/lease/decider.test.ts` covering the full AC matrix for pure cases: acquire-when-empty returns `acquired`; acquire-when-conflicting-role throws `LeaseConflict`; acquire-same-entity-different-role succeeds; release-`done` returns `released { outcome: 'done' }`; release-`abort` returns `released { outcome: 'abort' }`; release-unknown-token throws `LeaseNotFound`; extend-active returns `extended { newExpiresAt }`; extend-expired throws `LeaseExpired`; extend-unknown throws `LeaseNotFound`; expire-past-expiry returns `expired`; expire-already-released returns `[]` (idempotent no-op); expire-still-active returns `[]` (no-op, time hasn't passed).
+  2. Implement `spacebridge/src/domain/lease/decider.ts` exporting `decide(cmd: LeaseCommand, state: LeaseState, now: number) : LeaseEvent[]` as a switch on `cmd.type`. No imports from `db`, `schema`, `socket-*`, `node:fs`, `node:net`, `drizzle-orm`. Only `./types`, `./errors`, and pure stdlib.
+  3. `now: number` is injected (not `Date.now()`) so tests are deterministic. The decider consumes `lease_duration` from a `config` arg or from the command payload.
+- **acceptance_criteria**:
+  - `bun test spacebridge/src/domain/lease/decider.test.ts` passes with ≥12 cases covering the matrix above.
+  - Decider source file has zero imports from `db`, `schema`, any `ipc/*`, or `daemon/*` (verified via `grep -E "from ['\"](\\.\\./|\\./\\.\\./)" spacebridge/src/domain/lease/decider.ts` returning only `./types`, `./errors`).
+  - AC-1 (acquire empty), AC-2 (acquire conflict), AC-4 (extend), AC-7 (getAvailableWork seed), AC-8 (release-done), AC-9 (release-abort) each trace to a named test case.
+- **files_modified**:
+  - `spacebridge/src/domain/lease/decider.ts` (new)
+  - `spacebridge/src/domain/lease/decider.test.ts` (new)
+
+### Task 4 -- Pure evolve + snapshot projection + replay helper
+
+- **model**: sonnet
+- **wave**: 2 (parallel to T3 -- no shared state)
+- **skills hint**: `superpowers:test-driven-development`
+- **read_first**:
+  - `spacebridge/src/domain/lease/types.ts` (LeaseState shape)
+  - `spacebridge/src/schema.ts` (entityLeases + leaseEvents definitions from T2)
+  - `spacebridge/src/db.ts` (createDb pattern)
+- **action**:
+  1. Write `spacebridge/src/domain/lease/evolve.test.ts`: apply each event variant to a starting state; verify: `acquired` adds entry; `extended` updates `expires_at`; `released` removes entry; `expired` removes entry; replay-from-empty with N events produces equivalent state to the serial `decide → apply` loop.
+  2. Implement `spacebridge/src/domain/lease/evolve.ts`: pure `evolve(state: LeaseState, event: LeaseEvent) : LeaseState` and `replay(events: LeaseEvent[]) : LeaseState = events.reduce(evolve, emptyState)`.
+  3. Implement `spacebridge/src/domain/lease/persistence.ts` (impure, isolated): `appendEvents(db, aggregateId, events, seqStart)` writes to `lease_events`; `loadAllEvents(db)` reads `ORDER BY sequence_number ASC`; `upsertSnapshot(db, leaseToken)` / `deleteSnapshot(db, aggregateId)` maintain the `entity_leases` projection. This is the only file in `domain/lease/` allowed to import from `../../schema` and `../../db`.
+  4. `persistence.test.ts` exercises round-trip: write events via `appendEvents`, replay via `loadAllEvents + replay`, assert state matches; snapshot upsert/delete against `entity_leases`.
+- **acceptance_criteria**:
+  - `bun test spacebridge/src/domain/lease/evolve.test.ts` passes (pure, ≥6 cases).
+  - `bun test spacebridge/src/domain/lease/persistence.test.ts` passes using `:memory:` DB.
+  - Replay test: seed 10 events → `loadAllEvents + replay` produces identical state to reducing the same 10 via `evolve` in-memory (AC-6).
+  - `evolve.ts` has zero I/O imports (pure module discipline per MEMORY).
+- **files_modified**:
+  - `spacebridge/src/domain/lease/evolve.ts` (new)
+  - `spacebridge/src/domain/lease/evolve.test.ts` (new)
+  - `spacebridge/src/domain/lease/persistence.ts` (new)
+  - `spacebridge/src/domain/lease/persistence.test.ts` (new)
+
+### Task 5 -- Real CoordinationClient bridge
+
+- **model**: sonnet
+- **wave**: 3
+- **skills hint**: (none — integration wiring)
+- **read_first**:
+  - `spacebridge/src/ipc/coordination-client-stub.ts` (interface contract, keep)
+  - `spacebridge/src/domain/lease/decider.ts` (from T3)
+  - `spacebridge/src/domain/lease/evolve.ts` + `persistence.ts` (from T4)
+  - `bin/daemon.ts:56-89` (injection point)
+- **action**:
+  1. Create `spacebridge/src/ipc/coordination-client-bridge.ts` exporting `createCoordinationClientBridge(opts) : CoordinationClient` where `opts = { db: SpacebridgeDb, entityScanner: () => Promise<EntityRef[]>, leaseDurationMs: number, now?: () => number }`.
+  2. Internally, boot a `LeaseState` by calling `loadAllEvents + replay` once at construction time.
+  3. Each method (`acquireEntity` / `releaseEntity` / `extendLease`) constructs a `LeaseCommand`, calls `decide()`, if successful: `appendEvents()` → `updateSnapshot()` → `state = evolve(state, event)`. A-1/A-2 single-threaded event loop guarantees atomicity without explicit locks.
+  4. `getAvailableWork(role)` calls `entityScanner()` → filters out entities already leased in `state` for the target role → returns remaining.
+  5. Expose `expireDue(now)` for the janitor: scans `state` for leases past expiry and dispatches `expire` commands through the same path. Returns count of expired.
+  6. Expose `close()` (optional) for test cleanup.
+  7. `coordination-client-bridge.test.ts` exercises each method against a `:memory:` DB + fake scanner. Covers AC-1, AC-4, AC-7, AC-8, AC-9 at the RPC boundary.
+- **acceptance_criteria**:
+  - `bun test spacebridge/src/ipc/coordination-client-bridge.test.ts` passes.
+  - The bridge satisfies `CoordinationClient` interface (typecheck-enforced): `const c: CoordinationClient = createCoordinationClientBridge({...})` compiles.
+  - Calling `releaseEntity` with an unknown token throws `LeaseNotFound`; `extendLease` on expired lease throws `LeaseExpired` (O-2 captain selection).
+  - After `releaseEntity(..., 'done')`, `getAvailableWork` includes the entity; after acquire, it does not.
+- **files_modified**:
+  - `spacebridge/src/ipc/coordination-client-bridge.ts` (new)
+  - `spacebridge/src/ipc/coordination-client-bridge.test.ts` (new)
+
+### Task 6 -- Daemon integration + janitor + env config
+
+- **model**: sonnet
+- **wave**: 3 (depends on T5; serial with T5 inside wave 3)
+- **skills hint**: (none)
+- **read_first**:
+  - `spacebridge/bin/daemon.ts:31-118` (cmdStart + shutdown)
+  - `spacebridge/src/daemon/integration.test.ts` (existing integration test pattern)
+  - `spacebridge/src/ipc/coordination-client-bridge.ts` (from T5)
+- **action**:
+  1. In `bin/daemon.ts:cmdStart`, resolve config: `leaseDurationMs = Number(process.env.SPACEBRIDGE_LEASE_DURATION_MS) || 300_000`; `janitorIntervalMs = Number(process.env.SPACEBRIDGE_JANITOR_INTERVAL_MS) || 30_000`.
+  2. Instantiate `db = createDb(path.join(stateDir, "spacebridge.db"))`.
+  3. Provide an `entityScanner` that reads entity files from the workflow dir (initial scan -- a simple stub reading `docs/build-pipeline/*.md` frontmatter suffices for 056; entity 057 replaces with DB-backed). If a scan implementation is out of scope for 056, pass a trivial `async () => []` scanner and note in code comment that entity 057 supplies the real one. (The FO simulator test in T7 injects its own scanner, so the real daemon can ship with an empty scanner without blocking AC.)
+  4. `const bridge = createCoordinationClientBridge({ db, entityScanner, leaseDurationMs })`. Replace `const stub = createCoordinationClientStub()` line.
+  5. Change `onCoordinationRequest` to dispatch to `bridge[method](...)` instead of `stub[method](...)`. Error serialization already handled by socket-server.ts.
+  6. Start janitor: `const janitorTimer = setInterval(() => bridge.expireDue(Date.now()), janitorIntervalMs)`. Add `clearInterval(janitorTimer)` inside `shutdown()`.
+  7. Keep `coordination-client-stub.ts` + its test (used by unit tests that don't need coordination).
+- **acceptance_criteria**:
+  - `bun test spacebridge/src/daemon/integration.test.ts` still passes (existing daemon lifecycle intact).
+  - A new integration test `daemon-coordination.test.ts` spawns the daemon with `SPACEBRIDGE_LEASE_DURATION_MS=500 SPACEBRIDGE_JANITOR_INTERVAL_MS=100`, acquires a lease, waits >700ms, then asserts the lease is expired (AC-5, janitor wired).
+  - Daemon shutdown closes the janitor (no dangling timer — verified by checking the daemon process exits within the integration test timeout).
+  - `grep -n "createCoordinationClientStub" spacebridge/bin/daemon.ts` returns 0 matches (swap is complete).
+- **files_modified**:
+  - `spacebridge/bin/daemon.ts`
+  - `spacebridge/src/daemon/daemon-coordination.test.ts` (new integration test)
+
+### Task 7 -- FO simulator integration test + concurrent acquire + replay
+
+- **model**: sonnet
+- **wave**: 3 (depends on T6)
+- **skills hint**: `superpowers:verification-before-completion`
+- **read_first**:
+  - `spacebridge/src/ipc/integration.test.ts` (client/server round-trip pattern)
+  - `spacebridge/src/daemon/integration.test.ts` (spawn pattern)
+  - `spacebridge/src/ipc/socket-client.ts` (createSocketClient)
+- **action**:
+  1. Create `spacebridge/tests/fo-simulator.integration.test.ts` (top-level `tests/` dir is acceptable; follow the existing location convention -- if tests live in `src/` elsewhere, put this in `src/ipc/` as `fo-simulator.integration.test.ts`). Decide based on observed layout at execution time. The test:
+     - Spawns daemon with `SPACEBRIDGE_STATE_DIR=$TMP`, `SPACEBRIDGE_AUTO_STOP=1`.
+     - Seeds 2 entity files (or injects a fake scanner via test-mode env, if the daemon exposes it) representing entities `A` and `B`.
+     - Connects 1 shim client; calls `coordination-request` with `method: "getAvailableWork", args: ["FO"]` → asserts returns `[A, B]`.
+     - Calls `acquireEntity(A, FO, session1)` → asserts returns a `LeaseToken`.
+     - Calls `getAvailableWork(FO)` again → asserts returns `[B]` only (AC-7).
+     - Calls `releaseEntity(token, "done")` → asserts success; `getAvailableWork(FO)` → returns `[A, B]` again (AC-8).
+  2. Create `spacebridge/src/ipc/coordination-concurrent.test.ts`: 2 shim clients call `acquireEntity` on the same `(slug, role)` in parallel (`Promise.all`); asserts exactly 1 succeeds, 1 receives error containing `LeaseConflict` (AC-3).
+  3. Create `spacebridge/src/domain/lease/replay.integration.test.ts`: write events via `appendEvents` in one DB, then instantiate a fresh bridge over the same DB path, call `getAvailableWork` → asserts state reflects all prior events (AC-6). This is NOT a full daemon restart test (simpler and deterministic), but validates the replay semantic end-to-end.
+- **acceptance_criteria**:
+  - All three new tests pass via `bun test`.
+  - AC-3 verified (concurrent acquire → 1 success + 1 LeaseConflict).
+  - AC-6 verified (event log replay reconstructs state).
+  - AC-7 verified in FO simulator (getAvailableWork filters leased entities).
+  - AC-8 verified in FO simulator (release-done returns entity to pool).
+  - Running `bun test` from `spacebridge/` passes fully with no regressions.
+- **files_modified**:
+  - `spacebridge/src/ipc/fo-simulator.integration.test.ts` (new)
+  - `spacebridge/src/ipc/coordination-concurrent.test.ts` (new)
+  - `spacebridge/src/domain/lease/replay.integration.test.ts` (new)
+
+## UAT Spec
+
+Scope note: entity 056 is bridge-side daemon work. There is no UI to click through. FO integration is simulated in T7; real FO prompt wiring is deferred to a post-PR2 entity (per Q-1). All UAT items are **cli** or **api** class.
+
+### UAT-1 (cli) -- Daemon starts and accepts coordination requests
+
+- **Type**: cli
+- **Setup**: `export SPACEBRIDGE_STATE_DIR=$(mktemp -d); cd spacebridge && bun bin/daemon.ts start &`
+- **Verify**: `bun bin/daemon.ts status` reports `daemon running`. `ls $SPACEBRIDGE_STATE_DIR` shows `spacebridge.sock`, `spacebridge.pid`, `spacebridge.db`.
+- **Teardown**: `bun bin/daemon.ts stop`.
+- **Pass criteria**: status reports running; db file created; no errors on stop.
+
+### UAT-2 (cli) -- All bun tests pass in spacebridge/
+
+- **Type**: cli
+- **Command**: `cd spacebridge && bun test`
+- **Pass criteria**: 0 failures; new test files (decider.test.ts, evolve.test.ts, persistence.test.ts, coordination-client-bridge.test.ts, daemon-coordination.test.ts, fo-simulator.integration.test.ts, coordination-concurrent.test.ts, replay.integration.test.ts, schemas.test.ts) all appear in output.
+
+### UAT-3 (cli) -- Repo-root test suite passes (regression check per MEMORY)
+
+- **Type**: cli
+- **Command**: `cd /path/to/repo-root && bun test`
+- **Pass criteria**: Full repo test suite passes (per MEMORY: "Test Suite Scope -- Repo Root vs Tool Dir"). Catches any cross-package regression.
+
+### UAT-4 (cli) -- LCD schema discipline mechanical check
+
+- **Type**: cli
+- **Command**: `grep -E 'serial|timestamptz|datetime|RETURNING' spacebridge/drizzle/*.sql`
+- **Pass criteria**: zero matches (AC-10).
+
+### UAT-5 (cli) -- Stub is preserved for unit-test consumers
+
+- **Type**: cli
+- **Command**: `test -f spacebridge/src/ipc/coordination-client-stub.ts && bun test spacebridge/src/ipc/coordination-client-stub.test.ts`
+- **Pass criteria**: stub file exists; its test passes unchanged (A-6 preserved).
+
+### UAT-6 (api) -- Janitor expires leases under real time
+
+- **Type**: api (subprocess integration)
+- **Covered by**: `daemon-coordination.test.ts` (Task 6 AC). Run as: `bun test spacebridge/src/daemon/daemon-coordination.test.ts`.
+- **Pass criteria**: Lease acquired at T=0 with 500ms duration is reported expired (absent from `getAvailableWork` response) after T>600ms with 100ms janitor interval.
+
+### UAT-7 (api) -- Concurrent acquire resolves to exactly one winner
+
+- **Type**: api
+- **Covered by**: `coordination-concurrent.test.ts`. Run as: `bun test spacebridge/src/ipc/coordination-concurrent.test.ts`.
+- **Pass criteria**: Of two parallel `acquireEntity` calls, one resolves with a LeaseToken; the other rejects with an error message containing `LeaseConflict`.
+
+### UAT-8 (interactive) -- Captain sign-off on scope closure
+
+- **Type**: interactive
+- **Question to captain**: "Entity 056 shipped bridge-side. PR2 (engine-side FO wiring) remains a separate follow-up. Do you confirm the simulator test satisfies your scope for 056, and that FO real integration is tracked elsewhere (057 or a new entity)?"
+- **Pass criteria**: captain answers YES; no scope creep requested.
+
+## Validation Map
+
+Every AC from the entity's Acceptance Criteria section maps to exactly one task and one verification command.
+
+| Requirement | Task | Command | Status |
+|---|---|---|---|
+| AC-1: acquire returns acquired event when no conflict | T3 | `bun test spacebridge/src/domain/lease/decider.test.ts` (case: acquire-empty) | PLANNED |
+| AC-2: acquire throws LeaseConflict on (entity, role) collision | T3 | `bun test spacebridge/src/domain/lease/decider.test.ts` (case: acquire-conflict) | PLANNED |
+| AC-3: concurrent acquire -- one wins, one rejects | T7 | `bun test spacebridge/src/ipc/coordination-concurrent.test.ts` | PLANNED |
+| AC-4: extend resets expires_at | T3 | `bun test spacebridge/src/domain/lease/decider.test.ts` (case: extend-active) | PLANNED |
+| AC-5: janitor expires past-due leases | T6 | `bun test spacebridge/src/daemon/daemon-coordination.test.ts` (case: janitor expires) | PLANNED |
+| AC-6: event replay reconstructs state across fresh instance | T7 (+ T4 pure replay) | `bun test spacebridge/src/domain/lease/replay.integration.test.ts` | PLANNED |
+| AC-7: getAvailableWork excludes leased entities | T7 (via T5 bridge logic) | `bun test spacebridge/src/ipc/fo-simulator.integration.test.ts` (step 3-4) | PLANNED |
+| AC-8: release('done') returns entity to pool | T7 | `bun test spacebridge/src/ipc/fo-simulator.integration.test.ts` (step 5) | PLANNED |
+| AC-9: release('abort') leaves entity in current phase | T3 (decider event) + T7 (RPC smoke) | `bun test spacebridge/src/domain/lease/decider.test.ts` (case: release-abort) | PLANNED |
+| AC-10: LCD schema discipline on any new table | T2 | `grep -E 'serial|timestamptz|datetime|RETURNING' spacebridge/drizzle/*.sql` (0 matches) | PLANNED |
+
+Each task's `files_modified` entry in the PLAN section maps to a workflow-index append call at plan approval (see Stage Report: plan).
+
+## Stage Report: plan
+
+- [x] Research findings produced: DONE
+  5 domains covered: Upstream Constraints (fmodel + design doc §5.1/§5.3/§3.3/§3.5 + engine-freeze invariant), Existing Patterns (test isolation, schema application layering, fmodel columns, IPC routing, daemon lifecycle hooks, coordination response errors), Library / API Surface (Zod not yet a dep, Drizzle table template, drizzle-kit generate, bun:test, unix socket integration pattern), Known Gotchas (var hoisting, fix-forward commits, schema drift, janitor-acquire race, O-2 semantics, migration parity, replay ordering), Reference Examples (entity 050 fmodel columns, entity 052 daemon spawn, stub injection point, pure-module pattern precedent).
+  Research subagent dispatches: 0 (deferred — all Confident ≥0.85 assumptions, no external tech claims, fmodel pattern defined in design doc; findings synthesized inline via direct read of spacebridge/src, bin/daemon.ts, package.json, drizzle/0000_*.sql).
+- [x] PLAN produced: DONE
+  7 tasks across 3 waves with full per-task attributes. Wave 1 (T1, T2) parallel foundation; Wave 2 (T3, T4) parallel pure domain; Wave 3 (T5→T6→T7) serial integration. Every task specifies model, wave, skills hint, read_first, action, acceptance_criteria, files_modified.
+- [x] UAT Spec produced: DONE
+  8 items: 5 cli, 2 api, 1 interactive. Covers daemon lifecycle smoke, full bun test, repo-root regression, LCD mechanical grep, stub preservation, janitor expiry, concurrent acquire, captain scope sign-off on simulator-only FO satisfaction.
+- [x] Validation Map produced: DONE
+  All 10 ACs from the entity's Acceptance Criteria section mapped exactly once to (task, command, status=PLANNED).
+- [x] Plan-checker pass: DONE
+  Inline self-review across 7 dimensions (AC coverage, task dependencies, read_first sufficiency, scope discipline, risks/gotchas, testability, workflow-index). Verdict PASS on iteration 1. Revision iterations: 1 (no corrections required). Subagent plan-checker deferred because subagents cannot recursively dispatch Agent per MEMORY: subagent-cannot-nest-agent-dispatch; captain review follows.
+- [x] workflow-index append called: DONE
+  1 append operation covering 7 tasks and 23 file targets (6 updates to existing sections: bin/daemon.ts, bun.lock, package.json, src/db.ts, src/schema.test.ts, src/schema.ts; 17 new sections: drizzle/0001_*.sql, src/daemon/daemon-coordination.test.ts, src/domain/lease/{decider.test,decider,errors,evolve.test,evolve,persistence.test,persistence,replay.integration.test,schemas.test,schemas,types}.ts, src/ipc/{coordination-client-bridge.test,coordination-client-bridge,coordination-concurrent.test,fo-simulator.integration.test}.ts). Committed as `chore(index): add contracts for entity-spacebridge-role-aware-lease-manager entering plan` on branch spacedock-ensign/spacebridge-role-aware-lease-manager.
+
+Plan confidence: 92% (below 95% auto-advance threshold → captain gate).
+Factors:
+- Context completeness: HIGH (SO pipeline fully confirmed; 7 Confident assumptions; 2 options selected; 2 questions answered; explore Stage Report clean).
+- Scope clarity: HIGH (7 tasks with clear file boundaries; ACs all mapped; no decomposition opportunity given fmodel aggregate cohesion).
+- Risk level: MEDIUM (new domain module + new table + daemon behavioral change + janitor timing; mitigated by pure-module discipline, `:memory:` test isolation, env-configurable intervals, and simulator test for FO).
+- Precedent strength: HIGH (entity 050 schema pattern, entity 052 daemon lifecycle + integration test pattern, existing coordination-client-stub.ts matches the target interface exactly).
+- AC testability: HIGH (10 ACs → mostly unit tests + 3 integration tests; LCD via grep; concurrent acquire + replay have established patterns).
+Reason for <95%: T6's entityScanner implementation choice (trivial stub returning [] vs real filesystem scanner) is intentionally left to task-execution judgment rather than pre-wired; T7's test file location convention (`src/ipc/` vs top-level `tests/`) is resolved at execute time. Both are low-risk but non-zero open calls. Captain should confirm simulator-only FO satisfaction per UAT-8 before merge regardless of confidence gate.
+
+
