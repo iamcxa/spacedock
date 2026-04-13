@@ -529,3 +529,29 @@ All applicable quality checks are complete. Entity 076 is a documentation update
 1. In `skills/build-clarify/SKILL.md` lines 273, 276, 279: replace `->` with `→` in the three annotation format lines inside Response handling.
 2. In `skills/build-clarify/references/output-format.md` lines 92, 101: replace `->` with `→` in the new Open Exploration Item section description and example.
 3. (Optional NIT) Update CONTRACTS.md entries for `clarify-open-exploration-loop` from `🟡 in-flight` to `✅ final`.
+
+## Stage Report: review (cycle 2)
+
+### Verification of Feedback Cycle 1 Findings
+
+**F-1 (HIGH/DOC):** Arrow style consistency in Step 4.5 annotations
+- [x] FIXED
+  - `skills/build-clarify/SKILL.md` lines 273, 276, 279: All annotation format lines now use `→` (U+2192 unicode) instead of `->` (ASCII)
+  - `skills/build-clarify/references/output-format.md` lines 92, 101: Both description and example now use `→` consistently
+  - Verified via grep: all instances of `Confirmed:`, `Corrected by`, and `Selected:` annotation patterns use `→`
+
+**F-2 (LOW/DOC):** Arrow-style rule in Open Exploration Item section
+- [x] FIXED
+  - `skills/build-clarify/references/output-format.md` line 108: Added explicit rule: "All annotation arrows use → (U+2192 unicode), never -> (ASCII)"
+  - Rule appears in the Open Exploration Item section per specification
+  - Matches style of existing arrow-style rules in other annotation sections (lines 33-39)
+
+**F-3 (NIT/DOC):** CONTRACTS.md status update
+- [x] FIXED
+  - `docs/build-pipeline/_index/CONTRACTS.md`: Both `clarify-open-exploration-loop` contract rows now show `✅ final` status (previously `🟡 in-flight`)
+  - Last Updated: 2026-04-13
+  - Applied to both SKILL.md and output-format.md contract entries
+
+### Verdict
+
+**PASSED** -- All 3 findings from feedback cycle 1 are fixed and verified. Ready to advance.
