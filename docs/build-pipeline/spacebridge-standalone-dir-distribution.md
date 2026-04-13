@@ -1,8 +1,8 @@
 ---
 id: 059
 title: "Standalone directory distribution + wrapper CLI"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md); scope revised 2026-04-10 after entity 049 spike
 started:
 completed:
@@ -67,22 +67,27 @@ depends-on: [053]
 A-1: daemon.ts already implements cmdStart, cmdStop, cmdStatus with full functionality -- cli.ts delegates to these, does not reimplement.
 Confidence: 🟢 Confident (0.95)
 Evidence: daemon.ts:31 cmdStart (socket server + PID + shutdown handlers), daemon.ts:132 cmdStop (read PID + SIGTERM), daemon.ts:160 cmdStatus (__status RPC query). Line 258-268 routes via `Bun.argv[2]`.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: The MCP shim entry point is `autoForkDaemon()` from auto-fork.ts, which checks for existing daemon and starts the shim connection.
 Confidence: 🟢 Confident (0.90)
 Evidence: auto-fork.ts:62 `autoForkDaemon()` exported. channel-provider-bridge.ts:18 creates the ChannelProvider bridge over a SocketClient. Together they form the shim startup path for the `mcp` subcommand.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-3: `~/.spacedock/spacebridge.db` path persists across upgrades -- the CLI/build never touches user data.
 Confidence: 🟢 Confident (0.95)
 Evidence: db.ts:116 `defaultDbPath()` returns `${homedir()}/.spacedock/spacebridge.db`. This is outside the plugin install directory. Upgrades replace plugin files but not `~/.spacedock/`.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-4: Build script runs `bun run --bun next build` from `spacebridge/ui/` with `output: 'standalone'` in next.config.ts.
 Confidence: 🟢 Confident (0.90)
 Evidence: Entity 049 V4-V5 verified this exact command. Entity 053 O-1 placed Next.js at `spacebridge/ui/`. Note: `ui/` directory doesn't exist yet (053 not executed) -- build script validates existence before running.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-5: Post-build static/public copy is a 2-line `cp -r` operation that is idempotent.
 Confidence: 🟢 Confident (0.95)
 Evidence: Entity 049 Results section documents this step. Entity 053 A-6 confirmed it. Standard Next.js standalone deployment step.
+→ Confirmed: captain, 2026-04-13 (batch)
 
 ## Option Comparisons
 
@@ -98,6 +103,8 @@ Return value trace: auto-fork.ts:62 `autoForkDaemon()` spawns `bin/daemon.ts sta
 
 Design doc invariant check: §3.1:186 says "thin `spacebridge` CLI wrapper". This implies a separate wrapper, not extending daemon.ts. The design doc envisions daemon.ts as the daemon process and a wrapper as the user-facing CLI.
 
+→ Selected: 新建 bin/cli.ts，委派 daemon 命令 + 新增 mcp/share (captain, 2026-04-13, interactive)
+
 ## Open Questions
 
 Q-1: How does the Claude Code plugin mechanism register `spacebridge` as a CLI command available to the user?
@@ -107,6 +114,8 @@ Domain: Readable/Textual, Runnable/Invokable
 Why it matters: The acceptance criterion says "spacebridge start is available as a command" after plugin install. But `.claude-plugin/plugin.json` currently has no `bin` or `commands` field -- just metadata (name, version, description). If CC plugins don't support a `bin` entry, the CLI might need to be registered via a different mechanism (e.g., the plugin's skills invoke it, or the user runs `bun spacebridge/bin/cli.ts` directly instead of a bare `spacebridge` command).
 
 Suggested options: (a) Add a `bin` field to plugin.json (e.g., `"bin": {"spacebridge": "bin/cli.ts"}`) -- if CC plugin spec supports it, this is the cleanest path. (b) No global command -- users run `bun /path/to/spacebridge/bin/cli.ts start` directly or via an alias. Simpler, no plugin spec dependency. (c) Register as a CC skill that wraps the CLI -- `spacebridge:start`, `spacebridge:stop`, etc. Integrates with CC UX but adds skill boilerplate.
+
+→ Answer: (b) 不註冊全域命令 -- 使用者直接執行 `bun bin/cli.ts start` 或設 alias。MCP shim 透過 .mcp.json stdio transport 啟動，不需要全域 CLI。簡單且不依賴 CC plugin spec 的 bin 欄位。 (captain, 2026-04-13, interactive)
 
 ## Stage Report: explore
 
@@ -123,3 +132,34 @@ Suggested options: (a) Add a `bin` field to plugin.json (e.g., `"bin": {"spacebr
 - [x] Scale assessment: confirmed Small
   4 files across 3 layers; thin wrapper + build script + plugin config
 - [x] Research dispatched: 0 researchers (skipped -- Small entity, all tech validated by entity 049 spike and existing codebase)
+
+## Canonical References
+
+- `spacebridge/bin/daemon.ts` -- cmdStart/cmdStop/cmdStatus implementations (A-1), argv routing at line 258 (O-1 comparison)
+- `spacebridge/src/daemon/auto-fork.ts` -- autoForkDaemon() shim entry point (A-2)
+- `spacebridge/src/ipc/channel-provider-bridge.ts` -- ChannelProvider RPC bridge for mcp subcommand (A-2)
+- `spacebridge/src/db.ts` -- defaultDbPath() for upgrade persistence (A-3)
+- `spacebridge/.claude-plugin/plugin.json` -- plugin manifest to modify (Q-1)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  Small entity, no decomposition recommendation
+- [x] Re-validation: 5 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  All evidence verified in current session; Small scope, no gaps from templates
+- [x] Assumptions confirmed: 5 / 5 (0 corrected)
+  A-1 through A-5 confirmed batch
+- [x] Options selected: 1 / 1
+  O-1 new bin/cli.ts (recommended) -- clean separation from daemon.ts
+- [x] Questions answered: 1 / 1
+  Q-1 no global CLI command -- users run bun bin/cli.ts directly, MCP via .mcp.json
+- [x] Open exploration: 0 gray areas surfaced (0 from templates, 0 from CONTRACTS, 0 from directive, 0 via freeform)
+  Captain noted CI discussion is premature; complete on first iteration
+- [x] Canonical refs added: 5
+  daemon.ts, auto-fork.ts, channel-provider-bridge.ts, db.ts, plugin.json
+- [x] Context status: ready
+  Gate passed: all 5 assumptions confirmed, 1 option selected, 1 Q answered
+- [x] Handoff mode: loose
+  No auto_advance in frontmatter; captain must say "execute 059" to advance
+- [x] Clarify duration: 4 questions asked, session complete
+  1 batch confirmation + 1 option selection + 1 Q answer + 1 exploration iteration
