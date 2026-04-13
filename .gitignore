@@ -20,3 +20,7 @@ docs/build-pipeline/*.comments.json
 
 # Unrelated tool config
 recce.yml
+
+# spacebridge Next.js UI
+spacebridge/ui/.next
+spacebridge/ui/node_modules

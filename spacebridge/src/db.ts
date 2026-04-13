@@ -94,6 +94,16 @@ function applySchema(sqlite: Database): void {
     )
   `);
   sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS lease_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      aggregate_id TEXT NOT NULL,
+      sequence_number INTEGER NOT NULL,
+      event_type TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      timestamp INTEGER NOT NULL
+    )
+  `);
+  sqlite.exec(`
     CREATE TABLE IF NOT EXISTS share_tokens (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       token TEXT NOT NULL UNIQUE,

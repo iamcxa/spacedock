@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "type": "module",
   "dependencies": {
-    "drizzle-orm": "^0.40.0"
+    "drizzle-orm": "^0.40.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "drizzle-kit": "^0.30.0",

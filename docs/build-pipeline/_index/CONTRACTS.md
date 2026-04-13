@@ -12,6 +12,13 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Declare trailofbits + iamcxa-plugins marketplaces and enable 7 plugins | ✅ final | 2026-04-12 |
 
+
+### .gitignore
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | Ignore spacebridge/ui build artifacts (.next, node_modules) | 🔵 planned | 2026-04-13 |
+
 ### agents/code-explorer.md
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -41,6 +48,13 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent for variant-analysis trailofbits skill | ✅ final | 2026-04-12 |
+
+
+### docs/architecture/spacebridge-ui.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | Document war room UI spawn lifecycle + port 8420 + SPACEBRIDGE_SKIP_UI | 🔵 planned | 2026-04-13 |
 
 ### docs/build-pipeline/_mods/pr-merge.md
 
@@ -207,11 +221,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | build-flow-tdd-discipline | execute | Add TDD Mode RED-GREEN-REFACTOR sub-cycle activated by test_first flag | in-flight | 2026-04-12 |
 
 ### spacebridge/bin/daemon.ts
+| spacebridge-nextjs-warroom-sse-feed | plan | Spawn Next.js UI standalone as child process on port 8420 + graceful shutdown | 🔵 planned | 2026-04-13 |
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | Daemon entry point with start/stop/status subcommands | 🔵 planned | 2026-04-12 |
-| spacebridge-nextjs-warroom-sse-feed | execute | Integrate Next.js standalone child-process spawn into cmdStart/shutdown | 🟡 in-flight | 2026-04-13 |
+| spacebridge-role-aware-lease-manager | plan | Swap stub→bridge client, mount lease janitor, add lease/janitor env config | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/src/daemon/auto-fork.test.ts
 
@@ -224,6 +239,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | Shim-side auto-fork daemon logic with lock + socket probe | 🔵 planned | 2026-04-12 |
+
+### spacebridge/src/daemon/daemon-coordination.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Integration test: janitor expires lease with short duration via env config | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/src/daemon/index.ts
 
@@ -249,6 +270,20 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | mkdir-based atomic lock file for double-fork prevention | 🔵 planned | 2026-04-12 |
 
+
+
+### spacebridge/src/daemon/nextjs-child.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | TDD tests for Next.js child process spawn + SIGTERM + SIGKILL timeout | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/daemon/nextjs-child.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | spawnNextjsChild/shutdownNextjsChild/resolveNextjsServerScript helpers | 🔵 planned | 2026-04-13 |
+
 ### spacebridge/src/daemon/pid.test.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -261,89 +296,325 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | PID file management -- write, read, alive check, stale cleanup | 🔵 planned | 2026-04-12 |
 
+### spacebridge/src/domain/lease/decider.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Pure decider unit tests: acquire conflict, release outcomes, extend, expire idempotency | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/decider.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Pure decider(cmd, state, now) for lease CQRS aggregate, zero I/O | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/errors.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Named error classes: LeaseConflict, LeaseNotFound, LeaseExpired | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/evolve.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Pure evolve + replay unit tests: events apply to state correctly | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/evolve.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Pure evolve(state, event) + replay(events) reducer for LeaseState | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/persistence.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Round-trip tests: appendEvents → loadAllEvents → replay equivalence; snapshot upsert | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/persistence.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Lease event log append + load; entity_leases snapshot projection maintenance | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/replay.integration.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Integration: fresh bridge over existing DB replays events into equivalent state (AC-6) | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/schemas.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Spot-check Zod command/event schemas reject malformed input | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/schemas.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Zod schemas for LeaseCommand and LeaseEvent variants with .passthrough() | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/domain/lease/types.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Domain types: Role, EntityRef, LeaseToken, LeaseState, LeaseCommand, LeaseEvent unions | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/ipc/coordination-client-bridge.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Bridge client unit tests: acquire/release/extend/getAvailableWork against :memory: DB | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/ipc/coordination-client-bridge.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Real CoordinationClient wiring decider + persistence + entityScanner; replaces stub | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/ipc/coordination-concurrent.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | Concurrent acquire integration test: exactly one winner, one LeaseConflict (AC-3) | 🔵 planned | 2026-04-13 |
+
+### spacebridge/src/ipc/fo-simulator.integration.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | FO simulator over unix socket: getAvailableWork → acquire → release cycle (AC-7, AC-8) | 🔵 planned | 2026-04-13 |
+
 ### spacebridge/src/ipc/types.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | Add __status RPC response type for daemon status query | 🔵 planned | 2026-04-12 |
 
-### spacebridge/src/daemon/nextjs-child.ts
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### spacebridge/ui/app/api/events/route.test.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| spacebridge-nextjs-warroom-sse-feed | execute | spawnNextjsChild / shutdownNextjsChild helpers for daemon lifecycle integration | 🟡 in-flight | 2026-04-13 |
-
-### spacebridge/src/daemon/nextjs-child.test.ts
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| spacebridge-nextjs-warroom-sse-feed | execute | TDD integration tests for spawn + graceful shutdown + SIGKILL fallback | 🟡 in-flight | 2026-04-13 |
+| spacebridge-nextjs-warroom-sse-feed | plan | TDD tests for SSE Route Handler -- streaming + abort cleanup | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/ui/app/api/events/route.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| spacebridge-nextjs-warroom-sse-feed | execute | SSE Route Handler polling events table 500ms, ReadableStream + abort cleanup | 🟡 in-flight | 2026-04-13 |
+| spacebridge-nextjs-warroom-sse-feed | plan | SSE Route Handler polling events table at 500ms interval | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/app/globals.css
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | Tailwind v4 + shadcn theme (CSS-only config, no tailwind.config.js) | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/ui/app/layout.tsx
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| spacebridge-nextjs-warroom-sse-feed | execute | Next.js App Router root layout with shadcn globals.css | 🟡 in-flight | 2026-04-13 |
+| spacebridge-nextjs-warroom-sse-feed | plan | Root Server Component layout -- html/body + imports globals.css | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/ui/app/page.tsx
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| spacebridge-nextjs-warroom-sse-feed | execute | War room Server Component fetching entities from filesystem + leases from DB | 🟡 in-flight | 2026-04-13 |
+| spacebridge-nextjs-warroom-sse-feed | plan | War room Server Component -- fetches entities + leases, passes to WarRoom | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/bun.lock
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | Bun lockfile for spacebridge-ui Next.js project | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/components.json
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | shadcn/UI v4 config (New York style, Neutral base, CSS variables) | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/components/empty-state.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | Empty-state Server Component when zero connected sessions | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/ui/components/entity-card.tsx
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| spacebridge-nextjs-warroom-sse-feed | execute | Server-safe entity card with slug/title/status/stage/lease badges | 🟡 in-flight | 2026-04-13 |
+| spacebridge-nextjs-warroom-sse-feed | plan | Entity card Server Component -- Card + Badge + Tooltip (slug/title/status/stage/lease) | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/ui/components/live-feed.tsx
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| spacebridge-nextjs-warroom-sse-feed | execute | Client Component SSE EventSource consumer with ScrollArea + auto-scroll | 🟡 in-flight | 2026-04-13 |
+| spacebridge-nextjs-warroom-sse-feed | plan | Live feed Client Component -- EventSource consumer, newest-first, auto-scroll to top | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/components/repo-section.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | Collapsible repo grid Server Component (HTML details, no JS state) | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/components/ui/badge.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | shadcn Badge primitive | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/components/ui/button.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | shadcn Button primitive | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/components/ui/card.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | shadcn Card primitive | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/components/ui/scroll-area.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | shadcn ScrollArea primitive | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/components/ui/separator.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | shadcn Separator primitive | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/components/ui/skeleton.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | shadcn Skeleton primitive | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/components/ui/tabs.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | shadcn Tabs primitive | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/components/ui/tooltip.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | shadcn Tooltip primitive | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/ui/components/war-room.tsx
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| spacebridge-nextjs-warroom-sse-feed | execute | Client Component Tabs war room layout with repo grouping | 🟡 in-flight | 2026-04-13 |
+| spacebridge-nextjs-warroom-sse-feed | plan | War room Client Component -- Tabs (All + per-repo), two-column layout w/ LiveFeed | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/lib/db.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | TDD tests for read-only DB factory + schema re-export | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/ui/lib/db.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| spacebridge-nextjs-warroom-sse-feed | execute | openReadOnlyDb factory for UI read-only Drizzle access | 🟡 in-flight | 2026-04-13 |
+| spacebridge-nextjs-warroom-sse-feed | plan | Read-only Drizzle DB factory -- opens spacebridge.db with readonly:true | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/lib/entity-parse.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | TDD tests for frontmatter parser (graceful fallback on malformed) | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/ui/lib/entity-parse.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| spacebridge-nextjs-warroom-sse-feed | execute | Inline-duplicate of frontmatter-io splitFrontmatter/parseEntity with graceful fallback | 🟡 in-flight | 2026-04-13 |
+| spacebridge-nextjs-warroom-sse-feed | plan | YAML frontmatter parser (inline-duplicate from tools/dashboard/src/frontmatter-io.ts) | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/lib/entity-scan.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | TDD tests for entity scan -- skips malformed files without throw | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/ui/lib/entity-scan.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| spacebridge-nextjs-warroom-sse-feed | execute | scanEntitiesForRepo reads docs/build-pipeline/*.md and returns EntityCard[] | 🟡 in-flight | 2026-04-13 |
+| spacebridge-nextjs-warroom-sse-feed | plan | Scan docs/build-pipeline/*.md per projectRoot, return EntityCard[] | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/lib/utils.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | shadcn cn() classname helper (tailwind-merge + clsx) | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/ui/next.config.mjs
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| spacebridge-nextjs-warroom-sse-feed | execute | Next.js config with output standalone + reactStrictMode | 🟡 in-flight | 2026-04-13 |
+| spacebridge-nextjs-warroom-sse-feed | plan | Next.js config -- output:standalone, reactStrictMode:true | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/ui/package.json
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| spacebridge-nextjs-warroom-sse-feed | execute | Next.js 16 + React 19 + Bun subproject package with build/start scripts | 🟡 in-flight | 2026-04-13 |
+| spacebridge-nextjs-warroom-sse-feed | plan | Spacebridge UI Next.js 16 + React 19 + Drizzle project manifest | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/postcss.config.mjs
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | PostCSS config -- @tailwindcss/postcss plugin (Tailwind v4) | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/public/.gitkeep
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | Empty public dir placeholder for standalone build copy step | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/tsconfig.json
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-nextjs-warroom-sse-feed | plan | TypeScript config for Next.js App Router (strict, bundler resolution, paths) | 🔵 planned | 2026-04-13 |
 
 ### tests/fixtures/pr-review-loop-pipeline/README.md
 
@@ -448,6 +719,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Lockfile from bun install for drizzle-orm deps | 🔵 planned | 2026-04-12 |
+| spacebridge-role-aware-lease-manager | plan | Lockfile refresh after bun add zod | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/drizzle.config.ts
 
@@ -461,6 +733,12 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Generated LCD-compliant SQL migrations for 5 tables | 🔵 planned | 2026-04-12 |
 
+### spacebridge/drizzle/0001_*.sql
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-role-aware-lease-manager | plan | drizzle-kit generated migration for new lease_events table | 🔵 planned | 2026-04-13 |
+
 ### spacebridge/drizzle/meta/_journal.json
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -472,6 +750,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Package manifest with drizzle-orm and drizzle-kit deps | 🔵 planned | 2026-04-12 |
+| spacebridge-role-aware-lease-manager | plan | Add zod runtime dependency for lease command/event schemas | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/src/db.test.ts
 
@@ -484,18 +763,21 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Drizzle DB factory with bun:sqlite WAL and default path | 🔵 planned | 2026-04-12 |
+| spacebridge-role-aware-lease-manager | plan | Add lease_events CREATE TABLE IF NOT EXISTS mirror in applySchema | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/src/schema.test.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Schema validation tests -- table creation, LCD compliance, CRUD, fmodel columns | 🔵 planned | 2026-04-12 |
+| spacebridge-role-aware-lease-manager | plan | Add lease_events insert/query case + LCD grep pass | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/src/schema.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Drizzle LCD schema -- 5 tables with fmodel-compatible columns | 🔵 planned | 2026-04-12 |
+| spacebridge-role-aware-lease-manager | plan | Add leaseEvents table (append-only event log for lease CQRS aggregate) | 🔵 planned | 2026-04-13 |
 
 ### spacebridge/tsconfig.json
 
