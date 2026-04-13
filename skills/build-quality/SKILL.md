@@ -18,7 +18,7 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
 ## Tools Available
 
 **Can use:**
-- `Bash` -- run `bun test`, `bun lint`, `bunx tsc --noEmit`, `bun build`, and project ops-config reads
+- `Bash` -- run `bun test`, `bun lint`, `bunx tsc --noEmit`, `bun build`, project ops-config reads, and `find` for config file scanning (Step 0.5 language detection)
 - `Read` -- open the entity file to find the quality section anchor, open workflow ops config if coverage threshold is defined
 - `Grep` -- only to locate the ops-config file if its path is not already known
 - `Write` / `Edit` -- only to append the `## Stage Report: quality` section to the entity body
@@ -43,6 +43,35 @@ If any field is missing, proceed with best-effort discovery (e.g. Grep the repo 
 
 ---
 
+## Step 0.5: Language and Runner Detection
+
+Auto-detect which languages are present in the project by scanning for config files at the repo root and one level of subdirectories. This step runs once; Steps 1-4 consume its output.
+
+**Detection table:**
+
+| Config file | Language | Test runner | Type checker | Linter | Build |
+|-------------|----------|-------------|--------------|--------|-------|
+| `tsconfig.json` | TypeScript | `bun test` (default), `vitest run` (if vitest.config.*), `npx jest` (if jest.config.*) | `bunx tsc --noEmit -p {tsconfig_path}` | `bun lint` (if eslint config exists) | `bun build` (if build script in package.json) |
+| `pyproject.toml` or `setup.py` | Python | `pytest` (if pytest in deps), `python -m unittest discover` (fallback) | `pyright` (if pyright in deps or pyrightconfig.json), `mypy` (if mypy in deps) | `ruff check .` (if ruff in deps) | n/a |
+| `go.mod` | Go | `go test ./...` | `go vet ./...` (built-in) | `golangci-lint run` (if installed) | `go build ./...` |
+| `Cargo.toml` | Rust | `cargo test` | (built-in to cargo check) | `cargo clippy` (if installed) | `cargo build` |
+
+**Procedure:**
+
+1. Scan for config files: `find . -maxdepth 2 -name "tsconfig.json" -o -name "pyproject.toml" -o -name "setup.py" -o -name "go.mod" -o -name "Cargo.toml" | head -20`
+2. For each detected config, resolve the runner by checking for runner-specific config files (vitest.config.ts, jest.config.js, pyrightconfig.json, etc.) in the same directory or repo root.
+3. Produce a `detected_languages` list of `{language, config_path, test_cmd, typecheck_cmd, lint_cmd, build_cmd}` objects.
+4. If no config files found, default to the legacy hardwired commands: `{language: "typescript", test_cmd: "bun test", typecheck_cmd: "bunx tsc --noEmit", lint_cmd: "bun lint", build_cmd: "bun build"}`.
+
+**Evidence:** Record the full find output and the resolved runner list in the evidence snippet for this step. The evidence is informational only -- Step 0.5 never fails.
+
+**TS enhanced sub-detection:** For each detected TypeScript config, also record:
+- `strict_mode`: whether `"strict": true` is set in compilerOptions
+- `include_globs`: the `include` array from the tsconfig
+These are consumed by Step 4.75 for TS-specific ratchets.
+
+---
+
 ## Step 1: Run `bun test` (Full Suite, Not Targeted)
 
 Execute the full project test suite:
@@ -54,6 +83,22 @@ bun test
 Capture exit code, stdout, and stderr. Record the last 40 lines of combined output (or the entire output if shorter) as the evidence snippet for this check. If any tests fail, also capture the full failing-test blocks (test name + assertion message + stack) for inclusion in the Stage Report.
 
 **No scope narrowing.** Even if execute only touched one file, you run the full suite. Even if the previous quality run failed on two tests and execute reported DONE, you run the full suite. Re-entry after a fix still runs the **bun test full suite** -- that is the whole point of the quality gate.
+
+**Runner-aware execution.** If Step 0.5 detected multiple languages, run the test command for EACH detected language sequentially. Record per-language test output. The overall Step 1 verdict is `fail` if ANY language's test command fails. Per-language results are recorded as sub-sections in the evidence snippet:
+
+```
+#### typescript
+command: bun test
+exit_code: 0
+output: {snippet}
+
+#### python
+command: pytest
+exit_code: 0
+output: {snippet}
+```
+
+If Step 0.5 produced only the legacy default (single TypeScript), run `bun test` exactly as before -- no behavioral change for single-language projects.
 
 **Verdict for this check:**
 - Exit code 0 and no failing-test lines → `pass`
@@ -71,6 +116,8 @@ bun lint
 
 Capture exit code and the full lint output. Record it verbatim in the evidence snippet. Do NOT run `bun lint --fix`. Do NOT restrict to changed files. The pre-commit hook already handles `--fix` on changed files during execute commits; your job is the project-wide invariant check.
 
+**Runner-aware execution.** If Step 0.5 detected multiple languages, run the lint command for EACH detected language sequentially. Record per-language lint output. The overall Step 2 verdict is `fail` if ANY language's lint command fails. Per-language results are recorded as sub-sections in the evidence snippet (same shape as Step 1). If Step 0.5 produced only the legacy default (single TypeScript), run `bun lint` exactly as before -- no behavioral change for single-language projects.
+
 **Verdict for this check:**
 - Exit code 0 → `pass`
 - Non-zero exit or any reported error → `fail`. Warnings-only output is a `pass` unless the workflow ops config defines `lint_warnings_are_errors: true`.
@@ -86,6 +133,8 @@ bunx tsc --noEmit
 ```
 
 Capture exit code and the full type-check output. Record every `error TS####` line verbatim. Do NOT attempt to narrow by file. Do NOT restrict to incremental mode; you run the cold, full-project check.
+
+**Runner-aware execution.** If Step 0.5 detected multiple languages, run the typecheck command for EACH detected language sequentially. For TypeScript, run `bunx tsc --noEmit -p {tsconfig_path}` for EACH detected tsconfig.json (there may be multiple: spacebridge/tsconfig.json, tools/dashboard/tsconfig.json). Record per-language typecheck output. The overall Step 3 verdict is `fail` if ANY language's typecheck command fails. Per-language results are recorded as sub-sections in the evidence snippet (same shape as Step 1). If Step 0.5 produced only the legacy default (single TypeScript), run `bunx tsc --noEmit` exactly as before -- no behavioral change for single-language projects.
 
 **Verdict for this check:**
 - Exit code 0 and no `error TS` lines → `pass`
@@ -103,9 +152,144 @@ bun build
 
 If the project does not define a `build` script, run the equivalent entry-point build command documented in the project CLAUDE.md (e.g. `bun run build` against a named entry point). Record evidence verbatim.
 
+**Runner-aware execution.** If Step 0.5 detected multiple languages, run the build command for EACH detected language sequentially. Record per-language build output. The overall Step 4 verdict is `fail` if ANY language's build command fails. Per-language results are recorded as sub-sections in the evidence snippet (same shape as Step 1). If Step 0.5 produced only the legacy default (single TypeScript), run `bun build` exactly as before -- no behavioral change for single-language projects.
+
 **Verdict for this check:**
 - Exit code 0 with no reported errors → `pass`
 - Non-zero exit or any reported build error → `fail`
+
+---
+
+## Step 4.5: Regression Gate (Cross-Entity)
+
+This step classifies whether Step 1 test failures are caused by the current entity's changes breaking a prior entity's test coverage. It does NOT re-run tests -- it reuses Step 1's already-captured results.
+
+**(1) Auto-pass shortcut.** If Step 1 verdict = `pass` (all tests green, exit code 0, zero failing-test lines), Step 4.5 verdict = `pass` with evidence:
+
+```
+Step 1 passed, all tests green including cross-entity coverage. No regression possible.
+```
+
+Skip to Step 5. Do NOT query CONTRACTS.md when Step 1 is green -- if all tests passed, prior entity tests also passed by definition.
+
+**(2) CONTRACTS.md query when Step 1 failed.** If Step 1 verdict = `fail`, read `docs/build-pipeline/_index/CONTRACTS.md`. Parse the `## Active Contracts` section: each subsection header is a file path (e.g., `### skills/build-review/SKILL.md`), and each table row under it has columns `Entity | Stage | Intent | Status | Last Updated`. Run:
+
+```bash
+git diff --name-only {execute_base}..HEAD
+```
+
+to get the current entity's file delta. For each file path in the delta, check if CONTRACTS.md has a subsection for that path with a DIFFERENT entity's row (status `final` or `in-flight`).
+
+**(3) Cross-entity regression classification.** For each failing test file from Step 1's evidence, check if the test's corresponding source file appears in CONTRACTS.md under a DIFFERENT entity (not the current one) with status `final` or `in-flight`. If yes, classify that failure as `cross-entity-regression`.
+
+Convention: for a failing test at `tests/foo/bar.test.ts`, the corresponding source file is typically `src/foo/bar.ts` or the closest co-located source. Use the file paths from Step 1's failing-test output (stack traces, file references) to identify which source files are involved.
+
+**(4) Verdict.**
+- If any `cross-entity-regression` classified failure found: verdict = `fail`, classification tag = `cross-entity-regression`, `feedback-to: execute` with prior entity context (entity slug + overlapping file path from CONTRACTS.md) included in the Stage Report.
+- If all Step 1 failures are current-entity only (no CONTRACTS.md cross-entity match): verdict = `pass` for the regression gate. The current-entity failures are already handled by Step 1's `fail` verdict and `feedback-to: execute`. Step 4.5 does not duplicate that routing.
+
+---
+
+## Step 4.75: Ratchet Checks (Per-Language)
+
+Two ratchet invariants per detected language, plus TS-specific enhanced ratchets. Ratchets compare current counts against persisted baselines in ops.config.json. On first run (no baseline), skip with warning and write initial baselines.
+
+**Read baselines.** Read `{workflow_dir}/ops.config.json`. Parse the `ratchet_baselines` key. If the file is absent or the key is missing, treat all baselines as absent (first run).
+
+### Ratchet 1: Type Coverage
+
+For each detected language, verify that every source file is covered by at least one type-check config.
+
+**TypeScript procedure:**
+1. Enumerate all .ts files: `find . -name "*.ts" -not -path "*/node_modules/*" -not -path "*/dist/*" -not -path "*/.worktrees/*"`
+2. For each tsconfig.json detected in Step 0.5, parse its `include` globs and `exclude` globs.
+3. For each .ts file, check if it matches at least one tsconfig's include pattern (and is not excluded). Files not covered by any tsconfig are flagged.
+4. Verdict: if any .ts file is uncovered, `fail`. Evidence: list each uncovered file path.
+
+**Python procedure:**
+1. Enumerate all .py files: `find . -name "*.py" -not -path "*/node_modules/*" -not -path "*/.venv/*" -not -path "*/__pycache__/*"`
+2. Check if a type checker config exists (pyrightconfig.json, mypy.ini, or pyproject.toml with [tool.pyright] or [tool.mypy]).
+3. If no type checker config, all .py files are uncovered. If config exists, check its include/exclude rules.
+4. Verdict: same as TS -- uncovered files → `fail`.
+
+**Other languages:** Go and Rust have built-in type checking (go vet, cargo check). Type coverage ratchet is auto-pass for these -- record "built-in type checking, all source files covered by language toolchain" in evidence.
+
+### Ratchet 2: Test Count
+
+For each detected language, count current tests and compare against baseline.
+
+**Procedure:**
+1. Run the detected test command with count extraction:
+   - TypeScript/bun: parse `bun test` output for pass/fail/skip counts
+   - Python/pytest: `pytest --co -q` (collect-only, outputs test count)
+   - Go: `go test ./... -v 2>&1 | grep -c "=== RUN"`
+   - Rust: `cargo test -- --list 2>&1 | grep -c "test "`
+2. Compare `count(current) >= count(baseline)` from ops.config.json.
+3. If no baseline exists (first run): skip comparison, record current count as initial baseline. Emit `ratchet: skipped -- first run, baseline initialized at {count}`.
+4. If `count(current) < count(baseline)`: verdict `fail`. Evidence: `test count regression: current={N} < baseline={M}, delta={N-M}`.
+5. If `count(current) >= count(baseline)`: verdict `pass`. Update baseline to current count (deferred to Step 7 -- baselines only written on overall quality pass).
+
+### TS Enhanced Ratchets
+
+These sub-ratchets apply only to detected TypeScript configs. They are tracked as sub-counts within the ratchet evidence, not as separate Stage Report check categories.
+
+**TS-E1: Strict mode verification.**
+For each tsconfig.json, verify `"strict": true` is set. If strict is false or absent, emit a `warning` (not fail on first detection -- the ratchet tracks whether strict was enabled at baseline time). If strict was true at baseline and is now false: `fail`.
+
+**TS-E2: `as any` cast count.**
+Run: `grep -rc "as any" --include="*.ts" {src_dirs} | tail -1` (total count).
+Compare against baseline. `count(current) > count(baseline)` → `fail`. New casts must not be added.
+
+**TS-E3: `@ts-ignore` / `@ts-expect-error` count.**
+Run: `grep -rc "@ts-ignore\|@ts-expect-error" --include="*.ts" {src_dirs} | tail -1` (total count).
+Compare against baseline. `count(current) > count(baseline)` → `fail`. Suppressions must not increase.
+
+### Baseline Update Rule
+
+Baselines are written to ops.config.json ONLY when the overall quality verdict is `pass` (all checks green, Step 7). This ensures the ratchet never ratchets down from a failing state. The update happens in Step 7 after the verdict is determined, not in Step 4.75.
+
+**ops.config.json schema for ratchet_baselines:**
+
+```json
+{
+  "ratchet_baselines": {
+    "typescript": {
+      "test_count": 342,
+      "as_any_count": 5,
+      "ts_ignore_count": 2,
+      "strict_mode": true,
+      "uncovered_files": []
+    },
+    "python": {
+      "test_count": 87,
+      "uncovered_files": []
+    }
+  }
+}
+```
+
+### Evidence Shape
+
+Record per-language ratchet results in the evidence snippet. This evidence feeds into the Stage Report `### ratchet` check category (see Step 6).
+
+```
+#### typescript
+type_coverage: pass (47/47 files covered by 2 tsconfigs)
+test_count: pass (current=342 >= baseline=340)
+ts_strict: pass (all tsconfigs have strict: true)
+ts_as_any: pass (current=5 <= baseline=5)
+ts_ignore: pass (current=2 <= baseline=2)
+
+#### python
+type_coverage: skipped (no python detected)
+test_count: skipped (no python detected)
+```
+
+### Verdict
+
+- All ratchets pass for all detected languages → `pass`
+- Any ratchet fails for any language → `fail`
+- First run with no baselines → `pass` (baselines initialized, no comparison possible)
 
 ---
 
@@ -126,7 +310,7 @@ Do NOT interpret line-by-line coverage gaps. Do NOT suggest tests to add. The nu
 
 ## Step 6: Assemble Structured Per-Check Verdict
 
-Collect the five check results from Steps 1-5 into a structured verdict per check category. This is the core of the Stage Report -- each check is its own pass/fail row with its own evidence snippet. Do NOT aggregate. Do NOT flatten to a single "mostly passing" summary. Do NOT compute percentages.
+Collect the six check results from Steps 1-5 (including Step 4.75) into a structured verdict per check category. This is the core of the Stage Report -- each check is its own pass/fail row with its own evidence snippet. Do NOT aggregate. Do NOT flatten to a single "mostly passing" summary. Do NOT compute percentages.
 
 **The Stage Report contains a structured verdict per check category, not an aggregate.** Aggregating loses the signal FO needs to route feedback correctly. A single "3/4" or "mostly passing" line erases which gate closed, which blocks downstream automation from branching on a specific failure.
 
@@ -143,7 +327,24 @@ evidence:
 ```
 ```
 
-Repeat this shape for `lint`, `typecheck`, `build`, `coverage`.
+Repeat this shape for `lint`, `typecheck`, `build`, `regression`, `ratchet`, `coverage`.
+
+For `regression` (Step 4.5), use this shape:
+
+```
+### regression
+verdict: {pass|fail}
+command: n/a -- reuses Step 1 evidence
+classification: {cross-entity-regression | current-entity-only | auto-pass (Step 1 green)}
+evidence:
+```
+{If auto-pass: "Step 1 passed, all tests green including cross-entity coverage. No regression possible."}
+{If cross-entity-regression: prior entity slug + overlapping file path from CONTRACTS.md + failing test reference}
+{If current-entity-only: "Step 1 failures are entity-scope only; no CONTRACTS.md cross-entity match found"}
+```
+{if fail:} prior-entity: {entity-slug}
+{if fail:} overlapping-file: {file path from CONTRACTS.md}
+```
 
 ---
 
@@ -220,6 +421,27 @@ evidence:
 {snippet}
 ```
 
+### regression
+verdict: {pass|fail}
+command: n/a -- reuses Step 1 evidence
+classification: {cross-entity-regression | current-entity-only | auto-pass (Step 1 green)}
+evidence:
+```
+{see Step 4.5 verdict shape}
+```
+{if fail:} prior-entity: {entity-slug}
+{if fail:} overlapping-file: {file path from CONTRACTS.md}
+
+### ratchet
+verdict: {pass|fail|skipped}
+command: n/a -- composite of per-language ratchet checks
+evidence:
+```
+{per-language ratchet results from Step 4.75}
+{if fail: which language, which ratchet, current vs baseline counts}
+{if skipped: "first run -- baselines initialized, no comparison"}
+```
+
 ### coverage
 verdict: {pass|fail|skipped}
 command: {bun test --coverage | n/a}
@@ -231,11 +453,21 @@ evidence:
 notes: {one line if any input field was missing, else omit}
 ```
 
+**Baseline update.** After determining overall verdict `pass`, update ops.config.json `ratchet_baselines` with current counts from Step 4.75. Use Read + Write to atomically update the file. If ops.config.json does not exist, create it with the `ratchet_baselines` key only. Do NOT update baselines if overall verdict is `fail` or `pass (pre-existing failures noted)` -- baselines only advance on a clean overall pass.
+
 Write the report with the Write or Edit tool into the entity body at the `## Stage Report: quality` anchor (create the section if absent; replace in full if the section already exists from a prior quality run). Do not edit any other part of the entity.
 
 ---
 
 ## Rules -- No Exceptions
+
+### Regression Gate -- No Re-Execution
+
+- **NEVER re-run tests in Step 4.5.** Step 4.5 reuses Step 1 evidence exclusively. The full suite already ran in Step 1; re-running it in Step 4.5 is redundant, costs tokens, and would produce identical results. Evidence reuse is the contract.
+- **NEVER skip CONTRACTS.md query when Step 1 has failures.** When Step 1 verdict = fail, CONTRACTS.md query is mandatory. The query is lightweight (one file read + table parse) and is the only way to distinguish current-entity failures from cross-entity regressions. Skipping it when failures exist means cross-entity regressions go undetected and get misrouted as simple execute bounces.
+- **NEVER invent a parallel tracking mechanism for cross-entity file ownership.** CONTRACTS.md is the single source of truth for which entities modified which files. Do NOT grep git history, do NOT scan commit messages, do NOT maintain a local cache. CONTRACTS.md is authoritative and is maintained by the pipeline.
+- **NEVER query CONTRACTS.md when Step 1 passed.** If Step 1 is green, all tests passed -- including any tests from prior entities that touch overlapping files. A green Step 1 is a mathematical guarantee that no cross-entity regression exists. Querying CONTRACTS.md when tests are green is wasted computation that adds no signal.
+- **NEVER emit `feedback-to: execute` twice** (once from Step 1 and once from Step 4.5) for a cross-entity regression. Step 4.5's `feedback-to: execute` supersedes Step 1's by adding the `cross-entity-regression` classification tag and prior entity context. The Stage Report contains exactly one `feedback-to` directive with all relevant classification context merged.
 
 ### Full Suite, Not Targeted
 
@@ -255,7 +487,7 @@ Write the report with the Write or Edit tool into the entity body at the `## Sta
 
 ### Binary Per-Check Verdict
 
-- **The Stage Report contains a structured verdict per check category**, not an aggregate. Each of `test`, `lint`, `typecheck`, `build`, `coverage` gets its own `verdict: {pass|fail|skipped}` row with its own evidence snippet.
+- **The Stage Report contains a structured verdict per check category**, not an aggregate. Each of `test`, `lint`, `typecheck`, `build`, `ratchet`, `coverage` gets its own `verdict: {pass|fail|skipped}` row with its own evidence snippet.
 - **NEVER report "MOSTLY PASSING (3/4)".** Prose-fuzzy aggregation hides which gate closed; downstream automation cannot branch on "mostly". FO needs to know exactly which check failed to route feedback correctly.
 - **NEVER apply a 75% threshold** or any other percentage-based aggregation. There is no 75% threshold. Any single failing check closes the quality gate.
 - **NEVER report a bare "FAIL with failing-test count".** Under-reporting. Captain and execute need the per-check breakdown plus the verbatim failing output to plan the fix, not just a count.
@@ -268,3 +500,11 @@ Write the report with the Write or Edit tool into the entity body at the `## Sta
 - **Never invoke other skills** from within quality. You are a leaf stage skill.
 - **Never edit code** -- your Write/Edit scope is strictly the entity body's `## Stage Report: quality` section.
 - **Use `--` (double dash)** everywhere. Never `—` (em dash). Matches the rest of the build skill family.
+
+### Ratchet Discipline
+
+- **NEVER update baselines on a failing quality run.** Baselines are written to ops.config.json ONLY when the overall verdict is `pass`. Writing baselines on partial-pass or fail ratchets the floor down, defeating the invariant. Step 7 baseline update is gated on overall verdict.
+- **NEVER skip type coverage enumeration by trusting tsc exit code alone.** `tsc --noEmit` only checks files within tsconfig `include`. The type coverage ratchet must independently enumerate all source files and verify each is covered by at least one tsconfig. This is the entity 052 lesson: tsc can report 0 errors while files go unchecked.
+- **NEVER ratchet on first run.** First run with no ops.config.json or no `ratchet_baselines` key initializes baselines and skips comparison. Ratcheting on first run would fail every bootstrapping entity.
+- **NEVER interpret ratchet failures.** Like all quality checks, ratchet results are verbatim counts. "The as-any count increased by 2" is the full evidence. Do not suggest which casts to remove or why they were added.
+- **NEVER hardwire runner commands in ratchet count extraction.** Use the runner resolved in Step 0.5. If Step 0.5 detected vitest, the test count extraction runs against vitest output, not bun test output.

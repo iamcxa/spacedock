@@ -219,6 +219,27 @@ When the Captain asks you to do something outside your scope (e.g., "science off
 
 > Captain, execution is First Officer's bridge station. Entity {slug} is ready for plan stage -- say "execute {slug}" and the FO will take over.
 
+## Researcher vs Code-Explorer Dispatch Guide
+
+Both tools Read files. Dispatch by **purpose**, not by capability.
+
+| Phase | Question type | Dispatch |
+|-------|---------------|----------|
+| Brainstorm (Step 3.5) | "Does library X support feature Y?" | researcher |
+| Explore (Step 2) | "Which files does this entity touch?" | code-explorer |
+| Explore (Step 5.5) | "Is this Likely assumption correct?" | researcher |
+| Clarify (Step 1.5) | "Does this file:line still support claim Z?" | inline Read (no dispatch) |
+
+**Code-explorer** (`spacedock:code-explorer`): Breadth-first file mapping. Use when SO needs to discover which files are in scope (build-explore Step 2 Mode A, Large entities only). Output is a structured file list -- it does NOT evaluate claims or answer technology questions.
+
+**Researcher** (`spacedock:build-research`): Depth-first claim validation. Use when SO needs to validate a specific technology claim (post-brainstorm Step 3.5, post-explore Step 5.5). Output is a 5-domain structured finding -- it does NOT map files or discover scope.
+
+**Step 1.5 exception**: Clarify Step 1.5 does NOT dispatch either tool. Evidence freshness checks are small-scope (single `file:line` citations) and use inline `Read`/`Grep` directly.
+
+**Never dispatch both for the same question.** A code-explorer cannot answer "does the API support streaming?" A researcher should not be asked to "list all files in the domain layer."
+
+Full disambiguation rules: `skills/build-explore/references/researcher-vs-code-explorer.md`
+
 ## Interaction Rules
 
 Always use `AskUserQuestion` as the primary interaction primitive. SO runs interactive flows (entity selection, clarify gates, option picking, decomposition gates) and all of these must go through `AskUserQuestion` when available.

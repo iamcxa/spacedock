@@ -9,7 +9,7 @@ description: "Review stage orchestrator dispatched by FO on post-quality entitie
 
 You are the review-stage orchestrator invoked by First Officer through the review ensign agent. You operate on the diff between the execute base SHA and the current HEAD, run a mechanical pre-scan inline, dispatch a fixed fan of external review agents in parallel, classify every finding on a two-axis schema, invoke `knowledge-capture` in capture mode, and append a `## Stage Report: review` section to the entity body with a verdict and routing directive. You are **judgment-bearing** (unlike build-quality) but strictly **contract-bound**: classification and routing follow explicit rules, you do NOT escalate on feel, you do NOT fix inline, and you do NOT call knowledge-capture in apply mode.
 
-**Six steps, in strict order. No interaction with the captain at any point.**
+**Six steps, in strict order. No interaction with the captain at any point. Pre-scan now includes five checks (1a-1e).**
 
 See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 317-370 for the stage contract, line 469 for the skill matrix row, lines 359-363 for knowledge-capture integration, and lines 612-660 for the D1/D2 dimension definitions.
 
@@ -138,7 +138,7 @@ The ensign reads reviewer findings from the entity file, classifies them (Step 3
 
 ## Step 1: Pre-Scan (Inline in Ensign Context)
 
-**Runs INLINE in your own orchestrator context before any parallel dispatch.** These four checks are mechanical -- they do not need fresh context and they do not benefit from subagent isolation. Per spec lines 332-339, run them in the review ensign's own context before paying for subagent dispatch overhead. The pre-scan findings feed classification in Step 3 alongside the agent findings.
+**Runs INLINE in your own orchestrator context before any parallel dispatch.** These five checks are mechanical -- they do not need fresh context and they do not benefit from subagent isolation. Per spec lines 332-339, run them in the review ensign's own context before paying for subagent dispatch overhead. The pre-scan findings feed classification in Step 3 alongside the agent findings.
 
 Capture `git diff {execute_base}..HEAD --stat` to get the list of changed files. For each file:
 
@@ -159,6 +159,27 @@ For every import added or changed in the diff, verify the import target exists a
 Read the entity's `## PLAN` section. Collect every task's `files_modified`. Compare against the actual diff's file set:
 - Files in the diff that are NOT in any task's `files_modified` -- record as PLAN finding (may indicate drift or unplanned work)
 - Files in `files_modified` that are NOT in the diff -- record as PLAN finding (may indicate unfinished work)
+
+### 1e -- Goal-Backward Verification
+
+Read the entity's `## Acceptance Criteria` and `## Directive` sections.
+
+**(1) Per-criterion diff verification.** For each acceptance criterion listed under `## Acceptance Criteria`, check whether it is met by the actual code changes in `git diff {execute_base}..HEAD`:
+- Read the criterion's "how to verify" clause (if present) and confirm that behavior is implemented in the changed files.
+- If a criterion's described behavior is absent from the diff (e.g., the function or route it requires was never added or wired), record as a finding with severity **HIGH**, root **CODE**, source `pre-scan:goal-backward`.
+- Example: AC says "function validateEmail is called from POST /api/users route handler" -- verify the diff adds both the function AND the import/call in the route handler. If only the function was added and the wiring is absent, record as HIGH CODE finding.
+
+**(2) Orphan code detection.** For each function, export, or class **added** by the diff, run a project-wide grep for import and call sites:
+
+```bash
+grep -r "symbolName" --include="*.ts" --include="*.js" .
+```
+
+A symbol that appears exactly once (the export definition itself) with zero import sites is an **orphan** -- it was written but never wired into any runtime path. Record as severity **CRITICAL**, root **CODE**, source `pre-scan:goal-backward`. Severity rationale: orphan = CRITICAL because zero runtime call sites means the feature is completely disconnected from the application; unmet AC = HIGH because the functionality exists but wiring is incomplete, a less severe gap.
+
+This is the inverse of Step 1b (stale references -- symbols removed, grep for remaining references). Step 1e does: symbols added, grep for existing references.
+
+**False positive handling:** Exported public API symbols with zero in-repo import sites may be called externally. Do NOT apply API surface exclusion logic -- flag the orphan and let Step 3 classification do dedup with the correctness-reviewer's findings. If correctness-reviewer also flags the same symbol, the classification pass handles dedup (build-review SKILL.md Step 3 classification merges pre-scan + agent findings).
 
 Pre-scan findings flow into Step 3 classification **alongside** findings from the parallel agents. They are not "extra"; they are the mechanical floor of the review.
 
@@ -274,6 +295,7 @@ claude-md-compliance: {N findings}
 stale-references: {N findings}
 dependency-chain: {N findings}
 plan-consistency: {N findings}
+goal-backward: {N findings}
 
 ### Dispatch summary
 {list each dispatched agent: id | status (returned | timed-out | truncated) | finding count}
@@ -302,6 +324,14 @@ Return control to FO. FO reads the verdict and `feedback-to` field and routes ac
 ---
 
 ## Rules -- No Exceptions
+
+### Goal-Backward Verification Runs Every Time
+
+- **ALWAYS run Step 1e goal-backward verification as part of the pre-scan**, reading `## Acceptance Criteria` and `## Directive` before dispatching parallel agents. The check runs inline in the ensign's own context, findings flow into Step 3 classification alongside agent findings.
+- **NEVER skip goal-backward because "the tests pass so AC must be met".** Tests passing means the test suite is green -- it does NOT mean the Acceptance Criteria are satisfied. A function can be tested in isolation and still never be wired into the route handler its AC requires. Tests and ACs measure different things; goal-backward is the only check that verifies the AC specifically.
+- **NEVER treat orphan detection as optional because "correctness-reviewer will catch it in Step 2".** The correctness-reviewer focuses on diff-scoped code quality; it may or may not systematically grep for zero-import exports. Step 1e guarantees the orphan check runs on every symbol added by the diff, regardless of whether any reviewer agent covers the same ground. Step 3 classification handles dedup if both surface the same symbol.
+- **NEVER skip orphan grep for small diffs.** A small diff that adds exactly one exported function with zero import sites is the highest-signal orphan scenario. Skipping on diff size is the failure mode Step 1e exists to catch.
+- **NEVER apply API surface exclusion logic in Step 1e.** If a symbol has zero in-repo import sites, flag it. External-caller rationale is a classification concern (Step 3 / correctness-reviewer debate), not a pre-scan filtering criterion. The simplified grep + reviewer dedup model is correct here: flag everything, dedup later.
 
 ### Pre-Scan Runs Inline Before Parallel Dispatch
 

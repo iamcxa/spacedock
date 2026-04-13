@@ -44,8 +44,13 @@ text). See the GSD todo for design notes.
 | `build-tdd-plan-checker-missing-test-file.yaml` | `skills/build-plan/references/plan-checker-prompt.md` 6d | 1 | (no dispatches yet -- entity 067) |
 | `build-tdd-vacuous-test-detection.yaml` | `skills/task-execution/SKILL.md` TDD Mode | 1 | (no dispatches yet -- entity 067) |
 | `build-tdd-no-tdd-no-cycle.yaml` | `skills/task-execution/SKILL.md` TDD Mode | 1 | (no dispatches yet -- entity 067) |
+| `build-plan.yaml` | `skills/build-plan/SKILL.md` + references | 3 | (no fix needed — all first-try green) |
+| `build-clarify-revalidation.yaml` | `skills/build-clarify/SKILL.md` Step 1.5 | 5 | (no dispatches yet -- entity 078) |
+| `build-review-goal-backward.yaml` | `skills/build-review/SKILL.md` Step 1e | 2 | (no dispatches yet -- entity 081) |
+| `build-quality-regression-gate.yaml` | `skills/build-quality/SKILL.md` Step 4.5 | 2 | (no dispatches yet -- entity 081) |
+| `build-quality-ratchet.yaml` | `skills/build-quality/SKILL.md` Step 4.75 + Ratchet Discipline | 2 | (no dispatches yet -- entity 083) |
 
-**Total: 19 unique scenarios.** 5 of them have round-2 history entries
+**Total: 33 unique scenarios.** 5 of them have round-2 history entries
 (re-tested after fix-forward commits), giving 17+ total subagent dispatches
 captured in the history fields.
 

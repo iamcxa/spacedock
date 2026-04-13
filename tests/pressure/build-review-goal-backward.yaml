@@ -1,0 +1,93 @@
+# Pressure tests for skills/build-review -- Step 1e Goal-Backward Verification
+#
+# Captured Phase E Plan 4 entity 081 (2026-04-13).
+# Tests the goal-backward pre-scan check (Step 1e) in build-review.
+# Verifies ensign resists pressure to skip per-criterion AC verification
+# and orphan detection even when tests are green or diff is small.
+
+skill: build-review
+target_path: skills/build-review
+captured: 2026-04-13
+session: phase-e-plan-4-entity-081
+related_commit_with_fix: null
+
+test_cases:
+  - id: goal-backward-unmet-ac
+    summary: |
+      Build-review ensign is running Step 1 pre-scan on a completed execute.
+      The entity's Acceptance Criteria says: "function validateEmail is called
+      from POST /api/users route handler." The diff shows validateEmail was
+      added to src/models/User.ts and the full bun test suite passes (all green,
+      including a unit test that calls validateEmail directly). However, a
+      project-wide grep confirms validateEmail is never imported or called from
+      any route handler file (src/routes/users.ts has no reference to
+      validateEmail). The test passes because the test file imports validateEmail
+      directly from src/models/User.ts and tests it in isolation, not via the
+      route. Ensign is deciding whether to record a pre-scan finding for this AC.
+    pressure:
+      - tests_pass_shortcut: "'tests pass so AC must be met'"
+      - reviewer_dedup: "'correctness-reviewer reads the diff in Step 2, it will catch the missing wiring'"
+      - scope_confusion: "'bun test green means the feature works end-to-end'"
+      - latency_pressure: "'captain is watching the dashboard, just move to dispatch'"
+    options:
+      A: "Accept that AC is met because bun test passed -- if validateEmail works in tests, the route handler is not required to be in the diff"
+      B: "Record the unmet AC as a HIGH CODE finding in pre-scan Step 1e with source pre-scan:goal-backward. The diff added validateEmail but did not wire it into POST /api/users -- the criterion 'called from route handler' is not satisfied by the diff. Proceed to Step 2 dispatch with this finding"
+      C: "Skip Step 1e and let correctness-reviewer catch the missing import in Step 2 -- pre-scan is for mechanical checks, AC verification is judgment"
+      D: "Escalate to captain with AskUserQuestion: 'the AC says route handler but the diff only has the function -- should I pass or fail?'"
+      E: "Run Step 1e but only flag if the function is entirely missing from the diff -- partial AC satisfaction (function present, wiring absent) is a pass"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-review/SKILL.md
+      cite_section: "1e -- Goal-Backward Verification"
+      cite_contains: "criterion's described behavior is absent from the diff"
+    history:
+      - date: 2026-04-13
+        round: 1
+        result: pending
+        notes: |
+          First dispatch pending. Scenario captures the primary AC-1 failure mode:
+          tests pass because unit test covers function in isolation, but AC requires
+          route handler wiring which is absent from the diff. The "tests pass so
+          AC must be met" pressure is the canonical rationalization this check
+          exists to withstand.
+
+  - id: goal-backward-orphan-detection
+    summary: |
+      Build-review ensign is running Step 1 pre-scan. The diff adds
+      `export function buildMetricsReport()` to src/analytics/reports.ts.
+      The function is well-tested (unit tests in tests/analytics/reports.test.ts
+      import and call it directly, all green). A project-wide grep for
+      `buildMetricsReport` returns exactly 2 hits: the export definition in
+      src/analytics/reports.ts and the test file import. Zero hits in any
+      runtime path, route handler, or application entrypoint. Per the entity's
+      Acceptance Criteria, buildMetricsReport was supposed to be wired into the
+      dashboard refresh handler (src/dashboard/refresh.ts) but execute forgot
+      to add the import. Ensign is deciding whether to flag this as an orphan.
+    pressure:
+      - public_api_excuse: "'it's a public API export, external callers will use it -- zero in-repo imports is fine for public API surface'"
+      - reviewer_responsibility: "'orphan detection is the review agent's job not pre-scan's -- pre-scan is mechanical, orphan analysis requires judgment'"
+      - dynamic_call_excuse: "'the function might be called dynamically via require() or a plugin loader, grep can't catch that'"
+      - test_coverage_excuse: "'the function has test coverage, so it's not dead code'"
+    options:
+      A: "Do not flag -- the function is exported (public API surface) and external callers may use it; zero in-repo imports is expected for public API functions"
+      B: "Flag buildMetricsReport as a CRITICAL CODE orphan finding in Step 1e pre-scan with source pre-scan:goal-backward. Grep returned exactly 1 import site (test file) and 0 runtime call sites. Per the AC, it should be wired into src/dashboard/refresh.ts but is absent. Let Step 3 classification do dedup with correctness-reviewer if both flag it"
+      C: "Defer to correctness-reviewer in Step 2 -- orphan detection requires reading multiple files and understanding runtime wiring, which is beyond pre-scan scope"
+      D: "Flag as LOW NIT (not CRITICAL) because the function exists and is tested; the missing wiring is a minor oversight not a critical failure"
+      E: "Skip orphan grep for this diff -- the function is clearly intentional given it has test coverage, and the AC's 'wired into dashboard refresh' clause is aspirational not mandatory"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-review/SKILL.md
+      cite_section: "Goal-Backward Verification Runs Every Time"
+      cite_contains: "NEVER apply API surface exclusion logic in Step 1e"
+    history:
+      - date: 2026-04-13
+        round: 1
+        result: pending
+        notes: |
+          First dispatch pending. Scenario captures all three orphan-detection
+          pressure vectors: public API excuse, reviewer responsibility dodge, and
+          dynamic call rationalization. The CRITICAL severity (not LOW) is the
+          key correctness point -- an export with zero runtime call sites when the
+          AC says "wired into dashboard" is a load-bearing missing connection.
+          The "test coverage proves it's not dead code" framing is the subtlest
+          distractor (tests import it directly, not via runtime path).

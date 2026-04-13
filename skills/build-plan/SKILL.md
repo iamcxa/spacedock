@@ -67,6 +67,49 @@ Additionally, outside the entity body:
 
 ---
 
+## Step 0.5: Assumption Evidence Re-Validation
+
+After confirming the Input Contract, re-validate each clarify-confirmed assumption's cited evidence before proceeding to topic extraction. This prevents plan generation from building on stale or contradicted premises.
+
+**Procedure**:
+
+1. Parse the entity body's `## Assumptions` section. For each assumption with a `→ Confirmed:` annotation, extract the `Evidence:` field content.
+2. For each Evidence field, extract file:line citations using regex `(\S+):(\d+)(?:-(\d+))?`. An Evidence field may contain multiple citations (separated by periods or semicolons). Assumptions without parseable file:line citations are skipped silently -- no re-validation attempted, no annotation.
+3. For each extracted citation, use `Read` tool to access the cited file and line range. If the file does not exist or the line number is out of range, treat as **contradicted** (A-1 -- same severity as semantic contradiction).
+4. Compare the current file content at the cited region against the assumption's claim using LLM runtime judgment (same method as explore Step 3.7). Three outcomes:
+   - **(a) Evidence holds**: current content supports the assumption's claim. Proceed silently -- no annotation. Silence = OK.
+   - **(b) Evidence stale**: file content changed but the semantic claim is still plausible (e.g., line numbers shifted, surrounding code reformatted, but the behavior described in the assumption still exists). Emit `(⚠ stale-evidence: {file}:{cited-line} -- {brief description of what changed})` inline on the assumption's Evidence line. Plan proceeds with caution.
+   - **(c) Evidence contradicted**: current file content demonstrates the opposite of the assumption's claim, OR the cited file/line no longer exists. This is a **blocker**. Write a contradiction block in `## Stage Report: plan` with `feedback-to: captain` and halt -- do NOT proceed to Step 1 or generate any plan tasks.
+
+**Contradiction blocker format**:
+
+```markdown
+## Stage Report: plan
+
+status: failed
+feedback-to: captain
+reason: Step 0.5 assumption evidence contradicted
+
+### Contradicted assumptions
+- A-{n}: {assumption summary}
+  - Cited: {file}:{line}
+  - Expected: {what the assumption claimed}
+  - Found: {what the file actually shows}
+
+### Captain options
+- **re-clarify**: return entity to clarify stage to update assumptions with current evidence
+- **override**: captain confirms the assumption is still valid despite changed evidence, plan proceeds
+```
+
+**Rules specific to Step 0.5**:
+- Step 0.5 treats all file changes equally regardless of source -- whether another entity shipped, FO daemon committed, or a manual edit occurred. Do not distinguish change source.
+- Multiple stale-evidence warnings do NOT escalate to contradiction. Each citation is judged independently.
+- Step 0.5 does not modify assumption text or `→ Confirmed:` annotations -- it only adds `(⚠ stale-evidence: ...)` inline warnings or writes a blocker Stage Report.
+- Use `--` (double dash) in all markers and annotations, never em dash.
+- Multiple citations in one Evidence field are each evaluated independently. A mix of hold and stale in one field produces a stale annotation (proceed); only a contradicted citation in any field triggers a blocker.
+
+---
+
 ## Step 1: Topic Extraction
 
 Read the entity file. Parse `## Brainstorming Spec`, `## Explore Output`, `## Clarify Output`, `## Acceptance Criteria`.
@@ -276,6 +319,7 @@ Wait for the dispatched subagent to return. Parse its YAML output into a list of
 5. Research Coverage -- every `read_first` traces to a research source
 6. Validation Sampling (Full Nyquist) -- 6a presence / 6b latency / 6c continuity / 6d wave-0 completeness
 7. Cross-Entity Coherence -- `files_modified` cross-checked against `CONTRACTS.md`
+8. Type/Test Coverage -- source files have test pairing and type-check config coverage
 
 ---
 
@@ -441,7 +485,7 @@ The `chore(index):` commits from step 9a are already in place from the `workflow
 
 ## Plan-Checker Dimensions (Reference)
 
-The full plan-checker prompt template, including all 7 dimensions and YAML output format, lives in `skills/build-plan/references/plan-checker-prompt.md`. Step 6 reads that file and dispatches the rendered template as the prompt of an `Agent(subagent_type="general-purpose", model="sonnet", ...)` call. Keep the template in its own reference file so SKILL.md stays readable.
+The full plan-checker prompt template, including all 8 dimensions and YAML output format, lives in `skills/build-plan/references/plan-checker-prompt.md`. Step 6 reads that file and dispatches the rendered template as the prompt of an `Agent(subagent_type="general-purpose", model="sonnet", ...)` call. Keep the template in its own reference file so SKILL.md stays readable.
 
 | # | Dimension | Check |
 |---|-----------|-------|
@@ -452,6 +496,7 @@ The full plan-checker prompt template, including all 7 dimensions and YAML outpu
 | 5 | Research Coverage | Every `read_first` traces to a research source |
 | 6 | Validation Sampling | Full Nyquist: 6a presence / 6b latency / 6c continuity / 6d wave-0 |
 | 7 | Cross-Entity Coherence | `files_modified` cross-checked against `CONTRACTS.md` |
+| 8 | Type/Test Coverage | Source files have test pairing and type-check config coverage |
 
 ---
 
@@ -467,6 +512,7 @@ The full plan-checker prompt template, including all 7 dimensions and YAML outpu
 - **NEVER dispatch a researcher as a tiebreaker.** Tiebreakers are majority-vote cargo cult. Surface the contradiction as an Open Question.
 - **Use `--` (double dash)** in markers and annotations, never `—` (em dash). Matches `build-brainstorm`, `build-explore`, `build-research` conventions.
 - **The `workflow-index append` at step 9 is UNCONDITIONAL.** Not optional. Not deferrable. Not threshold-gated. Unconditional. Reread the No-Exceptions block in step 9 if tempted.
+- **NEVER skip Step 0.5 assumption re-validation.** If assumptions have file:line evidence, Step 0.5 must run. Skipping Step 0.5 permits plan generation on stale premises -- the exact failure mode parent 077 exists to prevent.
 
 ---
 
@@ -479,5 +525,6 @@ Any of the following means the plan is not ready to advance. Write `## Stage Rep
 - **Missing input sections.** If `## Brainstorming Spec`, `## Explore Output`, `## Clarify Output`, or `## Acceptance Criteria` is missing, escalate -- do not attempt to proceed on partial input.
 - **`workflow-index append` failure.** If any append call at step 9a fails (write error, schema error, CONTRACTS.md not writable), escalate with the failing invocation details. Do NOT commit the plan body while CONTRACTS.md is inconsistent.
 - **Plan-checker returns malformed YAML.** If the dispatched plan-checker returns prose instead of YAML, or the YAML fails to parse, treat it as a blocker in the revision loop (not a separate error path) and re-dispatch once with a note; if still malformed, escalate.
+- **Step 0.5 contradiction detected.** An assumption's cited evidence now contradicts the claim. Do not proceed to Step 1. Write the contradiction blocker and return.
 
 All of these mean: stop, write the Stage Report with `feedback-to: captain`, return to FO. Do not ship a broken plan to execute stage.

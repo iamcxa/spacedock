@@ -125,6 +125,35 @@ Iterate waves sequentially (wave 0, then wave 1, then wave 2, ...). Inside each 
 
 See `docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md` for the dispatch ownership model and `references/agent-dispatch-guide.md` for why ensigns cannot dispatch Agent.
 
+### 4.0 -- Per-Wave Staleness Pre-Check
+
+Before dispatching wave N's tasks (or verifying teammate commits in Mode A), compare the wave's `files_modified` targets against a baseline git state. This is a WARNING mechanism -- staleness does not block dispatch.
+
+**Baseline selection:**
+- Wave 0 and wave 1: use `execute_base_sha` (captured at stage entry, functionally equivalent to plan-approval state for source files per entity 080 A-2).
+- Wave N > 1: use the post-wave-(N-1) commit SHA (the last serial commit from step 4d of the prior wave). This prevents intra-entity modifications by earlier waves from triggering false positives.
+
+**Detection command:**
+Collect all `files_modified` from every task in the current wave into a deduped list. Run:
+```bash
+git diff --diff-filter=M --name-only {baseline} -- {file1} {file2} ...
+```
+The `--diff-filter=M` flag restricts output to modified files only, excluding files with "added" status (new files the plan will create -- per entity 080 A-1, these are not stale).
+
+**Two outcomes:**
+- **(a) No output** -- all target files unchanged since baseline. Proceed silently to wave dispatch.
+- **(b) One or more file paths returned** -- these files were modified externally since the baseline. Emit a warning to orchestrator output:
+  ```
+  wave {N}: ⚠ stale-files [{file1}, {file2}] -- baseline {baseline_sha} ({baseline_sha_short})
+  ```
+  Collect the warning in orchestrator memory (keyed by wave number) for inclusion in `## Stage Report: execute` under `### Stale-file warnings`. **Proceed with wave dispatch** -- staleness is a warning, not a blocker (per parent 077 GUARDRAILS).
+
+**Baseline advancement:** After step 4d completes (serial commits for the wave), capture the new HEAD as the baseline for the next wave:
+```bash
+wave_baseline=$(git rev-parse HEAD)
+```
+This `wave_baseline` replaces `execute_base_sha` as the comparison target for wave N+1's pre-check.
+
 ### Two execution modes
 
 **Mode A -- FO task-list-driven (preferred):** FO dispatched task-executor teammates per wave before invoking you. Teammates self-claimed tasks via the shared task list, wrote files, and committed on the worktree branch. Your job is to:
@@ -186,6 +215,8 @@ git commit -m "feat(execute): {slug} task-{task.id} -- {one-line action summary}
 The pre-commit hook fires per commit (lint + tsc --incremental per spec line 290). Do NOT override the hook. If the hook fails on a task's commit, treat the task as BLOCKED retroactively -- revert the staged edits via `git restore --staged {files}` and escalate per step 7.
 
 Update the `## Validation Map` after each successful commit: set `status: done` and `last run: {timestamp}` for the task's row. Do this with Edit (not Write) to avoid clobbering unrelated rows.
+
+**Baseline advancement for staleness pre-check:** After the last commit in this wave, capture the post-wave HEAD via `git rev-parse HEAD` and store it as `wave_baseline` for the next wave's Step 4.0 pre-check. For the first wave, this replaces `execute_base_sha` as the staleness baseline.
 
 ---
 
@@ -268,6 +299,11 @@ workflow-index transition: {commit SHA from step 2}
 ### BLOCKED escalations (if any)
 - task-{id}: haiku BLOCKED ({reason}) -> sonnet BLOCKED ({reason}) -> opus {DONE|BLOCKED} ({reason})
 - ...
+
+### Stale-file warnings
+- wave {N}: ⚠ stale-files [{file1}, {file2}] -- baseline {sha} ({sha_short})
+- ...
+(omit subsection if no stale files detected across any wave)
 
 ### Findings
 #### Skill suggestions
