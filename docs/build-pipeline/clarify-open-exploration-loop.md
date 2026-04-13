@@ -1,8 +1,8 @@
 ---
 id: 076
 title: "Clarify open exploration loop -- captain-driven gray area discovery"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: captain feedback during 052 clarify session (2026-04-13)
 started:
 completed:
@@ -61,22 +61,27 @@ depends-on: []
 A-1: Step 4.5 inserts between Steps 4 and 5 using fractional numbering (4.5) without renumbering existing steps. External references to "Step 5" remain valid.
 Confidence: Confident (0.95)
 Evidence: skills/build-clarify/SKILL.md:171-220 -- Steps 4 and 5 have clear boundaries; agents/science-officer.md references "Step 5 sufficiency gate" by name, not by positional index
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-2: New gray areas discovered in Step 4.5 are immediately discussed with the captain, resolved, and annotated in the entity body within the same iteration -- arriving at Step 5 already resolved and passing the sufficiency gate without Step 5 modification.
 Confidence: Confident (0.85)
 Evidence: skills/build-clarify/SKILL.md:220-228 -- Step 5 checks "every item has annotation"; items created AND annotated during Step 4.5 satisfy this. SKILL.md:335 -- "Entity body IS the checkpoint" supports immediate write-through
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-3: The "seen topics" set is recoverable from the entity body on session resume -- the union of all A-n/O-n/Q-n headings in the entity, readable via grep on resume.
 Confidence: Confident (0.90)
 Evidence: skills/build-clarify/SKILL.md:335 -- "Entity body IS the checkpoint." SKILL.md:99-101 -- resume case already re-reads entity body counts. Seen-topics follows same pattern
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-4: Step 4.5's AskUserQuestion calls follow the same format rules as Steps 3 and 4: 2-4 options, one question per message, header ≤12 chars, recommendation when evidence supports it.
 Confidence: Confident (0.95)
 Evidence: skills/build-clarify/references/ask-user-question-rules.md:1-9 -- rules apply to ALL AskUserQuestion calls in build-clarify; Steps 3 and 4 establish the pattern
+→ Confirmed: captain, 2026-04-13 (batch)
 
 A-5: Step 5 sufficiency gate needs no modification -- Step 4.5 creates items in the same A-n/Q-n format as explore, and resolves them inline before "Complete" is selected.
 Confidence: Confident (0.85)
 Evidence: skills/build-clarify/SKILL.md:222-228 -- five gate checks scan sections by format (A-n annotations, O-n selections, Q-n answers), not by creation source
+→ Confirmed: captain, 2026-04-13 (batch)
 
 ## Option Comparisons
 
@@ -90,6 +95,8 @@ Step 4.5 needs `gray-area-templates.md` (currently at `skills/build-explore/refe
 | Copy or symlink to build-clarify references | Explicit ownership; both skills reference local files | File duplication (copy) or symlink maintenance; contradicts "one source of truth" principle | Medium | Viable |
 | Embed suggestion heuristic inline in Step 4.5 | No dependency; Step 4.5 has self-contained logic | Duplicates template knowledge; drifts from explore's templates over time; contradicts CLAUDE.md "one source of truth" | Medium | Not recommended |
 
+→ Selected: Read by absolute path from explore's references (captain, 2026-04-13, interactive)
+
 ## Open Questions
 
 Q-1: How should Step 4.5 format captain-discovered gray areas in the entity body?
@@ -100,6 +107,8 @@ Why it matters: Downstream consumers (build-plan, FO, status script) parse A-n/O
 
 Suggested options: (a) Same A-n/Q-n format in existing sections, numbering continues from explore's last entry (e.g., explore wrote A-1 through A-5, Step 4.5 creates A-6), (b) Separate `## Captain Gray Areas` section with own numbering scheme, (c) Free-form `## Open Exploration Notes` section not parsed by downstream
 
+→ Answer: Same A-n/Q-n format, continue numbering (captain, 2026-04-13, interactive)
+
 Q-2: What is the ordering expectation with entity 072 (build-explore domain-aware gray areas)?
 
 Domain: Runnable / Invokable
@@ -107,6 +116,12 @@ Domain: Runnable / Invokable
 Why it matters: Entity 072 enhances explore's Step 4 with directive-derived gray areas. Entity 076 enhances clarify's Step 4.5 with uncovered-template suggestions. If 072 ships first, explore covers MORE gray areas, leaving fewer for Step 4.5's "uncovered templates" source -- the two features are complementary but overlap in the template-coverage dimension. The captain should decide whether 076 depends on 072 or can ship independently.
 
 Suggested options: (a) Independent -- 076 proceeds now, Step 4.5 adapts dynamically to whatever explore produced (more explore coverage = fewer 4.5 suggestions, which is fine), (b) 076 depends on 072 -- add to depends-on, ship 076 after explore is enhanced, (c) Merge scope -- combine directive-derived gray areas (explore enhancement) + open exploration loop (clarify addition) into a single entity
+
+→ Answer: Independent -- 076 proceeds now, Step 4.5 self-adapts to whatever explore produced. Sources 2+3 (CONTRACTS.md, implied technology) are 072-independent. Avoids blocking on 072's empty pipeline state. (captain, 2026-04-13, interactive)
+
+## Canonical References
+
+(No external docs cited during clarify session)
 
 ## References
 
@@ -118,6 +133,25 @@ Suggested options: (a) Independent -- 076 proceeds now, Step 4.5 adapts dynamica
 - Entity 052 clarify session (2026-04-13): captain feedback that identified this gap
 - Entity 072 (build-explore domain-aware gray areas): overlapping concern -- explore-stage directive-derived gray areas
 - Entity 075 (research dispatch): related pipeline improvement, but distinct concern (research = evidence gathering, this = interaction design)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  entity is Small scope, no children proposed
+- [x] Assumptions confirmed: 5 / 5 (0 corrected)
+  A-1 through A-5 confirmed via batch -- all Confident, no corrections needed
+- [x] Options selected: 1 / 1
+  O-1 cross-skill reference -- Read by absolute path from explore's references (recommended)
+- [x] Questions answered: 2 / 2
+  Q-1 same A-n/Q-n format continue numbering; Q-2 independent of entity 072
+- [x] Canonical refs added: 0
+  captain cited no external docs during clarify session
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected, all Qs answered
+- [x] Handoff mode: loose
+  captain must say 'execute 076' to advance; no auto_advance in frontmatter
+- [x] Clarify duration: 4 questions asked, session complete
+  1 batch confirmation + 1 AskUserQuestion option + 2 AskUserQuestion Qs (+ 1 follow-up analysis)
 
 ## Stage Report: explore
 
