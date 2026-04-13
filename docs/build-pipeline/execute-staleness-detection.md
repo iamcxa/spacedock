@@ -246,9 +246,9 @@ None
 
 | Requirement | Task | Command | Status | Last Run |
 |-------------|------|---------|--------|----------|
-| AC-1: wave 1 pre-check compares files_modified against plan-approval SHA and warns on change | task-1 | `grep "4.0 -- Per-Wave Staleness Pre-Check" skills/build-execute/SKILL.md && grep "diff-filter=M --name-only" skills/build-execute/SKILL.md` | pending | -- |
-| AC-2: wave 2 pre-check uses wave 1's final commit SHA as baseline, not plan-approval SHA | task-1 | `grep "wave_baseline" skills/build-execute/SKILL.md && grep "post-wave-(N-1) commit SHA" skills/build-execute/SKILL.md` | pending | -- |
-| AC-3: stale file warning does not halt dispatch and is logged in Stage Report | task-2 | `grep "### Stale-file warnings" skills/build-execute/SKILL.md && grep "Proceed with wave dispatch" skills/build-execute/SKILL.md` | pending | -- |
+| AC-1: wave 1 pre-check compares files_modified against plan-approval SHA and warns on change | task-1 | `grep "4.0 -- Per-Wave Staleness Pre-Check" skills/build-execute/SKILL.md && grep "diff-filter=M --name-only" skills/build-execute/SKILL.md` | done | 2026-04-13 |
+| AC-2: wave 2 pre-check uses wave 1's final commit SHA as baseline, not plan-approval SHA | task-1 | `grep "wave_baseline" skills/build-execute/SKILL.md && grep "post-wave-(N-1) commit SHA" skills/build-execute/SKILL.md` | done | 2026-04-13 |
+| AC-3: stale file warning does not halt dispatch and is logged in Stage Report | task-2 | `grep "### Stale-file warnings" skills/build-execute/SKILL.md && grep "Proceed with wave dispatch" skills/build-execute/SKILL.md` | done | 2026-04-13 |
 
 ## Stage Report: explore
 
@@ -311,6 +311,45 @@ Plan-checker ran inline (ensign context lacks Agent tool per `references/agent-d
 ### Commits
 - chore(plan): execute-staleness-detection plan -- per-wave staleness pre-check for build-execute
 - chore(index): add contracts for entity-execute-staleness-detection entering plan (1 file)
+
+## Stage Report: execute
+
+status: passed
+base SHA: b942b73
+final SHA: fb0dbb8
+waves: 1 wave completed out of 1 declared
+tasks: 2 done, 0 blocked, 0 needs_context-rounds
+workflow-index transition: skipped -- entity 080 CONTRACTS row was appended by plan stage (a2bb4ac); execute inline fallback (Mode B, no FO team dispatch, ensign context)
+
+### Dispatch Mode
+Mode B -- inline serial fallback. No FO-dispatched task-executor teammates. Both tasks executed serially by orchestrator in wave 1 order. Same-file overlap (plan-checker Dim 3 warning) handled by serial execution.
+
+### Per-task summary
+- task-1: DONE (sonnet) -- commit 8941c07 -- insert Step 4.0 Per-Wave Staleness Pre-Check subsection into build-execute SKILL.md
+- task-2: DONE (sonnet) -- commit fb0dbb8 -- add Stale-file warnings subsection to Stage Report template in Step 9
+
+### BLOCKED escalations (if any)
+(none)
+
+### Stale-file warnings
+(none -- no stale files detected; single-file entity on isolated worktree branch)
+
+### Findings
+#### Skill suggestions
+(none)
+#### Scope observations
+- task-1 and task-2 both modified `skills/build-execute/SKILL.md` in wave 1 (non-overlapping sections: Step 4 vs Step 9). Plan-checker Dim 3 flagged this as a warning; serial Mode B execution resolved it without incident.
+#### Pre-existing failures
+(none)
+#### Unresolved scope gaps
+(none)
+
+knowledge capture: skipped -- no findings met D1/D2 threshold
+
+## Files Modified
+
+- `skills/build-execute/SKILL.md` -- task-1 (8941c07): inserted `### 4.0 -- Per-Wave Staleness Pre-Check` subsection between Step 4 header and `### Two execution modes`; added baseline advancement paragraph to `### 4d -- Serial Git Commits After Wave Closes`
+- `skills/build-execute/SKILL.md` -- task-2 (fb0dbb8): inserted `### Stale-file warnings` subsection in Stage Report template between `### BLOCKED escalations` and `### Findings`
 
 ## References
 
