@@ -1,8 +1,8 @@
 ---
 id: 093
 title: "Comment UX polish — right panel layout + text-selection highlights"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: /build
 created: 2026-04-14T12:00:00+08:00
 started:
@@ -63,22 +63,27 @@ depends-on: [054]
 A-1: Current layout is single-column `max-w-4xl` with comments rendered inline under section headings via `EntityBody` component.
 Confidence: 🟢 Confident (0.95)
 Evidence: `spacebridge/ui/app/entity/[slug]/page.tsx:140` -- `<main className="container mx-auto px-4 py-8 max-w-4xl">`; `:163-175` -- `<EntityBody>` receives `commentsBySection` and renders comments inline
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-2: Comments already have `selectedText` field in DB schema, available on the page as `commentRows[].selectedText`.
 Confidence: 🟢 Confident (0.95)
 Evidence: `spacebridge/ui/app/entity/[slug]/page.tsx:37` -- `selectedText: string` in commentRows type; `spacebridge/ui/lib/schema.ts` defines the column
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-3: shadcn ScrollArea, Card, Badge components already in project dependencies (from 054 ship).
 Confidence: 🟢 Confident (0.95)
 Evidence: `spacebridge/ui/package.json:12-13` -- `@radix-ui/react-scroll-area`, `@radix-ui/react-tabs`; shadcn component set established by 053
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-4: Text-selection popover component already exists from 054 — can be extended for highlight click behavior.
 Confidence: 🟡 Likely (0.75)
 Evidence: `spacebridge/ui/components/text-selection-popover.tsx` exists. Needs verification that it handles `selectedText` matching for highlight injection.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-5: EntityBody currently receives and renders comments inline — refactor must separate body rendering from comment rendering to enable the two-column layout.
 Confidence: 🟢 Confident (0.90)
 Evidence: `page.tsx:163-175` -- EntityBody receives `commentsBySection`, `repliesByParent`, `entitySlug` props alongside `body` and `sectionHeadings`. The component is responsible for both markdown body AND comment display.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 ## Option Comparisons
 
@@ -88,6 +93,8 @@ Evidence: `page.tsx:163-175` -- EntityBody receives `commentsBySection`, `replie
 |---|---|---|---|---|
 | useEffect + DOM TreeWalker post-hydration | Matches entity 013 proven pattern; works on any rendered HTML; decoupled from markdown parser | DOM manipulation in React is fragile; must re-run on body changes | Medium | Recommended |
 | React-level: custom remark plugin during markdown parse | Type-safe; React-native; no post-hydration DOM surgery | Tightly coupled to markdown parser; harder to match arbitrary selectedText spans that cross markdown nodes | High | Not recommended |
+
+→ Selected: useEffect + DOM TreeWalker post-hydration (captain, 2026-04-14, interactive)
 
 ## Open Questions
 
@@ -118,3 +125,22 @@ Not warranted. 5-6 files, all UI components in the same app. Single coherent cha
 - [x] Scale assessment: Small confirmed
   5-6 UI files, no backend changes
 - [x] Research dispatched: 0 researchers (skipped -- all internal UI patterns, entity 013 prior art in codebase)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- Small UI entity
+- [x] Re-validation: 5 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+- [x] Assumptions confirmed: 5 / 5 (0 corrected)
+  A-1 through A-5 confirmed via batch
+- [x] Options selected: 1 / 1
+  O-1 useEffect + DOM TreeWalker post-hydration (matches entity 013 proven pattern)
+- [x] Questions answered: 0 / 0
+- [x] Open exploration: 0 gray areas surfaced
+- [x] Canonical refs added: 0
+  3 refs already populated from explore
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected. Ready for FO execution.
+- [x] Handoff mode: loose
+  auto_advance not set; captain must say "execute 093" to advance
+- [x] Clarify duration: 2 questions asked, session complete
+  1 batch confirmation + 1 O-1 AskUserQuestion
