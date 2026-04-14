@@ -44,3 +44,32 @@ export const events = sqliteTable("events", {
   sequenceNumber: integer("sequence_number"),
   payload: text("payload"),
 });
+
+export const comments = sqliteTable("comments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  commentId: text("comment_id").notNull().unique(),
+  entityPath: text("entity_path").notNull(),
+  selectedText: text("selected_text").notNull(),
+  sectionHeading: text("section_heading").notNull(),
+  content: text("content").notNull(),
+  author: text("author").notNull(),
+  createdAt: integer("created_at").notNull(),
+  resolved: integer("resolved").notNull().default(0),
+  resolvedReason: text("resolved_reason"),
+  resolvedVersion: integer("resolved_version"),
+  parentId: text("parent_id"),
+  workflowDir: text("workflow_dir").notNull(),
+  eventType: text("event_type"),
+  aggregateId: text("aggregate_id"),
+  sequenceNumber: integer("sequence_number"),
+  payload: text("payload"),
+});
+
+export const commentEvents = sqliteTable("comment_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  aggregateId: text("aggregate_id").notNull(),
+  sequenceNumber: integer("sequence_number").notNull(),
+  eventType: text("event_type").notNull(),
+  payload: text("payload").notNull(),
+  timestamp: integer("timestamp").notNull(),
+});
