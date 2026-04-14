@@ -2,7 +2,7 @@
 id: 091
 title: "Clarify pre-presentation evidence gate -- SO must Read-verify before asking captain"
 status: clarify
-context_status: awaiting-clarify
+context_status: ready
 source: captain feedback (2026-04-14 SO session -- captain caught unverified citations in assumption batch)
 started:
 completed:
@@ -82,6 +82,11 @@ Confidence: 🟢 Confident (0.95)
 Evidence: Both target files are markdown specs: `skills/build-clarify/SKILL.md` and `agents/science-officer.md`. Skill behavior is defined by spec text that the LLM follows. MEMORY.md: "Skill Contract Fixes Are Plan-Driven, Not Pipeline-Driven."
 → Confirmed: captain, 2026-04-14 (batch)
 
+A-5: Resume case skip condition remains unchanged under the new provenance rule. Captain-confirmed evidence is a human judgment that should not be overridden by provenance checking. The provenance rule only targets "not yet presented to captain" scenarios, not "captain confirmed in prior session" scenarios.
+Confidence: 🟢 Confident (0.95)
+Evidence: GUARDRAILS bullet 1: "Do NOT change Step 1.5 skip condition for resume case"; risk vector is different (codebase drift, not provenance gap)
+→ Confirmed: captain, 2026-04-14 (interactive)
+
 ## Open Questions
 
 Q-1: Should the provenance rule be strict (always Read every file:line before presenting, even if SO already Read it during explore in the same session) or smart (only Read files that SO did NOT personally Read)?
@@ -94,6 +99,8 @@ Suggested options:
 - (a) Smart provenance: "If you cannot recall a Read tool call for the cited file in this session, Read it now." Efficient, but requires honest self-assessment.
 - (b) Strict always-Read: "Before presenting Step 2 batch, Read every file:line citation regardless of prior reads in this session." Redundant but bulletproof. ~5-10 extra Read calls per entity.
 - (c) Strict for Mode A only: "If explore used code-explorer dispatch (Mode A), Step 1.5 1a is mandatory. If explore used inline mapping (Mode B), Step 1.5 1a may skip file:line citations that SO Read during explore." Targets the actual gap without penalizing Mode B.
+
+→ Answer: Strict for Mode A only -- mandatory Re-read when explore used code-explorer dispatch, skip-eligible when SO personally Read during inline mapping (Mode B). Targets the actual gap without penalizing Mode B. (captain, 2026-04-14, interactive)
 
 ## Stage Report: explore
 
@@ -117,3 +124,25 @@ Suggested options:
 - `skills/build-clarify/SKILL.md:119` -- Read mandate text (the rule that should fire but doesn't)
 - `agents/science-officer.md:99` -- Step 3 build-clarify delegation text (A-2 gap location)
 - `agents/science-officer.md:93-99` -- full Step 3 per-skill execution rules section (insertion point for checkpoint)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- Small scope bugfix, no children proposed
+- [x] Re-validation: 4 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  Evidence verified in this session: SKILL.md:115 (A-1), science-officer.md:99 (A-2) both hold
+- [x] Assumptions confirmed: 5 / 5 (0 corrected)
+  A-1 through A-4 confirmed via batch (prior session); A-5 confirmed interactive (resume case boundary)
+- [x] Options selected: 0 / 0
+  No option comparisons in entity
+- [x] Questions answered: 1 / 1
+  Q-1 provenance rule strictness -- Mode A only strict (targets actual gap without penalizing Mode B)
+- [x] Open exploration: 1 gray area surfaced (0 from templates, 0 from CONTRACTS, 0 from directive, 1 via captain selection)
+  Resume case boundary condition (A-5) -- confirmed: resume skip unchanged, provenance rule only for first-presentation
+- [x] Canonical refs added: 0
+  4 refs already populated from prior explore session
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all Qs answered, no options to select
+- [x] Handoff mode: loose
+  auto_advance not set; captain must say "execute 091" to advance
+- [x] Clarify duration: 3 questions asked, session complete
+  1 Q-1 AskUserQuestion + 2 exploration iterations
