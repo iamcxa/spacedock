@@ -2,7 +2,7 @@
 id: 103
 title: "Shape skill -- pre-build alignment for user stories and scope validation"
 status: draft
-context_status: none
+context_status: pending
 source: captain architectural discussion (2026-04-14 SO session — split product alignment from technical execution via /shape skill + build integration)
 created: 2026-04-14T21:30:00+08:00
 started:
@@ -111,6 +111,7 @@ Initial 4 forge fixtures covering scale × type diversity:
   - **Runnable / Invokable** — new `/shape` slash command + 3 subagents.
   - **Readable / Textual** — shape artifact sections embedded in entity body.
   - **Skill-surface** — edits to 3 existing skills (build, build-brainstorm, build-clarify).
+- **Scope flag**: ⚠️ likely-decomposable — triggered by directive length (>3 sentences) + multi-domain classification (Runnable + Readable + Skill-surface). Captain has indicated monolithic intent during design discussion (rejected `/commission` workflow split; scoped to three concrete changes); explore/clarify to confirm or reconsider whether to split into (a) `/shape` skill + subagents, (b) build/brainstorm/clarify integration edits, (c) forge fixture + test infrastructure.
 - **Related entities**:
   - Entity 102 `brainstorm-dual-lens-cross-entity-dedup` — shape may reduce its scope (product-level dedup is now shape's job); deferred archival decision.
   - Entity 100 `spacebridge-cloud-collaborative-warroom` — planned first forge fixture (Large/UI).
@@ -125,3 +126,37 @@ Initial 4 forge fixtures covering scale × type diversity:
   - `Research Threshold` — dispatch researchers for Likely+ (0.50+) assumptions.
   - Forge usage mandatory for skill work (2026-04-14 directive).
 - **Created**: 2026-04-14T21:30:00+08:00
+
+## Goal Check
+
+You are asking for an optional pre-build `/shape` skill that captures product-level intent (problem framing, user stories, scope boundary) into entity body sections, consumed by `/build --from {slug}` as enrichment, without disrupting the existing build pipeline.
+
+- **Problem being solved**: `/build` jumps straight to technical brainstorming without first confirming product direction; Medium+ entities waste clarify cycles on late-discovered direction changes, while Small tasks that don't need shape should retain the current fast path.
+- **Expected outcome**: captain types `/shape "{directive}"` when a Medium+ feature needs alignment → validated sections appear in entity body → `/build --from {slug}` enriches brainstorm with specific user stories → fewer product-level clarify rounds. Small tasks bypass shape entirely via the escape-hatch.
+- **Explicit non-goals**: does NOT replace SO pipeline stages; does NOT auto-route from `/build` (captain drives routing); does NOT decompose multi-entity directives (delegate to build-pipeline decomposition gate); does NOT allow reshape-mid-build (immutable-pitch discipline — open new entity with `supersedes`); does NOT touch plan artifact storage or code-execution stages.
+
+## Brainstorming Spec
+
+**APPROACH**: Add a new leaf skill `skills/build-shape/SKILL.md` registered as `/shape` via `user-invocable: true` frontmatter (pattern used by 11 existing slash-command skills). The skill runs a 4-step internal flow (`assume → imagine → align → ship` as internal steps, NOT pipeline stages — provenance: Basecamp Shape Up pitch structure + GSD `/gsd-discuss-phase` adaptive questioning) with three context-isolated subagent wrappers dispatched via the Agent tool: `build-shape-framer` (opus — hard synthesis, proposes 2-3 problem statements), `build-shape-story-gen` (sonnet — templated output, generates 3-5 user stories per accepted frame), `build-shape-scope-drafter` (sonnet — constrained output, drafts in/out scope). Skill body owns all captain `AskUserQuestion` interaction; subagents do generative heavy lifting. Output written as entity body sections (`## Problem Statement`, `## User Stories`, `## Scope: In`, `## Scope: Out`, `## References`) plus a frontmatter transition `shape_status: draft → validated`. Step 1 heuristic escape-hatch: Small/bugfix-level directives trigger early exit with "shape unnecessary — run `/build` directly" recommendation. Companion micro-edits to `skills/build/SKILL.md` (accept `--from {slug}` flag, load shape sections), `skills/build-brainstorm/SKILL.md` (add Step 1f shape consumption; activate the Step 2.5 Goal Check shape-present cross-check branch — stub already shipped in commit `06d2329`), and `skills/build-clarify/SKILL.md` (skip product-level assumption category when shape section present in entity). Schema update to `docs/build-pipeline/README.md` adds `shape_status: draft|validated|n/a` field. Forge discipline: skill developed via `kc-plugin-forge` TDD — 4 golden fixtures covering scale × type diversity (F-1 entity 100 Large/UI, F-2 entity 101 Large/runtime, F-3 Medium feature TBD from explore, F-4 synthetic Small bugfix for escape-hatch regression).
+
+**ALTERNATIVE**: Ship `/shape` as a full spacedock workflow via `/commission`, producing a peer `docs/shape-pipeline/` with its own README, `assume/imagine/align/ship` as real pipeline stages (not internal steps), FO dispatch, and mod system. -- D-01 Rejected during design discussion (2026-04-14): (a) dual-pipeline sync problem — shape pipeline ↔ build pipeline state coordination, entity-ID namespace collision, cross-pipeline status awareness; (b) `align` stage is fundamentally captain-in-the-loop conversation — forcing it into FO-dispatch semantics creates impedance mismatch (FO stops and waits on `AskUserQuestion` calls, which is not a natural FO/ensign primitive); (c) workflow machinery overhead (separate README, status script, first-officer agent, mod hooks) pays no dividend when a shape "workflow run" has exactly one entity per run with no parallel stage execution. Skill + subagents carries the same interaction shape with ~10% of the scaffolding cost.
+
+**GUARDRAILS**:
+- New skill MUST follow forge TDD workflow (`kc-plugin-forge`) — write golden fixtures FIRST, iterate SKILL.md against fixtures until green (captain directive 2026-04-14).
+- Subagents MUST be thin wrappers per `MEMORY.md :: Thin Wrapper Agent Pattern` (~15-22 lines per agent MD file, loading `kc-plugin-forge` or other skill plugins for actual logic).
+- Shape artifact storage is entity body sections — do NOT create `docs/_shapes/` subdirectory or separate artifact files (rejected in design; single-source-of-truth entity body).
+- `/shape` and `/build` share the same entity state machine; `shape_status` transitions are additive to `context_status`, not a replacement — both fields coexist.
+- NEVER modify existing SO pipeline stages beyond the three documented micro-edits (build, build-brainstorm, build-clarify); no cascading skill-contract changes.
+- Immutable-pitch discipline enforced at skill level: once `shape_status: validated` is committed, `/shape` refuses to rerun on the same entity — returns "use `supersedes: {old-slug}` on a new entity" recommendation.
+- Forge fixtures MUST include at least one Small/bugfix directive to verify escape-hatch works (regression safety — shape must not force itself on tasks it's not designed for).
+
+**RATIONALE**: The skill+subagents approach isolates captain-interactive work from agent-dispatch work at the right architectural layer. Build-pipeline's value is agent-dispatched execution (execute/quality/review/uat/ship are naturally stage-shaped); shape's value is captain-in-the-loop alignment (inherently conversation-shaped). Making shape a pipeline would force it to pretend to be stage-shaped; keeping it as a skill preserves the existing build pipeline's agent-dispatch optimization. The three micro-edits are the minimum necessary integration surface — adding shape adds exactly those three integration points, no cascading changes. The already-shipped Goal Check commit (`06d2329`) is the prototype for this surgical-edit discipline. Forge TDD on the new skill (not on existing ones) keeps test discipline local to net-new behavior, matching the captain's 2026-04-14 directive that skill work MUST use forge.
+
+## Acceptance Criteria
+
+- Given a raw Medium+ directive, when captain invokes `/shape "{directive}"`, then the skill creates a new entity at `docs/build-pipeline/{slug}.md` with `shape_status: draft` and an interactive loop begins (how to verify: grep entity file for `shape_status:` frontmatter and `## Problem Statement` section after invocation)
+- Given a shape session completes successfully, when the internal ship step finalizes, then the entity frontmatter transitions `shape_status: draft → validated` and body contains all 5 required sections in order: `## Problem Statement`, `## User Stories`, `## Scope: In`, `## Scope: Out`, `## References` (how to verify: parse frontmatter + `grep -n '^## '` to confirm section order)
+- Given a Small/bugfix-level directive (e.g., "fix typo in README", "bump dep version X to Y"), when `/shape "{directive}"` is invoked, then the skill emits an escape-hatch message recommending `/build` directly and exits without creating an entity (how to verify: invoke with small directive fixture, assert no entity file created, assert recommendation message in stdout)
+- Given an entity with `shape_status: validated`, when `/build --from {slug}` is invoked, then build-brainstorm's Step 1f reads the entity's shape sections and the resulting APPROACH paragraph references at least one user story by number (how to verify: diff brainstorm output with vs without `--from`; with `--from`, APPROACH contains at least one `US-{n}` or `user story {n}` citation)
+- Given an entity with `shape_status: validated`, when `/shape "{same directive}" {slug}` is re-invoked on the same entity, then `/shape` refuses to rerun and emits the immutable-pitch recommendation with the `supersedes:` pattern (how to verify: second invocation — assert refusal message, assert entity body unchanged via `git diff HEAD` returns empty)
+- Given `kc-plugin-forge` TDD fixtures F-1 through F-4 (100, 101, one Medium TBD, one Small escape-hatch synthetic), when `skills/build-shape/SKILL.md` is developed, then all 4 fixtures pass forge acceptance checks before the skill is considered ship-ready (how to verify: `kc-plugin-forge validate skills/build-shape` with all 4 fixtures, assert exit code 0)
