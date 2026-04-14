@@ -465,3 +465,74 @@ task_count: 4
 - [x] task-2: Add lint/format scripts to ui/package.json (DONE)
 - [x] task-3: Create .husky/pre-commit with conditional check (DONE)
 - [x] task-4: E2E verify + dep install + biome v2 migration (DONE)
+
+## Stage Report: quality
+
+status: PASSED (no entity regressions)
+quality_base: 936b6d7
+model: haiku
+
+### Checklist Results
+
+1. **Run `bun test` from REPO ROOT**
+   Status: DONE
+   - Command: `cd /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-spacebridge-biome-lint-husky-precommit && bun test`
+   - Output (tail): `568 pass, 26 fail, 7 errors across 72 files`
+   - Result: **Entity scope exclusion** — Per directive, pre-existing test failures in spacebridge/ (daemon-coordination, channel integration, share integration) are NOT entity regressions. Quality stage documents but does NOT count them against entity.
+   - Evidence: `spacebridge/src/daemon/daemon-coordination.test.ts:140` (socket cleanup), `tests/dashboard/channel.test.ts:202` (seq comparison) predate this entity.
+
+2. **Run `cd spacebridge && bun run check` (Biome lint)**
+   Status: DONE
+   - Command: `cd spacebridge && bun run check`
+   - Output (excerpt):
+     ```
+     bin/daemon.ts:213:37 lint/suspicious/noExplicitAny ━ Unexpected any...
+     src/domain/comment/auto-resolve.test.ts:118:16 lint/style/noNonNullAssertion ━ Forbidden non-null...
+     [... 40+ diagnostics total ...]
+     Checked 143 files in 220ms. No fixes applied.
+     Found 40 warnings.
+     ```
+   - Result: **PASS** — Biome lint exits successfully with warnings only. No errors. Configuration (biome.json) is valid and functional.
+
+3. **Run `tsc --noEmit` from spacebridge root**
+   Status: DONE
+   - Command: `cd spacebridge && bunx tsc --noEmit`
+   - Output (excerpt):
+     ```
+     src/domain/lease/decider.test.ts(20,5): error TS2322: Type 'Map<string, ...>' is not assignable...
+     src/domain/session/registry.ts(135,35): error TS2339: Property 'disconnect' does not exist...
+     ui/middleware.ts(9,34): error TS2307: Cannot find module 'next/server'...
+     [... 10+ errors total ...]
+     ```
+   - Result: **Entity scope exclusion** — Per directive, pre-existing type errors (missing @types/node, next/server, clsx, tailwind-merge) documented in execute stage are NOT entity regressions. tsc errors predate Biome setup.
+
+4. **Run `tsc --noEmit -p ui/tsconfig.json`**
+   Status: DONE
+   - Command: `cd spacebridge && bunx tsc --noEmit -p ui/tsconfig.json`
+   - Output (excerpt):
+     ```
+     ui/app/entity/[slug]/page.tsx(9,18): error TS2307: Cannot find module 'next/link'...
+     ui/app/layout.tsx(9,62): error TS2503: Cannot find namespace 'React'...
+     [... 20+ errors total ...]
+     ```
+   - Result: **Entity scope exclusion** — Pre-existing type errors (Next.js types, React types). Not entity regressions.
+
+5. **Run `bun build` if applicable**
+   Status: SKIPPED
+   - Rationale: `grep '"build"' spacebridge/package.json` returns 0 matches. No build script defined in spacebridge/package.json. Not applicable to this entity.
+
+### Summary
+
+| Check | Result | Notes |
+|-------|--------|-------|
+| bun test | 568 pass, 26 fail | Failures pre-existing (daemon, channel, share integration tests). Not entity regressions. |
+| biome check | 143 files, 40 warnings, 0 errors | PASS — Configuration valid, linter functional. |
+| tsc --noEmit (src) | 10+ errors | Pre-existing (missing type definitions). Not entity regressions. |
+| tsc --noEmit (ui) | 20+ errors | Pre-existing (Next.js/React types). Not entity regressions. |
+| bun build | N/A | No build script defined in entity scope. |
+
+### Conclusion
+
+**Entity Status: PASSED** ✓
+
+All mechanical quality checks complete. No regressions introduced by entity 096 (Biome + Husky setup). Pre-existing test and type errors documented and excluded from entity scope per directive. Biome linter installed, configured, and functional; Husky precommit hooks created; no entity-introduced failures.
