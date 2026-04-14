@@ -61,6 +61,21 @@ export function EntityDetailClient({
     router.refresh();
   }, [router]);
 
+  const scrollToHighlight = useCallback((commentId: string) => {
+    const marks = document.querySelectorAll('.comment-highlight');
+    for (const mark of marks) {
+      const ids = (mark.getAttribute('data-comment-ids') || '').split(',');
+      if (ids.includes(commentId)) {
+        mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        mark.classList.add('comment-highlight-flash');
+        mark.addEventListener('animationend', () => {
+          mark.classList.remove('comment-highlight-flash');
+        }, { once: true });
+        break;
+      }
+    }
+  }, []);
+
   const allHighlightComments = commentRows.filter((c) => c.selectedText !== "");
 
   return (
@@ -81,6 +96,7 @@ export function EntityDetailClient({
           entitySlug={entitySlug}
           sectionHeadings={sectionHeadings}
           onCommentAdded={handleCommentAdded}
+          onScrollToHighlight={scrollToHighlight}
         />
       </div>
     </div>
