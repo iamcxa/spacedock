@@ -1,7 +1,7 @@
 ---
 id: 105
 title: Explore Nüwa-Alignment + Subagent-First Enforcement (v2) -- Multi-Angle Parallel Explorer + Track-A Triple-Gate + Tension Output
-status: draft
+status: clarify
 context_status: awaiting-clarify
 source: /build (decomposed from epic 102)
 created: 2026-04-14T00:00:00Z
@@ -157,18 +157,22 @@ You are asking for a restructure of build-explore so every mapping pass dispatch
 **A-1**: The current Step 5 Hybrid Classification soft rule ("2+ consistent usages = Confident; 1 usage clear-fit = Likely; 1 usage unclear = Unclear") is exactly the heuristic Port 8 replaces with the triple-gate. No hidden precedent exists that Port 8 would conflict with.
 - **Confidence**: Confident (0.95) `[primary]`
 - **Evidence**: `skills/build-explore/references/hybrid-classification-heuristic.md:19-21` verbatim matches the quoted soft rule; `:157-158` restates it operationally ("Found 2+ consistent usages? --> Track A (Confident); Found 1 usage? --> Track A (Likely or Unclear depending on fit)"). Port 8's triple-gate replaces these lines directly.
+- → Confirmed: captain, 2026-04-15 (batch -- auto-advance, confidence 95%)
 
 **A-2**: No in-flight CONTRACTS collision exists on `skills/build-explore/SKILL.md`. 105 has no ship-order coordination cost (contrast with sibling 104 which has `build-flow-tdd-discipline` in-flight collision).
 - **Confidence**: Confident (0.95) `[primary]`
 - **Evidence**: `docs/build-pipeline/_index/CONTRACTS.md:207-211` lists only one entity on build-explore/SKILL.md -- `phase-e-plan-4-dogfood-trailofbits-integration` with status `✅ final` (already shipped 2026-04-12). No `in-flight` or `planned` entries on Step 2 / Step 5 / Step 6 surface. 105 can plan + execute + ship without rebase concerns on this file.
+- → Confirmed: captain, 2026-04-15 (batch -- auto-advance, confidence 95%)
 
 **A-3**: The 4-parallel `spacedock:code-explorer` dispatch pattern is already proven in production -- parent epic 102 successfully used this exact pattern (3 concurrent explorers) during its explore stage. Port 7's 4-angle fanout is an elaboration of validated infrastructure, not novel.
 - **Confidence**: Confident (0.95) `[primary]`
 - **Evidence**: Parent entity 102 `## Stage Report: explore` line 304 records "Three `spacedock:code-explorer` agents dispatched in parallel for Lens (c)+(d)". Dispatch mechanism (`Agent(subagent_type="spacedock:code-explorer", ...)`) + parallel-return synthesis already works in SO-direct mode. Port 7 adds angle specialization to the prompt, not a new dispatch primitive.
+- → Confirmed: captain, 2026-04-15 (batch -- auto-advance, confidence 95%)
 
 **A-4**: The Track-B "Recommendation Validation" logic in `hybrid-classification-heuristic.md` (return-value-trace + design-doc-invariant cross-reference) is orthogonal to Port 8's Track-A triple-gate and is preserved unchanged by Port 8. Port 8 changes only Track A classification, not Track B validation.
 - **Confidence**: Confident (0.95) `[primary]`
 - **Evidence**: `skills/build-explore/SKILL.md:166-168` ("Recommendation Validation (Track B only): before marking any option as `Recommended`, run the two validation checks..."); `references/hybrid-classification-heuristic.md` structure separates Track A gating (lines 19-21, 157-158) from Track B recommendation validation (separate section). Port 8's triple-gate target is lines 19-21 + 157-158 only.
+- → Confirmed: captain, 2026-04-15 (batch -- auto-advance, confidence 95%)
 
 ## Option Comparisons
 
@@ -184,6 +188,8 @@ Sibling 104 A-7 committed the captain to vendoring `extraction-framework.md` loc
 
 **Decision owner**: captain via clarify. Recommendation favors `docs/build-pipeline/_docs/` (option 1) matching existing pipeline-doc convention. Plan-phase for 104 + 105 must agree on identical path.
 
+→ Selected: `docs/build-pipeline/_docs/extraction-framework.md` (captain, 2026-04-15, auto-advance confidence 92%) -- matches existing `_docs/` convention (SO-FO-DISPATCH-SPLIT.md already lives there); 104 + 105 plan-phase MUST commit to this identical path. Sibling 104 A-7 plan-phase action updates accordingly.
+
 ## Open Questions
 
 ### Q-1: Port 11 ship-blocking precedence vs explore's historically non-blocking contract (from α-1 in APPROACH)
@@ -197,6 +203,8 @@ Sibling 104 A-7 committed the captain to vendoring `extraction-framework.md` loc
 2. **Include Port 11 as OPTIONAL** at invocation time -- skip flag in the dispatch prompt allows callers to opt-out when caller cannot handle blocker. Preserves backward-compat.
 3. **Defer Port 11 entirely to Phase-E+1** -- ship Ports 7-10 in this entity; open a sibling entity for self-test gate later when FO dispatch graph has Agent-tool audit already complete.
 
+→ Answer: Include Port 11 as MANDATORY under path-aware semantics (captain, 2026-04-15, auto-advance confidence 95%) -- inherits sibling 104 Q-1 hard-fail-to-FO pattern propagated via O-3 path-aware gate semantics. Mode A gate failure returns structured blocker payload (failure reason + gate id + offending Evidence line); Mode B emits alpha markers inline + Stage Report warning `gate-{n} advisory-only in Mode B`. Plan-phase MUST audit FO ensign paths that currently assume explore always returns Stage Report -- update those routing hooks to handle Mode A blocker payload before 105 execute lands.
+
 ### Q-2: Negative-space angle (iv) operational definition
 
 **Domain**: Runnable/Invokable (skill subagent prompt contract)
@@ -209,6 +217,8 @@ Sibling 104 A-7 committed the captain to vendoring `extraction-framework.md` loc
 3. **Drop angle (iv) entirely** -- use only 3 angles (prevailing / recent / sibling). Accept reduced coverage; negative-space is too fragile to operationalize reliably.
 4. **Open-ended -- captain decides at clarify**.
 
+→ Answer: Seed list in dispatch prompt (option 1) (captain, 2026-04-15, interactive) -- negative-space angle explorer receives an explicit seed list of "expected absences" in its dispatch prompt, generated by SKILL.md from APPROACH keywords against a seed pattern table. Plan-phase MUST (a) write the seed pattern table into `references/parallel-explorer-angles.md` (per Q-3 reference doc decision), covering at minimum: async context → `await` absence; error-handling → `try/catch` absence; lock/mutex → `lock|Mutex` absence; test coverage → empty test files; type annotation → missing annotations; (b) spec the keyword→seed mapping rule in the same doc; (c) explorer returns structured "confirmed / refuted / not-applicable" per seed, never freeform absence claims.
+
 ### Q-3: 4-angle list as static SKILL.md text vs editable reference doc (inherited from Core Tension essential child-specific)
 
 **Domain**: Readable/Textual (skill definition location)
@@ -219,6 +229,8 @@ Sibling 104 A-7 committed the captain to vendoring `extraction-framework.md` loc
 1. **Static SKILL.md text** -- 4 angles fixed in SKILL.md body; angle-definition changes require full skill-rewrite entity. Simplest but highest churn cost.
 2. **`references/parallel-explorer-angles.md` reference doc** -- angle definitions in a dedicated ref doc (as parent 102 section 7 suggested); SKILL.md cites the ref doc. Lighter iteration cost.
 3. **Angle-discovery-per-invocation meta-step** -- before dispatching explorers, a meta-step determines which angles apply to this directive (e.g., greenfield projects skip "negative-space"). Most flexible, highest complexity.
+
+→ Answer: `references/parallel-explorer-angles.md` reference doc (option 2) (captain, 2026-04-15, auto-advance confidence 92%) -- matches build-explore's existing reference-doc precedent (`references/gray-area-templates.md`, `references/hybrid-classification-heuristic.md`, `references/output-format.md`, `references/agent-dispatch-guide.md`). SKILL.md cites the doc via `references/parallel-explorer-angles.md`; angle-definition edits become independent commits without full SKILL.md rewrite. Plan-phase creates the ref doc as part of Port 7 implementation.
 
 ## Stage Report: explore
 
@@ -235,3 +247,21 @@ Sibling 104 A-7 committed the captain to vendoring `extraction-framework.md` loc
 - [x] Scale assessment: confirmed Medium
   frontmatter declared Medium; 4 files mapped (lower than brainstorm 7 files estimate -- heavy inheritance from sibling 104 explore reduced re-mapping cost); scope flag "likely-decomposable-already" noted -- NOT warranted to sub-decompose (ports share tier-tag + Mode A/B infrastructure)
 - [x] Research dispatched: 0 researchers (skipped -- all 4 assumptions Confident ≥0.95 AND no external technology claims; all claims are codebase-architecture citations)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- child 105 has no `## Decomposition Recommendation` section; parent 102 was the epic that decomposed to 104+105
+- [x] Re-validation: 4 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+- [x] Assumptions confirmed: 4 / 4 (0 corrected)
+  A-1 through A-4 confirmed via auto-advance batch (captain directive: confidence >=90% auto-advance; all at 95%)
+- [x] Options selected: 1 / 1
+  O-1 `docs/build-pipeline/_docs/extraction-framework.md` (auto-advance, 92%) -- matches _docs/ precedent; coordinates with sibling 104 A-7 plan-phase
+- [x] Questions answered: 3 / 3 (0 deferred)
+  Q-1 Port 11 MANDATORY + path-aware (auto, 95% -- inherits sibling 104 Q-1 hard-fail pattern); Q-2 seed list in dispatch prompt (interactive, captain confirmed); Q-3 references/parallel-explorer-angles.md (auto, 92% -- matches build-explore references/ precedent)
+- [x] Open exploration: 0 gray areas surfaced (auto-advance 92% -- templates/CONTRACTS/directive-implied all covered by pre-identified items; no new gaps detected)
+- [x] Canonical refs added: 0 (inherited from brainstorm seed set; O-1 resolves vendoring target path but sibling 104 plan-phase owns the file copy)
+- [x] Context status: ready
+  gate passed: 4 assumptions confirmed, 1 option selected, 3 questions answered, 9 acceptance criteria present with no α markers, Canonical References seeded
+- [x] Handoff mode: loose (auto_advance: blank in frontmatter)
+  captain must say "execute explore-nuwa-subagent-first" or "execute 105" to advance; First Officer owns status: plan transition in separate flow
+- [x] Clarify duration: 1 AskUserQuestion call (Q-2 only -- 7 of 8 items auto-advanced per captain directive confidence >=90%; session complete)
