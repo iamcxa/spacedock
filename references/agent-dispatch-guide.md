@@ -49,13 +49,13 @@ Haiku models confabulate tool lists from prompt context without checking functio
 
 ### Consequence for Orchestrator Skills
 
-Skills that assume their caller has Agent tool for dispatching parallel workers (researchers, task-executors, review agents) will fail silently when loaded by an ensign or other subagent. **The ensign is a subagent that cannot dispatch.**
+Skills that assume their caller has Agent tool for dispatching parallel workers (researchers, troop agents, review agents) will fail silently when loaded by an ensign or other subagent. **The ensign is a subagent that cannot dispatch.**
 
 Two correct architectures:
 
-1. **Two-phase dispatch:** The main session dispatches workers directly (Phase 1), then dispatches the ensign for synthesis (Phase 2). Workers write results to files; the ensign reads files. Communication happens through files, not through the main session's context window.
+1. **FO-direct troop dispatch (execute stage):** FO loads `spacedock:build-execute` via Skill() and dispatches troop agents directly per wave with per-task model hints. No ensign intermediary. FO IS the orchestrator. See `references/first-officer-shared-core.md` troops-dispatch section.
 
-2. **Main-session-as-orchestrator:** The main session loads the skill directly and follows its dispatch instructions. No ensign involved. This is simpler but loads more into the main session's context.
+2. **Two-phase dispatch (other stages):** The main session dispatches workers directly (Phase 1), then dispatches the ensign for synthesis (Phase 2). Workers write results to files; the ensign reads files. Communication happens through files, not through the main session's context window.
 
 ---
 

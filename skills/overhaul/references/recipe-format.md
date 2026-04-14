@@ -208,7 +208,7 @@ The `anchor` field is a substring that uniquely identifies the start of the bloc
     | explore | sonnet | Codebase mapping + contradiction annotation |
     | clarify | sonnet | Captain-interactive Q&A with AskUserQuestion |
     | plan | opus | Research-backed plan, wave graph, task decomposition |
-    | execute | sonnet | Wave-parallel task dispatch via task-executor |
+    | execute | sonnet | Wave-parallel task dispatch via troop agents (FO-direct) |
     | quality | haiku | Acceptance criteria + structural regression checks |
     | review | sonnet | Judgment-based code review in parallel |
     | uat | sonnet | UAT runner + captain sign-off gate |

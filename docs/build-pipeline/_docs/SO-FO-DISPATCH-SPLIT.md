@@ -155,10 +155,10 @@ FO creates team + tasks from PLAN:
   Wave 3 tasks: depend on wave 2
   Final task:   "Write Stage Report" (depends on all waves)
 
-FO spawns T task-executor teammates (T = wave size or fewer)
-Task-executors self-claim per wave
-  -> each writes files + commits on worktree branch
-  -> SendMessage if cross-file issues discovered
+FO spawns T troop agents (T = wave size or fewer)
+Troops are dispatched per wave by FO directly
+  -> each writes files, returns changed_files + status
+  -> FO commits serially after wave closes
 
 Stage Report task auto-unblocks
   -> synthesis teammate reads commits, writes ## Stage Report: execute
@@ -291,7 +291,7 @@ See full reference: `skills/build-explore/references/researcher-vs-code-explorer
 | Skill | Current assumption | Correct behavior |
 |---|---|---|
 | `build-plan` Step 2 | "You dispatch researchers" | "FO dispatched researchers before you. Read ## Research Findings from entity file." |
-| `build-execute` Step 4 | "You dispatch task-executors" | "FO dispatched task-executors per wave. Read commits + write Stage Report." |
+| `build-execute` Step 4 | "You dispatch task-executors" | "FO dispatches troop agents per wave directly. FO IS the orchestrator -- no ensign intermediary." |
 | `build-review` Step 2 | "You dispatch 10 review agents" | "FO dispatched themed reviewers who debated. Read findings + classify." |
 | `build-explore` Step 2 | "You dispatch code-explorer" | When SO-owned: "SO dispatches code-explorer, you read results." When FO-owned (fallback): "FO dispatches, you read results." |
 
