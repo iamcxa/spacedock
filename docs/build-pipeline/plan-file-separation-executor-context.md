@@ -2,7 +2,7 @@
 id: 092
 title: "Plan file separation -- reduce executor context pollution"
 status: clarify
-context_status: awaiting-clarify
+context_status: ready
 source: captain architectural insight (2026-04-14 SO session -- "plan 階段是否應該開另外一個文件")
 started:
 completed:
@@ -14,7 +14,7 @@ pr:
 intent: feature
 scale: Medium
 project: spacedock
-depends-on: []
+depends-on: [061]
 ---
 
 ## Directive
@@ -98,6 +98,11 @@ Confidence: 🟢 Confident (0.90)
 Evidence: CONTRACTS.md header: "Each section lists a file path with entities that have modified it." A plan file at `_plans/{slug}-plan.md` is just another file path. workflow-index-maintainer appends rows automatically.
 → Confirmed: captain, 2026-04-14 (batch)
 
+A-7: 092 depends-on 061 (build-research + build-plan skills). 061 establishes HOW build-plan works (skill design improvements); 092 then decides WHERE it writes. If 061 redesigns build-plan's output format, that design informs 092's plan file structure. Captain chose HOW-before-WHERE ordering.
+Confidence: 🟢 Confident (0.95)
+Evidence: Captain decision: "092 depends-on 061". 061 is currently `context_status: pending` — will enter explore soon. 092 should not enter plan until 061's design decisions are known.
+→ Confirmed: captain, 2026-04-14 (interactive) -- cross-entity dependency established
+
 ## Option Comparisons
 
 ### O-1: Plan file discovery -- frontmatter cross-ref vs convention-based path
@@ -112,6 +117,8 @@ Return value trace: build-execute Step 1 currently does `Read(entity_file)` → 
 
 Design doc invariant check: no design doc governs plan file location. Convention is consistent with existing `_archive/`, `_index/`, `_docs/` subdirectory patterns under `docs/build-pipeline/`.
 
+→ Selected: Convention-based `_plans/{slug}-plan.md` -- zero frontmatter changes, consistent with existing subdirectory patterns (captain, 2026-04-14, interactive)
+
 ### O-2: Stage Report placement for execute-phase stages
 
 | Option | Pros | Cons | Complexity | Recommendation |
@@ -120,6 +127,8 @@ Design doc invariant check: no design doc governs plan file location. Convention
 | All Stage Reports stay in entity file | Single location for all Stage Reports. Status script unchanged. Dashboard unchanged. | Entity file still grows during execute — partially defeats the purpose. Executor still writes to entity file, blurring ownership boundary. | Low | Viable |
 
 Return value trace: `tools/dashboard/src/frontmatter-io.ts:140` parses `## Stage Report:` sections. If reports split across two files, the parser needs a `readStageReports(entityPath, planPath?)` variant. If all in entity, parser unchanged.
+
+→ Selected: All Stage Reports stay in entity file -- dashboard/status-script unchanged, Stage Reports are small metadata (not implementation context), core win (executor doesn't read discuss context) is preserved without full ownership split (captain, 2026-04-14, interactive)
 
 ## Open Questions
 
@@ -134,6 +143,8 @@ Suggested options:
 - (b) Soft migration at ship time: when an old-format entity ships, its plan sections are retroactively extracted to a plan file during archive. Gradual convergence, no mid-stage disruption.
 - (c) Flag-based: add `plan_format: v2` to entity frontmatter. build-plan checks the flag and writes to the appropriate location. Explicit per-entity opt-in.
 
+→ Answer: (a) Hard cut + dual-format -- new entities post-092 use plan file. In-flight entities keep old format. build-execute checks: plan file exists → read it; doesn't exist → fallback to entity body `## PLAN`. Dual-format removed after all old entities ship to archive. (captain, 2026-04-14, interactive)
+
 Q-2: Does build-uat need to read the plan file for UAT Spec, or does it only need the entity's `## Acceptance Criteria`?
 
 Domain: Runnable/Invokable
@@ -143,6 +154,8 @@ Why it matters: If build-uat reads UAT Spec from the plan file, it's another con
 Suggested options:
 - (a) build-uat reads UAT Spec from plan file — it needs the full test item list with categories (browser/cli/api) and automation flags.
 - (b) build-uat only needs Acceptance Criteria from entity — UAT Spec is consumed by build-plan for generating the spec, and build-uat re-derives test items from Acceptance Criteria at runtime.
+
+→ Answer: (a) build-uat reads UAT Spec from plan file -- it needs the full test item list with categories and automation flags that build-plan produced. build-uat is the third consumer of the plan file (alongside build-execute and task-executors). (captain, 2026-04-14, interactive)
 
 ## Stage Report: explore
 
@@ -169,3 +182,26 @@ Suggested options:
 - `docs/build-pipeline/_index/CONTRACTS.md:1-15` -- per-file-path table format (A-6 natural extension)
 - `tools/dashboard/src/frontmatter-io.ts:140` -- Stage Report parser (O-2 impact if reports split)
 - Existing subdirectory precedents: `_archive/`, `_index/`, `_docs/` under `docs/build-pipeline/`
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  Medium entity, cohesive "separate plan file" operation
+- [x] Re-validation: 6 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  All evidence verified via personal Read/grep in this session
+- [x] Assumptions confirmed: 7 / 7 (0 corrected)
+  A-1..A-6 batch-confirmed; A-7 (061 dependency) surfaced in exploration loop
+- [x] Options selected: 2 / 2
+  O-1: convention-based `_plans/{slug}-plan.md`; O-2: all Stage Reports stay in entity file (dashboard remains single-entry-point)
+- [x] Questions answered: 2 / 2 (0 deferred)
+  Q-1: hard cut + dual-format (build-execute fallback to entity body for old-format); Q-2: build-uat reads UAT Spec from plan file
+- [x] Open exploration: 1 gray area surfaced (0 from templates, 1 from cross-entity analysis, 0 from directive, 0 via freeform)
+  061 dependency: captain chose 092 depends-on 061 (HOW before WHERE ordering). Also discussed O-2 architecture depth (dashboard as single-entry-point, future artifacts extensibility, build pipeline gaps)
+- [x] Canonical refs added: 0
+  No new refs during clarify (7 from explore)
+- [x] Context status: ready
+  Gate passed: 7 assumptions confirmed, 2 options selected, 2 questions answered, 5 acceptance criteria α-clean
+- [x] Handoff mode: loose
+  No auto_advance; captain must say "execute 092" to FO
+- [x] Clarify duration: 7 AskUserQuestion calls + 1 assumption batch + 1 extended architecture discussion
+  Batch(1) + O-1(1) + O-2(1) + Q-1(2, captain explored O-2 reconsideration + pipeline gaps before answering) + Q-2(1) + exploration(2 iterations: 061 dependency + Complete)
