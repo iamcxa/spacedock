@@ -14,6 +14,7 @@ import type {
   RpcResponsePayload,
   CoordinationRequestPayload,
   CoordinationResponsePayload,
+  HeartbeatPayload,
 } from "./types";
 
 export interface SocketServerOptions {
@@ -22,6 +23,7 @@ export interface SocketServerOptions {
   onRpcRequest: (sessionId: string, req: RpcRequestPayload) => Promise<RpcResponsePayload>;
   onCoordinationRequest: (sessionId: string, req: CoordinationRequestPayload) => Promise<CoordinationResponsePayload>;
   onDisconnect: (sessionId: string) => void;
+  onHeartbeat?: (sessionId: string) => void;
 }
 
 export interface SocketServer {
@@ -59,6 +61,15 @@ export function createSocketServer(opts: SocketServerOptions): SocketServer {
 
           const sessionId = socketSessions.get(socket);
           if (!sessionId) return; // unregistered socket, ignore
+
+          if (msg.type === "heartbeat") {
+            const payload = msg.payload as HeartbeatPayload;
+            opts.onHeartbeat?.(payload.sessionId ?? sessionId);
+            if (!socket.destroyed) {
+              socket.write(encodeMessage({ id: msg.id, type: "heartbeat-ack", payload: {} }));
+            }
+            return;
+          }
 
           if (msg.type === "rpc-request") {
             const req = msg.payload as RpcRequestPayload;
