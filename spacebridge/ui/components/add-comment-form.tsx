@@ -1,33 +1,45 @@
 "use client";
 // spacebridge/ui/components/add-comment-form.tsx
 // ABOUTME: Client Component — section dropdown + Textarea + Button for adding a top-level comment.
-// POSTs to /api/entities/[slug]/comments.
+// POSTs to /api/entities/[slug]/comments. Calls onCommentAdded on success for optimistic update.
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+interface CommentRow {
+  commentId: string;
+  selectedText: string;
+  sectionHeading: string;
+  content: string;
+  author: string;
+  parentId: string | null;
+  createdAt: number;
+  resolved: number;
+  resolvedReason: string | null;
+}
+
 interface AddCommentFormProps {
   entitySlug: string;
   sectionHeadings: string[];
+  onCommentAdded?: (comment: CommentRow) => void;
 }
 
-export function AddCommentForm({ entitySlug, sectionHeadings }: AddCommentFormProps) {
-  const router = useRouter();
+export function AddCommentForm({ entitySlug, sectionHeadings, onCommentAdded }: AddCommentFormProps) {
   const [section, setSection] = useState(sectionHeadings[0] ?? "");
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!content.trim() || !section) return;
+    if (!content.trim()) return;
     setSubmitting(true);
     setError(null);
-    setSuccess(false);
+
+    const trimmedContent = content.trim();
+    const now = Date.now();
 
     try {
       const res = await fetch(`/api/entities/${entitySlug}/comments`, {
@@ -35,7 +47,7 @@ export function AddCommentForm({ entitySlug, sectionHeadings }: AddCommentFormPr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sectionHeading: section,
-          content: content.trim(),
+          content: trimmedContent,
           selectedText: "",
           author: "captain",
         }),
@@ -45,9 +57,19 @@ export function AddCommentForm({ entitySlug, sectionHeadings }: AddCommentFormPr
         const data = await res.json().catch(() => ({}));
         setError((data as { error?: string }).error ?? "Failed to submit comment");
       } else {
+        const data = await res.json().catch(() => ({}));
         setContent("");
-        setSuccess(true);
-        router.refresh();
+        onCommentAdded?.({
+          commentId: (data as { commentId?: string }).commentId ?? crypto.randomUUID(),
+          selectedText: "",
+          sectionHeading: section,
+          content: trimmedContent,
+          author: "captain",
+          parentId: null,
+          createdAt: now,
+          resolved: 0,
+          resolvedReason: null,
+        });
       }
     } catch {
       setError("Network error — please try again");
@@ -77,7 +99,7 @@ export function AddCommentForm({ entitySlug, sectionHeadings }: AddCommentFormPr
             >
               {sectionHeadings.map((h) => (
                 <option key={h} value={h}>
-                  {h.replace(/^##\s*/, "")}
+                  {h}
                 </option>
               ))}
             </select>

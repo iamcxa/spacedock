@@ -1,7 +1,11 @@
+"use client";
 // spacebridge/ui/components/entity-body.tsx
-// ABOUTME: Server Component — renders markdown body with react-markdown,
-// injects comment threads per section heading, add-comment form at bottom.
+// ABOUTME: Client Component — renders markdown body with react-markdown,
+// injects comment threads per section heading with optimistic update support.
+// Manages local comment state; background router.refresh() keeps RSC in sync.
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { CommentThread } from "@/components/comment-thread";
 import { AddCommentForm } from "@/components/add-comment-form";
@@ -29,10 +33,22 @@ interface EntityBodyProps {
 export function EntityBody({
   body,
   sectionHeadings,
-  commentsBySection,
+  commentsBySection: initialCommentsBySection,
   repliesByParent,
   entitySlug,
 }: EntityBodyProps) {
+  const router = useRouter();
+  const [commentsBySection, setCommentsBySection] = useState(initialCommentsBySection);
+
+  function handleCommentAdded(newComment: CommentRow) {
+    const section = newComment.sectionHeading;
+    setCommentsBySection((prev) => ({
+      ...prev,
+      [section]: [...(prev[section] ?? []), newComment],
+    }));
+    router.refresh();
+  }
+
   return (
     <div>
       <h2 className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wide">
@@ -72,7 +88,11 @@ export function EntityBody({
       </article>
 
       <div className="mt-8">
-        <AddCommentForm entitySlug={entitySlug} sectionHeadings={sectionHeadings} />
+        <AddCommentForm
+          entitySlug={entitySlug}
+          sectionHeadings={sectionHeadings}
+          onCommentAdded={handleCommentAdded}
+        />
       </div>
     </div>
   );
