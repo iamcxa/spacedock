@@ -634,3 +634,12 @@ Create a thin `spacebridge/bin/cli.ts` as the unified CLI entry point with 5 sub
    Required fixes before UAT:
    - Merge duplicate `node:path` imports in `cli.ts` (lines 7+9 → one import)
    - Remove stale "SPACEBRIDGE_DEV env var for invocation (O-2 decision)" phrase from `auto-fork.ts` ABOUTME line 4
+
+### Feedback Cycle 1
+
+Fixed both SHOULD FIX items from review:
+
+- **C-1/S-1**: Merged duplicate `node:path` imports in `spacebridge/bin/cli.ts` — `import { resolve } from "node:path"` (line 7) and `import { join } from "node:path"` (line 9) collapsed into `import { resolve, join } from "node:path"`.
+- **C-3**: Updated ABOUTME in `spacebridge/src/daemon/auto-fork.ts` line 4 — removed stale "SPACEBRIDGE_DEV env var for invocation (O-2 decision)" phrase; replaced with "resolves bin/cli.ts relative to this source file (Q-1 decision, entity 059)" to reflect the actual post-task-2 behavior.
+
+`bun test` result after fixes: 200 pass, 0 fail (27 files).

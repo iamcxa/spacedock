@@ -4,9 +4,8 @@
 // adds mcp subcommand via autoForkDaemon, and stubs share (entity 058).
 // Users invoke via: bun run bin/cli.ts <subcommand>
 
-import { resolve } from "node:path";
+import { resolve, join } from "node:path";
 import { autoForkDaemon } from "../src/daemon/auto-fork";
-import { join } from "node:path";
 import { homedir } from "node:os";
 
 // ─── State directory resolution ──────────────────────────────────────────────
