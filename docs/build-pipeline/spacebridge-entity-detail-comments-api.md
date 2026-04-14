@@ -472,3 +472,108 @@ app/api/entities/[slug]/comments/[id]/resolve/route.ts (POST resolve)
   Self-review iteration 1: verified all tasks have required attributes (model, wave, skills_hint, read_first, action, acceptance_criteria, files_modified). Verified wave dependencies are acyclic. Verified all ACs covered in Validation Map. Verified all files_modified are under spacebridge/. Verified no YAML frontmatter modification. No issues found — PASS.
 - [ ] workflow-index append called
   SKIPPED — no workflow-index skill invocation available in this ensign context. The FO will handle workflow-index append at plan approval per the build-plan skill contract.
+
+## Stage Report: execute
+
+### Per-task commit SHAs
+
+| Task | Wave | Status | SHA | Description |
+|---|---|---|---|---|
+| Task 1 | 1 | DONE | cc0aa13 | Comment domain types + errors |
+| Task 2 | 2 | DONE | d5cbc89 | Comment decider (pure, 14 tests) |
+| Task 3 | 2 | DONE | d5cbc89 | Comment evolve + replay (pure, 8 tests) |
+| Task 4 | 2 | DONE | d5cbc89 | Comment Zod schemas with .passthrough() (18 tests) |
+| Task 5 | 3 | DONE | ddeaf7d | Schema migration: commentEvents table + parentId column |
+| Task 6 | 3 | DONE | ddeaf7d | Persistence layer (11 tests) |
+| Task 7 | 3 | DONE | ddeaf7d | openWritableDb() in ui/lib/db.ts (3 tests) |
+| Task 8 | 1 | DONE | 8b22d6b | react-markdown + shadcn textarea/avatar/collapsible |
+| Task 9 | 4 | DONE | e82a3bc | Entity detail page Server Component |
+| Task 10 | 4 | DONE | e82a3bc | Comment thread Client Components |
+| Task 11 | 5 | DONE | b6142ed | REST Route Handlers (GET/POST comments, reply, resolve) |
+| Task 12 | 5 | DONE | b6142ed | Auto-resolve utility + 4 integration tests + Route Handler |
+| Task 13 | 5 | DONE | b6142ed | SSE integration verified — no code changes needed |
+| Task 14 | 6 | DONE | — | E2E integration verification (see below) |
+
+### Checklist
+
+- [x] All 14 plan tasks executed (per-task commit SHAs recorded)
+  14 tasks completed across 6 waves. Wave order respected throughout. 5 commits total (waves 1-5 grouped logically; Task 1+8 each got individual commits, waves 2-5 as single commit per wave).
+
+- [x] Wave order respected (Wave 1→2→3→4→5→6)
+  Wave 1 (cc0aa13, 8b22d6b) → Wave 2 (d5cbc89) → Wave 3 (ddeaf7d) → Wave 4 (e82a3bc) → Wave 5 (b6142ed). Dependencies satisfied: Task 2+3+4 depended on Task 1 (done first). Tasks 5+6+7 depended on wave 1+2. Task 9+10 depended on tasks 5+7+8. Tasks 11+12+13 depended on waves 2+3+4.
+
+- [x] All acceptance criteria from each task verified
+  Task 1: bun build --no-bundle types.ts passes (zero output = clean build). Task 2: 14 decider tests pass. Task 3: 8 evolve tests pass. Task 4: 18 schema tests pass. Task 5: 27 existing schema tests still pass, LCD grep: 0 violations. Task 6: 11 persistence tests pass. Task 7: 3 db tests pass. Task 8: react-markdown in package.json, 3 shadcn components created. Task 9: entity detail page at app/entity/[slug]/page.tsx, Server Component (no "use client"), notFound() on missing entity. Task 10: 4 Client Components with "use client" directive. Task 11: Route Handlers for GET/POST comments, POST reply, POST resolve. Task 12: 4 auto-resolve integration tests pass. Task 13: SSE event shape verified matches FeedEntry interface. Task 14: 249 spacebridge tests pass, Next.js build succeeds, tsc --noEmit clean, LCD compliant.
+
+- [x] No scope creep beyond files_modified per task
+  Each task modified only the files listed in its files_modified attribute. No extra files touched. Task 13 confirmed no code changes needed (verification-only).
+
+- [x] Pre-commit hooks passed on all commits
+  All 5 commits completed successfully with no hook failures.
+
+### Integration verification results (Task 14)
+
+**Full test suite (spacebridge/)**: 249 pass, 0 fail across 32 files
+Note: 23 pre-existing failures in tools/dashboard/ (missing @modelcontextprotocol/sdk + diff packages) — unrelated to entity 054, present before this branch.
+
+**Next.js build** (`bun run build` from spacebridge/ui/): SUCCESS
+All 8 routes compiled: /, /entity/[slug], /api/entities/[slug]/comments, /api/entities/[slug]/comments/[id]/reply, /api/entities/[slug]/comments/[id]/resolve, /api/entities/[slug]/auto-resolve, /api/events, /_not-found.
+
+**TypeScript** (`bunx tsc --noEmit`): 0 errors
+
+**LCD compliance** (`grep -E '\bserial\b|\btimestamptz\b|\bdatetime\b|\bRETURNING\b'`): 0 matches — compliant
+
+**Zod passthrough**: 7 schema variants all have `.passthrough()` confirmed
+
+**comment_events table**: 6 columns (id, aggregateId, sequenceNumber, eventType, payload, timestamp) — exact match to lease_events shape
+
+**parentId column**: Present in comments table in schema.ts:74
+
+**O-2 compliance** (no suggestions): grep for "suggestion" in decider.ts: 0 matches
+
+**SSE wiring**: Route Handlers write type/entity/stage/agent/timestamp/detail to events table. SSE endpoint polls at 500ms. Comment events appear in war room live feed automatically.
+
+## Files Modified
+
+### New files (spacebridge/src/)
+- `spacebridge/src/domain/comment/types.ts` — CommentCommand/Event/State/emptyCommentState
+- `spacebridge/src/domain/comment/errors.ts` — CommentNotFound, CommentAlreadyResolved, ParentCommentNotFound, DuplicateCommentId
+- `spacebridge/src/domain/comment/decider.ts` — pure decide(cmd, state, now) → CommentEvent[]
+- `spacebridge/src/domain/comment/decider.test.ts` — 14 tests
+- `spacebridge/src/domain/comment/evolve.ts` — pure evolve + replay
+- `spacebridge/src/domain/comment/evolve.test.ts` — 8 tests
+- `spacebridge/src/domain/comment/schemas.ts` — Zod schemas with .passthrough()
+- `spacebridge/src/domain/comment/schemas.test.ts` — 18 tests
+- `spacebridge/src/domain/comment/persistence.ts` — appendEvents, loadEvents, upsertSnapshot, markResolved, getCommentsByEntity
+- `spacebridge/src/domain/comment/persistence.test.ts` — 11 tests
+- `spacebridge/src/domain/comment/auto-resolve.ts` — triggerAutoResolve() utility
+- `spacebridge/src/domain/comment/auto-resolve.test.ts` — 4 tests
+
+### Modified files (spacebridge/src/)
+- `spacebridge/src/schema.ts` — commentEvents table + parentId column on comments
+- `spacebridge/src/db.ts` — applySchema: CREATE comment_events + ALTER TABLE comments ADD COLUMN parent_id
+
+### New files (spacebridge/ui/)
+- `spacebridge/ui/app/entity/[slug]/page.tsx` — entity detail Server Component
+- `spacebridge/ui/app/api/entities/[slug]/comments/route.ts` — GET list + POST add
+- `spacebridge/ui/app/api/entities/[slug]/comments/[id]/reply/route.ts` — POST reply
+- `spacebridge/ui/app/api/entities/[slug]/comments/[id]/resolve/route.ts` — POST resolve
+- `spacebridge/ui/app/api/entities/[slug]/auto-resolve/route.ts` — POST auto-resolve
+- `spacebridge/ui/components/entity-header.tsx` — EntityHeader Server Component
+- `spacebridge/ui/components/stage-timeline.tsx` — StageTimeline Server Component
+- `spacebridge/ui/components/entity-body.tsx` — EntityBody Server Component
+- `spacebridge/ui/components/comment-thread.tsx` — CommentThread Client Component
+- `spacebridge/ui/components/comment.tsx` — Comment Client Component
+- `spacebridge/ui/components/comment.tsx` — Comment Client Component
+- `spacebridge/ui/components/reply-form.tsx` — ReplyForm Client Component
+- `spacebridge/ui/components/add-comment-form.tsx` — AddCommentForm Client Component
+
+### Modified files (spacebridge/ui/)
+- `spacebridge/ui/lib/schema.ts` — comments + commentEvents table mirrors
+- `spacebridge/ui/lib/db.ts` — openWritableDb() + WritableDbHandle type
+- `spacebridge/ui/lib/db.test.ts` — openWritableDb export test added
+- `spacebridge/ui/package.json` — react-markdown added
+- `spacebridge/ui/bun.lock` — updated
+- `spacebridge/ui/components/ui/textarea.tsx` — shadcn component (new)
+- `spacebridge/ui/components/ui/avatar.tsx` — shadcn component (new)
+- `spacebridge/ui/components/ui/collapsible.tsx` — shadcn component (new)
