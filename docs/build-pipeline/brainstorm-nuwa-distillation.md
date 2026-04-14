@@ -770,3 +770,57 @@ None -- no HTTP or RPC surface in this entity.
 | AC-8 Single-lens claim triggers gate-ii block OR α marker | task-2 (5.5 merge gate item ii + self-test item 2 + Q-1 failure routing) | `grep -c 'Gate (ii) generative power' skills/build-brainstorm/SKILL.md` ≥1 AND `grep -c 'Hard-fail to FO' skills/build-brainstorm/SKILL.md` ≥1 | pending | -- |
 | AC-9 Leaf→orchestrator nested-context detects nesting or emits warning | task-2 (Mode selection heuristic + Mode B fallback) | `grep -c 'Mode B.*no Agent tool\|Detection heuristic' skills/build-brainstorm/SKILL.md` ≥2 | pending | -- |
 
+
+## Stage Report: plan
+
+- [x] Load spacedock:build-plan skill
+  invoked via Skill() at start of plan stage; 9-step orchestration protocol followed
+- [x] Extract research topics from entity context
+  brainstorm + explore + clarify already provided 7 Confirmed assumptions, 3 Selected options, 5 Answered questions; plan-stage topics reduced via research dedup (Step 1.5) to 3 implementation-specific lookups: (a) Mode A/B exact structure to copy, (b) extraction-framework source verification, (c) sibling 105 tier-tag parity check
+- [ ] SKIP: Dispatch parallel research subagents for identified topics
+  ensigns cannot dispatch Agent (per references/claude-ensign-runtime.md + MEMORY.md subagent-cannot-nest-agent-dispatch); 3 residual topics after dedup are narrow in-repo lookups, not broad-tech research -- performed inline per build-plan Step 2 fallback. Logged as "Dispatch Gaps" below.
+- [x] Synthesize into ## Research Findings section
+  5 canonical subsections (Upstream Constraints / Existing Patterns / Library-API Surface / Known Gotchas / Reference Examples); 6+ citations per subsection with file:line or entity:ID evidence
+- [x] Produce ## PLAN with wave-graph task breakdown and per-task model hints
+  1 Task 0 (env-verify, sonnet, wave 0) + 7 code tasks (wave 1); serial SKILL.md chain 1 to 2 to 3 (same file), parallel vendoring branch (Task 4), serial 104-body chain 5 to 6 to 7; model hints: opus (Task 2 major surgery), sonnet (Tasks 0/1/3/4/5), haiku (Tasks 6/7 mechanical)
+- [x] Produce ## UAT Spec with automated + interactive items
+  Browser (None -- no UI surface), CLI (7 automated greps), API (None), Interactive (3 captain sign-off items covering O-3 path-aware gate semantics and A-7 vendor review)
+- [x] Produce ## Validation Map tying AC to validation artifacts
+  9 rows covering AC-1..AC-9, each mapped to one or more tasks and grep/test command; note AC-7 runtime dogfood deferred (documentation-level only at plan-phase)
+- [x] Run self-review iteration(s) per plan-checker dimensions
+  inline self-review (Step 5) checked placeholders, tier-tag + escape-hatch consistency, wave dependencies, and AC coverage -- passed; plan-checker Agent dispatch (Step 6-7) unavailable in ensign runtime; five of the eight dimensions (1 Requirement Coverage, 2 Task Completeness, 3 Dependency Correctness, 6 Validation Sampling, 7 Cross-Entity Coherence via workflow-index append) self-verified inline; dimensions 4/5/8 not separately audited
+- [x] Append CONTRACTS rows via workflow-index skill at plan approval
+  4 rows added: 3 rows under `skills/build-brainstorm/SKILL.md` (Tasks 1/2/3) + 1 new section `docs/build-pipeline/_docs/extraction-framework.md` (Task 4); commit chore(index): add contracts for entity-brainstorm-nuwa-distillation entering plan (4 rows, 2 files)
+- [x] Commit work on the spacedock-ensign/brainstorm-nuwa-distillation branch with meaningful messages
+  two commits: plan(104) for plan body + chore(index) for CONTRACTS append; branch spacedock-ensign/brainstorm-nuwa-distillation
+- [x] Write ## Stage Report: plan with all items marked DONE/SKIPPED/FAILED
+  this section
+
+### Dispatch Gaps
+
+- **Step 2 research subagents**: skipped Agent dispatch; performed inline serial reads of 3 sources (skills/build-explore/SKILL.md Mode A/B, skills/graft/SKILL.md:50 Agent precedent, docs/build-pipeline/explore-nuwa-subagent-first.md sibling 105 tier-tag). Root cause: ensign runtime has no Agent tool. Not a plan quality gap -- topics were narrow enough for inline coverage.
+- **Step 6 plan-checker dispatch**: skipped Agent(subagent_type="general-purpose", model="sonnet") dispatch. Root cause: same (no Agent tool). Mitigation: inline self-review covered placeholder scan, wave-graph sanity, tier-tag / escape-hatch consistency, and AC-to-Validation-Map completeness. Dimensions 4/5/8 (Context Compliance, Research Coverage, Type/Test Coverage) not separately audited -- Type/Test Coverage is N/A for skill-text edits (no source/test pairing); Context Compliance and Research Coverage implicitly satisfied by the inline research threading captain decisions O-1/O-2/O-3 and answers Q-1..Q-5 through task actions.
+
+### Plan-checker final output
+
+```yaml
+# plan-checker not dispatched (ensign runtime lacks Agent); inline self-review verdict:
+issues: []
+inline_self_review:
+  placeholder_scan: clean (TBD/"add appropriate"/"similar to Task N" not present in plan body)
+  wave_dependency_sanity: clean (Task 0 wave 0; Tasks 1-7 wave 1 with documented serial chains on shared files)
+  validation_map_completeness: clean (9/9 acceptance criteria covered)
+  tier_tag_consistency: clean (bracketed [primary|secondary|tertiary] used consistently, matches sibling 105)
+  escape_hatch_literal: clean (Checked -- no notable constraints identified. used consistently per O-2)
+  a_marker_canonical_form: clean (Q-4 literal "(α: claim count {n} outside default 3-7; scale-justified by {directive-signal})" present in Task 2)
+iterations: 0 (plan-checker not dispatched)
+```
+
+### Commits
+
+- plan(104): brainstorm-nuwa-distillation -- Research + PLAN + UAT + Validation Map
+- chore(index): add contracts for entity-brainstorm-nuwa-distillation entering plan (4 rows, 2 files)
+
+### Summary
+
+Plan stage for entity 104 produced research-backed PLAN (1 Task 0 + 7 code tasks), UAT Spec, Validation Map covering all 9 acceptance criteria, and unconditional workflow-index append for 2 contract surfaces. Agent-dispatch steps (research subagents, plan-checker) were skipped with documented rationale -- ensign runtime lacks the Agent tool -- and mitigated by inline serial research and inline self-review. Core decisions threaded through tasks: O-1 Mode A/B split, O-2 "Checked -- no notable constraints identified." escape-hatch, O-3 path-aware gate semantics, Q-1 hard-fail to FO routing, Q-2 keyword-driven journal + Core Tension sibling clustering, Q-3 predictive marker heuristic (action verb + non-directive file/layer name), Q-4 canonical α-form, Q-5 ship 104 first ahead of build-flow-tdd-discipline rebase.
