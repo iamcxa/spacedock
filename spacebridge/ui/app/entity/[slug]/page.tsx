@@ -6,7 +6,7 @@
 import { notFound } from "next/navigation";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { gt, eq, asc } from "drizzle-orm";
+import { and, eq, asc } from "drizzle-orm";
 import { parseEntity } from "@/lib/entity-parse";
 import { EntityHeader } from "@/components/entity-header";
 import { StageTimeline } from "@/components/stage-timeline";
@@ -72,7 +72,7 @@ export default async function EntityDetailPage({ params }: PageProps) {
           detail: events.detail,
         })
         .from(events)
-        .where(eq(events.entity, slug))
+        .where(and(eq(events.entity, slug), eq(events.type, "stage_transition")))
         .orderBy(asc(events.timestamp))
         .all();
 
