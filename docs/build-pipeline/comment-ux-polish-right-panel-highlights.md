@@ -145,3 +145,411 @@ Not warranted. 5-6 files, all UI components in the same app. Single coherent cha
   auto_advance not set; captain must say "execute 093" to advance
 - [x] Clarify duration: 2 questions asked, session complete
   1 batch confirmation + 1 O-1 AskUserQuestion
+
+## Research Findings
+
+### Upstream Constraints
+
+No active DECISIONS.md entries constrain this entity's file set. CONTRACTS.md has no `in-flight` entries on `spacebridge/ui/app/entity/[slug]/page.tsx`, `entity-body.tsx`, or `text-selection-popover.tsx`. The entity is UI-only per directive -- no API routes, schema changes, or Route Handlers. CLAUDE.md mandates strict TypeScript, Zod at boundaries (not applicable here -- no new API boundaries), and running linter.
+
+### Existing Patterns
+
+**Two-column layout (share page):** `spacebridge/ui/app/share/[token]/page.tsx:163` uses `grid grid-cols-1 lg:grid-cols-3 gap-6` with `lg:col-span-2` for EntityBody and a sidebar for live feed + comment form. This is the proven layout pattern in this codebase for body + sidebar.
+
+**TreeWalker highlight injection (entity 013):** `tools/dashboard/static/detail.js:1281-1385` implements the full algorithm:
+1. Flatten body text via `document.createTreeWalker(bodyEl, NodeFilter.SHOW_TEXT)` into `fullText` string + `nodeOffsets[]` array mapping text nodes to character ranges.
+2. For each comment with `selected_text`, find interval via `fullText.indexOf(selected_text)`.
+3. Build segment breakpoints for overlapping highlights -- deduplicate boundary points, sort, build `[start, end)` segments with covering comment IDs.
+4. Wrap text ranges in `<mark>` elements via `wrapTextRange()` in reverse order (preserves offsets).
+5. `data-comment-ids` attribute on `<mark>` enables click-to-scroll to sidebar comment.
+
+**Flash animation (entity 013):** `tools/dashboard/static/detail.css:610-617` -- `comment-highlight-flash` class triggers a 0.6s ease-in-out keyframe cycling background from 0.25 to 0.65 opacity yellow.
+
+**Comment sidebar click-to-highlight (entity 013):** `tools/dashboard/static/detail.js:569-584` -- clicking a sidebar comment card queries `.comment-highlight[data-comment-ids]`, calls `scrollIntoView({ behavior: 'smooth', block: 'center' })`, adds flash class, removes on `animationend`.
+
+### Library/API Surface
+
+**ScrollArea (shadcn/radix):** `spacebridge/ui/components/ui/scroll-area.tsx` wraps `@radix-ui/react-scroll-area`. The `Viewport` child creates a scrollable container. Standard `document.getElementById().scrollIntoView()` works inside ScrollArea -- the browser scrolls the nearest overflow container (the Viewport div). No special API needed for programmatic scrolling.
+
+**ReactMarkdown components prop:** `entity-body.tsx:88-111` already uses the `components` prop to override `h2` rendering. The `<article ref={articleRef}>` wrapping gives us the DOM container reference needed for TreeWalker post-hydration.
+
+### Known Gotchas
+
+**DOM manipulation in React:** The TreeWalker approach injects `<mark>` elements directly into the DOM, bypassing React's virtual DOM. This is safe ONLY in a `useEffect` that runs after hydration and does not conflict with React's reconciliation. The `articleRef` container must NOT be re-rendered by React state changes while highlights are applied, or React will overwrite the injected marks. Solution: wrap the highlight logic in a `useEffect` with dependencies on `body` and `commentsBySection` -- when either changes, clear all marks, let React re-render, then re-apply highlights.
+
+**selectedText matching on body changes:** If a comment's `selectedText` no longer matches the rendered body (e.g., body was edited), `fullText.indexOf(selectedText)` returns -1 and the comment simply gets no highlight. The comment still appears in the panel. No error thrown (AC-4 requirement).
+
+**Responsive stacking:** At `<768px` the grid must stack vertically. Using `grid-cols-1 lg:grid-cols-[7fr_3fr]` with `lg:` prefix ensures mobile stacking. The breakpoint in the spec says `<768px` (md), not `<1024px` (lg). Using `md:grid-cols-[7fr_3fr]` for the 768px threshold.
+
+### Reference Examples
+
+**Share page two-column layout:** `spacebridge/ui/app/share/[token]/page.tsx:163-184` -- direct template for the grid structure. Uses `grid-cols-1 lg:grid-cols-3` with `lg:col-span-2` for body.
+
+**Entity 013 CSS palette:** `tools/dashboard/static/detail.css:594-617`:
+- Normal: `background: rgba(255, 212, 0, 0.25); border-bottom: 2px solid rgba(255, 212, 0, 0.6); cursor: pointer`
+- Hover: `background: rgba(255, 212, 0, 0.45)`
+- Resolved: `background: rgba(255, 212, 0, 0.1); border-bottom-color: rgba(255, 212, 0, 0.25)`
+- Flash: keyframe 0%/100% bg 0.25, 50% bg 0.65, duration 0.6s ease-in-out
+
+## PLAN
+
+Goal: Restructure entity detail page to two-column layout with right comment panel and yellow text-selection highlights.
+
+<task id="task-0" model="haiku" wave="0" skills="">
+  <read_first>
+    - spacebridge/ui/app/entity/[slug]/page.tsx
+    - spacebridge/ui/components/entity-body.tsx
+    - spacebridge/ui/components/text-selection-popover.tsx
+    - spacebridge/ui/components/comment-thread.tsx
+    - spacebridge/ui/components/comment.tsx
+    - spacebridge/ui/app/globals.css
+  </read_first>
+
+  <action>
+  Environment verification: confirm all 6 files listed above exist and are readable.
+  Confirm `@radix-ui/react-scroll-area` is in `spacebridge/ui/package.json` dependencies.
+  Confirm `spacebridge/ui/components/ui/scroll-area.tsx` exports `ScrollArea`.
+  Confirm `spacebridge/ui/tsconfig.json` `include` covers `**/*.ts` and `**/*.tsx`.
+  Run `grep -c "export function" spacebridge/ui/components/entity-body.tsx` -- expect 1 (EntityBody).
+  Run `grep -c "export function" spacebridge/ui/components/comment-thread.tsx` -- expect 1 (CommentThread).
+  </action>
+
+  <acceptance_criteria>
+    - All 6 files exist and are readable
+    - `grep "@radix-ui/react-scroll-area" spacebridge/ui/package.json` returns a match
+    - `grep "export.*ScrollArea" spacebridge/ui/components/ui/scroll-area.tsx` returns a match
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1" skills="">
+  <read_first>
+    - spacebridge/ui/app/entity/[slug]/page.tsx
+    - spacebridge/ui/app/share/[token]/page.tsx
+    - spacebridge/ui/components/entity-body.tsx
+  </read_first>
+
+  <action>
+  Restructure page.tsx from single-column to two-column layout:
+
+  1. Change the outer `<main>` from `max-w-4xl` to `max-w-7xl` to accommodate the wider two-column layout.
+  2. Replace the `<div className="mt-6">` wrapping EntityBody with a CSS grid container:
+     ```
+     <div className="mt-6 grid grid-cols-1 md:grid-cols-[7fr_3fr] gap-6">
+     ```
+  3. EntityBody goes in the left column. Remove `commentsBySection`, `repliesByParent`, and `entitySlug` props from EntityBody -- these move to the new CommentPanel.
+  4. Add a right column containing a new `<CommentPanel>` component (created in task-2) that receives `commentRows`, `repliesByParent`, `entitySlug`, and `sectionHeadings` as props.
+  5. Import CommentPanel at the top of the file.
+
+  Refactor EntityBody props:
+  - Remove `commentsBySection`, `repliesByParent`, `entitySlug` from EntityBodyProps interface.
+  - Remove all inline comment rendering from the h2 components override (lines 89-111 currently render CommentThread under each h2 -- remove that).
+  - Keep `body`, `sectionHeadings`, and `articleRef` exposed. Add a new prop `allComments` (flat array of CommentRow with non-empty selectedText) for the highlight hook (task-3).
+  - Keep the TextSelectionPopover and AddCommentForm in EntityBody (they need the articleRef container).
+  - Actually, move AddCommentForm to CommentPanel (task-2) since it logically belongs with comments. TextSelectionPopover stays with the body (it needs mouse selection within the article).
+  - Update EntityBody's `onCommentAdded` callback to bubble up to the page level -- lift state: page.tsx manages `commentsBySection` state via useState, passes it down to both EntityBody (for highlights) and CommentPanel (for display). This requires converting page.tsx to use a Client Component wrapper.
+
+  Since page.tsx is a Server Component, create a new Client Component `EntityDetailClient` in `spacebridge/ui/components/entity-detail-client.tsx` that:
+  - Receives `body`, `sectionHeadings`, `commentRows`, `repliesByParent`, `entitySlug`, `stageTransitions`, `frontmatter` as props from the Server Component.
+  - Manages `commentsBySection` state (initialized from props, updated via `handleCommentAdded`).
+  - Renders the two-column grid layout with EntityBody (left) and CommentPanel (right).
+  - EntityHeader and StageTimeline stay in page.tsx Server Component above the client boundary.
+
+  page.tsx changes:
+  - Import `EntityDetailClient` instead of directly rendering EntityBody.
+  - Pass data props to EntityDetailClient.
+  - Remove the `commentsBySection` grouping logic (moves to client component).
+  </action>
+
+  <acceptance_criteria>
+    - `grep "grid-cols-1 md:grid-cols" spacebridge/ui/components/entity-detail-client.tsx` finds the two-column grid
+    - `grep "EntityDetailClient" spacebridge/ui/app/entity/[slug]/page.tsx` confirms import
+    - `grep "max-w-7xl" spacebridge/ui/app/entity/[slug]/page.tsx` confirms wider container
+    - `bun test` from repo root passes (no regressions)
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/app/entity/[slug]/page.tsx
+    - spacebridge/ui/components/entity-body.tsx
+    - spacebridge/ui/components/entity-detail-client.tsx
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="1" skills="">
+  <read_first>
+    - spacebridge/ui/components/comment-thread.tsx
+    - spacebridge/ui/components/comment.tsx
+    - spacebridge/ui/components/add-comment-form.tsx
+    - spacebridge/ui/components/ui/scroll-area.tsx
+  </read_first>
+
+  <action>
+  Create `spacebridge/ui/components/comment-panel.tsx` -- the right-side comment panel:
+
+  ```typescript
+  "use client";
+  // ABOUTME: Client Component -- right-side comment panel for entity detail two-column layout.
+  // Shows all comments grouped by section with independent ScrollArea scrolling.
+  // Each comment card has id="comment-{commentId}" for scroll-to-comment from highlights.
+  ```
+
+  Props interface:
+  ```typescript
+  interface CommentPanelProps {
+    commentsBySection: Record<string, CommentRow[]>;
+    repliesByParent: Record<string, CommentRow[]>;
+    sectionHeadings: string[];
+    entitySlug: string;
+    onCommentAdded: (comment: CommentRow) => void;
+  }
+  ```
+
+  Implementation:
+  1. Wrap the entire panel in `<div className="sticky top-8">` for sticky positioning alongside the body.
+  2. Use shadcn `ScrollArea` with `className="h-[calc(100vh-12rem)]"` for independent scrolling.
+  3. Inside ScrollArea, render a header "Comments" with count badge.
+  4. For each section in `sectionHeadings` that has comments, render a section header and CommentThread cards.
+  5. Each CommentThread wrapper div gets `id={`comment-${comment.commentId}`}` for scroll targeting from highlights.
+  6. Document-level comments (empty sectionHeading key) render first under "General" header.
+  7. At the bottom, render the AddCommentForm (moved from entity-body.tsx).
+  8. On mobile (`md:` breakpoint), the panel stacks below the body naturally via the grid-cols-1 fallback.
+  </action>
+
+  <acceptance_criteria>
+    - `grep "comment-panel" spacebridge/ui/components/comment-panel.tsx` confirms file exists
+    - `grep "ScrollArea" spacebridge/ui/components/comment-panel.tsx` confirms ScrollArea usage
+    - `grep 'id={.*comment-' spacebridge/ui/components/comment-panel.tsx` confirms comment card IDs for scroll targeting
+    - `grep "AddCommentForm" spacebridge/ui/components/comment-panel.tsx` confirms form is in panel
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/components/comment-panel.tsx
+  </files_modified>
+</task>
+
+<task id="task-3" model="sonnet" wave="2" skills="">
+  <read_first>
+    - spacebridge/ui/components/entity-body.tsx
+    - spacebridge/ui/components/entity-detail-client.tsx
+    - tools/dashboard/static/detail.js
+  </read_first>
+
+  <action>
+  Implement the useEffect + DOM TreeWalker yellow highlight injection in entity-body.tsx, adapting entity 013's proven pattern for React:
+
+  1. Add a new `useEffect` hook in EntityBody that runs after hydration. Dependencies: `[body, allComments]` where `allComments` is the flat array of CommentRow objects with non-empty `selectedText`.
+
+  2. Inside the useEffect, implement the TreeWalker algorithm (adapted from detail.js:1281-1385):
+
+     a. Get the article DOM node via `articleRef.current`.
+     b. Remove existing `<mark>` elements (querySelectorAll('.comment-highlight'), unwrap children, normalize).
+     c. Flatten text via `document.createTreeWalker(articleRef.current, NodeFilter.SHOW_TEXT)` into `fullText` + `nodeOffsets[]`.
+     d. For each comment in `allComments`, if `selectedText` is non-empty, find interval via `fullText.indexOf(comment.selectedText)`. Skip if -1 (AC-4 graceful degradation).
+     e. Build segment breakpoints for overlapping highlights (same algorithm as detail.js:1321-1346).
+     f. Wrap text ranges in `<mark>` elements in reverse order. Each `<mark>` gets:
+        - `className="comment-highlight"` (+ ` resolved` if `comment.resolved === 1`)
+        - `data-comment-ids={commentIds.join(',')}`
+        - `style` with `background: rgba(255,212,0,0.25)`, `borderBottom: 2px solid rgba(255,212,0,0.8)`, `cursor: pointer`
+
+  3. Add a click handler on the article container (via another useEffect or event delegation) that:
+     a. Detects clicks on `.comment-highlight` elements.
+     b. Reads `data-comment-ids` attribute, takes the first ID.
+     c. Calls `document.getElementById('comment-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })`.
+     d. Adds `comment-highlight-flash` class to the target comment card in the panel, removes after animation.
+
+  4. Add the `onHighlightClick` prop to EntityBody (or handle internally by calling scrollIntoView directly since the comment panel IDs are global).
+
+  5. Add CSS for highlight styles to globals.css:
+     ```css
+     .comment-highlight {
+       background: rgba(255, 212, 0, 0.25);
+       border-bottom: 2px solid rgba(255, 212, 0, 0.8);
+       cursor: pointer;
+       border-radius: 2px;
+     }
+     .comment-highlight:hover {
+       background: rgba(255, 212, 0, 0.45);
+     }
+     .comment-highlight.resolved {
+       background: rgba(255, 212, 0, 0.1);
+       border-bottom-color: rgba(255, 212, 0, 0.25);
+     }
+     .comment-highlight-flash {
+       animation: highlight-flash 0.6s ease-in-out;
+     }
+     @keyframes highlight-flash {
+       0%, 100% { background: rgba(255, 212, 0, 0.25); }
+       50% { background: rgba(255, 212, 0, 0.65); }
+     }
+     .comment-card-flash {
+       animation: card-flash 0.6s ease-in-out;
+     }
+     @keyframes card-flash {
+       0%, 100% { box-shadow: none; }
+       50% { box-shadow: 0 0 0 2px rgba(255, 212, 0, 0.6); }
+     }
+     ```
+  </action>
+
+  <acceptance_criteria>
+    - `grep "createTreeWalker" spacebridge/ui/components/entity-body.tsx` confirms TreeWalker usage
+    - `grep "comment-highlight" spacebridge/ui/components/entity-body.tsx` confirms mark class assignment
+    - `grep "scrollIntoView" spacebridge/ui/components/entity-body.tsx` confirms click-to-scroll behavior
+    - `grep "comment-highlight" spacebridge/ui/app/globals.css` confirms CSS styles added
+    - `grep "highlight-flash" spacebridge/ui/app/globals.css` confirms flash animation keyframes
+    - `bun test` from repo root passes
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/components/entity-body.tsx
+    - spacebridge/ui/app/globals.css
+  </files_modified>
+</task>
+
+<task id="task-4" model="sonnet" wave="2" skills="">
+  <read_first>
+    - spacebridge/ui/components/comment-panel.tsx
+    - spacebridge/ui/components/entity-detail-client.tsx
+  </read_first>
+
+  <action>
+  Add reverse interaction: clicking a comment card in the right panel scrolls to and flashes the corresponding highlight in the body.
+
+  1. In CommentPanel, for each CommentThread wrapper div that has a non-empty `selectedText`, add an `onClick` handler:
+     a. Query `articleRef` (passed as prop from entity-detail-client) or use global `document.querySelectorAll('.comment-highlight')` to find marks with matching `data-comment-ids`.
+     b. Call `mark.scrollIntoView({ behavior: 'smooth', block: 'center' })` on the first matching mark.
+     c. Add `comment-highlight-flash` class to the mark, remove on `animationend`.
+
+  2. In entity-detail-client.tsx, pass a `scrollToHighlight` callback to CommentPanel:
+     ```typescript
+     function scrollToHighlight(commentId: string) {
+       const marks = document.querySelectorAll('.comment-highlight');
+       for (const mark of marks) {
+         const ids = (mark.getAttribute('data-comment-ids') || '').split(',');
+         if (ids.includes(commentId)) {
+           mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+           mark.classList.add('comment-highlight-flash');
+           mark.addEventListener('animationend', () => {
+             mark.classList.remove('comment-highlight-flash');
+           }, { once: true });
+           break;
+         }
+       }
+     }
+     ```
+
+  3. CommentPanel receives `onScrollToHighlight?: (commentId: string) => void` prop. Each comment card with `selectedText` gets a clickable indicator (small highlight icon or the selectedText blockquote becomes clickable) that triggers `onScrollToHighlight(comment.commentId)`.
+  </action>
+
+  <acceptance_criteria>
+    - `grep "scrollToHighlight" spacebridge/ui/components/entity-detail-client.tsx` confirms callback
+    - `grep "onScrollToHighlight" spacebridge/ui/components/comment-panel.tsx` confirms prop usage
+    - `grep "comment-highlight-flash" spacebridge/ui/components/entity-detail-client.tsx` confirms flash class application
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/components/comment-panel.tsx
+    - spacebridge/ui/components/entity-detail-client.tsx
+  </files_modified>
+</task>
+
+<task id="task-5" model="sonnet" wave="3" skills="">
+  <read_first>
+    - spacebridge/ui/app/entity/[slug]/page.tsx
+    - spacebridge/ui/components/entity-detail-client.tsx
+    - spacebridge/ui/components/entity-body.tsx
+    - spacebridge/ui/components/comment-panel.tsx
+    - spacebridge/ui/app/globals.css
+  </read_first>
+
+  <action>
+  Integration verification and polish:
+
+  1. Run `cd spacebridge/ui && bun run build` to confirm the Next.js app builds without TypeScript or bundling errors.
+  2. Run `bun test` from repo root to confirm no test regressions.
+  3. Run `cd spacebridge/ui && npx tsc --noEmit` to confirm type-checking passes.
+  4. Verify responsive behavior: confirm the grid uses `md:grid-cols-[7fr_3fr]` (768px breakpoint) so `<768px` stacks vertically (AC-5).
+  5. Verify that entity-body.tsx no longer renders CommentThread inline under h2 headings.
+  6. Verify that comment-panel.tsx renders all comments with proper `id="comment-{commentId}"` attributes.
+  7. Verify that globals.css has complete highlight CSS (normal, hover, resolved, flash keyframes, card-flash keyframes).
+  </action>
+
+  <acceptance_criteria>
+    - `cd spacebridge/ui && bun run build` exits 0
+    - `bun test` from repo root passes with 0 failures
+    - `cd spacebridge/ui && npx tsc --noEmit` exits 0
+    - `grep "md:grid-cols" spacebridge/ui/components/entity-detail-client.tsx` confirms responsive breakpoint
+    - `grep -c "CommentThread" spacebridge/ui/components/entity-body.tsx` returns 0 (no inline comments)
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+- [ ] Entity detail page at `/entity/[slug]` on desktop (>=1024px) shows two-column layout: body left (~70%), comment panel right (~30%) with independent scrolling
+- [ ] Comments with non-empty `selectedText` produce yellow highlight marks in the entity body
+- [ ] Clicking a highlighted text span scrolls the right panel to the corresponding comment card with a flash animation
+- [ ] Clicking a comment card with `selectedText` in the right panel scrolls the body to the corresponding highlight with a flash animation
+- [ ] A comment whose `selectedText` no longer matches body content still appears in the panel without error, with no highlight in the body
+- [ ] On narrow viewport (<768px), the comment panel stacks below the entity body
+
+### CLI
+None
+
+### API
+None
+
+### Interactive
+- [ ] Captain can create a text-selection comment via the popover and see it immediately appear in the right panel (optimistic update)
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1: Two-column layout on desktop (>=1024px), body left ~70%, panel right ~30% with independent scrolling | task-1 | `grep "md:grid-cols" spacebridge/ui/components/entity-detail-client.tsx` | pending | -- |
+| AC-2: Yellow highlight mark on matching selectedText | task-3 | `grep "comment-highlight" spacebridge/ui/components/entity-body.tsx && grep "comment-highlight" spacebridge/ui/app/globals.css` | pending | -- |
+| AC-3: Click highlight scrolls to comment card with flash | task-3 | `grep "scrollIntoView" spacebridge/ui/components/entity-body.tsx` | pending | -- |
+| AC-4: Mismatched selectedText -- no error, comment still in panel | task-3 | `bun test` (graceful indexOf === -1 skip) | pending | -- |
+| AC-5: Narrow viewport (<768px) stacks vertically | task-1, task-5 | `grep "grid-cols-1 md:" spacebridge/ui/components/entity-detail-client.tsx` | pending | -- |
+
+## Stage Report: plan
+
+status: passed
+plan-checker verdict: PASS (after 1 revision iteration)
+iteration count: 1
+knowledge capture: skipped -- no findings met D1/D2 threshold
+workflow-index append: 5 append calls, covering 6 tasks and 5 files, all successful
+
+### Dispatch Gaps
+
+Research Findings populated via inline serial research (no FO-dispatched researchers). All 3 topics (entity 013 TreeWalker pattern, two-column layout pattern, ScrollArea API) covered inline with file:line citations.
+
+### Plan-checker final output
+```yaml
+issues:
+  - dimension: cross_entity_coherence
+    severity: warning
+    description: "Skill tool unavailable in inline plan-checker; Dim 7 not evaluated at check time. Manual verification during research confirmed no in-flight conflicts on plan files."
+    fix_hint: "Captain: verify Dim 7 out-of-band via workflow-index read"
+  - dimension: type_test_coverage
+    task: task-1
+    severity: warning
+    description: "task-1 modifies 3 .tsx files but files_modified includes no test file"
+    fix_hint: "Existing tests cover via bun test in acceptance_criteria; add explicit test file if new testable logic is introduced"
+```
+
+### Step 0.5 assumption re-validation
+- A-1: page.tsx:140 -- evidence holds (max-w-4xl confirmed)
+- A-2: page.tsx:37 -- evidence holds (selectedText: string confirmed)
+- A-3: package.json:12 -- evidence holds (@radix-ui/react-scroll-area confirmed)
+- A-4: text-selection-popover.tsx exists -- evidence holds
+- A-5: page.tsx:163-175 -- evidence holds (EntityBody receives comment props)
+
+### Commits
+- chore(index): add contracts for entity-comment-ux-polish-right-panel-highlights entering plan (5 files)
+- chore(plan): comment-ux-polish-right-panel-highlights two-column layout + highlight injection plan
