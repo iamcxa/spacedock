@@ -41,6 +41,9 @@ export function decide(
       if (!parent) {
         throw new ParentCommentNotFound(cmd.parentCommentId);
       }
+      if (parent.parentId !== null) {
+        throw new ParentCommentNotFound(cmd.parentCommentId);
+      }
       if (parent.resolved) {
         throw new CommentAlreadyResolved(cmd.parentCommentId);
       }

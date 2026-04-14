@@ -163,6 +163,29 @@ describe("reply_to_comment", () => {
     ).toThrow(CommentAlreadyResolved);
   });
 
+  it("throws ParentCommentNotFound when parent is itself a reply (no nested replies)", () => {
+    const state = makeState([
+      { commentId: "c1", parentId: null },
+      { commentId: "c2", parentId: "c1" },
+    ]);
+    expect(() =>
+      decide(
+        {
+          type: "reply_to_comment",
+          commentId: "c3",
+          parentCommentId: "c2",
+          entityPath: "/path/entity.md",
+          selectedText: "",
+          sectionHeading: "## Directive",
+          content: "Nested reply attempt",
+          author: "captain",
+        },
+        state,
+        NOW,
+      ),
+    ).toThrow(ParentCommentNotFound);
+  });
+
   it("throws DuplicateCommentId when reply commentId already exists", () => {
     const state = makeState([{ commentId: "c1" }, { commentId: "c2" }]);
     expect(() =>
