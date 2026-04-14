@@ -1,7 +1,7 @@
 ---
 id: 059
 title: "Standalone directory distribution + wrapper CLI"
-status: quality
+status: uat
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md); scope revised 2026-04-10 after entity 049 spike
 started: 2026-04-14T09:00:00+08:00
