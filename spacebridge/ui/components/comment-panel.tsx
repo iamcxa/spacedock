@@ -27,6 +27,7 @@ interface CommentPanelProps {
   sectionHeadings: string[];
   entitySlug: string;
   onCommentAdded: (comment: CommentRow) => void;
+  onScrollToHighlight?: (commentId: string) => void;
 }
 
 export function CommentPanel({
@@ -35,6 +36,7 @@ export function CommentPanel({
   sectionHeadings,
   entitySlug,
   onCommentAdded,
+  onScrollToHighlight,
 }: CommentPanelProps) {
   const [commentsBySection, setCommentsBySection] = useState(initialCommentsBySection);
 
@@ -80,6 +82,16 @@ export function CommentPanel({
               </p>
               {generalComments.map((comment) => (
                 <div key={comment.commentId} id={`comment-${comment.commentId}`}>
+                  {comment.selectedText && onScrollToHighlight && (
+                    <button
+                      type="button"
+                      onClick={() => onScrollToHighlight(comment.commentId)}
+                      className="mb-1 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                      title="Scroll to highlight"
+                    >
+                      <span>&#8593;</span> View in text
+                    </button>
+                  )}
                   <CommentThread
                     comment={comment}
                     replies={repliesByParent[comment.commentId] ?? []}
@@ -101,6 +113,16 @@ export function CommentPanel({
                 </p>
                 {sectionComments.map((comment) => (
                   <div key={comment.commentId} id={`comment-${comment.commentId}`}>
+                    {comment.selectedText && onScrollToHighlight && (
+                      <button
+                        type="button"
+                        onClick={() => onScrollToHighlight(comment.commentId)}
+                        className="mb-1 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                        title="Scroll to highlight"
+                      >
+                        <span>&#8593;</span> View in text
+                      </button>
+                    )}
                     <CommentThread
                       comment={comment}
                       replies={repliesByParent[comment.commentId] ?? []}
