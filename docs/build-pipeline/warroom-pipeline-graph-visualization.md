@@ -64,6 +64,10 @@ depends-on: [053]
 
 (explore stage will populate)
 
+## Bundled Fix: Multi-Session Entity Routing
+
+Entity detail page (`/entity/[slug]`) currently uses `limit(1)` to pick the first session's projectRoot — breaks when multiple CC sessions are connected with different repos. Fix: pass repo context via URL param or scan all projectRoots to find the matching entity file. This is a natural fit for 094 since the war room home page already handles multi-session correctly.
+
 ## Assumptions
 
 (explore stage will populate)
