@@ -1,7 +1,7 @@
 ---
 id: 057
 title: "Multi-root session registry + file watcher"
-status: execute
+status: quality
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started: 2026-04-14T09:00:00+08:00
@@ -220,3 +220,19 @@ Suggested options: (a) All files -- emit for every file change in watched dirs, 
   No auto_advance in frontmatter; captain must say "execute 057" to advance
 - [x] Clarify duration: 7 questions asked, session complete
   1 batch confirmation + 2 option selections + 1 Q answer + 3 exploration iterations
+
+### Feedback Cycle 1
+
+**R-1 (HIGH — fixed):** Removed redundant second DB scan in `createSessionRegistry`. Now a single `db.select()` over `session_events` builds both `allEvents` (for replay) and `seqCounters` (group by aggregateId, max sequenceNumber). Dropped dead `countEvents` import and replaced dynamic schema imports with a static top-level import of `sessionEventsTable`.
+
+**R-2 (HIGH — fixed):** `nextSeq()` now accepts a `count` parameter and advances the counter by `events.length`, not 1. Fixes sequence number collision on any multi-event batch (e.g. `disconnectAll` writing N `session_disconnected` events — previously all but the first would collide on the next write).
+
+**S-1 (MEDIUM — fixed):** `registry.register()` now validates `projectRoot` before reaching the decider: rejects non-absolute paths (missing leading `/`) and paths containing `..` segments, throwing `InvalidProjectRoot` (new named error class in `errors.ts`).
+
+**R-3 (MEDIUM — fixed):** `evolve()` case `session_reconnected` now emits `console.warn` with the sessionId when the defensive guard fires (session absent from state), making replay anomalies visible in logs rather than silent.
+
+**R-5 (LOW — fixed):** Shutdown handler now calls `process.exit(0)` after `disconnectAll` completes, and `process.exit(1)` on error, preventing the daemon from hanging on an idle event loop after shutdown.
+
+**S-2 (LOW — fixed):** Socket-server heartbeat handler now validates that `payload.sessionId` matches the socket's registered sessionId. Mismatches are logged and dropped.
+
+**ST-1–ST-4 (LOW — fixed inline with R-1):** Dead `countEvents` import dropped; dynamic `import("../../schema")` calls replaced with a static top-level import.
