@@ -1,6 +1,6 @@
 ---
 name: build-brainstorm
-description: "Non-interactive spec distiller for /build. Takes a captain's directive and produces a structured brainstorming spec with APPROACH/ALTERNATIVE/GUARDRAILS/RATIONALE and acceptance criteria. Uses α markers for unclear sections instead of asking questions."
+description: "Non-interactive spec distiller for /build. Takes a captain's directive and produces a product-level Goal Check plus a technical brainstorming spec with APPROACH/ALTERNATIVE/GUARDRAILS/RATIONALE and acceptance criteria. Uses α markers for unclear sections instead of asking questions."
 ---
 
 # Build-Brainstorm -- Non-Interactive Spec Distiller
@@ -72,6 +72,41 @@ Classify the directive into one or more domains:
 - Tag multiple domains when applicable -- over-tagging is cheap
 - When ambiguous, tag broader
 - Record result for downstream build-explore consumption
+
+---
+
+## Step 2.5: Goal Check Emission
+
+Before distilling the technical brainstorming spec, emit a product-level `## Goal Check` block. Purpose: surface product-level intent in ≤150 words so captain can spot misalignment without wading through technical detail. This is the first place where captain catches "wrong direction" — if Goal Check is off, no amount of clean APPROACH/ALTERNATIVE work will save the entity.
+
+### Structure
+
+Produce two parts:
+
+**One-sentence restatement** (required, **never α-mark**): "You are asking for {literal restatement of directive's core ask, in plain language — avoid technical jargon}."
+
+**Three bullets**:
+- **Problem being solved**: what pain this addresses (the "why")
+- **Expected outcome**: what concretely changes when this ships (the "what changes")
+- **Explicit non-goals**: what this does NOT do — adjacent work, scope boundaries, deferred concerns
+
+### α-marker rules for Goal Check
+
+- **Never α-mark the one-sentence restatement.** If you cannot restate the directive, you cannot brainstorm it — same principle as RATIONALE. Make your best literal restatement; captain will correct if wrong.
+- **Aggressively α-mark the non-goals bullet** — directives rarely state what's out of scope explicitly. Format: `Explicit non-goals: {best guess} (needs clarification -- deferred to explore)`.
+- Other bullets: α-mark per the alpha-marker-protocol.
+
+### Length discipline
+
+≤150 words total. Plain language. No technical library/file-path references (those belong in APPROACH). Goal Check reads like captain could paste it to a PM unfamiliar with the codebase.
+
+### Shape-present cross-check mode (future — inactive until Step 1f ships)
+
+When `/build --from {shape-slug}` integration lands (tracked in entity 103 `shape-pre-build-alignment-skill`) and Step 1f is added, this Step 2.5 branches:
+- **No shape present** (current behavior): emit full Goal Check as specified above.
+- **Shape present** (future): entity already has `## Problem Statement` / `## User Stories` from a prior `/shape` session. Goal Check becomes a 2-line sanity cross-check — "Shape validated on {date}. Cross-check: the current directive still aligns with the shape's problem statement." If drift detected, α-mark the cross-check.
+
+Until Step 1f exists, treat this as a forward-compatibility note and always emit the full Goal Check.
 
 ---
 
@@ -178,9 +213,11 @@ Scan the directive for large-scope signals. This is O(1) -- pure text analysis, 
 Before returning output, verify quality:
 
 1. **α marker count**: Count all `(needs clarification -- deferred to explore)` markers. If >3, prepend warning: `⚠️ High uncertainty: {n} α markers. Consider providing more detail in the directive.`
-2. **APPROACH vs ALTERNATIVE**: Verify they are genuinely different approaches, not rephrased versions of the same idea
-3. **Acceptance Criteria**: Verify each criterion is testable (has a concrete verification method, not vague language)
-4. **GUARDRAILS vs APPROACH**: Verify guardrails don't contradict the chosen approach
+2. **Goal Check present and well-formed**: Verify the `## Goal Check` block (a) exists, (b) ≤150 words, (c) one-sentence restatement is NOT α-marked, (d) contains all three bullets (problem / expected outcome / non-goals), (e) reads as product-level plain language (no file paths, no library names).
+3. **Goal Check vs APPROACH alignment**: Verify APPROACH serves the "expected outcome" stated in Goal Check. If APPROACH drifts outside Goal Check's problem framing or touches declared non-goals, rewrite APPROACH (not Goal Check — directive is source of truth).
+4. **APPROACH vs ALTERNATIVE**: Verify they are genuinely different approaches, not rephrased versions of the same idea
+5. **Acceptance Criteria**: Verify each criterion is testable (has a concrete verification method, not vague language)
+6. **GUARDRAILS vs APPROACH**: Verify guardrails don't contradict the chosen approach
 
 If any check fails, fix inline before returning. Do not flag to the user -- fix it yourself.
 
@@ -203,6 +240,14 @@ Return structured sections as **plain text**. The `/build` skill assembles them 
 - **Scope flag**: {⚠️ likely-decomposable, or omit this line if not flagged}
 - **Related entities**: {id -- title (status)} or "None found"
 - **Created**: {ISO 8601 timestamp}
+
+## Goal Check
+
+You are asking for {one-sentence plain-language restatement of the directive's core ask}.
+
+- **Problem being solved**: {the pain this addresses}
+- **Expected outcome**: {what concretely changes when this ships}
+- **Explicit non-goals**: {what this does NOT do -- adjacent work, scope boundaries} {(needs clarification -- deferred to explore) if uncertain}
 
 ## Brainstorming Spec
 
