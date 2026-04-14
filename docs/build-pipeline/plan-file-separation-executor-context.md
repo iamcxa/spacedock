@@ -2,7 +2,7 @@
 id: 092
 title: "Plan file separation -- reduce executor context pollution"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: captain architectural insight (2026-04-14 SO session -- "plan 階段是否應該開另外一個文件")
 started:
 completed:
@@ -60,3 +60,106 @@ depends-on: []
 - MEMORY.md: "Flatten Dispatch — Troops Architecture" — executor dispatch directly affected
 - Skills affected: build-plan, build-execute, build-quality, build-review, build-uat, task-execution
 - Infrastructure affected: CONTRACTS.md, workflow-index, dashboard frontmatter-io.ts, status script
+- `skills/build-plan/SKILL.md:198` -- "Write three sections into the entity body" (output target to change)
+- `skills/build-execute/SKILL.md:64` -- "Read the entity file. Parse `## PLAN`" (input source to change)
+- `skills/build-execute/SKILL.md:159-170` -- Mode A/B both operate on entity-parsed task list (input source to change)
+- `skills/build-uat/SKILL.md` -- reads UAT Spec from entity (input source to change)
+- `skills/task-execution/SKILL.md` -- task-executors receive task blocks in Agent prompt from build-execute, NOT entity directly (already isolated — no change needed)
+
+## Assumptions
+
+A-1: Task-executors already DON'T read the entity file directly. They receive structured task blocks in the Agent dispatch prompt from build-execute. The "context pollution" happens at build-execute's Step 1 (reads entire entity body to parse `## PLAN`), not at the task-executor level.
+Confidence: 🟢 Confident (0.95)
+Evidence: `skills/build-execute/SKILL.md:64` reads entity file to parse plan. `skills/build-execute/SKILL.md:159-170` Mode A/B both dispatch from parsed task data. `skills/task-execution/SKILL.md` has zero references to entity_body/entity_context — tasks receive `read_first`, `action`, `acceptance_criteria` blocks.
+
+A-2: build-plan is the sole writer of `## Plan`, `## UAT Spec`, and `## Validation Map`. No other skill writes these sections. Changing the output target from entity body to plan file only requires modifying build-plan.
+Confidence: 🟢 Confident (0.95)
+Evidence: `skills/build-plan/SKILL.md:198` "Write three sections into the entity body". `grep -rl "## Plan\|## UAT Spec\|## Validation Map" skills/*/SKILL.md` — only build-plan writes these (build-execute reads them).
+
+A-3: build-execute is the sole consumer of `## PLAN` section data. It reads the entity file at Step 1, parses tasks into a wave graph, then dispatches.
+Confidence: 🟢 Confident (0.95)
+Evidence: `skills/build-execute/SKILL.md:64` "Read the entity file. Parse `## PLAN` into an in-memory task list." No other skill (quality, review) references `## PLAN` content.
+
+A-4: build-quality runs project-wide checks (`bun test`, `bun lint`, `tsc --noEmit`, `bun build`) and does NOT parse plan sections. It does not need plan file awareness.
+Confidence: 🟢 Confident (0.90)
+Evidence: `skills/build-quality/SKILL.md` grep for Plan/UAT/Validation returns 0 matches on plan-reading lines. Quality checks are mechanical project-wide passes, not plan-task-specific.
+
+A-5: build-review reads the execute-base diff (code changes), not the plan content. It dispatches parallel review agents against the diff. Plan file awareness is not required.
+Confidence: 🟢 Confident (0.85)
+Evidence: `skills/build-review/SKILL.md` grep for Plan returns 0 plan-reading references. Review operates on `git diff execute_base..HEAD`, not on plan task descriptions.
+
+A-6: CONTRACTS.md uses a per-file-path table with entity/stage/intent/status columns. The plan file is a new path that would naturally get its own CONTRACTS row — no schema change needed, just an additional row per entity.
+Confidence: 🟢 Confident (0.90)
+Evidence: CONTRACTS.md header: "Each section lists a file path with entities that have modified it." A plan file at `_plans/{slug}-plan.md` is just another file path. workflow-index-maintainer appends rows automatically.
+
+## Option Comparisons
+
+### O-1: Plan file discovery -- frontmatter cross-ref vs convention-based path
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Convention-based: `_plans/{slug}-plan.md` derived from entity slug | Zero frontmatter changes. build-execute just constructs the path from the entity slug. Predictable, grep-friendly. | Coupling to slug naming convention. If entity slug changes (rename), plan file path breaks. | Low | ✅ Recommended |
+| Frontmatter cross-ref: entity adds `plan_file: _plans/{slug}-plan.md` | Explicit reference — no coupling to naming convention. Supports arbitrary plan file locations. | Requires frontmatter schema change. build-plan must write the cross-ref. build-execute must parse frontmatter before reading plan. More moving parts. | Medium | Viable |
+| Both: convention as default, frontmatter override | Maximum flexibility. Convention covers 99% of cases; frontmatter for edge cases (multi-plan, custom location). | Over-engineered for v1. Two discovery paths to maintain and test. | Medium | Not recommended |
+
+Return value trace: build-execute Step 1 currently does `Read(entity_file)` → parse `## PLAN`. With convention: `Read(_plans/{slug}-plan.md)` — one fewer indirection than frontmatter lookup. With frontmatter: `Read(entity_file)` → parse `plan_file` field → `Read(plan_file)` — still needs entity read first.
+
+Design doc invariant check: no design doc governs plan file location. Convention is consistent with existing `_archive/`, `_index/`, `_docs/` subdirectory patterns under `docs/build-pipeline/`.
+
+### O-2: Stage Report placement for execute-phase stages
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Execute-phase Stage Reports in plan file | Clean ownership: FO writes all execute-phase artifacts to one file. Entity stays discuss-only. Dashboard reads one file per phase (entity for discuss, plan for execute). | Status script must check two files per entity. Dashboard frontmatter-io needs plan-file Stage Report parsing. | Medium | ✅ Recommended |
+| All Stage Reports stay in entity file | Single location for all Stage Reports. Status script unchanged. Dashboard unchanged. | Entity file still grows during execute — partially defeats the purpose. Executor still writes to entity file, blurring ownership boundary. | Low | Viable |
+
+Return value trace: `tools/dashboard/src/frontmatter-io.ts:140` parses `## Stage Report:` sections. If reports split across two files, the parser needs a `readStageReports(entityPath, planPath?)` variant. If all in entity, parser unchanged.
+
+## Open Questions
+
+Q-1: Should the transition be "hard cut" (all new entities use plan file, old entities stay as-is) or "soft migration" (a migration script moves existing in-flight entities' plan sections to plan files)?
+
+Domain: Organizational/Data-transforming
+
+Why it matters: Currently entities 053 (quality), 056 (review), 054 (plan) are in-flight with plan content in entity body. If the transition is hard-cut, these entities complete with old format while new entities use new format. The dashboard/status-script must handle both formats permanently (or until all old entities ship). If soft migration, existing plan content moves to plan files, but mid-stage entities could break if the move isn't atomic.
+
+Suggested options:
+- (a) Hard cut with dual-format support: new entities post-092 use plan file. Existing in-flight entities keep old format. Dashboard handles both. Dual-format code is removed after all old entities ship to archive.
+- (b) Soft migration at ship time: when an old-format entity ships, its plan sections are retroactively extracted to a plan file during archive. Gradual convergence, no mid-stage disruption.
+- (c) Flag-based: add `plan_format: v2` to entity frontmatter. build-plan checks the flag and writes to the appropriate location. Explicit per-entity opt-in.
+
+Q-2: Does build-uat need to read the plan file for UAT Spec, or does it only need the entity's `## Acceptance Criteria`?
+
+Domain: Runnable/Invokable
+
+Why it matters: If build-uat reads UAT Spec from the plan file, it's another consumer of the new file. If it only needs Acceptance Criteria (which stays in entity), the affected surface is smaller.
+
+Suggested options:
+- (a) build-uat reads UAT Spec from plan file — it needs the full test item list with categories (browser/cli/api) and automation flags.
+- (b) build-uat only needs Acceptance Criteria from entity — UAT Spec is consumed by build-plan for generating the spec, and build-uat re-derives test items from Acceptance Criteria at runtime.
+
+## Stage Report: explore
+
+- [x] Files mapped: 8 across skills (5 SKILL.md files), infra (2), entity-dir (1 new)
+  skills: build-plan/SKILL.md (modify output), build-execute/SKILL.md (modify input), build-uat/SKILL.md (modify input?), build-quality/SKILL.md (no change needed), build-review/SKILL.md (no change needed); infra: CONTRACTS.md (natural extension), frontmatter-io.ts (plan-file parser if Stage Reports split); new: docs/build-pipeline/_plans/ directory
+- [x] Assumptions formed: 6 (Confident: 6, Likely: 0, Unclear: 0)
+  A-1 task-executors already isolated (0.95), A-2 build-plan sole writer (0.95), A-3 build-execute sole reader (0.95), A-4 quality no plan refs (0.90), A-5 review no plan refs (0.85), A-6 CONTRACTS natural extension (0.90)
+- [x] Options surfaced: 2
+  O-1 plan file discovery (convention ✅ vs frontmatter cross-ref); O-2 Stage Report placement (plan file ✅ vs entity file)
+- [x] Questions generated: 2
+  Q-1 transition strategy (hard cut vs soft migration vs flag-based); Q-2 build-uat UAT Spec source
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorm
+- [x] Scale assessment: confirmed Medium
+  8 files across 3 layers (skills, infra, entity-dir); core changes to 3 skills (build-plan, build-execute, build-uat)
+- [x] Research dispatched: 0 researchers (skipped -- all internal architecture, no external tech)
+
+## Canonical References
+
+- `skills/build-plan/SKILL.md:198` -- current plan output target ("Write three sections into the entity body")
+- `skills/build-execute/SKILL.md:64` -- current plan input source ("Read the entity file. Parse `## PLAN`")
+- `skills/build-execute/SKILL.md:159-170` -- Mode A/B execution from parsed entity (dispatch isolation point)
+- `skills/task-execution/SKILL.md` -- task-executor receives task blocks, NOT entity body (A-1 evidence)
+- `docs/build-pipeline/_index/CONTRACTS.md:1-15` -- per-file-path table format (A-6 natural extension)
+- `tools/dashboard/src/frontmatter-io.ts:140` -- Stage Report parser (O-2 impact if reports split)
+- Existing subdirectory precedents: `_archive/`, `_index/`, `_docs/` under `docs/build-pipeline/`
