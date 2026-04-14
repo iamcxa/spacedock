@@ -44,12 +44,8 @@ export async function POST(
     const db = createDb(defaultDbPath());
     const entityPath = `/docs/build-pipeline/${slug}.md`;
 
-    // previousStage is a stage name — map to section heading convention
-    const sectionHeading = previousStage.startsWith("## ")
-      ? previousStage
-      : `## ${previousStage.charAt(0).toUpperCase()}${previousStage.slice(1)}`;
-
-    const result = await triggerAutoResolve(db, entityPath, sectionHeading);
+    // Pass stage name directly — triggerAutoResolve uses substring match against sectionHeading
+    const result = await triggerAutoResolve(db, entityPath, previousStage);
 
     return Response.json({ ok: true, resolvedCount: result.resolvedCount });
   } catch (err) {

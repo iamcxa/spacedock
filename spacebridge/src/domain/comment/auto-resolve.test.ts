@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { createDb } from "../../db";
 import type { SpacebridgeDb } from "../../db";
 import { triggerAutoResolve } from "./auto-resolve";
-import { appendEvents, upsertSnapshot, getCommentsByEntity } from "./persistence";
+import { appendEvents, countEvents, upsertSnapshot, getCommentsByEntity } from "./persistence";
 import type { CommentEvent } from "./types";
 
 const ENTITY_PATH = "/docs/build-pipeline/test-entity.md";
@@ -34,7 +34,8 @@ function makeAddEvent(commentId: string, sectionHeading: string): CommentEvent {
 
 async function seedComment(commentId: string, sectionHeading: string) {
   const evt = makeAddEvent(commentId, sectionHeading);
-  await appendEvents(db, ENTITY_PATH, [evt], 0);
+  const seqStart = await countEvents(db, ENTITY_PATH);
+  await appendEvents(db, ENTITY_PATH, [evt], seqStart);
   await upsertSnapshot(db, {
     commentId,
     entityPath: ENTITY_PATH,
@@ -117,6 +118,21 @@ describe("triggerAutoResolve", () => {
     const c2 = rows.find((r) => r.commentId === "c2")!;
     expect(c2.resolved).toBe(1);
     expect(c2.resolvedReason).toBe("stage_advanced");
+  });
+
+  it("resolves comments under 'Stage Report: explore' heading when stageName is 'explore'", async () => {
+    await seedComment("c1", "## Stage Report: explore");
+    await seedComment("c2", "## Stage Report: plan");
+
+    const result = await triggerAutoResolve(db, ENTITY_PATH, "explore");
+    expect(result.resolvedCount).toBe(1);
+
+    const rows = await getCommentsByEntity(db, ENTITY_PATH);
+    const c1 = rows.find((r) => r.commentId === "c1")!;
+    const c2 = rows.find((r) => r.commentId === "c2")!;
+    expect(c1.resolved).toBe(1);
+    expect(c1.resolvedReason).toBe("stage_advanced");
+    expect(c2.resolved).toBe(0);
   });
 
   it("only resolves comments for matching entityPath", async () => {

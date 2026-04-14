@@ -8,38 +8,59 @@ import { decide } from "./decider";
 import { replay } from "./evolve";
 import { appendEvents, loadEvents, markResolved, countEvents } from "./persistence";
 
+// triggerAutoResolve resolves all open comments whose sectionHeading contains
+// the given stageName (case-insensitive). This handles real entity headings like
+// "## Stage Report: explore" being resolved when stage "explore" advances.
 export async function triggerAutoResolve(
   db: SpacebridgeDb,
   entityPath: string,
-  previousSectionHeading: string,
+  stageName: string,
 ): Promise<{ resolvedCount: number }> {
   const existingEvents = await loadEvents(db, entityPath);
   const state = replay(existingEvents);
 
-  const now = Date.now();
-  const events = decide(
-    {
-      type: "resolve_by_stage_advance",
-      entityPath,
-      sectionHeading: previousSectionHeading,
-    },
-    state,
-    now,
-  );
+  const stageNameLower = stageName.toLowerCase();
 
-  if (events.length === 0) {
+  // Collect unique sectionHeadings that contain the stage name
+  const matchingHeadings = new Set<string>();
+  for (const [, comment] of state) {
+    if (
+      comment.entityPath === entityPath &&
+      !comment.resolved &&
+      comment.sectionHeading.toLowerCase().includes(stageNameLower)
+    ) {
+      matchingHeadings.add(comment.sectionHeading);
+    }
+  }
+
+  if (matchingHeadings.size === 0) {
+    return { resolvedCount: 0 };
+  }
+
+  const now = Date.now();
+  let allEvents: ReturnType<typeof decide> = [];
+
+  for (const sectionHeading of matchingHeadings) {
+    const resolved = decide(
+      { type: "resolve_by_stage_advance", entityPath, sectionHeading },
+      state,
+      now,
+    );
+    allEvents = allEvents.concat(resolved);
+  }
+
+  if (allEvents.length === 0) {
     return { resolvedCount: 0 };
   }
 
   const seqStart = await countEvents(db, entityPath);
-  await appendEvents(db, entityPath, events, seqStart);
+  await appendEvents(db, entityPath, allEvents, seqStart);
 
-  // Update snapshots
-  for (const evt of events) {
+  for (const evt of allEvents) {
     if (evt.type === "comment_resolved") {
       await markResolved(db, evt.commentId, "stage_advanced");
     }
   }
 
-  return { resolvedCount: events.length };
+  return { resolvedCount: allEvents.length };
 }
