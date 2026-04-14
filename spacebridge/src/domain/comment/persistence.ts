@@ -2,7 +2,7 @@
 // ABOUTME: Impure persistence layer for the comment aggregate. Only file in domain/comment/
 // allowed to import from schema/db. Handles event log append, load, and snapshot upsert.
 
-import { eq, and, asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import type { SpacebridgeDb } from "../../db";
 import { commentEvents, comments } from "../../schema";
 import type { CommentEvent } from "../comment/types";
@@ -25,10 +25,7 @@ export async function appendEvents(
   }
 }
 
-export async function loadEvents(
-  db: SpacebridgeDb,
-  aggregateId: string,
-): Promise<CommentEvent[]> {
+export async function loadEvents(db: SpacebridgeDb, aggregateId: string): Promise<CommentEvent[]> {
   const rows = await db
     .select()
     .from(commentEvents)
@@ -38,17 +35,11 @@ export async function loadEvents(
 }
 
 export async function loadAllEvents(db: SpacebridgeDb): Promise<CommentEvent[]> {
-  const rows = await db
-    .select()
-    .from(commentEvents)
-    .orderBy(asc(commentEvents.sequenceNumber));
+  const rows = await db.select().from(commentEvents).orderBy(asc(commentEvents.sequenceNumber));
   return rows.map((r) => JSON.parse(r.payload) as CommentEvent);
 }
 
-export async function countEvents(
-  db: SpacebridgeDb,
-  aggregateId: string,
-): Promise<number> {
+export async function countEvents(db: SpacebridgeDb, aggregateId: string): Promise<number> {
   const rows = await db
     .select()
     .from(commentEvents)
@@ -117,7 +108,7 @@ export async function markResolved(
 export async function getCommentsByEntity(
   db: SpacebridgeDb,
   entityPath: string,
-): Promise<typeof comments.$inferSelect[]> {
+): Promise<(typeof comments.$inferSelect)[]> {
   return db
     .select()
     .from(comments)

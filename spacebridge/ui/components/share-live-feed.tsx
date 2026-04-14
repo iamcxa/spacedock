@@ -4,7 +4,7 @@
 // Connects to /api/share/events?token=<token>, filters by entitySlug client-side
 // (defense-in-depth per MEMORY). Shows reconnect banner on disconnect (A-13).
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface FeedEntry {
@@ -45,7 +45,9 @@ export function ShareLiveFeed({ token, entitySlug }: ShareLiveFeedProps) {
         // Defense-in-depth: filter to scoped entity (MEMORY: client-side filter)
         if (evt.entity !== entitySlug) return;
         setEntries((prev) => [evt, ...prev].slice(0, 100));
-      } catch { /* ignore malformed events */ }
+      } catch {
+        /* ignore malformed events */
+      }
     };
 
     return () => es.close();
@@ -71,7 +73,9 @@ export function ShareLiveFeed({ token, entitySlug }: ShareLiveFeedProps) {
               <div key={`${entry.id}-${entry.timestamp}`} className="text-xs p-2 rounded bg-muted">
                 <div className="flex items-center justify-between gap-1 mb-0.5">
                   <span className="font-mono font-medium">{entry.type}</span>
-                  <span className="text-muted-foreground shrink-0">{formatRelative(entry.timestamp)}</span>
+                  <span className="text-muted-foreground shrink-0">
+                    {formatRelative(entry.timestamp)}
+                  </span>
                 </div>
                 {entry.detail && (
                   <div className="text-muted-foreground truncate">{entry.detail}</div>

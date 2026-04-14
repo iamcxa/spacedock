@@ -1,12 +1,11 @@
 // spacebridge/src/ipc/channel-provider-bridge.test.ts
 // ABOUTME: Tests for ChannelProviderBridge — forwards ChannelProvider calls via socket RPC.
 
-import { describe, test, expect } from "bun:test";
-import { createChannelProviderBridge } from "./channel-provider-bridge";
-import { randomUUID } from "node:crypto";
-import type { IpcMessage } from "./types";
-import type { SocketClient } from "./socket-client";
+import { describe, expect, test } from "bun:test";
 import type { AgentEvent } from "../../../tools/dashboard/src/types";
+import { createChannelProviderBridge } from "./channel-provider-bridge";
+import type { SocketClient } from "./socket-client";
+import type { IpcMessage } from "./types";
 
 function makeFakeClient(
   responseMap: Record<string, unknown>,
@@ -55,17 +54,27 @@ describe("ChannelProviderBridge", () => {
 
   test("createSnapshot sends correct RPC and returns EntitySnapshot", async () => {
     const fakeSnap = {
-      id: 1, entity: "e", version: 2, body: "body",
-      frontmatter: null, author: "fo", reason: "test",
-      source: "update" as const, rollback_from_version: null,
-      rollback_section: null, created_at: "2026-01-01T00:00:00Z",
+      id: 1,
+      entity: "e",
+      version: 2,
+      body: "body",
+      frontmatter: null,
+      author: "fo",
+      reason: "test",
+      source: "update" as const,
+      rollback_from_version: null,
+      rollback_section: null,
+      created_at: "2026-01-01T00:00:00Z",
     };
     const client = makeFakeClient({ createSnapshot: fakeSnap });
     const bridge = createChannelProviderBridge({ client });
 
     const input = {
-      entity: "e", body: "body", author: "fo",
-      reason: "test", source: "update" as const,
+      entity: "e",
+      body: "body",
+      author: "fo",
+      reason: "test",
+      source: "update" as const,
     };
     const snap = await bridge.snapshotStore.createSnapshot(input);
     expect(snap).toEqual(fakeSnap);
@@ -108,7 +117,9 @@ describe("ChannelProviderBridge", () => {
   test("stop() calls client.close()", () => {
     let closed = false;
     const client = makeFakeClient({});
-    (client as any).close = () => { closed = true; };
+    (client as any).close = () => {
+      closed = true;
+    };
     const bridge = createChannelProviderBridge({ client });
 
     bridge.stop();

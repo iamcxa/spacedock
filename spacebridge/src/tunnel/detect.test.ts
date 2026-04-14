@@ -1,14 +1,14 @@
 // ABOUTME: Unit tests for detectProvider — mocks binary availability, tests capability-based selection.
 
-import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 // We test the logic by importing the module and mocking child_process.execSync
 // Since bun:test mock.module patches imports, we test the exported functions directly
 // using a testable wrapper that accepts a custom binary-check function.
 
+import { CloudflaredProvider } from "./cloudflared";
 import { NgrokProvider } from "./ngrok";
 import { TailscaleProvider } from "./tailscale";
-import { CloudflaredProvider } from "./cloudflared";
 
 // ─── TunnelProvider interface compliance ──────────────────────────────────────
 
@@ -108,7 +108,7 @@ describe("detectProvider logic", () => {
     const detect = makeDetectFn(["ngrok", "tailscale", "cloudflared"]);
     const result = detect();
     expect(result).not.toBeNull();
-    expect(result!.name).toBe("ngrok");
+    expect(result?.name).toBe("ngrok");
   });
 
   test("skips cloudflared (SSE=false) and returns null when only cloudflared is available", () => {
@@ -121,7 +121,7 @@ describe("detectProvider logic", () => {
     const detect = makeDetectFn(["tailscale", "cloudflared"]);
     const result = detect();
     expect(result).not.toBeNull();
-    expect(result!.name).toBe("tailscale");
+    expect(result?.name).toBe("tailscale");
   });
 
   test("returns null when no SSE-compatible provider is available", () => {
@@ -134,7 +134,7 @@ describe("detectProvider logic", () => {
     const detect = makeDetectFn(["cloudflared"]);
     const result = detect("cloudflared");
     expect(result).not.toBeNull();
-    expect(result!.name).toBe("cloudflared");
+    expect(result?.name).toBe("cloudflared");
   });
 
   test("override throws if binary is not installed", () => {

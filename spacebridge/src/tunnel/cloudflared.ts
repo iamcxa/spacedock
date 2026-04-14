@@ -5,7 +5,7 @@
 // URL extracted from stderr (pattern: https://*.trycloudflare.com).
 // Credentials: uses ~/.cloudflared/ per Q-1 answer (provider-native credential storage).
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import type { TunnelProvider } from "./provider";
 
 export class CloudflaredProvider implements TunnelProvider {
@@ -24,11 +24,9 @@ export class CloudflaredProvider implements TunnelProvider {
   }
 
   async start(localPort: number): Promise<string> {
-    this.child = spawn(
-      "cloudflared",
-      ["tunnel", "--url", `http://localhost:${localPort}`],
-      { stdio: ["ignore", "pipe", "pipe"] }
-    );
+    this.child = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${localPort}`], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
 
     // cloudflared prints the URL to stderr
     this.publicUrl = await this.waitForUrl(30_000);
@@ -68,10 +66,17 @@ export class CloudflaredProvider implements TunnelProvider {
     child.kill("SIGTERM");
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
-        try { child.kill("SIGKILL"); } catch { /* already dead */ }
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          /* already dead */
+        }
         resolve();
       }, 5000);
-      child.once("exit", () => { clearTimeout(timer); resolve(); });
+      child.once("exit", () => {
+        clearTimeout(timer);
+        resolve();
+      });
     });
   }
 

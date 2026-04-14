@@ -4,7 +4,7 @@
 
 import { eq } from "drizzle-orm";
 import type { SpacebridgeDb } from "../../db";
-import { leaseEvents, entityLeases } from "../../schema";
+import { entityLeases, leaseEvents } from "../../schema";
 import type { LeaseEvent, LeaseToken } from "../lease/types";
 
 export async function appendEvents(
@@ -26,26 +26,17 @@ export async function appendEvents(
 }
 
 export async function loadAllEvents(db: SpacebridgeDb): Promise<LeaseEvent[]> {
-  const rows = await db
-    .select()
-    .from(leaseEvents)
-    .orderBy(leaseEvents.sequenceNumber);
+  const rows = await db.select().from(leaseEvents).orderBy(leaseEvents.sequenceNumber);
   return rows.map((r) => JSON.parse(r.payload) as LeaseEvent);
 }
 
 export async function countEvents(db: SpacebridgeDb, aggregateId: string): Promise<number> {
-  const rows = await db
-    .select()
-    .from(leaseEvents)
-    .orderBy(leaseEvents.sequenceNumber);
+  const rows = await db.select().from(leaseEvents).orderBy(leaseEvents.sequenceNumber);
   return rows.filter((r) => r.aggregateId === aggregateId).length;
 }
 
 export async function upsertSnapshot(db: SpacebridgeDb, lease: LeaseToken): Promise<void> {
-  const existing = await db
-    .select()
-    .from(entityLeases)
-    .where(eq(entityLeases.token, lease.token));
+  const existing = await db.select().from(entityLeases).where(eq(entityLeases.token, lease.token));
 
   if (existing.length > 0) {
     await db

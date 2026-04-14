@@ -19,6 +19,12 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | Ignore spacebridge/ui build artifacts (.next, node_modules) | 🔵 planned | 2026-04-13 |
 
+### .husky/pre-commit
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-biome-lint-husky-precommit | plan | Conditional pre-commit hook running lint-staged + tsc for spacebridge | 🔵 planned | 2026-04-14 |
+
 ### agents/ensign.md
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -274,6 +280,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-standalone-dir-distribution | plan | Add mcpServers field for MCP stdio entry | 🔵 planned | 2026-04-14 |
+
+### spacebridge/biome.json
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-biome-lint-husky-precommit | plan | Biome linter/formatter config covering src/, ui/, bin/ | 🔵 planned | 2026-04-14 |
 
 ### spacebridge/bin/cli.ts
 
@@ -805,6 +817,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | Spacebridge UI Next.js 16 + React 19 + Drizzle project manifest | 🔵 planned | 2026-04-13 |
+| spacebridge-biome-lint-husky-precommit | plan | Add lint/format scripts using Biome with --config-path | 🔵 planned | 2026-04-14 |
 
 ### spacebridge/ui/postcss.config.mjs
 
@@ -928,6 +941,7 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Lockfile from bun install for drizzle-orm deps | 🔵 planned | 2026-04-12 |
 | spacebridge-role-aware-lease-manager | plan | Lockfile refresh after bun add zod | 🔵 planned | 2026-04-13 |
+| spacebridge-biome-lint-husky-precommit | plan | Lockfile refresh after bun add @biomejs/biome husky lint-staged | 🔵 planned | 2026-04-14 |
 
 ### spacebridge/drizzle.config.ts
 
@@ -959,6 +973,7 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-plugin-skeleton-drizzle-schema | plan | Package manifest with drizzle-orm and drizzle-kit deps | 🔵 planned | 2026-04-12 |
 | spacebridge-role-aware-lease-manager | plan | Add zod runtime dependency for lease command/event schemas | 🔵 planned | 2026-04-13 |
+| spacebridge-biome-lint-husky-precommit | plan | Add @biomejs/biome, husky, lint-staged devDeps + scripts + lint-staged config | 🔵 planned | 2026-04-14 |
 
 ### spacebridge/src/db.test.ts
 

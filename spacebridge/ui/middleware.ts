@@ -6,8 +6,8 @@
 // to avoid Edge Runtime bun:sqlite restrictions — middleware only checks token format.
 // Non-share paths pass through unmodified.
 
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 
@@ -20,7 +20,7 @@ interface RateLimitBucket {
 // In-memory only: fine for single-daemon pre-SaaS architecture (design doc §6.4).
 const rateLimitMap = new Map<string, RateLimitBucket>();
 
-export const RATE_LIMIT_MAX = 60;        // requests per window
+export const RATE_LIMIT_MAX = 60; // requests per window
 export const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 
 export function checkRateLimit(token: string, nowMs: number = Date.now()): boolean {
@@ -76,9 +76,7 @@ export function middleware(request: NextRequest): NextResponse {
   const pathname = url.pathname;
 
   // Only intercept share routes
-  const isShareRoute =
-    pathname.startsWith("/share/") ||
-    pathname.startsWith("/api/share/");
+  const isShareRoute = pathname.startsWith("/share/") || pathname.startsWith("/api/share/");
 
   if (!isShareRoute) {
     return NextResponse.next();
@@ -87,18 +85,12 @@ export function middleware(request: NextRequest): NextResponse {
   const token = extractTokenFromUrl(url);
 
   if (!token) {
-    return NextResponse.json(
-      { error: "Missing share token" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Missing share token" }, { status: 401 });
   }
 
   // Rate limit check (in-memory, per token)
   if (!checkRateLimit(token)) {
-    return NextResponse.json(
-      { error: "Rate limit exceeded" },
-      { status: 429 }
-    );
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }
 
   // Inject token into request headers for downstream route handlers.

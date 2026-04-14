@@ -1,10 +1,10 @@
 // spacebridge/src/domain/session/evolve.test.ts
 // ABOUTME: Pure unit tests for the session evolve function. No DB, no I/O.
 
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { evolve, replay } from "./evolve";
+import type { SessionEvent } from "./types";
 import { emptySessionState } from "./types";
-import type { SessionEvent, SessionState } from "./types";
 
 const NOW = 1_000_000;
 
@@ -101,8 +101,20 @@ describe("replay", () => {
     const events: SessionEvent[] = [
       registeredEvent,
       { type: "session_heartbeat", sessionId: "sess-1", lastHeartbeat: NOW + 1000 },
-      { type: "session_registered", sessionId: "sess-2", projectRoot: "/repo-b", pid: 55, connectedAt: NOW + 500, lastHeartbeat: NOW + 500 },
-      { type: "session_disconnected", sessionId: "sess-1", reason: "timeout", disconnectedAt: NOW + 2000 },
+      {
+        type: "session_registered",
+        sessionId: "sess-2",
+        projectRoot: "/repo-b",
+        pid: 55,
+        connectedAt: NOW + 500,
+        lastHeartbeat: NOW + 500,
+      },
+      {
+        type: "session_disconnected",
+        sessionId: "sess-1",
+        reason: "timeout",
+        disconnectedAt: NOW + 2000,
+      },
     ];
 
     const replayed = replay(events);

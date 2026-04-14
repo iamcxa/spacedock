@@ -1,7 +1,7 @@
 // ABOUTME: Read-only schema subset for spacebridge UI — mirrors spacebridge/src/schema.ts.
 // Declared here to avoid cross-node_modules drizzle-orm type conflicts.
 // Keep in sync with spacebridge/src/schema.ts field additions.
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const sessions = sqliteTable("sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),

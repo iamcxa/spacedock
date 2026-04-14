@@ -1,10 +1,11 @@
 // ABOUTME: Integration tests for SSE route handler — content-type, backlog flush, abort.
 // Opens temp DB, pre-inserts events, calls GET(), asserts SSE stream behavior.
-import { describe, expect, test } from "bun:test";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { mkdirSync } from "node:fs";
+
 import { Database } from "bun:sqlite";
+import { describe, expect, test } from "bun:test";
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const TMP = join(tmpdir(), `sse-test-${Date.now()}`);
 
@@ -20,7 +21,11 @@ function createTestDb(dbPath: string) {
   return sqlite;
 }
 
-async function readChunks(body: ReadableStream<Uint8Array>, timeoutMs: number, stopOn = "data:"): Promise<string> {
+async function readChunks(
+  body: ReadableStream<Uint8Array>,
+  timeoutMs: number,
+  stopOn = "data:",
+): Promise<string> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let result = "";

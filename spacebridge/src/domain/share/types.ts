@@ -3,13 +3,13 @@
 
 export interface ShareToken {
   id: number;
-  token: string;          // 48-char hex, 192-bit entropy
-  entitySlug: string;     // scoped to one entity
-  createdAt: number;      // epoch-ms
-  expiresAt: number;      // epoch-ms
+  token: string; // 48-char hex, 192-bit entropy
+  entitySlug: string; // scoped to one entity
+  createdAt: number; // epoch-ms
+  expiresAt: number; // epoch-ms
 }
 
 export interface ShareTokenCreateInput {
   entitySlug: string;
-  ttlMs: number;          // time-to-live in milliseconds (default: 7 * 24 * 60 * 60 * 1000)
+  ttlMs: number; // time-to-live in milliseconds (default: 7 * 24 * 60 * 60 * 1000)
 }

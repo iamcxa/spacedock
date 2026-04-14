@@ -4,7 +4,7 @@
 // Events are 🟡 event-log only (no decider) — appended to events table with sentinel values.
 // macOS FSEvents only emits "rename"; debounce key = filename only (A-9 gotcha).
 
-import { watch, type FSWatcher } from "node:fs";
+import { type FSWatcher, watch } from "node:fs";
 import type { SpacebridgeDb } from "../../db";
 import { events as eventsTable } from "../../schema";
 import type { SessionRegistry } from "./registry";
@@ -31,7 +31,7 @@ export function createFileWatcher(opts: FileWatcherOptions): FileWatcher {
   function startWatcher(workflowDir: string): void {
     if (watchers.has(workflowDir)) return;
     try {
-      const watcher = watch(workflowDir, { recursive: true }, (event, filename) => {
+      const watcher = watch(workflowDir, { recursive: true }, (_event, filename) => {
         if (!filename) return;
         // Q-1 answer: only *.md files
         if (!filename.endsWith(".md")) return;
@@ -42,19 +42,23 @@ export function createFileWatcher(opts: FileWatcherOptions): FileWatcher {
         const timer = setTimeout(() => {
           debounceTimers.delete(filename);
           // Write file_change event to events table (O-2: sentinel values)
-          opts.db.insert(eventsTable).values({
-            type: "file_change",
-            entity: "*",
-            stage: "watcher",
-            agent: "file-watcher",
-            timestamp: getNow(),
-            detail: filename,
-            workflowDir,
-          }).then(() => {
-            opts.onFileChange?.({ filename, workflowDir });
-          }).catch((err: Error) => {
-            console.error("[file-watcher] failed to append event:", err);
-          });
+          opts.db
+            .insert(eventsTable)
+            .values({
+              type: "file_change",
+              entity: "*",
+              stage: "watcher",
+              agent: "file-watcher",
+              timestamp: getNow(),
+              detail: filename,
+              workflowDir,
+            })
+            .then(() => {
+              opts.onFileChange?.({ filename, workflowDir });
+            })
+            .catch((err: Error) => {
+              console.error("[file-watcher] failed to append event:", err);
+            });
         }, 100);
         debounceTimers.set(filename, timer);
       });

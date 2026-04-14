@@ -1,12 +1,11 @@
 // spacebridge/src/ipc/coordination-client-bridge.test.ts
 // ABOUTME: Unit tests for the real CoordinationClient bridge against :memory: DB.
 
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { createDb } from "../db";
+import { LeaseExpired, LeaseNotFound } from "../domain/lease/errors";
 import { createCoordinationClientBridge } from "./coordination-client-bridge";
-import type { CoordinationClient } from "./coordination-client-stub";
-import type { EntityRef } from "./coordination-client-stub";
-import { LeaseConflict, LeaseNotFound, LeaseExpired } from "../domain/lease/errors";
+import type { CoordinationClient, EntityRef } from "./coordination-client-stub";
 
 const DURATION = 300_000;
 
@@ -20,7 +19,9 @@ const testEntities: EntityRef[] = [
 ];
 
 let nowMs = 1_000_000;
-function fakeNow() { return nowMs; }
+function fakeNow() {
+  return nowMs;
+}
 
 beforeEach(() => {
   nowMs = 1_000_000;

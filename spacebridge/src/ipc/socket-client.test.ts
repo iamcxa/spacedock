@@ -1,27 +1,30 @@
 // spacebridge/src/ipc/socket-client.test.ts
 // ABOUTME: Tests for the unix socket client (shim side) with reconnect logic.
 
-import { describe, test, expect, afterEach } from "bun:test";
-import { createSocketClient } from "./socket-client";
-import { createSocketServer } from "./socket-server";
-import { encodeMessage, createFrameDecoder } from "./framing";
+import { afterEach, describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
+import { existsSync, unlinkSync } from "node:fs";
 import * as net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
-import { unlinkSync, existsSync } from "node:fs";
+import { createFrameDecoder, encodeMessage } from "./framing";
+import { createSocketClient } from "./socket-client";
+import { createSocketServer } from "./socket-server";
 import type { IpcMessage, RegisterAckPayload } from "./types";
 
 function tempSock(): string {
   return join(tmpdir(), `test-client-${randomUUID()}.sock`);
 }
 
-function makeTestServer(sockPath: string, opts?: {
-  onRpcRequest?: (sessionId: string, req: any) => Promise<any>;
-}) {
+function makeTestServer(
+  sockPath: string,
+  opts?: {
+    onRpcRequest?: (sessionId: string, req: any) => Promise<any>;
+  },
+) {
   return createSocketServer({
     socketPath: sockPath,
-    onRegister: (sess) => ({ sessionToken: "tok-" + sess.sessionId, serverVersion: "1" }),
+    onRegister: (sess) => ({ sessionToken: `tok-${sess.sessionId}`, serverVersion: "1" }),
     onRpcRequest: opts?.onRpcRequest ?? (async () => ({ result: null })),
     onCoordinationRequest: async () => ({ result: null }),
     onDisconnect: () => {},
@@ -33,7 +36,10 @@ describe("SocketClient", () => {
 
   afterEach(() => {
     for (const p of cleanupSocks.splice(0)) {
-      if (existsSync(p)) try { unlinkSync(p); } catch {}
+      if (existsSync(p))
+        try {
+          unlinkSync(p);
+        } catch {}
     }
   });
 
@@ -118,9 +124,21 @@ describe("SocketClient", () => {
       await client.connect();
 
       const [r1, r2, r3] = await Promise.all([
-        client.request({ id: randomUUID(), type: "rpc-request", payload: { method: "methodA", args: [] } }),
-        client.request({ id: randomUUID(), type: "rpc-request", payload: { method: "methodB", args: [] } }),
-        client.request({ id: randomUUID(), type: "rpc-request", payload: { method: "methodC", args: [] } }),
+        client.request({
+          id: randomUUID(),
+          type: "rpc-request",
+          payload: { method: "methodA", args: [] },
+        }),
+        client.request({
+          id: randomUUID(),
+          type: "rpc-request",
+          payload: { method: "methodB", args: [] },
+        }),
+        client.request({
+          id: randomUUID(),
+          type: "rpc-request",
+          payload: { method: "methodC", args: [] },
+        }),
       ]);
 
       expect((r1.payload as any).result).toBe("methodA");
@@ -239,11 +257,13 @@ describe("SocketClient", () => {
       const decoder = createFrameDecoder((msg) => {
         const m = msg as IpcMessage;
         if (m.type === "register") {
-          socket.write(encodeMessage({
-            id: m.id,
-            type: "register-ack",
-            payload: { sessionToken: "tok", serverVersion: "1" } satisfies RegisterAckPayload,
-          }));
+          socket.write(
+            encodeMessage({
+              id: m.id,
+              type: "register-ack",
+              payload: { sessionToken: "tok", serverVersion: "1" } satisfies RegisterAckPayload,
+            }),
+          );
         }
         // rpc-request: intentionally no response
       });
@@ -274,7 +294,10 @@ describe("SocketClient", () => {
       await expect(pendingPromise).rejects.toThrow();
     } finally {
       await new Promise<void>((r) => netServer.close(() => r()));
-      if (existsSync(sockPath)) try { unlinkSync(sockPath); } catch {}
+      if (existsSync(sockPath))
+        try {
+          unlinkSync(sockPath);
+        } catch {}
     }
   });
 });

@@ -1,14 +1,14 @@
 // ABOUTME: Unit tests for middleware rate limiter and token extraction logic.
 // Tests pure functions only — no Next.js runtime needed.
 
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import {
   checkRateLimit,
-  resetRateLimitMap,
   extractTokenFromPath,
   extractTokenFromUrl,
   RATE_LIMIT_MAX,
   RATE_LIMIT_WINDOW_MS,
+  resetRateLimitMap,
 } from "./middleware";
 
 beforeEach(() => {

@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "next dev -p 8420",
     "build": "next build && cp -r .next/static .next/standalone/ui/.next/static && cp -r public .next/standalone/ui/public",
-    "start": "bun run .next/standalone/ui/server.js"
+    "start": "bun run .next/standalone/ui/server.js",
+    "lint": "biome check --config-path .. .",
+    "lint:fix": "biome check --config-path .. --write .",
+    "format": "biome format --config-path .. --write .",
+    "format:check": "biome format --config-path .. ."
   },
   "dependencies": {
     "@radix-ui/react-scroll-area": "^1.2.10",

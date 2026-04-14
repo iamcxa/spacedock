@@ -2,19 +2,21 @@
 // ABOUTME: Integration tests for coordination RPC through live daemon (janitor expiry, swap).
 // Spawns real daemon subprocess with test isolation env. Validates AC-5 (janitor).
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { tmpdir } from "node:os";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { createConnection } from "node:net";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { createSocketClient } from "../ipc/socket-client";
 
 const DAEMON_SCRIPT = resolve(import.meta.dir, "../../bin/daemon.ts");
 
 let tmpDir: string;
 
-function socketPath() { return join(tmpDir, "spacebridge.sock"); }
+function socketPath() {
+  return join(tmpDir, "spacebridge.sock");
+}
 
 function spawnDaemon(extraEnv?: Record<string, string>) {
   return Bun.spawn(["bun", "run", DAEMON_SCRIPT, "start"], {
@@ -33,13 +35,19 @@ async function waitForSocket(path: string, timeoutMs = 8000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const alive = await new Promise<boolean>((res) => {
-      if (!existsSync(path)) { res(false); return; }
+      if (!existsSync(path)) {
+        res(false);
+        return;
+      }
       const s = createConnection({ path });
-      s.on("connect", () => { s.destroy(); res(true); });
+      s.on("connect", () => {
+        s.destroy();
+        res(true);
+      });
       s.on("error", () => res(false));
     });
     if (alive) return;
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
   }
   throw new Error(`waitForSocket timed out (${path})`);
 }
@@ -89,7 +97,7 @@ describe("daemon coordination — stub-replaced bridge", () => {
       client.close();
     } finally {
       proc.kill("SIGTERM");
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 300));
     }
   }, 15_000);
 
@@ -105,25 +113,40 @@ describe("daemon coordination — stub-replaced bridge", () => {
       await client.connect();
 
       // Acquire a lease
-      const acquireResp = await coordinationRequest(client, "acquireEntity", ["ent-y", "FO", "sess-1"]);
+      const acquireResp = await coordinationRequest(client, "acquireEntity", [
+        "ent-y",
+        "FO",
+        "sess-1",
+      ]);
       expect(acquireResp.error).toBeUndefined();
-      const token = acquireResp.result as { token: string; entity_slug: string; role: string; session_id: string; acquired_at: number; expires_at: number };
+      const token = acquireResp.result as {
+        token: string;
+        entity_slug: string;
+        role: string;
+        session_id: string;
+        acquired_at: number;
+        expires_at: number;
+      };
       expect(token.token).toBeTruthy();
 
       // Wait > lease duration + janitor interval
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, 800));
 
       // getAvailableWork should now include the entity again (lease expired)
       // entityScanner returns [] in 056, so we verify via acquireEntity succeeding again
       // (if lease still held, would return an error)
-      const reacquireResp = await coordinationRequest(client, "acquireEntity", ["ent-y", "FO", "sess-2"]);
+      const reacquireResp = await coordinationRequest(client, "acquireEntity", [
+        "ent-y",
+        "FO",
+        "sess-2",
+      ]);
       expect(reacquireResp.error).toBeUndefined();
       expect((reacquireResp.result as { token?: string })?.token).toBeTruthy();
 
       client.close();
     } finally {
       proc.kill("SIGTERM");
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 300));
     }
   }, 15_000);
 
@@ -136,10 +159,12 @@ describe("daemon coordination — stub-replaced bridge", () => {
       expect(existsSync(socketPath())).toBe(true);
       proc.kill("SIGTERM");
       // Allow time for graceful shutdown (clearInterval + server.close)
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 500));
       expect(existsSync(socketPath())).toBe(false);
     } finally {
-      try { proc.kill("SIGTERM"); } catch {}
+      try {
+        proc.kill("SIGTERM");
+      } catch {}
     }
   }, 10_000);
 
@@ -158,7 +183,7 @@ describe("daemon coordination — stub-replaced bridge", () => {
       client.close();
     } finally {
       proc.kill("SIGTERM");
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 300));
     }
   }, 15_000);
 });

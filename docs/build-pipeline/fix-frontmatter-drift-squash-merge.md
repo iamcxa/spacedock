@@ -1,8 +1,8 @@
 ---
 id: 098
 title: "Fix frontmatter drift on squash merge — reconcile from main before PR"
-status: draft
-context_status: pending
+status: clarify
+context_status: ready
 source: /build
 created: 2026-04-14T12:30:00+08:00
 started:
@@ -56,22 +56,87 @@ children:
 - Given both mod files are modified, when the `## Hook: merge` sections are compared, then the reconciliation step text is identical in both (how to verify: diff the sections, assert no output)
 - Given the `## Rules` section, when read after the fix, then it contains an explicit reconciliation exception clause (how to verify: grep "reconcili" in mod file returns match in Rules section)
 
-## Open Questions
-
-(explore stage will populate)
-
 ## Assumptions
 
-(explore stage will populate)
+A-1: Merge hook exists at correct insertion point (`mods/pr-review-loop.md` lines 47-69) with no reconciliation step present. The fix inserts before existing step 2 (kc-pr-create invocation).
+Confidence: 🟢 Confident (0.95)
+Evidence: `mods/pr-review-loop.md:47-69` -- Hook: merge section; step 1 gathers context, step 1.5 confidence check, step 2 invokes kc-pr-create. Reconciliation inserts between 1.5 and 2.
+→ Confirmed: captain, 2026-04-14 (batch)
+
+A-2: Workflow activation copy exists at `docs/build-pipeline/_mods/pr-review-loop.md` with explicit "Keep in sync with the library version" note.
+Confidence: 🟢 Confident (0.95)
+Evidence: `docs/build-pipeline/_mods/pr-review-loop.md:7` -- "This is the build-pipeline activation of mods/pr-review-loop.md. Keep in sync with the library version."
+→ Confirmed: captain, 2026-04-14 (batch)
+
+A-3: `git show main:{path}` reliably reads the latest main HEAD's entity file for frontmatter extraction.
+Confidence: 🟢 Confident (0.90)
+Evidence: standard git behavior; used extensively in FO worktree patterns for branch comparison. MEMORY.md "Worktree Drift at Merge" documents `git checkout --theirs` as a related pattern.
+→ Confirmed: captain, 2026-04-14 (batch)
+
+A-4: One entity per worktree branch — reconciliation handles one entity file per merge hook invocation.
+Confidence: 🟡 Likely (0.75)
+Evidence: FO dispatch creates one worktree per entity (README.md schema: `worktree` field is singular). Edge case: manual multi-entity branches are possible but not FO-managed.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 ## Option Comparisons
 
-(explore stage will populate)
+(none -- approach is unambiguous, single viable implementation path)
+
+## Open Questions
+
+(none from explore)
+
+Q-1: Is the race condition between reconciliation and squash merge a concern?
+
+Domain: Behavioral/Callable
+Why it matters: If main moves between `git show main:{entity}` and the eventual squash merge, the reconciled frontmatter could be stale.
+Suggested options: (a) Benign -- frontmatter is stable after shipped; (b) Add pre-merge re-check
+
+→ Answer: Benign -- entity frontmatter reaches shipped before merge hook fires, FO does not modify after shipped. Other entities pushing to main don't affect THIS entity's frontmatter. Only risk is manual edits during PR review, which is a general PR workflow concern, not reconciliation-specific. (captain, 2026-04-14, interactive)
 
 ## Decomposition Recommendation
 
-(explore stage will populate if scope warrants it)
+Not warranted. 2 files, both the same mod at library and workflow level. Indivisible.
 
 ## Canonical References
 
-(clarify stage will populate)
+- `mods/pr-review-loop.md:47-69` -- merge hook section (insertion point)
+- `docs/build-pipeline/_mods/pr-review-loop.md:7` -- sync note
+
+## Stage Report: explore
+
+- [x] Files mapped: 2 across mod (library + workflow activation)
+  mods/pr-review-loop.md (library, insertion point lines 47-69); docs/build-pipeline/_mods/pr-review-loop.md (workflow copy, keep-in-sync)
+- [x] Assumptions formed: 4 (Confident: 3, Likely: 1, Unclear: 0)
+  A-1 insertion point (0.95), A-2 sync copy (0.95), A-3 git show (0.90), A-4 one entity per branch (0.75)
+- [x] Options surfaced: 0
+  Single viable implementation path
+- [x] Questions generated: 0
+  Directive is specific, all gray areas resolved as assumptions
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorm
+- [x] Scale assessment: Small confirmed
+  2 files, both same mod at library/workflow level
+- [x] Research dispatched: 0 researchers (skipped -- all assumptions internal git/codebase patterns)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- Small bugfix, 2 files
+- [x] Re-validation: 4 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  Evidence verified same session
+- [x] Assumptions confirmed: 4 / 4 (0 corrected)
+  A-1 through A-4 confirmed via batch
+- [x] Options selected: 0 / 0
+  No option comparisons in entity
+- [x] Questions answered: 1 / 1
+  Q-1 race condition benign -- frontmatter stable after shipped
+- [x] Open exploration: 1 gray area surfaced (0 from templates, 0 from CONTRACTS, 0 from directive, 1 via captain selection)
+  Race condition between reconciliation and squash merge (Q-1) -- confirmed benign
+- [x] Canonical refs added: 0
+  2 refs already populated from explore
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all Qs answered. Ready for FO execution.
+- [x] Handoff mode: loose
+  auto_advance not set; captain must say "execute 098" to advance
+- [x] Clarify duration: 3 questions asked, session complete
+  1 batch confirmation + 2 exploration iterations

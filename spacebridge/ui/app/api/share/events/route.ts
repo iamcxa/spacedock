@@ -4,8 +4,8 @@
 // Polls events table at 500ms filtered by WHERE entity = entitySlug (A-7).
 // Same ReadableStream pattern as /api/events but entity-filtered.
 
-import { gt, eq, and, asc } from "drizzle-orm";
 import { homedir } from "node:os";
+import { and, asc, eq, gt } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +15,8 @@ function defaultDbPath(): string {
 
 export async function GET(req: Request) {
   // Token extracted from ?token= query param by middleware and injected as header
-  const token = new Headers(req.headers).get("x-share-token") ??
-    new URL(req.url).searchParams.get("token");
+  const token =
+    new Headers(req.headers).get("x-share-token") ?? new URL(req.url).searchParams.get("token");
 
   if (!token) {
     return Response.json({ error: "Missing share token" }, { status: 401 });
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const sinceParam = url.searchParams.get("since");
   const parsed = parseInt(sinceParam ?? "0", 10);
-  let lastSeenId = isNaN(parsed) ? 0 : parsed;
+  let lastSeenId = Number.isNaN(parsed) ? 0 : parsed;
 
   const stream = new ReadableStream({
     start(controller) {
@@ -64,7 +64,9 @@ export async function GET(req: Request) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(row)}\n\n`));
             if (row.id > lastSeenId) lastSeenId = row.id;
           }
-        } catch { /* DB read error — skip poll cycle */ }
+        } catch {
+          /* DB read error — skip poll cycle */
+        }
       }
 
       poll();
@@ -73,7 +75,11 @@ export async function GET(req: Request) {
       req.signal.addEventListener("abort", () => {
         clearInterval(interval);
         handle.close();
-        try { controller.close(); } catch { /* already closed */ }
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
       });
     },
   });
@@ -82,7 +88,7 @@ export async function GET(req: Request) {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
+      Connection: "keep-alive",
     },
   });
 }

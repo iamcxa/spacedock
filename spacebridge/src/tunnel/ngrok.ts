@@ -3,7 +3,7 @@
 // supportsSSE() = true (ngrok v3 HTTP/1.1 upstream confirmed safe).
 // allowedPorts() = [] (no port restrictions).
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import type { TunnelProvider } from "./provider";
 
 export class NgrokProvider implements TunnelProvider {
@@ -46,7 +46,9 @@ export class NgrokProvider implements TunnelProvider {
       try {
         const res = await fetch("http://127.0.0.1:4040/api/tunnels");
         if (res.ok) {
-          const data = await res.json() as { tunnels: Array<{ public_url: string; proto: string }> };
+          const data = (await res.json()) as {
+            tunnels: Array<{ public_url: string; proto: string }>;
+          };
           const https = data.tunnels.find((t) => t.proto === "https");
           if (https) return https.public_url;
           const http = data.tunnels.find((t) => t.proto === "http");
@@ -67,10 +69,17 @@ export class NgrokProvider implements TunnelProvider {
     child.kill("SIGTERM");
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
-        try { child.kill("SIGKILL"); } catch { /* already dead */ }
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          /* already dead */
+        }
         resolve();
       }, 5000);
-      child.once("exit", () => { clearTimeout(timer); resolve(); });
+      child.once("exit", () => {
+        clearTimeout(timer);
+        resolve();
+      });
     });
   }
 

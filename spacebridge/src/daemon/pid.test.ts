@@ -2,11 +2,11 @@
 // ABOUTME: Tests for PID file management utilities (writePidFile, readPidFile, isProcessAlive, cleanStalePidFile).
 // Uses temp directories for isolation — never touches production ~/.spacedock/ paths.
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { writePidFile, readPidFile, isProcessAlive, cleanStalePidFile } from "./pid";
+import { join } from "node:path";
+import { cleanStalePidFile, isProcessAlive, readPidFile, writePidFile } from "./pid";
 
 let tmpDir: string;
 

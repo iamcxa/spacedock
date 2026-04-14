@@ -4,9 +4,9 @@
 // POSTs to /api/entities/[slug]/comments. Calls onCommentAdded on success for optimistic update.
 
 import { useState } from "react";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 
 interface CommentRow {
   commentId: string;
@@ -26,7 +26,11 @@ interface AddCommentFormProps {
   onCommentAdded?: (comment: CommentRow) => void;
 }
 
-export function AddCommentForm({ entitySlug, sectionHeadings, onCommentAdded }: AddCommentFormProps) {
+export function AddCommentForm({
+  entitySlug,
+  sectionHeadings,
+  onCommentAdded,
+}: AddCommentFormProps) {
   const [section, setSection] = useState(sectionHeadings[0] ?? "");
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);

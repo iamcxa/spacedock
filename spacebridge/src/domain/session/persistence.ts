@@ -26,17 +26,12 @@ export async function appendEvents(
 }
 
 export async function loadAllEvents(db: SpacebridgeDb): Promise<SessionEvent[]> {
-  const rows = await db
-    .select()
-    .from(sessionEvents)
-    .orderBy(sessionEvents.sequenceNumber);
+  const rows = await db.select().from(sessionEvents).orderBy(sessionEvents.sequenceNumber);
   return rows.map((r) => JSON.parse(r.payload) as SessionEvent);
 }
 
 export async function countEvents(db: SpacebridgeDb, aggregateId: string): Promise<number> {
-  const rows = await db
-    .select()
-    .from(sessionEvents);
+  const rows = await db.select().from(sessionEvents);
   return rows.filter((r) => r.aggregateId === aggregateId).length;
 }
 

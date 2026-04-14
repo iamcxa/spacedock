@@ -3,25 +3,28 @@
 // Accepts shim connections, routes IPC messages by type, maintains session→socket map.
 // Uses Node.js net module (Bun compatibility layer) for unix socket support.
 
+import { existsSync, unlinkSync } from "node:fs";
 import * as net from "node:net";
-import { unlinkSync, existsSync } from "node:fs";
-import { encodeMessage, createFrameDecoder } from "./framing";
+import { createFrameDecoder, encodeMessage } from "./framing";
 import type {
-  IpcMessage,
-  RegisterPayload,
-  RegisterAckPayload,
-  RpcRequestPayload,
-  RpcResponsePayload,
   CoordinationRequestPayload,
   CoordinationResponsePayload,
   HeartbeatPayload,
+  IpcMessage,
+  RegisterAckPayload,
+  RegisterPayload,
+  RpcRequestPayload,
+  RpcResponsePayload,
 } from "./types";
 
 export interface SocketServerOptions {
   socketPath: string;
   onRegister: (session: RegisterPayload, send: (msg: IpcMessage) => void) => RegisterAckPayload;
   onRpcRequest: (sessionId: string, req: RpcRequestPayload) => Promise<RpcResponsePayload>;
-  onCoordinationRequest: (sessionId: string, req: CoordinationRequestPayload) => Promise<CoordinationResponsePayload>;
+  onCoordinationRequest: (
+    sessionId: string,
+    req: CoordinationRequestPayload,
+  ) => Promise<CoordinationResponsePayload>;
   onDisconnect: (sessionId: string) => void;
   onHeartbeat?: (sessionId: string) => void;
 }
@@ -40,85 +43,91 @@ export function createSocketServer(opts: SocketServerOptions): SocketServer {
   const socketSessions = new Map<net.Socket, string>();
 
   const server = net.createServer((socket) => {
-    const decoder = createFrameDecoder(
-      (raw): void => {
-        (async () => {
-          const msg = raw as IpcMessage;
-          if (msg.type === "register") {
-            const payload = msg.payload as RegisterPayload;
-            const sessionId = payload.sessionId;
-            sessionSockets.set(sessionId, socket);
-            socketSessions.set(socket, sessionId);
+    const decoder = createFrameDecoder((raw): void => {
+      (async () => {
+        const msg = raw as IpcMessage;
+        if (msg.type === "register") {
+          const payload = msg.payload as RegisterPayload;
+          const sessionId = payload.sessionId;
+          sessionSockets.set(sessionId, socket);
+          socketSessions.set(socket, sessionId);
 
-            const send = (m: IpcMessage) => {
-              if (!socket.destroyed) socket.write(encodeMessage(m));
-            };
+          const send = (m: IpcMessage) => {
+            if (!socket.destroyed) socket.write(encodeMessage(m));
+          };
 
-            const ack = opts.onRegister(payload, send);
-            send({ id: msg.id, type: "register-ack", payload: ack });
+          const ack = opts.onRegister(payload, send);
+          send({ id: msg.id, type: "register-ack", payload: ack });
+          return;
+        }
+
+        const sessionId = socketSessions.get(socket);
+        if (!sessionId) return; // unregistered socket, ignore
+
+        if (msg.type === "heartbeat") {
+          const payload = msg.payload as HeartbeatPayload;
+          const heartbeatSessionId = payload.sessionId ?? sessionId;
+          if (heartbeatSessionId !== sessionId) {
+            console.warn(
+              `[socket-server] heartbeat sessionId mismatch: socket registered as ${sessionId}, got ${heartbeatSessionId} — ignoring`,
+            );
             return;
           }
+          opts.onHeartbeat?.(sessionId);
+          if (!socket.destroyed) {
+            socket.write(encodeMessage({ id: msg.id, type: "heartbeat-ack", payload: {} }));
+          }
+          return;
+        }
 
-          const sessionId = socketSessions.get(socket);
-          if (!sessionId) return; // unregistered socket, ignore
-
-          if (msg.type === "heartbeat") {
-            const payload = msg.payload as HeartbeatPayload;
-            const heartbeatSessionId = payload.sessionId ?? sessionId;
-            if (heartbeatSessionId !== sessionId) {
-              console.warn(`[socket-server] heartbeat sessionId mismatch: socket registered as ${sessionId}, got ${heartbeatSessionId} — ignoring`);
-              return;
-            }
-            opts.onHeartbeat?.(sessionId);
+        if (msg.type === "rpc-request") {
+          const req = msg.payload as RpcRequestPayload;
+          try {
+            const result = await opts.onRpcRequest(sessionId, req);
             if (!socket.destroyed) {
-              socket.write(encodeMessage({ id: msg.id, type: "heartbeat-ack", payload: {} }));
+              socket.write(encodeMessage({ id: msg.id, type: "rpc-response", payload: result }));
             }
-            return;
-          }
-
-          if (msg.type === "rpc-request") {
-            const req = msg.payload as RpcRequestPayload;
-            try {
-              const result = await opts.onRpcRequest(sessionId, req);
-              if (!socket.destroyed) {
-                socket.write(encodeMessage({ id: msg.id, type: "rpc-response", payload: result }));
-              }
-            } catch (err) {
-              if (!socket.destroyed) {
-                socket.write(encodeMessage({
+          } catch (err) {
+            if (!socket.destroyed) {
+              socket.write(
+                encodeMessage({
                   id: msg.id,
                   type: "rpc-response",
                   payload: { error: (err as Error).message } satisfies RpcResponsePayload,
-                }));
-              }
+                }),
+              );
             }
-            return;
           }
+          return;
+        }
 
-          if (msg.type === "coordination-request") {
-            const req = msg.payload as CoordinationRequestPayload;
-            try {
-              const result = await opts.onCoordinationRequest(sessionId, req);
-              if (!socket.destroyed) {
-                socket.write(encodeMessage({ id: msg.id, type: "coordination-response", payload: result }));
-              }
-            } catch (err) {
-              if (!socket.destroyed) {
-                socket.write(encodeMessage({
+        if (msg.type === "coordination-request") {
+          const req = msg.payload as CoordinationRequestPayload;
+          try {
+            const result = await opts.onCoordinationRequest(sessionId, req);
+            if (!socket.destroyed) {
+              socket.write(
+                encodeMessage({ id: msg.id, type: "coordination-response", payload: result }),
+              );
+            }
+          } catch (err) {
+            if (!socket.destroyed) {
+              socket.write(
+                encodeMessage({
                   id: msg.id,
                   type: "coordination-response",
                   payload: { error: (err as Error).message } satisfies CoordinationResponsePayload,
-                }));
-              }
+                }),
+              );
             }
-            return;
           }
-        })().catch((err) => {
-          // Async handler errors are logged; the socket remains open for subsequent messages
-          console.error("[socket-server] onMessage error:", err);
-        });
-      },
-    );
+          return;
+        }
+      })().catch((err) => {
+        // Async handler errors are logged; the socket remains open for subsequent messages
+        console.error("[socket-server] onMessage error:", err);
+      });
+    });
 
     socket.on("data", decoder);
 
@@ -135,7 +144,9 @@ export function createSocketServer(opts: SocketServerOptions): SocketServer {
     };
 
     socket.on("close", handleClose);
-    socket.on("error", () => { /* error fires before close */ });
+    socket.on("error", () => {
+      /* error fires before close */
+    });
   });
 
   return {
@@ -143,7 +154,9 @@ export function createSocketServer(opts: SocketServerOptions): SocketServer {
       return new Promise((resolve, reject) => {
         // Stale socket cleanup: unlink if file exists
         if (existsSync(opts.socketPath)) {
-          try { unlinkSync(opts.socketPath); } catch {}
+          try {
+            unlinkSync(opts.socketPath);
+          } catch {}
         }
         server.listen(opts.socketPath, () => resolve());
         server.on("error", reject);

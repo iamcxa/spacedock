@@ -1,7 +1,7 @@
 // spacebridge/src/ipc/coordination-client-stub.test.ts
 // ABOUTME: Tests for the CoordinationClient stub (noop placeholder until entity 056).
 
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { createCoordinationClientStub } from "./coordination-client-stub";
 
 describe("CoordinationClientStub", () => {

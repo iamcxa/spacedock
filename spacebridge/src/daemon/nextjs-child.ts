@@ -2,7 +2,7 @@
 // spawnNextjsChild: spawns bun run server.js with PORT + DB env vars, pipes stderr with [nextjs] prefix.
 // shutdownNextjsChild: SIGTERM with timeout-gated SIGKILL fallback.
 // resolveNextjsServerScript: locates .next/standalone/ui/server.js under pluginRoot.
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -36,10 +36,7 @@ export function spawnNextjsChild(opts: SpawnOpts): ChildProcess {
   return child;
 }
 
-export async function shutdownNextjsChild(
-  child: ChildProcess,
-  timeoutMs = 5000
-): Promise<void> {
+export async function shutdownNextjsChild(child: ChildProcess, timeoutMs = 5000): Promise<void> {
   return new Promise<void>((resolve) => {
     if (child.exitCode !== null) {
       resolve();
@@ -57,7 +54,11 @@ export async function shutdownNextjsChild(
 
     const killTimer = setTimeout(() => {
       child.removeListener("exit", onExit);
-      try { child.kill("SIGKILL"); } catch { /* already dead */ }
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        /* already dead */
+      }
       // Wait briefly for SIGKILL to land
       child.once("exit", () => resolve());
       // Hard fallback in case even SIGKILL doesn't fire exit event
@@ -72,12 +73,12 @@ interface ResolveOpts {
 
 export function resolveNextjsServerScript(
   pluginRoot: string,
-  opts: ResolveOpts = { checkExists: true }
+  opts: ResolveOpts = { checkExists: true },
 ): string {
   const scriptPath = join(pluginRoot, "ui", ".next", "standalone", "ui", "server.js");
   if (opts.checkExists !== false && !existsSync(scriptPath)) {
     throw new Error(
-      `Next.js standalone server not found at ${scriptPath}. Run: cd spacebridge/ui && bun run build`
+      `Next.js standalone server not found at ${scriptPath}. Run: cd spacebridge/ui && bun run build`,
     );
   }
   return scriptPath;

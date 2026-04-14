@@ -2,11 +2,11 @@
 // ABOUTME: Integration tests for triggerAutoResolve. Uses :memory: DB.
 // Tests: seed comments at stage X → trigger resolve → assert resolved with reason stage_advanced.
 
-import { describe, it, expect, beforeEach } from "bun:test";
-import { createDb } from "../../db";
+import { beforeEach, describe, expect, it } from "bun:test";
 import type { SpacebridgeDb } from "../../db";
+import { createDb } from "../../db";
 import { triggerAutoResolve } from "./auto-resolve";
-import { appendEvents, countEvents, upsertSnapshot, getCommentsByEntity } from "./persistence";
+import { appendEvents, countEvents, getCommentsByEntity, upsertSnapshot } from "./persistence";
 import type { CommentEvent } from "./types";
 
 const ENTITY_PATH = "/docs/build-pipeline/test-entity.md";

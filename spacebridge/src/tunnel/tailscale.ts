@@ -3,7 +3,7 @@
 // stop() must run `tailscale funnel {extPort} off` — SIGTERM alone leaves funnel active (A-15).
 // Public URL is deterministic: https://{machine}.{tailnet}.ts.net/
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import type { TunnelProvider } from "./provider";
 
 const ALLOWED_EXTERNAL_PORTS = [443, 8443, 10000];
@@ -29,7 +29,7 @@ export class TailscaleProvider implements TunnelProvider {
     this.child = spawn(
       "tailscale",
       ["funnel", String(this.externalPort), "/", `http://localhost:${localPort}`],
-      { stdio: ["ignore", "pipe", "pipe"] }
+      { stdio: ["ignore", "pipe", "pipe"] },
     );
 
     this.child.stderr?.on("data", (chunk: Buffer) => {
@@ -57,7 +57,9 @@ export class TailscaleProvider implements TunnelProvider {
           const proc = spawn("tailscale", ["funnel", "status"], {
             stdio: ["ignore", "pipe", "pipe"],
           });
-          proc.stdout?.on("data", (d: Buffer) => { out += d.toString(); });
+          proc.stdout?.on("data", (d: Buffer) => {
+            out += d.toString();
+          });
           proc.on("exit", (code) => {
             if (code === 0) resolve(out);
             else reject(new Error(`exit ${code}`));
@@ -90,10 +92,17 @@ export class TailscaleProvider implements TunnelProvider {
       this.child.kill("SIGTERM");
       await new Promise<void>((resolve) => {
         const timer = setTimeout(() => {
-          try { this.child?.kill("SIGKILL"); } catch { /* already dead */ }
+          try {
+            this.child?.kill("SIGKILL");
+          } catch {
+            /* already dead */
+          }
           resolve();
         }, 5000);
-        this.child?.once("exit", () => { clearTimeout(timer); resolve(); });
+        this.child?.once("exit", () => {
+          clearTimeout(timer);
+          resolve();
+        });
       });
     }
     this.child = null;

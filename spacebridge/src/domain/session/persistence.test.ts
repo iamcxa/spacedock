@@ -1,11 +1,17 @@
 // spacebridge/src/domain/session/persistence.test.ts
 // ABOUTME: Integration tests for session persistence layer using :memory: DB. No production DB.
 
-import { describe, test, expect, beforeEach } from "bun:test";
-import { createDb } from "../../db";
-import { appendEvents, loadAllEvents, countEvents, upsertSnapshot, deleteSnapshot } from "./persistence";
-import { replay } from "./evolve";
+import { beforeEach, describe, expect, test } from "bun:test";
 import type { SpacebridgeDb } from "../../db";
+import { createDb } from "../../db";
+import { replay } from "./evolve";
+import {
+  appendEvents,
+  countEvents,
+  deleteSnapshot,
+  loadAllEvents,
+  upsertSnapshot,
+} from "./persistence";
 import type { SessionEvent, SessionRecord } from "./types";
 
 let db: SpacebridgeDb;
@@ -66,7 +72,12 @@ describe("appendEvents + loadAllEvents", () => {
   test("replay of disconnect removes session from state", async () => {
     const events: SessionEvent[] = [
       ...sampleEvents,
-      { type: "session_disconnected", sessionId: "sess-1", reason: "explicit", disconnectedAt: NOW + 20_000 },
+      {
+        type: "session_disconnected",
+        sessionId: "sess-1",
+        reason: "explicit",
+        disconnectedAt: NOW + 20_000,
+      },
     ];
     await appendEvents(db, "sess-1", events, 1);
     const loaded = await loadAllEvents(db);

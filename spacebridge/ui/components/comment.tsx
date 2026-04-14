@@ -81,10 +81,14 @@ export function Comment({
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <span className="text-xs font-medium">{authorLabel(author)}</span>
               {author === "guest" && (
-                <Badge variant="outline" className="text-xs py-0">guest</Badge>
+                <Badge variant="outline" className="text-xs py-0">
+                  guest
+                </Badge>
               )}
               {author === "fo" && (
-                <Badge variant="secondary" className="text-xs py-0">FO</Badge>
+                <Badge variant="secondary" className="text-xs py-0">
+                  FO
+                </Badge>
               )}
               <span className="text-xs text-muted-foreground ml-auto">{formatTime(createdAt)}</span>
             </div>
@@ -96,9 +100,7 @@ export function Comment({
             <p className="text-sm text-foreground break-words">{content}</p>
             {resolved && resolvedReason && (
               <p className="text-xs text-muted-foreground mt-1">
-                {resolvedReason === "stage_advanced"
-                  ? "Auto-resolved: stage advanced"
-                  : "Resolved"}
+                {resolvedReason === "stage_advanced" ? "Auto-resolved: stage advanced" : "Resolved"}
               </p>
             )}
           </div>

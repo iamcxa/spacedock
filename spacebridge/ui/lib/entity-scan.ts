@@ -1,7 +1,7 @@
 // ABOUTME: Scans docs/build-pipeline/*.md for a given projectRoot, returns EntityCard[].
 // Skips files that fail to parse (graceful fallback — real repos have malformed files).
 import { readdir, readFile } from "node:fs/promises";
-import { join, basename } from "node:path";
+import { basename, join } from "node:path";
 import { parseEntity } from "./entity-parse";
 
 export interface EntityCard {
@@ -15,7 +15,7 @@ export interface EntityCard {
 
 export async function scanEntitiesForRepo(
   projectRoot: string,
-  repoLabel: string
+  repoLabel: string,
 ): Promise<EntityCard[]> {
   const pipelineDir = join(projectRoot, "docs", "build-pipeline");
   let files: string[];

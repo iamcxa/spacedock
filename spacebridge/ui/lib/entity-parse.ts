@@ -36,8 +36,11 @@ export function splitFrontmatter(text: string): [FrontmatterFields, string] {
 }
 
 function parseTags(rawTags: string): string[] {
-  if (!rawTags || !rawTags.trim()) return [];
-  return rawTags.split(",").map((t) => t.trim()).filter(Boolean);
+  if (!rawTags?.trim()) return [];
+  return rawTags
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
 }
 
 export function parseEntity(text: string): ParsedEntity {

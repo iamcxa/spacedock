@@ -6,8 +6,8 @@ import type { SessionRegistry } from "./registry";
 
 export interface HeartbeatMonitorOptions {
   registry: SessionRegistry;
-  timeoutMs: number;   // how long without heartbeat before session is considered stale
-  intervalMs: number;  // how often to scan (should be << timeoutMs)
+  timeoutMs: number; // how long without heartbeat before session is considered stale
+  intervalMs: number; // how often to scan (should be << timeoutMs)
   now?: () => number;
 }
 

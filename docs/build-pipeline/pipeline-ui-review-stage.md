@@ -2,7 +2,7 @@
 id: 095
 title: "Pipeline UI review stage -- visual parity audit before ship"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: captain (2026-04-14 -- entity 054 UX gap diagnosis)
 created: 2026-04-14T18:00:00+08:00
 started:
@@ -31,10 +31,10 @@ children:
 
 ## Captain Context Snapshot
 
-- **Repo**: main @ 83752a6
-- **Session**: FO startup, captain diagnosed 054 UX gap (Notion-like selection missing)
-- **Domain**: Pipeline/Process (build-pipeline workflow definition), Tooling
-- **Related entities**: 054 -- Entity detail page (shipped, PR #48 open) -- the entity whose UX gap motivated this. 093 -- Comment UX polish (draft) -- the actual UX fix for 054. GSD `/gsd-ui-review` and `/gsd-ui-phase` skills -- prior art for UI audit methodology.
+- **Repo**: main @ 5b5884c
+- **Session**: SO pipeline batch session, 094 just completed clarify. Captain diagnosed 054 UX gap (Notion-like selection missing).
+- **Domain**: Runnable/Invokable (pipeline stages, skill dispatch), Readable/Textual (reference docs, gray-area templates, skill specs)
+- **Related entities**: 054 -- Entity detail page (shipped, PR #48) -- the entity whose UX gap motivated this; 093 -- Comment UX polish (clarify, ready) -- the actual UX fix for 054; 074 -- Pipeline verification quality uplift (draft) -- related pipeline improvement; GSD `gsd-ui-auditor` agent -- prior art for 6-pillar UI audit methodology
 - **Created**: 2026-04-14T18:00:00+08:00
 
 ## Notes
@@ -57,3 +57,88 @@ The gap: explore checked `schema.ts` columns (`selected_text`, `section_heading`
 4. **During explore** -- add "interaction parity checklist" to explore skill's gray area generation
 
 Captain to decide positioning during brainstorm/clarify.
+
+## Brainstorming Spec
+
+**APPROACH**: Enhance the existing build pipeline with two complementary UI audit touchpoints -- no new pipeline stage needed. (1) **Explore enhancement**: Add a "UI Interaction Parity" section to `skills/build-explore/references/gray-area-templates.md` under the "User-facing Visual" domain. When an entity replaces or modifies an existing UI feature, explore should check: (a) current interaction patterns in the old UI via codebase inspection (event listeners, CSS hover/selection rules, keyboard handlers), (b) whether the `## UI Spec` section captures all discovered interaction patterns, (c) responsive behavior parity. This addresses the root cause -- explore's code bias toward data model/API layers. (2) **Review stage enhancement**: Add a "UI parity" check to `skills/build-review/SKILL.md`'s pre-scan phase. When the entity has `intent: feature` and touches frontend files (`components/`, `app/`), the pre-scan includes: compare the execute diff against the `## UI Spec` and flag interaction patterns present in modified/replaced files but absent from the new implementation. This is a backstop -- if explore missed something, review catches it before UAT. The existing review stage's themed reviewer mechanism (security/correctness/style) already supports conditional activation.
+
+**ALTERNATIVE**: Add `ui-review` as a new standalone pipeline stage between execute and quality with `feedback-to: execute`, using GSD's `gsd-ui-auditor` 6-pillar methodology (layout, hierarchy, interactions, states, responsiveness, accessibility) as the stage skill. -- D-01 Rejected: most entities have no UI. A new stage adds dispatch overhead for every entity even when not applicable. The review stage already has a themed reviewer mechanism that can conditionally activate for UI entities. A standalone stage is warranted only if UI review requires browser automation or screenshot comparison, which this entity does not propose. The GSD 6-pillar approach is better adapted as a reference checklist within existing stages than as a separate stage.
+
+**GUARDRAILS**:
+- No new pipeline stages in README.md `stages.states` -- enhance existing explore + review stages only
+- UI parity checks only activate for entities with `User-facing Visual` domain AND touching frontend files -- conditional, not universal
+- Must work within review stage's existing debate-driven dispatch pattern (pre-scan phase, not a new reviewer team)
+- GSD's 6-pillar methodology (layout, hierarchy, interactions, states, responsiveness, accessibility) as reference checklist, adapted to spacedock's Stage Report format
+- Preserve explore's non-interactive constraint -- UI interaction discovery happens via codebase reads (event listeners, CSS rules), not by opening a browser
+
+**RATIONALE**: The 054 gap was an explore-level blind spot: code-focused exploration missed UI interaction patterns that existed in the old dashboard. A new pipeline stage would be the wrong abstraction -- the issue isn't "no verification exists" but "existing verification doesn't cover UI patterns." Enhancing explore's gray-area templates catches the gap proactively (before plan), while adding a review pre-scan check provides a retroactive safety net (after execute). This dual-layer approach is consistent with the pipeline's existing design: explore generates questions, review verifies implementation. The review integration uses the pre-scan phase (not a full themed reviewer) to keep overhead minimal for UI-touching entities and zero for non-UI entities.
+
+## Acceptance Criteria
+
+- Given an entity with `User-facing Visual` domain that replaces or modifies an existing UI feature, when build-explore runs, then the gray-area-templates produce at least one UI interaction parity gray area checking old vs new interaction patterns (how to verify: grep gray-area-templates.md for "interaction parity" section; run explore on a test entity replacing a UI component, assert A-n or Q-n with interaction parity topic exists)
+- Given an entity touching `components/` or `app/` files and having a `## UI Spec` section, when build-review pre-scan runs, then the scan includes a UI parity check comparing the diff against the spec (how to verify: run review on a test entity with UI spec, assert "UI parity" check line in Stage Report pre-scan section)
+- Given an entity with no frontend files (pure backend/pipeline/skill), when build-explore and build-review run, then no UI parity checks are triggered (how to verify: run explore+review on a non-UI entity, assert no UI parity questions or findings)
+- Given the UI parity check in review finds a missing interaction pattern (e.g., hover state in old UI absent from new), when the finding is classified, then it is rated as at minimum a MEDIUM finding with `feedback-to: execute` routing (how to verify: review Stage Report shows finding with MEDIUM+ severity and feedback routing)
+
+## Assumptions
+
+A-1: UI Interaction Parity added as a new row in the `## 1. User-facing Visual` table of `gray-area-templates.md`. Format matches existing 5 rows: `| Gray Area | What to Assess | Example |`.
+Confidence: 🟢 Confident (0.95)
+Evidence: `skills/build-explore/references/gray-area-templates.md:23-29` -- existing table has 5 rows with consistent 3-column format
+
+A-2: Review pre-scan UI parity check is Step 1f, placed after existing checks 1a-1e. Each check is a markdown subsection (`### 1f -- UI Spec Parity`). The check reads `## UI Spec` from the entity body and compares against interaction patterns in the diff's frontend files.
+Confidence: 🟢 Confident (0.90)
+Evidence: `skills/build-review/SKILL.md:139-182` -- pre-scan has 5 checks (1a-1e), each as a `### 1{letter}` subsection; adding 1f follows established pattern
+
+A-3: Pre-scan activation is conditional: only runs when (a) the diff touches frontend files (`*.tsx`, `*.jsx`, `*.css`, or paths containing `components/`, `app/`) AND (b) the entity body contains a `## UI Spec` section. Non-UI entities skip entirely (zero overhead).
+Confidence: 🟢 Confident (0.90)
+Evidence: `skills/build-review/SKILL.md:157-161` -- Step 1d (Plan Consistency) already conditionally reads `## PLAN` section; same conditional pattern applies
+
+A-4: No changes to `docs/build-pipeline/README.md` stage definitions. This entity modifies skill reference docs only.
+Confidence: 🟢 Confident (0.95)
+Evidence: GUARDRAILS explicitly state "No new pipeline stages in README.md stages.states -- enhance existing explore + review stages only"
+
+A-5: Pre-scan UI parity findings use the existing severity/classification schema: MEDIUM severity, root CODE, source `pre-scan:ui-parity`, routing `feedback-to: execute`.
+Confidence: 🟢 Confident (0.85)
+Evidence: `skills/build-review/SKILL.md:168-178` -- Step 1e uses severity HIGH/CRITICAL, root CODE, source `pre-scan:goal-backward`; UI parity follows same schema at MEDIUM severity (interaction gap is less severe than orphan code)
+
+## Option Comparisons
+
+### O-1: Explore template depth -- passive questions vs active old-UI inspection
+
+The gray-area template row can either (a) prompt explore to ASK about interaction parity, or (b) instruct explore to actively READ old UI files for interaction patterns. The 054 gap was that explore never looked at the old UI code.
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Template instructs active inspection | Addresses root cause directly; explore greps replaced files for event listeners, CSS :hover/:focus/:selection rules, keyboard handlers | Requires explore to identify which files are "old UI" (may not be obvious from entity context alone); increases explore Step 4 complexity | Medium | Recommended |
+| Template prompts questions only | Minimal change; template row generates Track C questions for captain to answer about interaction patterns | Doesn't fix root cause; depends on captain knowing all old interaction patterns; 054 gap would recur if captain forgets | Low | Viable |
+
+## Open Questions
+
+Q-1: What specific interaction pattern categories should the gray-area template row enumerate in its "What to Assess" column?
+
+Domain: Readable/Textual
+
+Why it matters: The template row must be specific enough that explore produces useful gray areas (like "text-selection anchoring exists in old UI but not in UI Spec"), but general enough to catch novel patterns beyond the 054 case.
+
+Suggested options: (a) Event-driven: event listeners (click, hover, drag, text-selection, keyboard shortcuts), CSS interaction states (:hover, :focus, :active, transitions), responsive breakpoints, (b) GSD 6-pillar: layout, hierarchy, interactions, states, responsiveness, accessibility -- map to explore-friendly checks, (c) Minimal: "Compare interaction patterns in replaced/modified files against ## UI Spec" -- let explore use judgment
+
+## Canonical References
+
+(clarify stage will populate)
+
+## Stage Report: explore
+
+- [x] Files mapped: 6 across skill-docs, reference-docs, pipeline-config
+  skill-docs: 2 (build-explore/SKILL.md, build-review/SKILL.md); reference-docs: 1 (gray-area-templates.md); pipeline-config: 1 (README.md); entity-refs: 2 (054 gap analysis, 093 UX fix)
+- [x] Assumptions formed: 5 (Confident: 5, Likely: 0, Unclear: 0)
+  A-1 template row format (0.95); A-2 pre-scan Step 1f (0.90); A-3 conditional activation (0.90); A-4 no README changes (0.95); A-5 finding severity schema (0.85)
+- [x] Options surfaced: 1
+  O-1 explore template depth (active inspection vs passive questions)
+- [x] Questions generated: 1
+  Q-1 interaction pattern categories for template row
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorming spec
+- [x] Scale assessment: confirmed Medium
+  6 files mapped; 2 skill files + 1 reference doc to modify + tests = ~7-8 total files
+- [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident 0.85-0.95, no external tech claims, purely internal skill doc modifications)

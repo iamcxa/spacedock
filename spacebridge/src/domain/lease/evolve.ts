@@ -2,7 +2,7 @@
 // ABOUTME: Pure fmodel evolve function for the lease aggregate. Zero I/O.
 // evolve(state, event) → new LeaseState. replay(events) reduces over evolve from empty state.
 
-import type { LeaseEvent, LeaseState, LeaseKey } from "./types";
+import type { LeaseEvent, LeaseKey, LeaseState } from "./types";
 import { emptyLeaseState } from "./types";
 
 export function evolve(state: LeaseState, event: LeaseEvent): LeaseState {

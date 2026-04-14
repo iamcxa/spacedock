@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface FeedEntry {
@@ -43,7 +43,7 @@ export function LiveFeed() {
   // Auto-scroll to newest (top) when entries change — per MEMORY auto-scroll direction gotcha
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-  }, [entries.length]);
+  }, []);
 
   return (
     <div className="flex flex-col h-full border rounded-lg p-3">
@@ -65,7 +65,9 @@ export function LiveFeed() {
               <div key={`${entry.id}-${entry.timestamp}`} className="text-xs p-2 rounded bg-muted">
                 <div className="flex items-center justify-between gap-1 mb-0.5">
                   <span className="font-mono font-medium truncate">{entry.entity}</span>
-                  <span className="text-muted-foreground shrink-0">{formatRelative(entry.timestamp)}</span>
+                  <span className="text-muted-foreground shrink-0">
+                    {formatRelative(entry.timestamp)}
+                  </span>
                 </div>
                 <div className="text-muted-foreground truncate">
                   {entry.type} → {entry.stage}

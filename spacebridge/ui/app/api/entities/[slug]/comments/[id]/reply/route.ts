@@ -31,9 +31,7 @@ export async function POST(
   }
 
   try {
-    const { parseCommand } = await import(
-      "../../../../../../../../src/domain/comment/schemas"
-    );
+    const { parseCommand } = await import("../../../../../../../../src/domain/comment/schemas");
 
     let cmd: ReturnType<typeof parseCommand>;
     try {
@@ -48,7 +46,10 @@ export async function POST(
         author: (body as Record<string, unknown>).author ?? "captain",
       });
     } catch (err) {
-      return Response.json({ error: "Invalid request body", details: String(err) }, { status: 400 });
+      return Response.json(
+        { error: "Invalid request body", details: String(err) },
+        { status: 400 },
+      );
     }
 
     if (cmd.type !== "reply_to_comment") {
@@ -59,12 +60,8 @@ export async function POST(
     const { appendEvents, loadEvents, upsertSnapshot, countEvents } = await import(
       "../../../../../../../../src/domain/comment/persistence"
     );
-    const { decide } = await import(
-      "../../../../../../../../src/domain/comment/decider"
-    );
-    const { replay } = await import(
-      "../../../../../../../../src/domain/comment/evolve"
-    );
+    const { decide } = await import("../../../../../../../../src/domain/comment/decider");
+    const { replay } = await import("../../../../../../../../src/domain/comment/evolve");
 
     const db = createDb(defaultDbPath());
     const entityPath = `/docs/build-pipeline/${slug}.md`;

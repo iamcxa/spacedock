@@ -4,14 +4,14 @@
 // A-8: daemon-internal only — not an RPC interface like CoordinationClient.
 
 import { discoverWorkflows } from "../../../../tools/dashboard/src/discovery";
-import { sessionEvents as sessionEventsTable } from "../../schema";
 import type { SpacebridgeDb } from "../../db";
 import type { RegisterPayload } from "../../ipc/types";
+import { sessionEvents as sessionEventsTable } from "../../schema";
 import { decide } from "./decider";
-import { evolve, replay } from "./evolve";
 import { InvalidProjectRoot } from "./errors";
+import { evolve, replay } from "./evolve";
 import { appendEvents, deleteSnapshot, upsertSnapshot } from "./persistence";
-import type { SessionEvent, SessionRecord, SessionState } from "./types";
+import type { SessionEvent, SessionState } from "./types";
 
 export interface Workflow {
   dir: string;
@@ -21,7 +21,10 @@ export interface Workflow {
 export interface SessionRegistry {
   register(payload: RegisterPayload): Promise<SessionEvent[]>;
   heartbeat(sessionId: string): Promise<SessionEvent[]>;
-  disconnect(sessionId: string, reason: "explicit" | "timeout" | "shutdown"): Promise<SessionEvent[]>;
+  disconnect(
+    sessionId: string,
+    reason: "explicit" | "timeout" | "shutdown",
+  ): Promise<SessionEvent[]>;
   disconnectAll(reason: "shutdown"): Promise<SessionEvent[]>;
   getState(): SessionState;
   getActiveProjectRoots(): string[];
@@ -101,11 +104,7 @@ export async function createSessionRegistry(
 
     async heartbeat(sessionId: string): Promise<SessionEvent[]> {
       const now = getNow();
-      const events = decide(
-        { type: "heartbeat", sessionId, timestamp: now },
-        state,
-        now,
-      );
+      const events = decide({ type: "heartbeat", sessionId, timestamp: now }, state, now);
       await applyEvents(sessionId, events);
 
       const record = state.sessions.get(sessionId);
@@ -119,11 +118,7 @@ export async function createSessionRegistry(
       reason: "explicit" | "timeout" | "shutdown",
     ): Promise<SessionEvent[]> {
       const now = getNow();
-      const events = decide(
-        { type: "disconnect", sessionId, reason },
-        state,
-        now,
-      );
+      const events = decide({ type: "disconnect", sessionId, reason }, state, now);
       await applyEvents(sessionId, events);
 
       if (events.length > 0) {

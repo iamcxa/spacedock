@@ -3,14 +3,18 @@
 // Wires decider + evolve + persistence into the CoordinationClient interface.
 // Entity 057 will replace the entityScanner with a DB-backed projection.
 
-import { randomUUID } from "node:crypto";
-import type { CoordinationClient, Role, EntityRef, LeaseToken } from "./coordination-client-stub";
 import type { SpacebridgeDb } from "../db";
-import type { LeaseState } from "../domain/lease/types";
 import { decide } from "../domain/lease/decider";
+import { LeaseNotFound } from "../domain/lease/errors";
 import { evolve, replay } from "../domain/lease/evolve";
-import { appendEvents, loadAllEvents, upsertSnapshot, deleteSnapshot, countEvents } from "../domain/lease/persistence";
-import { LeaseExpired, LeaseNotFound } from "../domain/lease/errors";
+import {
+  appendEvents,
+  deleteSnapshot,
+  loadAllEvents,
+  upsertSnapshot,
+} from "../domain/lease/persistence";
+import type { LeaseState } from "../domain/lease/types";
+import type { CoordinationClient, EntityRef, LeaseToken, Role } from "./coordination-client-stub";
 
 export interface CoordinationClientBridgeOptions {
   db: SpacebridgeDb;
@@ -36,9 +40,10 @@ export async function createCoordinationClientBridge(
   // Track next sequence number per aggregate
   const seqCounters = new Map<string, number>();
   // Pre-populate seqCounters from loaded events by scanning aggregateId
-  const rows = await opts.db.select().from(
-    (await import("../schema")).leaseEvents
-  ).orderBy((await import("../schema")).leaseEvents.sequenceNumber);
+  const rows = await opts.db
+    .select()
+    .from((await import("../schema")).leaseEvents)
+    .orderBy((await import("../schema")).leaseEvents.sequenceNumber);
   for (const row of rows) {
     const cur = seqCounters.get(row.aggregateId) ?? 0;
     if (row.sequenceNumber >= cur) {
@@ -66,7 +71,13 @@ export async function createCoordinationClientBridge(
     async acquireEntity(slug: string, role: Role, sessionId: string): Promise<LeaseToken> {
       const now = getNow();
       const events = decide(
-        { type: "acquire", entitySlug: slug, role, sessionId, leaseDurationMs: opts.leaseDurationMs },
+        {
+          type: "acquire",
+          entitySlug: slug,
+          role,
+          sessionId,
+          leaseDurationMs: opts.leaseDurationMs,
+        },
         state,
         now,
       );
@@ -88,11 +99,7 @@ export async function createCoordinationClientBridge(
       const entry = findByToken(state, token.token);
       if (!entry) throw new LeaseNotFound(token.token);
       const aggregateId = `${entry.entity_slug}::${entry.role}`;
-      const events = decide(
-        { type: "release", token: token.token, outcome },
-        state,
-        now,
-      );
+      const events = decide({ type: "release", token: token.token, outcome }, state, now);
       await appendEvents(opts.db, aggregateId, events, nextSeq(aggregateId));
       for (const ev of events) {
         state = evolve(state, ev);
@@ -124,11 +131,7 @@ export async function createCoordinationClientBridge(
         if (lease.expires_at <= now) {
           try {
             const aggregateId = `${lease.entity_slug}::${lease.role}`;
-            const events = decide(
-              { type: "expire", token: lease.token, now },
-              state,
-              now,
-            );
+            const events = decide({ type: "expire", token: lease.token, now }, state, now);
             if (events.length > 0) {
               await appendEvents(opts.db, aggregateId, events, nextSeq(aggregateId));
               for (const ev of events) {

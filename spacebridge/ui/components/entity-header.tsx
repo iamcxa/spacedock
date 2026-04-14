@@ -1,8 +1,8 @@
 // spacebridge/ui/components/entity-header.tsx
 // ABOUTME: Server Component — entity header card with title, status/stage/intent badges.
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface EntityHeaderProps {
   title: string;
@@ -15,12 +15,16 @@ interface EntityHeaderProps {
 
 function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   switch (status) {
-    case "shipped": return "default";
+    case "shipped":
+      return "default";
     case "plan":
     case "execute":
-    case "review": return "secondary";
-    case "blocked": return "destructive";
-    default: return "outline";
+    case "review":
+      return "secondary";
+    case "blocked":
+      return "destructive";
+    default:
+      return "outline";
   }
 }
 

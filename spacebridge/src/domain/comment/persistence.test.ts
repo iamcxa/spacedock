@@ -1,19 +1,19 @@
 // spacebridge/src/domain/comment/persistence.test.ts
 // ABOUTME: Integration tests for comment persistence layer. Uses :memory: DB for isolation.
 
-import { describe, it, expect, beforeEach } from "bun:test";
-import { createDb } from "../../db";
+import { beforeEach, describe, expect, it } from "bun:test";
 import type { SpacebridgeDb } from "../../db";
+import { createDb } from "../../db";
+import { replay } from "./evolve";
 import {
   appendEvents,
-  loadEvents,
-  loadAllEvents,
   countEvents,
-  upsertSnapshot,
-  markResolved,
   getCommentsByEntity,
+  loadAllEvents,
+  loadEvents,
+  markResolved,
+  upsertSnapshot,
 } from "./persistence";
-import { replay } from "./evolve";
 import type { CommentEvent } from "./types";
 
 const WORKFLOW_DIR = "/test/workflow";
@@ -47,7 +47,10 @@ function makeReplyEvent(commentId: string, parentCommentId: string): CommentEven
   };
 }
 
-function makeResolveEvent(commentId: string, reason: "manual" | "stage_advanced" = "manual"): CommentEvent {
+function _makeResolveEvent(
+  commentId: string,
+  reason: "manual" | "stage_advanced" = "manual",
+): CommentEvent {
   return {
     type: "comment_resolved",
     commentId,
@@ -76,8 +79,8 @@ describe("appendEvents + loadEvents", () => {
 
     const state = replay(loaded);
     expect(state.size).toBe(3);
-    expect(state.get("c1")!.resolved).toBe(false);
-    expect(state.get("c3")!.parentId).toBe("c1");
+    expect(state.get("c1")?.resolved).toBe(false);
+    expect(state.get("c3")?.parentId).toBe("c1");
   });
 
   it("loads only events for matching aggregateId", async () => {
