@@ -672,3 +672,21 @@ gate: captain sign-off required
 ### F-1 Finding Decision Required
 
 Captain must decide: pin deps to `"2.4.10"/"9.1.7"/"16.4.0"` or accept `"latest"` with bun.lock anchor. This is a **captain gate** item before advancing to shipped.
+
+## Confidence Assessment
+
+Iteration: 1 of 3
+
+| Factor | Weight | Score | Contribution | Evidence |
+|---|---|---|---|---|
+| test_coverage | 25% | 80% | 20.0% | bun test 568 pass/26 fail (pre-existing), no ratchet baseline |
+| type_coverage | 20% | 80% | 16.0% | tsc pre-existing errors documented, no entity regressions |
+| review_severity | 20% | 85% | 17.0% | F-1 HIGH/DOC (version pins), F-2 NIT, F-3 NIT. 0 CRITICAL |
+| ac_completeness | 20% | 100% | 20.0% | 8/8 UAT items pass (7 CLI + 1 interactive captain-approved) |
+| integration_breadth | 15% | 100% | 15.0% | 4/4 tasks DONE, all planned files delivered |
+
+**Composite: 88.0%** (threshold: 90%)
+
+Gap analysis: test_coverage and type_coverage score 80% due to absent ratchet baselines (no prior entity established the baseline). Pre-existing tsc errors in spacebridge infra (missing @types/node, clsx, tailwind-merge) are documented in execute/quality Stage Reports. Auto-fix loop cannot improve these factors — the gap is structural.
+
+Captain escalation: composite < 90% after structural analysis. Requesting captain override to advance to shipped.
