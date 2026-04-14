@@ -5,11 +5,8 @@
 // Supports 3-mode comment UX: document-level, section-level, text-selection popover.
 // Manages local comment state; background router.refresh() keeps RSC in sync.
 
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRef } from "react";
 import ReactMarkdown from "react-markdown";
-import { CommentThread } from "@/components/comment-thread";
-import { AddCommentForm } from "@/components/add-comment-form";
 import { TextSelectionPopover } from "@/components/text-selection-popover";
 
 interface CommentRow {
@@ -27,59 +24,25 @@ interface CommentRow {
 interface EntityBodyProps {
   body: string;
   sectionHeadings: string[];
-  commentsBySection: Record<string, CommentRow[]>;
-  repliesByParent: Record<string, CommentRow[]>;
+  allComments: CommentRow[];
   entitySlug: string;
+  onCommentAdded: (comment: CommentRow) => void;
 }
-
-// GENERAL_KEY is the empty-string key used for document-level comments
-const GENERAL_KEY = "";
 
 export function EntityBody({
   body,
   sectionHeadings,
-  commentsBySection: initialCommentsBySection,
-  repliesByParent,
+  allComments,
   entitySlug,
+  onCommentAdded,
 }: EntityBodyProps) {
-  const router = useRouter();
-  const [commentsBySection, setCommentsBySection] = useState(initialCommentsBySection);
   const articleRef = useRef<HTMLElement>(null);
-
-  function handleCommentAdded(newComment: CommentRow) {
-    const section = newComment.sectionHeading;
-    setCommentsBySection((prev) => ({
-      ...prev,
-      [section]: [...(prev[section] ?? []), newComment],
-    }));
-    router.refresh();
-  }
-
-  // Section headings for the form: "General" (document-level) + actual sections
-  const formHeadings = [GENERAL_KEY, ...sectionHeadings];
-
-  const documentLevelComments = commentsBySection[GENERAL_KEY] ?? [];
 
   return (
     <div>
       <h2 className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wide">
         Entity Content
       </h2>
-
-      {/* Document-level comments displayed above body */}
-      {documentLevelComments.length > 0 && (
-        <div className="mb-6 space-y-2">
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Document Comments</p>
-          {documentLevelComments.map((comment) => (
-            <CommentThread
-              key={comment.commentId}
-              comment={comment}
-              replies={repliesByParent[comment.commentId] ?? []}
-              entitySlug={entitySlug}
-            />
-          ))}
-        </div>
-      )}
 
       {/* Relative container so popover can be absolutely positioned */}
       <div className="relative">
@@ -88,25 +51,10 @@ export function EntityBody({
             components={{
               h2: ({ node, children, ...props }) => {
                 const headingText = typeof children === "string" ? children : String(children);
-                const commentsForSection = commentsBySection[headingText] ?? [];
                 return (
-                  <div>
-                    <h2 {...props} className="text-lg font-semibold mt-6 mb-2 scroll-mt-16" id={headingText}>
-                      {children}
-                    </h2>
-                    {commentsForSection.length > 0 && (
-                      <div className="not-prose mb-4 space-y-2">
-                        {commentsForSection.map((comment) => (
-                          <CommentThread
-                            key={comment.commentId}
-                            comment={comment}
-                            replies={repliesByParent[comment.commentId] ?? []}
-                            entitySlug={entitySlug}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <h2 {...props} className="text-lg font-semibold mt-6 mb-2 scroll-mt-16" id={headingText}>
+                    {children}
+                  </h2>
                 );
               },
             }}
@@ -118,15 +66,7 @@ export function EntityBody({
         <TextSelectionPopover
           entitySlug={entitySlug}
           containerRef={articleRef}
-          onCommentAdded={handleCommentAdded}
-        />
-      </div>
-
-      <div className="mt-8">
-        <AddCommentForm
-          entitySlug={entitySlug}
-          sectionHeadings={formHeadings}
-          onCommentAdded={handleCommentAdded}
+          onCommentAdded={onCommentAdded}
         />
       </div>
     </div>

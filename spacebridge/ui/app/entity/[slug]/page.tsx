@@ -10,7 +10,7 @@ import { and, eq, asc } from "drizzle-orm";
 import { parseEntity } from "@/lib/entity-parse";
 import { EntityHeader } from "@/components/entity-header";
 import { StageTimeline } from "@/components/stage-timeline";
-import { EntityBody } from "@/components/entity-body";
+import { EntityDetailClient } from "@/components/entity-detail-client";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -116,19 +116,7 @@ export default async function EntityDetailPage({ params }: PageProps) {
 
   const { frontmatter, body } = parseEntity(entityText);
 
-  // Group comments by normalized sectionHeading (strip "## " prefix for consistent matching)
-  function normalizeHeading(h: string): string {
-    return h.replace(/^##\s*/, "").trim();
-  }
-  const topLevel = commentRows.filter((c) => !c.parentId);
   const replies = commentRows.filter((c) => c.parentId);
-  const commentsBySection = new Map<string, typeof topLevel>();
-  for (const comment of topLevel) {
-    const key = normalizeHeading(comment.sectionHeading);
-    const existing = commentsBySection.get(key) ?? [];
-    existing.push(comment);
-    commentsBySection.set(key, existing);
-  }
 
   // Build sections from body headings (## headings only), normalized (no "## " prefix)
   const sectionHeadings = body
@@ -137,7 +125,7 @@ export default async function EntityDetailPage({ params }: PageProps) {
     .map((line) => line.trim().replace(/^##\s*/, ""));
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-4xl">
+    <main className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="mb-4">
         <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
           ← War Room
@@ -159,21 +147,19 @@ export default async function EntityDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      <div className="mt-6">
-        <EntityBody
-          body={body}
-          sectionHeadings={sectionHeadings}
-          commentsBySection={Object.fromEntries(commentsBySection)}
-          repliesByParent={Object.fromEntries(
-            replies.reduce((acc, r) => {
-              const key = r.parentId!;
-              acc.set(key, [...(acc.get(key) ?? []), r]);
-              return acc;
-            }, new Map<string, typeof replies>())
-          )}
-          entitySlug={slug}
-        />
-      </div>
+      <EntityDetailClient
+        body={body}
+        sectionHeadings={sectionHeadings}
+        commentRows={commentRows}
+        repliesByParent={Object.fromEntries(
+          replies.reduce((acc, r) => {
+            const key = r.parentId!;
+            acc.set(key, [...(acc.get(key) ?? []), r]);
+            return acc;
+          }, new Map<string, typeof replies>())
+        )}
+        entitySlug={slug}
+      />
     </main>
   );
 }
