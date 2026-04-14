@@ -2,7 +2,7 @@
 id: 103
 title: "Shape skill -- pre-build alignment for user stories and scope validation"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: captain architectural discussion (2026-04-14 SO session — split product alignment from technical execution via /shape skill + build integration)
 created: 2026-04-14T21:30:00+08:00
 started:
@@ -137,7 +137,7 @@ You are asking for an optional pre-build `/shape` skill that captures product-le
 
 ## Brainstorming Spec
 
-**APPROACH**: Add a new leaf skill `skills/build-shape/SKILL.md` registered as `/shape` via `user-invocable: true` frontmatter (pattern used by 11 existing slash-command skills). The skill runs a 4-step internal flow (`assume → imagine → align → ship` as internal steps, NOT pipeline stages — provenance: Basecamp Shape Up pitch structure + GSD `/gsd-discuss-phase` adaptive questioning) with three context-isolated subagent wrappers dispatched via the Agent tool: `build-shape-framer` (opus — hard synthesis, proposes 2-3 problem statements), `build-shape-story-gen` (sonnet — templated output, generates 3-5 user stories per accepted frame), `build-shape-scope-drafter` (sonnet — constrained output, drafts in/out scope). Skill body owns all captain `AskUserQuestion` interaction; subagents do generative heavy lifting. Output written as entity body sections (`## Problem Statement`, `## User Stories`, `## Scope: In`, `## Scope: Out`, `## References`) plus a frontmatter transition `shape_status: draft → validated`. Step 1 heuristic escape-hatch: Small/bugfix-level directives trigger early exit with "shape unnecessary — run `/build` directly" recommendation. Companion micro-edits to `skills/build/SKILL.md` (accept `--from {slug}` flag, load shape sections), `skills/build-brainstorm/SKILL.md` (add Step 1f shape consumption; activate the Step 2.5 Goal Check shape-present cross-check branch — stub already shipped in commit `06d2329`), and `skills/build-clarify/SKILL.md` (skip product-level assumption category when shape section present in entity). Schema update to `docs/build-pipeline/README.md` adds `shape_status: draft|validated|n/a` field. Forge discipline: skill developed via `kc-plugin-forge` TDD — 4 golden fixtures covering scale × type diversity (F-1 entity 100 Large/UI, F-2 entity 101 Large/runtime, F-3 Medium feature TBD from explore, F-4 synthetic Small bugfix for escape-hatch regression).
+**APPROACH**: Add a new leaf skill `skills/build-shape/SKILL.md` registered as `/shape` via `user-invocable: true` frontmatter (pattern used by 11 existing slash-command skills) (✓ confirmed by explore: 11 skills match — build, build-clarify, build-distill, commission, dashboard, first-officer, graft, overhaul, refit, science-officer, uat-resume). The skill runs a 4-step internal flow (`assume → imagine → align → ship` as internal steps, NOT pipeline stages — provenance: Basecamp Shape Up pitch structure + GSD `/gsd-discuss-phase` adaptive questioning) with three context-isolated subagent wrappers dispatched via the Agent tool: `build-shape-framer` (opus — hard synthesis, proposes 2-3 problem statements), `build-shape-story-gen` (sonnet — templated output, generates 3-5 user stories per accepted frame), `build-shape-scope-drafter` (sonnet — constrained output, drafts in/out scope). Skill body owns all captain `AskUserQuestion` interaction; subagents do generative heavy lifting. Output written as entity body sections (`## Problem Statement`, `## User Stories`, `## Scope: In`, `## Scope: Out`, `## References`) plus a frontmatter transition `shape_status: draft → validated`. Step 1 heuristic escape-hatch: Small/bugfix-level directives trigger early exit with "shape unnecessary — run `/build` directly" recommendation. Companion micro-edits to `skills/build/SKILL.md` (accept `--from {slug}` flag, load shape sections), `skills/build-brainstorm/SKILL.md` (add Step 1f shape consumption; activate the Step 2.5 Goal Check shape-present cross-check branch — stub already shipped in commit `06d2329`) (✓ confirmed by explore: skills/build-brainstorm/SKILL.md:103-109 contains the Shape-present cross-check mode stub), and `skills/build-clarify/SKILL.md` (skip product-level assumption category when shape section present in entity) (⚠ contradicted: no such named "product-level assumption category" exists in build-clarify today; this is a net-new conditional branch whose predicate needs definition -- see Q-2). Schema update to `docs/build-pipeline/README.md` adds `shape_status: draft|validated|n/a` field. Forge discipline: skill developed via `kc-plugin-forge` TDD (✓ confirmed by explore: kc-plugin-forge installed at `/Users/kent/.claude/plugins/local/kc-plugin-forge/` with skills/ + smoke-tests/ + reference/ subdirectories) — 4 golden fixtures covering scale × type diversity (F-1 entity 100 Large/UI, F-2 entity 101 Large/runtime, F-3 Medium feature TBD from explore, F-4 synthetic Small bugfix for escape-hatch regression) (⚠ contradicted: forge convention is `smoke-tests/{skill}.smoke.yaml` at plugin root with `skill/trigger/timeout/assertions` schema, NOT `tests/forge/build-shape/*.yaml` -- fixture location + format need resolution, see O-1).
 
 **ALTERNATIVE**: Ship `/shape` as a full spacedock workflow via `/commission`, producing a peer `docs/shape-pipeline/` with its own README, `assume/imagine/align/ship` as real pipeline stages (not internal steps), FO dispatch, and mod system. -- D-01 Rejected during design discussion (2026-04-14): (a) dual-pipeline sync problem — shape pipeline ↔ build pipeline state coordination, entity-ID namespace collision, cross-pipeline status awareness; (b) `align` stage is fundamentally captain-in-the-loop conversation — forcing it into FO-dispatch semantics creates impedance mismatch (FO stops and waits on `AskUserQuestion` calls, which is not a natural FO/ensign primitive); (c) workflow machinery overhead (separate README, status script, first-officer agent, mod hooks) pays no dividend when a shape "workflow run" has exactly one entity per run with no parallel stage execution. Skill + subagents carries the same interaction shape with ~10% of the scaffolding cost.
 
@@ -160,3 +160,111 @@ You are asking for an optional pre-build `/shape` skill that captures product-le
 - Given an entity with `shape_status: validated`, when `/build --from {slug}` is invoked, then build-brainstorm's Step 1f reads the entity's shape sections and the resulting APPROACH paragraph references at least one user story by number (how to verify: diff brainstorm output with vs without `--from`; with `--from`, APPROACH contains at least one `US-{n}` or `user story {n}` citation)
 - Given an entity with `shape_status: validated`, when `/shape "{same directive}" {slug}` is re-invoked on the same entity, then `/shape` refuses to rerun and emits the immutable-pitch recommendation with the `supersedes:` pattern (how to verify: second invocation — assert refusal message, assert entity body unchanged via `git diff HEAD` returns empty)
 - Given `kc-plugin-forge` TDD fixtures F-1 through F-4 (100, 101, one Medium TBD, one Small escape-hatch synthetic), when `skills/build-shape/SKILL.md` is developed, then all 4 fixtures pass forge acceptance checks before the skill is considered ship-ready (how to verify: `kc-plugin-forge validate skills/build-shape` with all 4 fixtures, assert exit code 0)
+
+## Assumptions
+
+A-1: Three subagent wrappers (`build-shape-framer`, `build-shape-story-gen`, `build-shape-scope-drafter`) will follow the canonical 15-22 line thin-wrapper agent pattern — minimal frontmatter (`name`, `description`, `tools`, `model`, `color`, `skills`), 1-line role statement, Boot Sequence, Namespace Note — preloading `spacedock:build-shape` as their skill.
+Confidence: 🟢 Confident (0.95)
+Evidence: agents/code-explorer.md:1-21 (21 lines, 1 skill preload, `tools: Read, Grep, Glob, Bash`); agents/researcher.md:1-17 (17 lines, adds `WebFetch, WebSearch`); agents/differential-review-reviewer.md:1-21; agents/sharp-edges-reviewer.md:1-21; agents/troop.md:1-21 (2 skill preloads). Template consistent across 5+ examples — pattern is canonical.
+
+A-2: `/shape` registers as a slash command via `user-invocable: true` frontmatter on `skills/build-shape/SKILL.md`. No edits required to `.claude-plugin/plugin.json` — the plugin manifest has no `skills` array and skills are auto-discovered.
+Confidence: 🟢 Confident (0.98)
+Evidence: 11 existing user-invocable skills all register via frontmatter (build, build-clarify, build-distill, commission, dashboard, first-officer, graft, overhaul, refit, science-officer, uat-resume); `.claude-plugin/plugin.json:1-17` contains only `name`, `version`, `description`, `author`, `repository`, `license`, `keywords` — zero skill references.
+
+A-3: New skill owns a `skills/build-shape/references/` subdirectory holding format specs (`output-format.md`, `fixture-format.md`, `dispatch-guide.md` etc.), consumed by the skill's steps via `Read`. Matches canonical reference-doc layout across spacedock skills.
+Confidence: 🟢 Confident (0.90)
+Evidence: skills/build-clarify/references/output-format.md, skills/build-explore/references/gray-area-templates.md, skills/build-explore/references/hybrid-classification-heuristic.md, skills/build/references/, skills/commission/bin/status — 5+ spacedock skills use the `references/` sibling-to-SKILL.md pattern.
+
+A-4: New frontmatter field `shape_status: draft|validated|n/a` mirrors the existing `context_status` state-machine pattern at `docs/build-pipeline/README.md:272`. Additive to (not replacing) `context_status` — both fields coexist on entity frontmatter.
+Confidence: 🟢 Confident (0.90)
+Evidence: docs/build-pipeline/README.md:272 — `context_status` is an enum field with orthogonal-to-status semantics ("Tracks context maturity during draft/explore/clarify phases"); shape_status follows the same axis for a different lifecycle aspect (product-alignment maturity).
+
+A-5: Entity body section format (`## Problem Statement` / `## User Stories` / `## Scope: In` / `## Scope: Out` / `## References`) is specified in a dedicated reference doc (proposed: `skills/build-shape/references/output-format.md`), making the format a contract that build-brainstorm's Step 1f (consumer) can parse against and that build-clarify's shape-present skip branch can detect against.
+Confidence: 🟢 Confident (0.85)
+Evidence: skills/build-clarify/references/output-format.md is the canonical single-source-of-truth for its section formats; build-explore does the same via its references directory. New skill should mirror.
+
+A-6: `kc-plugin-forge` is installed locally and invocable — captain's 2026-04-14 directive ("skill work MUST use forge") is viable from current tooling inventory.
+Confidence: 🟢 Confident (0.95)
+Evidence: `/Users/kent/.claude/plugins/local/kc-plugin-forge/skills/kc-plugin-forge/SKILL.md` exists; plugin root has `skills/`, `smoke-tests/`, `reference/` subdirectories; `smoke-tests/kc-plugin-forge.smoke.yaml` demonstrates the `skill/trigger/timeout/assertions` fixture schema.
+
+## Option Comparisons
+
+### O-1: Fixture convention for build-shape TDD
+
+Given kc-plugin-forge uses `smoke-tests/{skill}.smoke.yaml` (schema: `skill/trigger/timeout/assertions`) while spacedock has `tests/pressure/{skill}.yaml` (schema: `test_cases` with `pressure` scenarios + `expected_answer`), which convention applies to build-shape?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Use kc-plugin-forge `smoke-tests/*.smoke.yaml` in the spacedock plugin root (+ reference-doc explaining the assertions strategy) | Matches captain's explicit 2026-04-14 directive ("use forge"); leverages forge's existing red/green pipeline (quality-pipeline.md, parallel-forge.md); directly aligned | smoke-tests schema is lightweight (assertions-only) and may not capture interactive-flow pressure nuance that shape's captain-loop requires | Medium | ✅ Recommended |
+| Use spacedock native `tests/pressure/build-shape.yaml` convention | Leverages existing repo convention; captured-session format already documents captain interactions richly (pressure labels, correct_because citations) | Diverges from captain's explicit forge directive; no visible test runner in spacedock (tests/pressure/*.yaml have no CI hookup); would require building runner infra | Medium | Viable, rejected due to directive |
+| Hybrid — forge smoke-tests for coarse assertions + pressure YAML for scenario richness | Covers both surfaces | Two fixture formats to maintain; unclear authority; defeats single-source-of-truth goal | High | Not recommended |
+
+Recommendation rationale: captain's 2026-04-14 directive is explicit and forge is installed. smoke-tests schema is sufficient because build-shape's acceptance criteria ARE assertion-shaped (entity file exists / sections present / frontmatter transitions / escape-hatch text appears). Red-scenario richness, where needed, can be expressed via forge's red/green iteration (`not_contains` assertions for "should not fire on Small directives"). Design doc invariant cross-reference: entity 103 GUARDRAILS explicitly cite kc-plugin-forge — no deviation justified.
+
+### O-2: Shape-skip branch location + predicate in build-clarify
+
+Given build-clarify has no existing "product-level assumption category" (⚠ contradiction from Step 3.7), where should the shape-present conditional branch insert, and what specifically does it skip?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Step 2 filter (lines 145-177): when `shape_status: validated`, filter out any A-n assumption whose Evidence line cites an entity body section under `## Problem Statement` / `## User Stories` / `## Scope: *` | Minimal code change; preserves Step 1.5 Coverage Check logic; uses existing assumption data + a 1-line predicate | Requires explore to tag which assumptions are "product-level-derived" (new responsibility for explore — minor) | Medium | ✅ Recommended |
+| Step 1.5 sub-check 1d template-skip (lines 130-141): when `shape_status: validated`, skip specific gray-area templates (problem-statement, user-story, scope-boundary) from application | Prevents assumption generation in the first place (vs filtering after) | Requires tagging product-level templates in `gray-area-templates.md` — cascading doc edits; template is the wrong granularity (a single template may have both product- and technical-level entries) | Medium-High | Viable |
+| Step 3+ auto-answer: run full clarify, but auto-answer product-level questions with "validated by shape ({slug})" | Simplest code path | Wastes captain time watching auto-answers; doesn't actually shorten clarify | Low | Not recommended |
+
+Recommendation rationale: Option 1 matches entity 103 Goal Check's expected outcome literally ("fewer product-level clarify rounds"). The predicate (Evidence cites `## Problem Statement` / `## User Stories` / `## Scope: *`) is mechanical and grep-able. Return-value trace: shape entity with `shape_status: validated` → Step 2 reads frontmatter → filters assumption list → captain sees only technical-layer assumptions. Design doc invariant cross-reference: captain's "build flow 保持現在流程" directive means Step 2 structure stays; Option 1 is a surgical filter, not a restructure.
+
+### O-3: build-distill skill relationship to build-shape
+
+Should `build-shape` invoke the existing `spacedock:build-distill` skill for its framer/story-gen steps, or run inline via subagent dispatch?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Invoke `spacedock:build-distill` for problem-framing + user-story generation | Reuses existing distillation code; smaller net-new surface | build-distill's domain per its description is "compare an external skill system against a build-* skill to identify capability gaps" — completely different purpose; coupling would force build-distill to grow a 2nd purpose (bad) or produce misaligned output (worse); lifecycle mismatch (build-distill is meta-analysis, shape is authoring) | High | Not recommended |
+| Dispatch 3 context-isolated subagent wrappers (framer opus / story-gen sonnet / scope sonnet) per entity 103 APPROACH | Fresh-context isolation; each wrapper's acceptance criterion is scoped + testable via forge; matches thin-wrapper pattern; captain-approved design | Net-new code surface (3 wrappers × 17-21 lines each = ~60 lines total) | Medium | ✅ Recommended |
+| Run all synthesis inline in build-shape main skill body (no subagents) | Simplest code path | Pollutes build-shape's context with generation debris; subagent-level acceptance criteria become untestable; violates captain's explicit subagent-dispatch decision | Low | Not recommended |
+
+Recommendation rationale: build-distill's purpose is meta-analysis (skill-system comparison) — using it for authoring would corrupt both skills. Captain's 2026-04-14 directive locked "3 subagent wrappers as thin wrappers per MEMORY.md pattern" — Option 2 is the only faithful execution. Return-value trace: `/shape {directive}` → skill Step 2 `Agent(spacedock:build-shape-framer)` → returns 2-3 problem candidates → skill AskUserQuestion → captain picks → skill Step 3 `Agent(spacedock:build-shape-story-gen)` with accepted frame → returns 3-5 stories → ... Shape stages produce clean handoffs between skill body and wrappers.
+
+## Open Questions
+
+Q-1: How are concurrent `/shape` and `/build` invocations on the same directive disambiguated?
+
+Domain: Runnable / Invokable
+
+Why it matters: Both commands create `docs/build-pipeline/{slug}.md` entities. If captain opens Session A with `/shape "feature X"` and Session B with `/build "feature X"` simultaneously (or within a few seconds), either (a) both sessions compute the same slug and one overwrites the other at commit time (git conflict), or (b) different slug normalizations produce two entities for the same logical feature. Captain explicitly raised parallel-session workflows in the earlier design discussion — this question decides whether v1 accepts the race or adds mitigation.
+
+Suggested options: (a) **Accept race for v1** — document "do not run `/shape` and `/build` concurrently on the same feature" in both skills' headers; collision surfaces as a normal git merge conflict; (b) **Deterministic slug + write-lock** — slug is a hash of normalized directive text; second writer detects `{slug}.md` exists and fails with "already in progress"; (c) **Shape-owns-claim protocol** — `/shape` writes a `.claude-plugin/locks/{slug}.lock` marker; `/build` detects lock and waits or displays "shape session in progress for this directive — run `/build --from {slug}` after shape ships".
+
+Q-2: What is the precise predicate for "shape-present → skip product-level assumptions" in build-clarify?
+
+Domain: Skill-surface
+
+Why it matters: APPROACH treats "product-level assumption category" as if it's an existing named thing, but build-clarify has no such category (⚠ contradicted by Step 3.7 — see explore annotation on APPROACH). O-2 recommended Option 1 (Evidence-line-based filter), but the recommendation's viability depends on whether assumptions consistently cite entity body section headers in their Evidence lines. If not, the filter misses product-level items.
+
+Suggested options: (a) **Evidence-line section-reference predicate** — filter any A-n whose Evidence cites `## Problem Statement` / `## User Stories` / `## Scope: *` (requires explore to tag evidence consistently); (b) **Explicit explore annotation** — build-explore marks product-level-derived assumptions with `[shape-covered]` tag; clarify filters on tag (explicit contract, explicit code); (c) **Keyword heuristic** — filter assumptions whose statement contains product-level keywords (user, role, scope, problem) — cheap but fuzzy, risks false positives on technical assumptions that happen to mention "user".
+
+Q-3: Which shipped or active Medium-scale entity becomes the F-3 forge fixture (diverse-type third seed)?
+
+Domain: Readable / Textual (test fixture identity)
+
+Why it matters: Forge TDD requires scale × type diversity: F-1 Large UI (entity 100), F-2 Large runtime (entity 101), F-4 Small synthetic escape-hatch. F-3 must be Medium scale AND a type that doesn't overlap F-1 or F-2. Choosing poorly (e.g., another UI-heavy entity) creates a fixture coverage gap. Captain input most useful since captain has historical view of which shipped entities best represent the Medium tier.
+
+Suggested options: captain input needed. Recent candidates from the build-pipeline: (a) **095 `pipeline-ui-review-stage`** (shipped, Medium, workflow-process type) — narrative continuity bonus: this is the entity that surfaced the shape gap; using it as F-3 closes a meaningful loop; (b) **083 `confidence-gate`** (shipped, Medium, automation type); (c) **093 `dashboard-feed-persistence`** (shipped, Medium, backend type); (d) **Captain picks** something off the active/archive roster with better first-hand knowledge.
+
+## Stage Report: explore
+
+- [x] Files mapped: 16 across domain, contract, config, test
+  domain: 5 files (build + build-brainstorm + build-clarify skills + gray-area-templates + decomposition-gate reference); contract: 4 files (README schema + clarify output-format + ask-user-question-rules + decomposition-gate); config: 6 files (5 thin-wrapper agents + science-officer agent + plugin.json); test: 1 file (pressure YAML fixture)
+- [x] Assumptions formed: 6 (Confident: 6, Likely: 0, Unclear: 0)
+  A-1 thin-wrapper pattern (5+ examples); A-2 user-invocable frontmatter (11 examples); A-3 references/ subdirectory (5+ examples); A-4 shape_status mirrors context_status (README.md:272); A-5 output-format spec file (canonical across build-clarify + build-explore); A-6 kc-plugin-forge installed (plugin present at ~/.claude/plugins/local/kc-plugin-forge/). All Confident via 2+ codebase usages — zero Likely, zero Unclear.
+- [x] Options surfaced: 3
+  O-1 fixture convention (forge smoke-tests vs pressure YAML vs hybrid -- Recommended: forge smoke-tests); O-2 clarify shape-skip branch location (Step 2 Evidence-filter vs Step 1.5 template-skip vs Step 3 auto-answer -- Recommended: Step 2 filter); O-3 build-distill relationship (invoke vs inline subagents vs no subagents -- Recommended: inline 3 thin-wrapper subagents).
+- [x] Questions generated: 3
+  Q-1 concurrent /shape + /build entity-creation race; Q-2 precise predicate for product-level assumption skip (APPROACH contradiction); Q-3 F-3 forge fixture Medium entity identity (captain picks).
+- [x] α markers resolved: 0 / 0
+  Brainstorming Spec had zero α markers — directive was fully specified.
+- [x] Scale assessment: confirmed Medium
+  16 files mapped across 4 layers — at the high end of Medium (5-15) due to reference-doc depth, but core skill-surface scope (new skill + 3 wrappers + 3 integration edits + 1 schema edit) remains Medium. No revision.
+- [x] Research dispatched: 0 researchers (resolved inline via filesystem check — kc-plugin-forge presence verified at /Users/kent/.claude/plugins/local/kc-plugin-forge/; all other Track A/B items are internal spacedock codebase patterns with 2+ existing usages, no external library/API/protocol claims warranting depth-first research)
+
+Scope flag resolution: ⚠️ likely-decomposable triggered in brainstorm Step 5.5 (directive >3 sentences + multi-domain classification). Explore **NOT recommending decomposition**. Reason: the three logical sub-scopes — (A) skill + 3 subagent wrappers, (B) build-pipeline integration edits (build + build-brainstorm + build-clarify + README schema), (C) forge fixtures + test infrastructure — are tightly coupled. Shipping any subset independently produces no user value: skill (A) produces an artifact that nothing reads without integration (B); integration (B) has nothing to test without skill (A); fixtures (C) require skill + integration to exist before they become meaningful. Captain's monolithic intent during design discussion (explicit rejection of `/commission` workflow split) is validated by this dependency analysis. Decomposition gate bypass approved.
