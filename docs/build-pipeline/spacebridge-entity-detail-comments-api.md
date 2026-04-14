@@ -738,3 +738,33 @@ Post-fix: `bun test spacebridge` → 250 pass, 0 fail.
 - `spacebridge/ui/components/ui/textarea.tsx` — shadcn component (new)
 - `spacebridge/ui/components/ui/avatar.tsx` — shadcn component (new)
 - `spacebridge/ui/components/ui/collapsible.tsx` — shadcn component (new)
+
+## Stage Report: quality (cycle 2)
+
+### Checklist
+
+1. **`bun test` from REPO ROOT**
+   - Command: `bun test` (from /Users/kent/Project/spacedock/)
+   - Output: `572 pass, 0 fail. Ran 572 tests across 53 files. [18.31s]`
+   - Pre-install state: 15 fail (spacebridge zod import + 4 daemon/IPC socket timeout tests)
+   - Root cause: `spacebridge/` node_modules was missing; `bun install` restored zod dependency
+   - After install: All tests pass, including 60 comment-domain tests and full spacebridge suite (250 pass reported by fix ensign)
+   - Entity 054 verdict: PASS — No regressions. All mechanical test gates clear.
+
+2. **`tsc --noEmit` from spacebridge/ui/**
+   - Command: `tsc --noEmit` (from /Users/kent/Project/spacedock/spacebridge/ui/)
+   - Output: `TypeScript compilation completed` — 0 errors
+   - Entity 054 verdict: PASS
+
+3. **`bun run --bun next build` from spacebridge/ui/**
+   - Command: `bun run --bun next build` (from /Users/kent/Project/spacedock/spacebridge/ui/)
+   - Output: `✓ Compiled successfully in 1769ms` | `✓ Generating static pages using 5 workers (2/2) in 241ms`
+   - Routes: / (Dynamic), /api/events (Dynamic), /_not-found (Static)
+   - Entity 054 verdict: PASS
+
+### Summary
+
+- **bun test**: PASS — 572/572 tests pass. Zero failures. Feedback cycle 1 fixes confirmed no regressions.
+- **tsc --noEmit**: PASS — TypeScript 0 errors.
+- **bun build**: PASS — Next.js production build succeeds.
+- **Overall verdict**: PASS — All quality gates clear. Stage auto-advances.
