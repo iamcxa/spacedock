@@ -1,7 +1,7 @@
 ---
 id: 092
 title: "Plan file separation -- reduce executor context pollution"
-status: draft
+status: clarify
 context_status: awaiting-clarify
 source: captain architectural insight (2026-04-14 SO session -- "plan 階段是否應該開另外一個文件")
 started:
@@ -71,26 +71,32 @@ depends-on: []
 A-1: Task-executors already DON'T read the entity file directly. They receive structured task blocks in the Agent dispatch prompt from build-execute. The "context pollution" happens at build-execute's Step 1 (reads entire entity body to parse `## PLAN`), not at the task-executor level.
 Confidence: 🟢 Confident (0.95)
 Evidence: `skills/build-execute/SKILL.md:64` reads entity file to parse plan. `skills/build-execute/SKILL.md:159-170` Mode A/B both dispatch from parsed task data. `skills/task-execution/SKILL.md` has zero references to entity_body/entity_context — tasks receive `read_first`, `action`, `acceptance_criteria` blocks.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-2: build-plan is the sole writer of `## Plan`, `## UAT Spec`, and `## Validation Map`. No other skill writes these sections. Changing the output target from entity body to plan file only requires modifying build-plan.
 Confidence: 🟢 Confident (0.95)
 Evidence: `skills/build-plan/SKILL.md:198` "Write three sections into the entity body". `grep -rl "## Plan\|## UAT Spec\|## Validation Map" skills/*/SKILL.md` — only build-plan writes these (build-execute reads them).
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-3: build-execute is the sole consumer of `## PLAN` section data. It reads the entity file at Step 1, parses tasks into a wave graph, then dispatches.
 Confidence: 🟢 Confident (0.95)
 Evidence: `skills/build-execute/SKILL.md:64` "Read the entity file. Parse `## PLAN` into an in-memory task list." No other skill (quality, review) references `## PLAN` content.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-4: build-quality runs project-wide checks (`bun test`, `bun lint`, `tsc --noEmit`, `bun build`) and does NOT parse plan sections. It does not need plan file awareness.
 Confidence: 🟢 Confident (0.90)
 Evidence: `skills/build-quality/SKILL.md` grep for Plan/UAT/Validation returns 0 matches on plan-reading lines. Quality checks are mechanical project-wide passes, not plan-task-specific.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-5: build-review reads the execute-base diff (code changes), not the plan content. It dispatches parallel review agents against the diff. Plan file awareness is not required.
 Confidence: 🟢 Confident (0.85)
 Evidence: `skills/build-review/SKILL.md` grep for Plan returns 0 plan-reading references. Review operates on `git diff execute_base..HEAD`, not on plan task descriptions.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-6: CONTRACTS.md uses a per-file-path table with entity/stage/intent/status columns. The plan file is a new path that would naturally get its own CONTRACTS row — no schema change needed, just an additional row per entity.
 Confidence: 🟢 Confident (0.90)
 Evidence: CONTRACTS.md header: "Each section lists a file path with entities that have modified it." A plan file at `_plans/{slug}-plan.md` is just another file path. workflow-index-maintainer appends rows automatically.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 ## Option Comparisons
 
