@@ -16,7 +16,7 @@ project: spacedock
 depends-on: [082, 083]
 parent: 074
 children: [086, 087, 088]
-context_status: explored
+context_status: ready
 ---
 
 ## Directive
