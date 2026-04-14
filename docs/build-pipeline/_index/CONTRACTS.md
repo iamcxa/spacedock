@@ -80,6 +80,12 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | flatten-dispatch-troops-architecture | execute | Update execute stage details: task-executor -> troop in dispatch descriptions | ✅ final | 2026-04-14 |
 
+### docs/build-pipeline/_docs/extraction-framework.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| brainstorm-nuwa-distillation | plan | Task 4 -- vendor huashu-nuwa extraction-framework.md to local _docs with functional header per A-7 | 🔵 planned | 2026-04-15 |
+
 ### docs/build-pipeline/_mods/pr-merge.md
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -183,6 +189,9 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add given/when/then AC guidance to step 4 for TDD-friendly spec generation | in-flight | 2026-04-12 |
+| brainstorm-nuwa-distillation | plan | Task 1 -- relax leaf constraint and preamble, raise file-read cap 5 to 9 | 🔵 planned | 2026-04-15 |
+| brainstorm-nuwa-distillation | plan | Task 2 -- add Agent tool, Mode A/B Step 1 Lens Collection, Step 5.5 merge gate + 5-item self-test, output-spec for 3 new body sections | 🔵 planned | 2026-04-15 |
+| brainstorm-nuwa-distillation | plan | Task 3 -- add Lens Subagent Prompts subsection with 4 lens dispatch templates | 🔵 planned | 2026-04-15 |
 
 ### skills/build-clarify/SKILL.md
 
