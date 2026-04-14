@@ -1,8 +1,8 @@
 ---
 id: 061
 title: Phase E Plan 2 -- build-research + build-plan Skills
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: /build
 created: 2026-04-11T04:12:22Z
 started:
@@ -65,26 +65,37 @@ children:
 A-1: Skills `build-research` and `build-plan` already exist with full implementations matching spec requirements.
 Confidence: 🟢 Confident (0.95)
 Evidence: `skills/build-research/SKILL.md:1-200` -- 6-step research subroutine with 5-domain output structure; `skills/build-plan/SKILL.md:1-530` -- 9-step plan orchestrator with workflow-index append, plan-checker, revision loop
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-2: The `agents/researcher.md` wrapper correctly loads the `build-research` skill as a leaf agent.
 Confidence: 🟢 Confident (0.95)
 Evidence: `agents/researcher.md:7` -- `skills: ["spacedock:build-research"]`; agent description matches spec for fresh-context research vessel
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-3: Workflow-index append is unconditionally integrated at plan approval (Step 9a) with No-Exceptions enforcement.
 Confidence: 🟢 Confident (0.95)
 Evidence: `skills/build-plan/SKILL.md:410-446` -- dedicated Step 9a section titled "unconditional, before commit" with No-Exceptions rationale block citing `workflow-index-lifecycle-gap.md` memory
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-4: Plan-checker covers 8 dimensions (expanded from spec's original 7 by entity 083), dispatched as `Agent(subagent_type="general-purpose", model="sonnet")`.
 Confidence: 🟢 Confident (0.90)
 Evidence: `skills/build-plan/SKILL.md:315-323` -- 8 dimensions listed (Requirement Coverage, Task Completeness, Dependency Correctness, Context Compliance, Research Coverage, Validation Sampling, Cross-Entity Coherence, Type/Test Coverage); `skills/build-plan/SKILL.md:301` -- `subagent_type="general-purpose"`
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-5: Namespace is settled: `skills/build-*` under `spacedock:` namespace, migration to `spacebridge:` deferred to entity 050.
 Confidence: 🟢 Confident (0.95)
 Evidence: `agents/researcher.md:20` -- "Namespace migration to spacebridge:researcher happens when spacebridge plugin skeleton is created (entity 050)"; `skills/build-plan/SKILL.md:12` -- same deferral; git commit `15772ac fix(phase-e-plan-2): spacebridge:* -> spacedock:* namespace sweep`
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-6: AC3's grep verification command (`grep -c "Dimension [1-7]"`) is stale -- the actual format uses a numbered list ("1. Requirement Coverage" etc.), not "Dimension N" strings. Verification intent is met but literal grep fails.
 Confidence: 🟢 Confident (0.90)
 Evidence: `skills/build-plan/SKILL.md:315-323` -- uses format `1. Requirement Coverage -- ...`, not `Dimension 1: ...`
+→ Confirmed: captain, 2026-04-14 (batch)
+
+A-7: AC1 and AC3 grep verification commands are stale but should NOT be modified in the AC text. Stale commands and correct alternatives documented in Stage Report: clarify instead.
+Confidence: 🟢 Confident (0.95)
+Evidence: AC1 `grep "^##? (Inputs|Process|Output)"` returns 0 (actual: `## Input Contract`, `## Step N`); AC3 `grep "Dimension [1-7]"` returns 0 (actual: `1. Requirement Coverage`)
+→ Confirmed: captain, 2026-04-14 (interactive)
 
 ## Option Comparisons
 
@@ -97,6 +108,8 @@ AC4 requires `build-research-*.yaml` (≥3 scenarios) and `build-plan-*.yaml` (�
 | Relax AC4 to match existing naming convention | Acknowledges naming evolved during execution; 19 build-* pressure tests provide comprehensive coverage already | AC4 text no longer matches its own grep verification commands | Low | Recommended |
 | Create missing fixtures to match AC4 exactly | Fully satisfies original AC as written; adds explicit edge case coverage for build-research | Creates ceremony for existing coverage; test suite already exercises these paths | Low | Viable |
 
+→ Selected: Relax AC4 to match existing naming convention (captain, 2026-04-14, interactive)
+
 ## Open Questions
 
 Q-1: Entity 061's primary deliverables (build-research SKILL, build-plan SKILL, researcher agent) already exist in the codebase, fully implemented during Phase E Plan 2 execution (git: `e375ec7`, `98bf2e2`, `15772ac`). The entity is still at `context_status: pending`. How should the entity lifecycle be handled?
@@ -105,13 +118,24 @@ Domain: Organizational/Data-transforming
 Why it matters: The APPROACH says "Create two new skills" but both already exist. Clarify needs to decide whether to (a) verify ACs against existing code, annotate gaps, and fast-track to ready, or (b) archive the entity as pre-shipped. AC5 requires the entity to reach `status: clarify` / `context_status: ready`, which is achievable via fast-track verification. The pressure test gap (O-1) and stale AC3 grep command (A-6) are the only remaining deltas between current state and full AC satisfaction.
 Suggested options: (a) Fast-track -- verify ACs against existing code, resolve O-1, update stale AC3 grep, advance to ready; (b) Archive as pre-shipped -- mark entity as completed with annotation that deliverables were shipped via Phase E Plan 2 commits
 
+→ Answer: Fast-track -- verify ACs against existing code, annotate gaps, advance to ready (captain, 2026-04-14, interactive)
+
+Q-2: Entity 092 (plan-file-separation) has `depends-on: [061]`. Once 061 reaches `context_status: ready`, is 092's dependency satisfied and ready for FO plan dispatch?
+
+Domain: Organizational/Data-transforming
+Why it matters: 092 was blocked waiting for 061's design decisions (plan output target, namespace, skill structure). With 061's fast-track confirmation, all relevant decisions are locked: build-plan exists at `skills/build-plan/`, outputs to entity body, namespace is `spacedock:`.
+Suggested options: (a) Dependency satisfied -- 092 can proceed to plan; (b) Additional coordination needed
+
+→ Answer: Dependency satisfied -- 092 can proceed to plan (captain, 2026-04-14, interactive)
+
 ## Decomposition Recommendation
 
 Not warranted. 11 files across 4 layers (skill, agent, test, index) with all primary deliverables already implemented. Remaining work is documentation/verification, not implementation.
 
 ## Canonical References
 
-(clarify stage will populate)
+- `docs/build-pipeline/plan-file-separation-executor-context.md` (entity 092) -- depends-on 061, dependency satisfied per Q-2
+- `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` -- Phase E spec, authoritative source for skill design (sections 5-6, skill matrix lines 458-512)
 
 ## Stage Report: explore
 
@@ -128,3 +152,40 @@ Not warranted. 11 files across 4 layers (skill, agent, test, index) with all pri
 - [x] Scale assessment: Medium confirmed
   11 files matches Medium range (5-15); no revision needed
 - [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident, no external tech claims)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- entity is Medium scope, explore determined "Not warranted"
+- [x] Re-validation: 7 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  All evidence fresh (written in same session as explore)
+- [x] Assumptions confirmed: 7 / 7 (0 corrected)
+  A-1 through A-6 confirmed via batch; A-7 confirmed interactive (stale AC grep commands)
+- [x] Options selected: 1 / 1
+  O-1 Pressure test gap -- Relax AC4 to match existing naming convention (recommended)
+- [x] Questions answered: 2 / 2
+  Q-1 fast-track to ready (deliverables pre-shipped); Q-2 entity 092 dependency satisfied
+- [x] Open exploration: 1 gray area surfaced (0 from templates, 0 from CONTRACTS, 0 from directive, 1 via captain selection)
+  AC verification command staleness (A-7); entity 092 dependency (Q-2)
+- [x] Canonical refs added: 2
+  entity 092 plan-file-separation; Phase E spec (sections 5-6)
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected, all Qs answered
+- [x] Handoff mode: loose
+  auto_advance not set; captain must say "execute 061" to advance
+- [x] Clarify duration: 5 questions asked, session complete
+  1 batch confirmation + 2 option/Q AskUserQuestion + 2 exploration iterations
+
+### Stale AC Verification Commands (per A-7)
+
+AC1 original: `grep -E "^##? (Inputs|Process|Output)" skills/build-research/SKILL.md` → returns 0
+AC1 correct: `grep -E "^## (Input Contract|Step [0-9]|Output)" skills/build-research/SKILL.md` → returns ≥3
+
+AC3 original: `grep -c "Dimension [1-7]" skills/build-plan/SKILL.md` → returns 0
+AC3 correct: `grep -cE "^[0-9]+\. " skills/build-plan/SKILL.md` within the Plan-Checker Dimensions section → returns 8
+
+AC4 original: `ls tests/pressure/build-research-*.yaml` → returns 0
+AC4 relaxed: `ls tests/pressure/build-research*.yaml` → returns 1 (`build-research.yaml`)
+
+### Namespace Decision (per AC6)
+
+Skills land at `skills/build-*` matching current pattern (defer spacebridge migration to Phase F per spec line 74, entity 050). Evidence: git commit `15772ac fix(phase-e-plan-2): spacebridge:* -> spacedock:* namespace sweep`.
