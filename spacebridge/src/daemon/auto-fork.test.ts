@@ -202,19 +202,11 @@ process.on("SIGTERM", async () => {
 });
 
 describe("resolveDaemonCommand", () => {
-  test("returns bun + relative path when SPACEBRIDGE_DEV=1", () => {
-    process.env.SPACEBRIDGE_DEV = "1";
+  test("returns bun run cli.ts start (always resolves relative to source)", () => {
     const cmd = resolveDaemonCommand();
     expect(cmd[0]).toBe("bun");
     expect(cmd[1]).toBe("run");
-    expect(cmd[2]).toMatch(/daemon\.ts$/);
+    expect(cmd[2]).toMatch(/bin\/cli\.ts$/);
     expect(cmd[3]).toBe("start");
-    delete process.env.SPACEBRIDGE_DEV;
-  });
-
-  test("returns [spacebridge, start] in production mode", () => {
-    delete process.env.SPACEBRIDGE_DEV;
-    const cmd = resolveDaemonCommand();
-    expect(cmd).toEqual(["spacebridge", "start"]);
   });
 });
