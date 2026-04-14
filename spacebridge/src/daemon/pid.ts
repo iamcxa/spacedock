@@ -2,7 +2,7 @@
 // ABOUTME: PID file management utilities for the spacebridge daemon lifecycle.
 // Provides read/write/alive-check/stale-cleanup for ~/.spacedock/spacebridge.pid.
 
-import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 /** Write daemon PID to file, creating parent directories as needed. */
@@ -18,7 +18,7 @@ export function readPidFile(pidPath: string): number | null {
     const content = readFileSync(pidPath, "utf8").trim();
     if (!content) return null;
     const pid = parseInt(content, 10);
-    if (isNaN(pid) || !isFinite(pid) || pid <= 0) return null;
+    if (Number.isNaN(pid) || !Number.isFinite(pid) || pid <= 0) return null;
     return pid;
   } catch {
     return null;
@@ -50,7 +50,9 @@ export function cleanStalePidFile(pidPath: string): boolean {
   // File missing or unparseable → already clean (or remove corrupt file)
   if (pid === null) {
     if (existsSync(pidPath)) {
-      try { unlinkSync(pidPath); } catch {}
+      try {
+        unlinkSync(pidPath);
+      } catch {}
     }
     return true;
   }
@@ -59,6 +61,8 @@ export function cleanStalePidFile(pidPath: string): boolean {
   if (isProcessAlive(pid)) return false;
 
   // Process dead → stale, delete file
-  try { unlinkSync(pidPath); } catch {}
+  try {
+    unlinkSync(pidPath);
+  } catch {}
   return true;
 }

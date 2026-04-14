@@ -1,22 +1,20 @@
 // spacebridge/src/ipc/socket-server.test.ts
 // ABOUTME: Tests for the unix socket server (daemon side).
 
-import { describe, test, expect, afterEach } from "bun:test";
-import { createSocketServer } from "./socket-server";
-import { createFrameDecoder, encodeMessage } from "./framing";
+import { afterEach, describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
+import { existsSync, unlinkSync } from "node:fs";
 import * as net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
-import { unlinkSync, existsSync } from "node:fs";
+import { createFrameDecoder, encodeMessage } from "./framing";
+import { createSocketServer } from "./socket-server";
 import type {
-  RegisterPayload,
+  IpcMessage,
   RegisterAckPayload,
+  RegisterPayload,
   RpcRequestPayload,
   RpcResponsePayload,
-  CoordinationRequestPayload,
-  CoordinationResponsePayload,
-  IpcMessage,
 } from "./types";
 
 function tempSock(): string {
@@ -30,7 +28,9 @@ function connectAndRegister(
   return new Promise((resolve, reject) => {
     const socket = net.createConnection({ path: socketPath });
     const received: IpcMessage[] = [];
-    const decoder = createFrameDecoder((msg) => { received.push(msg as IpcMessage); });
+    const decoder = createFrameDecoder((msg) => {
+      received.push(msg as IpcMessage);
+    });
 
     socket.on("data", (chunk) => {
       decoder(chunk as Buffer);
@@ -61,7 +61,10 @@ describe("SocketServer", () => {
 
   afterEach(() => {
     for (const p of cleanupSocks.splice(0)) {
-      if (existsSync(p)) try { unlinkSync(p); } catch {}
+      if (existsSync(p))
+        try {
+          unlinkSync(p);
+        } catch {}
     }
   });
 
@@ -97,7 +100,7 @@ describe("SocketServer", () => {
       socketPath: sockPath,
       onRegister: (sess) => {
         registered.push(sess.sessionId);
-        return { sessionToken: "tok-" + sess.sessionId, serverVersion: "1" };
+        return { sessionToken: `tok-${sess.sessionId}`, serverVersion: "1" };
       },
       onRpcRequest: async () => ({ result: null }),
       onCoordinationRequest: async () => ({ result: null }),
@@ -194,7 +197,7 @@ describe("SocketServer", () => {
 
     const server = createSocketServer({
       socketPath: sockPath,
-      onRegister: (sess) => ({ sessionToken: "tok-" + sess.sessionId, serverVersion: "1" }),
+      onRegister: (sess) => ({ sessionToken: `tok-${sess.sessionId}`, serverVersion: "1" }),
       onRpcRequest: async () => ({ result: null }),
       onCoordinationRequest: async () => ({ result: null }),
       onDisconnect: () => {},
@@ -207,7 +210,9 @@ describe("SocketServer", () => {
       await new Promise((r) => setTimeout(r, 20));
 
       const pushReceived: IpcMessage[] = [];
-      const dec = createFrameDecoder((msg) => { pushReceived.push(msg as IpcMessage); });
+      const dec = createFrameDecoder((msg) => {
+        pushReceived.push(msg as IpcMessage);
+      });
       sockA.on("data", dec);
 
       const pushed = server.pushToSession("sess-push-A", {
@@ -236,7 +241,7 @@ describe("SocketServer", () => {
 
     const server = createSocketServer({
       socketPath: sockPath,
-      onRegister: (sess) => ({ sessionToken: "tok-" + sess.sessionId, serverVersion: "1" }),
+      onRegister: (sess) => ({ sessionToken: `tok-${sess.sessionId}`, serverVersion: "1" }),
       onRpcRequest: async () => ({ result: null }),
       onCoordinationRequest: async () => ({ result: null }),
       onDisconnect: () => {},
@@ -250,8 +255,18 @@ describe("SocketServer", () => {
 
       const receivedA: IpcMessage[] = [];
       const receivedB: IpcMessage[] = [];
-      sockA.on("data", createFrameDecoder((m) => { receivedA.push(m as IpcMessage); }));
-      sockB.on("data", createFrameDecoder((m) => { receivedB.push(m as IpcMessage); }));
+      sockA.on(
+        "data",
+        createFrameDecoder((m) => {
+          receivedA.push(m as IpcMessage);
+        }),
+      );
+      sockB.on(
+        "data",
+        createFrameDecoder((m) => {
+          receivedB.push(m as IpcMessage);
+        }),
+      );
 
       server.pushToAll({ id: randomUUID(), type: "event-push", payload: { broadcast: true } });
 
@@ -274,7 +289,7 @@ describe("SocketServer", () => {
 
     const server = createSocketServer({
       socketPath: sockPath,
-      onRegister: (sess) => ({ sessionToken: "tok-" + sess.sessionId, serverVersion: "1" }),
+      onRegister: (sess) => ({ sessionToken: `tok-${sess.sessionId}`, serverVersion: "1" }),
       onRpcRequest: async () => ({ result: null }),
       onCoordinationRequest: async () => ({ result: null }),
       onDisconnect: (id) => disconnected.push(id),

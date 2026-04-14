@@ -6,7 +6,7 @@
 import type { SpacebridgeDb } from "../../db";
 import { decide } from "./decider";
 import { replay } from "./evolve";
-import { appendEvents, loadEvents, markResolved, countEvents } from "./persistence";
+import { appendEvents, countEvents, loadEvents, markResolved } from "./persistence";
 
 // triggerAutoResolve resolves all open comments whose sectionHeading contains
 // the given stageName (case-insensitive). This handles real entity headings like

@@ -13,10 +13,7 @@ function defaultDbPath(): string {
 
 const SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/;
 
-export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ slug: string }> },
-) {
+export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
   if (!SLUG_RE.test(slug)) {

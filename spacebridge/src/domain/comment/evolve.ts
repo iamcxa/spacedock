@@ -2,7 +2,7 @@
 // ABOUTME: Pure fmodel evolve function for the comment aggregate. Zero I/O.
 // evolve(state, event) → new CommentState. replay(events) reduces over evolve from empty state.
 
-import type { CommentEvent, CommentState, CommentSnapshot } from "./types";
+import type { CommentEvent, CommentSnapshot, CommentState } from "./types";
 import { emptyCommentState } from "./types";
 
 export function evolve(state: CommentState, event: CommentEvent): CommentState {

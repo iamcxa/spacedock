@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { EntityCard } from "@/lib/entity-scan";
 
 interface EntityCardProps {
@@ -34,9 +34,13 @@ export function EntityCardComponent({ entity, lease }: EntityCardProps) {
           <CardContent className="pt-0">
             <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{entity.title}</p>
             <div className="flex flex-wrap gap-1">
-              <Badge variant="outline" className="text-xs">{entity.status}</Badge>
+              <Badge variant="outline" className="text-xs">
+                {entity.status}
+              </Badge>
               {entity.stage && (
-                <Badge variant="outline" className="text-xs">{entity.stage}</Badge>
+                <Badge variant="outline" className="text-xs">
+                  {entity.stage}
+                </Badge>
               )}
             </div>
           </CardContent>

@@ -15,11 +15,7 @@ export function RepoSection({ repoLabel, entities, leaseMap }: RepoSectionProps)
       </summary>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
         {entities.map((entity) => (
-          <EntityCardComponent
-            key={entity.slug}
-            entity={entity}
-            lease={leaseMap[entity.slug]}
-          />
+          <EntityCardComponent key={entity.slug} entity={entity} lease={leaseMap[entity.slug]} />
         ))}
       </div>
     </details>

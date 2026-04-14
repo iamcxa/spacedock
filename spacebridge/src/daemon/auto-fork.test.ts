@@ -3,16 +3,14 @@
 // Tests use a real socket server (entity 051 createSocketServer) and temp dirs.
 // No mocks — full integration to validate the auto-fork sequence.
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createSocketServer } from "../ipc/socket-server";
-import { createSocketClient } from "../ipc/socket-client";
 import { autoForkDaemon, resolveDaemonCommand } from "./auto-fork";
 import { readPidFile } from "./pid";
-import { releaseLock } from "./lock";
 
 let tmpDir: string;
 
@@ -56,7 +54,7 @@ describe("autoForkDaemon — daemon already running", () => {
     // Start a real server at the socket path
     const server = createSocketServer({
       socketPath: opts.socketPath,
-      onRegister: (sess) => ({ sessionToken: randomUUID(), serverVersion: "0.1.0" }),
+      onRegister: (_sess) => ({ sessionToken: randomUUID(), serverVersion: "0.1.0" }),
       onRpcRequest: async () => ({ result: null }),
       onCoordinationRequest: async () => ({ result: null }),
       onDisconnect: () => {},
@@ -106,7 +104,9 @@ describe("autoForkDaemon — real daemon spawn via createSocketServer", () => {
     const opts = makeOpts();
 
     // Write a minimal daemon helper that starts a socket server at the given path
-    writeFileSync(helperScript, `
+    writeFileSync(
+      helperScript,
+      `
 import { createSocketServer } from ${JSON.stringify(join(import.meta.dir, "../ipc/socket-server"))};
 import { randomUUID } from "node:crypto";
 import { writeFileSync } from "node:fs";
@@ -127,7 +127,8 @@ process.on("SIGTERM", async () => {
   await server.close();
   process.exit(0);
 });
-`);
+`,
+    );
 
     const spawnOpts = makeOpts({
       daemonCmd: ["bun", "run", helperScript],
@@ -143,9 +144,11 @@ process.on("SIGTERM", async () => {
 
     // Cleanup: send SIGTERM to daemon
     if (pid) {
-      try { process.kill(pid, "SIGTERM"); } catch {}
+      try {
+        process.kill(pid, "SIGTERM");
+      } catch {}
       // Wait briefly for cleanup
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 200));
     }
   }, 10_000);
 
@@ -153,7 +156,9 @@ process.on("SIGTERM", async () => {
     const helperScript = join(tmpDir, "helper-daemon2.ts");
     const opts = makeOpts();
 
-    writeFileSync(helperScript, `
+    writeFileSync(
+      helperScript,
+      `
 import { createSocketServer } from ${JSON.stringify(join(import.meta.dir, "../ipc/socket-server"))};
 import { randomUUID } from "node:crypto";
 import { writeFileSync } from "node:fs";
@@ -173,7 +178,8 @@ process.on("SIGTERM", async () => {
   await server.close();
   process.exit(0);
 });
-`);
+`,
+    );
 
     const spawnOpts = makeOpts({
       daemonCmd: ["bun", "run", helperScript],
@@ -187,7 +193,7 @@ process.on("SIGTERM", async () => {
     ]);
 
     // Both must succeed: one forks the daemon, the other waits for its socket
-    const successes = [r1, r2].filter(r => r.status === "fulfilled");
+    const successes = [r1, r2].filter((r) => r.status === "fulfilled");
     expect(successes.length).toBe(2);
 
     // Exactly one PID file should exist with a single PID
@@ -195,8 +201,10 @@ process.on("SIGTERM", async () => {
     expect(pid).not.toBeNull();
 
     if (pid) {
-      try { process.kill(pid, "SIGTERM"); } catch {}
-      await new Promise(r => setTimeout(r, 200));
+      try {
+        process.kill(pid, "SIGTERM");
+      } catch {}
+      await new Promise((r) => setTimeout(r, 200));
     }
   }, 10_000);
 });

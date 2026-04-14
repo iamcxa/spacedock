@@ -6,10 +6,10 @@
 // without running drizzle-kit migrate (which requires a migrations folder on disk).
 
 import { Database } from "bun:sqlite";
-import { drizzle } from "drizzle-orm/bun-sqlite";
 import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
 import { homedir } from "node:os";
+import { dirname } from "node:path";
+import { drizzle } from "drizzle-orm/bun-sqlite";
 import * as schema from "./schema";
 
 export type SpacebridgeDb = ReturnType<typeof drizzle<typeof schema>>;

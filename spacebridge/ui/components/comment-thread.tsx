@@ -1,14 +1,14 @@
 "use client";
+
 // spacebridge/ui/components/comment-thread.tsx
 // ABOUTME: Client Component — renders a top-level comment Card with nested replies.
 // Uses Collapsible for reply expansion. Single-level threading (O-1).
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import { Comment } from "@/components/comment";
 import { ReplyForm } from "@/components/reply-form";
+import { Button } from "@/components/ui/button";
 
 interface CommentRow {
   commentId: string;

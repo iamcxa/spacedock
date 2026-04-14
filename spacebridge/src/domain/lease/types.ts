@@ -2,9 +2,9 @@
 // ABOUTME: Domain types for the role-aware lease manager fmodel CQRS aggregate.
 // Re-exports Role/EntityRef/LeaseToken from the canonical stub to avoid duplication.
 
-import type { Role, EntityRef, LeaseToken } from "../../ipc/coordination-client-stub";
+import type { EntityRef, LeaseToken, Role } from "../../ipc/coordination-client-stub";
 
-export type { Role, EntityRef, LeaseToken };
+export type { EntityRef, LeaseToken, Role };
 
 // Composite key for a lease: entity_slug + role pair
 export type LeaseKey = `${string}::${string}`;
@@ -44,11 +44,7 @@ export interface ExpireCommand {
   now: number;
 }
 
-export type LeaseCommand =
-  | AcquireCommand
-  | ReleaseCommand
-  | ExtendCommand
-  | ExpireCommand;
+export type LeaseCommand = AcquireCommand | ReleaseCommand | ExtendCommand | ExpireCommand;
 
 // ─── Events ────────────────────────────────────────────────────────────────────
 
@@ -81,8 +77,4 @@ export interface ExpiredEvent {
   expiredAt: number;
 }
 
-export type LeaseEvent =
-  | AcquiredEvent
-  | ReleasedEvent
-  | ExtendedEvent
-  | ExpiredEvent;
+export type LeaseEvent = AcquiredEvent | ReleasedEvent | ExtendedEvent | ExpiredEvent;

@@ -43,7 +43,7 @@ export function createCoordinationClientStub(): CoordinationClient {
         role,
         acquired_at: now,
         expires_at: now + 300_000, // 5 minutes stub duration
-        token: "stub-" + randomUUID(),
+        token: `stub-${randomUUID()}`,
       };
     },
 

@@ -1,6 +1,6 @@
 // ABOUTME: Tests for entity-parse.ts — splitFrontmatter + parseEntity with graceful fallback.
 import { describe, expect, test } from "bun:test";
-import { splitFrontmatter, parseEntity } from "./entity-parse";
+import { parseEntity, splitFrontmatter } from "./entity-parse";
 
 describe("splitFrontmatter", () => {
   test("valid frontmatter returns fields and body", () => {

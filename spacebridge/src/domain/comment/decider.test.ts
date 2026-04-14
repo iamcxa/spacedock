@@ -2,15 +2,15 @@
 // ABOUTME: Pure unit tests for comment decider. Zero I/O — no DB, no network.
 // Tests cover all command types and error conditions.
 
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { decide } from "./decider";
 import {
-  CommentNotFound,
   CommentAlreadyResolved,
-  ParentCommentNotFound,
+  CommentNotFound,
   DuplicateCommentId,
+  ParentCommentNotFound,
 } from "./errors";
-import type { CommentState, CommentSnapshot } from "./types";
+import type { CommentSnapshot, CommentState } from "./types";
 
 const NOW = 1_000_000;
 
@@ -210,11 +210,7 @@ describe("reply_to_comment", () => {
 describe("resolve_comment", () => {
   it("returns comment_resolved event with reason=manual", () => {
     const state = makeState([{ commentId: "c1" }]);
-    const events = decide(
-      { type: "resolve_comment", commentId: "c1" },
-      state,
-      NOW,
-    );
+    const events = decide({ type: "resolve_comment", commentId: "c1" }, state, NOW);
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe("comment_resolved");
     if (events[0].type === "comment_resolved") {
@@ -225,16 +221,16 @@ describe("resolve_comment", () => {
   });
 
   it("throws CommentNotFound when comment does not exist", () => {
-    expect(() =>
-      decide({ type: "resolve_comment", commentId: "ghost" }, new Map(), NOW),
-    ).toThrow(CommentNotFound);
+    expect(() => decide({ type: "resolve_comment", commentId: "ghost" }, new Map(), NOW)).toThrow(
+      CommentNotFound,
+    );
   });
 
   it("throws CommentAlreadyResolved when comment is already resolved", () => {
     const state = makeState([{ commentId: "c1", resolved: true, resolvedReason: "manual" }]);
-    expect(() =>
-      decide({ type: "resolve_comment", commentId: "c1" }, state, NOW),
-    ).toThrow(CommentAlreadyResolved);
+    expect(() => decide({ type: "resolve_comment", commentId: "c1" }, state, NOW)).toThrow(
+      CommentAlreadyResolved,
+    );
   });
 });
 
@@ -261,7 +257,7 @@ describe("resolve_by_stage_advance", () => {
         expect(e.resolvedReason).toBe("stage_advanced");
       }
     }
-    const resolvedIds = events.map((e) => e.type === "comment_resolved" ? e.commentId : "");
+    const resolvedIds = events.map((e) => (e.type === "comment_resolved" ? e.commentId : ""));
     expect(resolvedIds).toContain("c1");
     expect(resolvedIds).toContain("c2");
     expect(resolvedIds).not.toContain("c3");
@@ -269,7 +265,13 @@ describe("resolve_by_stage_advance", () => {
 
   it("does not resolve already-resolved comments", () => {
     const state = makeState([
-      { commentId: "c1", sectionHeading: "## Explore", entityPath: "/e.md", resolved: true, resolvedReason: "manual" },
+      {
+        commentId: "c1",
+        sectionHeading: "## Explore",
+        entityPath: "/e.md",
+        resolved: true,
+        resolvedReason: "manual",
+      },
       { commentId: "c2", sectionHeading: "## Explore", entityPath: "/e.md" },
     ]);
     const events = decide(

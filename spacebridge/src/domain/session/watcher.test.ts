@@ -1,16 +1,16 @@
 // spacebridge/src/domain/session/watcher.test.ts
 // ABOUTME: Integration tests for file watcher — scope expansion/contraction, debounce, *.md filter.
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { createDb } from "../../db";
-import { createFileWatcher } from "./watcher";
-import { events as eventsTable } from "../../schema";
+import { join } from "node:path";
 import type { SpacebridgeDb } from "../../db";
+import { createDb } from "../../db";
+import { events as eventsTable } from "../../schema";
 import type { SessionRegistry } from "./registry";
 import type { SessionState } from "./types";
+import { createFileWatcher } from "./watcher";
 
 let db: SpacebridgeDb;
 let tmpDir: string;
@@ -21,7 +21,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  try {
+    rmSync(tmpDir, { recursive: true, force: true });
+  } catch {}
 });
 
 function makeWorkflowDir(name: string): string {
@@ -36,9 +38,10 @@ function makeRegistry(workflowDirs: string[]): SessionRegistry {
     heartbeat: async () => [],
     disconnect: async () => [],
     disconnectAll: async () => [],
-    getState: () => ({ sessions: new Map() } as SessionState),
+    getState: () => ({ sessions: new Map() }) as SessionState,
     getActiveProjectRoots: () => [],
-    discoverActiveWorkflows: () => workflowDirs.map((dir) => ({ dir, commissioned_by: "spacedock@test" })),
+    discoverActiveWorkflows: () =>
+      workflowDirs.map((dir) => ({ dir, commissioned_by: "spacedock@test" })),
   };
 }
 
@@ -72,7 +75,8 @@ describe("scope expansion and contraction", () => {
     let activeDirs = [dirA, dirB];
     const registry: SessionRegistry = {
       ...makeRegistry([]),
-      discoverActiveWorkflows: () => activeDirs.map((d) => ({ dir: d, commissioned_by: "spacedock@test" })),
+      discoverActiveWorkflows: () =>
+        activeDirs.map((d) => ({ dir: d, commissioned_by: "spacedock@test" })),
     };
 
     const received: string[] = [];

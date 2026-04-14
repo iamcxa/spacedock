@@ -15,8 +15,8 @@ function defaultDbPath(): string {
 
 export async function POST(req: Request) {
   // Defense-in-depth: validate token again even though middleware already checked
-  const token = new Headers(req.headers).get("x-share-token") ??
-    new URL(req.url).searchParams.get("token");
+  const token =
+    new Headers(req.headers).get("x-share-token") ?? new URL(req.url).searchParams.get("token");
 
   if (!token) {
     return Response.json({ error: "Missing share token" }, { status: 401 });
@@ -54,9 +54,7 @@ export async function POST(req: Request) {
   const author = `guest:${nickname}`;
 
   try {
-    const { parseCommand } = await import(
-      "../../../../../src/domain/comment/schemas"
-    );
+    const { parseCommand } = await import("../../../../../src/domain/comment/schemas");
     const { createDb } = await import("../../../../../src/db");
     const { appendEvents, loadEvents, upsertSnapshot, countEvents } = await import(
       "../../../../../src/domain/comment/persistence"
@@ -70,21 +68,27 @@ export async function POST(req: Request) {
     let entityPath = `/docs/build-pipeline/${entitySlug}.md`;
     try {
       const { sessions } = await import("../../../../../src/schema");
-      const sessionRows = db.select({ projectRoot: sessions.projectRoot }).from(sessions).limit(1).all();
+      const sessionRows = db
+        .select({ projectRoot: sessions.projectRoot })
+        .from(sessions)
+        .limit(1)
+        .all();
       if (sessionRows.length > 0) {
         entityPath = join(sessionRows[0].projectRoot, "docs", "build-pipeline", `${entitySlug}.md`);
       }
-    } catch { /* use default path */ }
+    } catch {
+      /* use default path */
+    }
 
     const commentId = randomUUID();
     const cmd = parseCommand({
       type: "add_comment",
       commentId,
       entityPath,
-      selectedText: "",   // share view has no text selection (A-9)
+      selectedText: "", // share view has no text selection (A-9)
       sectionHeading: sectionHeading || `Shared comment on ${entitySlug}`,
       content,
-      author: "guest",    // parseCommand validates as 'captain'|'fo'|'guest'
+      author: "guest", // parseCommand validates as 'captain'|'fo'|'guest'
     });
 
     if (cmd.type !== "add_comment") {

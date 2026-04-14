@@ -1,11 +1,11 @@
 // spacebridge/src/domain/session/registry.test.ts
 // ABOUTME: Integration tests for session registry. Uses :memory: DB. Covers full lifecycle.
 
-import { describe, test, expect, beforeEach } from "bun:test";
-import { createDb } from "../../db";
-import { createSessionRegistry } from "./registry";
+import { beforeEach, describe, expect, test } from "bun:test";
 import type { SpacebridgeDb } from "../../db";
+import { createDb } from "../../db";
 import type { RegisterPayload } from "../../ipc/types";
+import { createSessionRegistry } from "./registry";
 
 let db: SpacebridgeDb;
 
@@ -83,9 +83,9 @@ describe("disconnectAll (A-12 graceful shutdown)", () => {
 
     const events = await registry.disconnectAll("shutdown");
     expect(events.length).toBe(3);
-    expect(events.every(e => e.type === "session_disconnected")).toBe(true);
-    const reasons = events.map(e => (e as { reason: string }).reason);
-    expect(reasons.every(r => r === "shutdown")).toBe(true);
+    expect(events.every((e) => e.type === "session_disconnected")).toBe(true);
+    const reasons = events.map((e) => (e as { reason: string }).reason);
+    expect(reasons.every((r) => r === "shutdown")).toBe(true);
     expect(registry.getState().sessions.size).toBe(0);
   });
 

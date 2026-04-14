@@ -2,18 +2,20 @@
 // ABOUTME: FO simulator integration test over live daemon. Validates Q-1 answer:
 // getAvailableWork → acquireEntity → releaseEntity cycle over RPC (no PR2 needed).
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { tmpdir } from "node:os";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { createConnection } from "node:net";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { createSocketClient } from "./socket-client";
 
 const DAEMON_SCRIPT = resolve(import.meta.dir, "../../bin/daemon.ts");
 
 let tmpDir: string;
-function socketPath() { return join(tmpDir, "spacebridge.sock"); }
+function socketPath() {
+  return join(tmpDir, "spacebridge.sock");
+}
 
 function spawnDaemon(extraEnv?: Record<string, string>) {
   return Bun.spawn(["bun", "run", DAEMON_SCRIPT, "start"], {
@@ -27,28 +29,47 @@ async function waitForSocket(path: string, timeoutMs = 8000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const alive = await new Promise<boolean>((res) => {
-      if (!existsSync(path)) { res(false); return; }
+      if (!existsSync(path)) {
+        res(false);
+        return;
+      }
       const s = createConnection({ path });
-      s.on("connect", () => { s.destroy(); res(true); });
+      s.on("connect", () => {
+        s.destroy();
+        res(true);
+      });
       s.on("error", () => res(false));
     });
     if (alive) return;
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
   }
   throw new Error(`waitForSocket timed out (${path})`);
 }
 
 function makeClient(id = randomUUID()) {
-  return createSocketClient({ socketPath: socketPath(), sessionId: id, projectRoot: tmpDir, pid: process.pid });
+  return createSocketClient({
+    socketPath: socketPath(),
+    sessionId: id,
+    projectRoot: tmpDir,
+    pid: process.pid,
+  });
 }
 
 async function coord(client: ReturnType<typeof makeClient>, method: string, args: unknown[]) {
-  const resp = await client.request({ id: randomUUID(), type: "coordination-request", payload: { method, args } });
+  const resp = await client.request({
+    id: randomUUID(),
+    type: "coordination-request",
+    payload: { method, args },
+  });
   return resp.payload as { result?: unknown; error?: string };
 }
 
-beforeEach(() => { tmpDir = mkdtempSync(join(tmpdir(), "sb-fo-sim-")); });
-afterEach(() => { rmSync(tmpDir, { recursive: true, force: true }); });
+beforeEach(() => {
+  tmpDir = mkdtempSync(join(tmpdir(), "sb-fo-sim-"));
+});
+afterEach(() => {
+  rmSync(tmpDir, { recursive: true, force: true });
+});
 
 describe("FO simulator — getAvailableWork + acquire + release cycle", () => {
   test("full FO workflow over RPC (AC-7, AC-8)", async () => {
@@ -90,7 +111,7 @@ describe("FO simulator — getAvailableWork + acquire + release cycle", () => {
       client.close();
     } finally {
       proc.kill("SIGTERM");
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 300));
     }
   }, 15_000);
 });

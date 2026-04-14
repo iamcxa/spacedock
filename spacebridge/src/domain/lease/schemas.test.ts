@@ -1,7 +1,7 @@
 // spacebridge/src/domain/lease/schemas.test.ts
 // ABOUTME: Minimal smoke tests for Zod lease command/event schemas.
 
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { parseCommand, parseEvent } from "./schemas";
 
 describe("parseCommand", () => {
@@ -28,7 +28,7 @@ describe("parseCommand", () => {
         role: "UNKNOWN",
         sessionId: "s",
         leaseDurationMs: 1000,
-      })
+      }),
     ).toThrow();
   });
 

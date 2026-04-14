@@ -37,11 +37,7 @@ export class TokenManager {
   }
 
   verify(token: string): ShareToken | null {
-    const rows = this.db
-      .select()
-      .from(shareTokens)
-      .where(eq(shareTokens.token, token))
-      .all();
+    const rows = this.db.select().from(shareTokens).where(eq(shareTokens.token, token)).all();
 
     if (rows.length === 0) return null;
 

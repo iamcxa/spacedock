@@ -4,17 +4,17 @@
 // Renders EntityHeader + EntityBody in read-only mode, ShareLiveFeed, ShareCommentForm.
 // No navigation bar — external users have no dashboard context (A-13).
 
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { asc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { eq, asc } from "drizzle-orm";
-import { parseEntity } from "@/lib/entity-parse";
-import { EntityHeader } from "@/components/entity-header";
 import { EntityBody } from "@/components/entity-body";
-import { ShareLiveFeed } from "@/components/share-live-feed";
+import { EntityHeader } from "@/components/entity-header";
 import { ShareCommentForm } from "@/components/share-comment-form";
-import { homedir } from "node:os";
+import { ShareLiveFeed } from "@/components/share-live-feed";
+import { parseEntity } from "@/lib/entity-parse";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +87,11 @@ export default async function SharePage({ params }: PageProps) {
     // Try env var first (reliable when no active CC session), then sessions table
     projectRoot = process.env.SPACEBRIDGE_PROJECT_ROOT ?? null;
     if (!projectRoot) {
-      const sessionRows = handle.db.select({ projectRoot: sessions.projectRoot }).from(sessions).limit(1).all();
+      const sessionRows = handle.db
+        .select({ projectRoot: sessions.projectRoot })
+        .from(sessions)
+        .limit(1)
+        .all();
       if (sessionRows.length > 0) {
         projectRoot = sessionRows[0].projectRoot;
       }
@@ -113,13 +117,17 @@ export default async function SharePage({ params }: PageProps) {
         .all();
     }
     handle.close();
-  } catch { /* DB unavailable — show entity if we can find the file */ }
+  } catch {
+    /* DB unavailable — show entity if we can find the file */
+  }
 
   if (projectRoot) {
     const filePath = join(projectRoot, "docs", "build-pipeline", `${entitySlug}.md`);
     try {
       entityText = await readFile(filePath, "utf-8");
-    } catch { /* File not found */ }
+    } catch {
+      /* File not found */
+    }
   }
 
   if (!entityText) {
@@ -147,9 +155,7 @@ export default async function SharePage({ params }: PageProps) {
 
   return (
     <div>
-      <div className="mb-2 text-xs text-muted-foreground">
-        Shared view — read only
-      </div>
+      <div className="mb-2 text-xs text-muted-foreground">Shared view — read only</div>
 
       <EntityHeader
         title={frontmatter.title ?? entitySlug ?? ""}
@@ -171,7 +177,7 @@ export default async function SharePage({ params }: PageProps) {
                 const key = r.parentId!;
                 acc.set(key, [...(acc.get(key) ?? []), r]);
                 return acc;
-              }, new Map<string, typeof replies>())
+              }, new Map<string, typeof replies>()),
             )}
             entitySlug={entitySlug}
           />

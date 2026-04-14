@@ -3,14 +3,10 @@
 // Connects to daemon, handles request/response correlation, and reconnect with exponential backoff.
 // Uses Node.js net module (Bun compatibility layer) for unix socket support.
 
-import * as net from "node:net";
 import { randomUUID } from "node:crypto";
-import { encodeMessage, createFrameDecoder } from "./framing";
-import type {
-  IpcMessage,
-  RegisterAckPayload,
-  RegisterPayload,
-} from "./types";
+import * as net from "node:net";
+import { createFrameDecoder, encodeMessage } from "./framing";
+import type { IpcMessage, RegisterAckPayload, RegisterPayload } from "./types";
 
 export interface SocketClientOptions {
   socketPath: string;
@@ -20,8 +16,8 @@ export interface SocketClientOptions {
   onPush?: (msg: IpcMessage) => void;
   reconnect?: {
     initialDelayMs?: number; // default 100
-    maxDelayMs?: number;     // default 5000
-    maxRetries?: number;     // default 5
+    maxDelayMs?: number; // default 5000
+    maxRetries?: number; // default 5
   };
   heartbeatIntervalMs?: number; // default 10_000; set 0 to disable
 }
@@ -98,11 +94,13 @@ export function createSocketClient(opts: SocketClientOptions): SocketClient {
             if (heartbeatTimer) clearInterval(heartbeatTimer);
             heartbeatTimer = setInterval(() => {
               if (!socket || socket.destroyed || !_connected) return;
-              socket.write(encodeMessage({
-                id: randomUUID(),
-                type: "heartbeat",
-                payload: { sessionId: opts.sessionId },
-              }));
+              socket.write(
+                encodeMessage({
+                  id: randomUUID(),
+                  type: "heartbeat",
+                  payload: { sessionId: opts.sessionId },
+                }),
+              );
             }, heartbeatIntervalMs);
           }
           resolve(msg.payload as RegisterAckPayload);
@@ -157,7 +155,9 @@ export function createSocketClient(opts: SocketClientOptions): SocketClient {
       };
 
       sock.on("close", handleDisconnect);
-      sock.on("end", () => { /* close follows end */ });
+      sock.on("end", () => {
+        /* close follows end */
+      });
     });
   }
 
@@ -168,10 +168,9 @@ export function createSocketClient(opts: SocketClientOptions): SocketClient {
       return;
     }
 
-    const delay = Math.min(
-      reconnectCfg.initialDelayMs * Math.pow(2, reconnectAttempt),
-      reconnectCfg.maxDelayMs,
-    ) + Math.random() * 50; // jitter
+    const delay =
+      Math.min(reconnectCfg.initialDelayMs * 2 ** reconnectAttempt, reconnectCfg.maxDelayMs) +
+      Math.random() * 50; // jitter
 
     reconnectAttempt++;
 

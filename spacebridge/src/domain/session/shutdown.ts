@@ -4,8 +4,8 @@
 // Order: stop monitor → close watcher → disconnectAll registry.
 
 import type { HeartbeatMonitor } from "./heartbeat-monitor";
-import type { FileWatcher } from "./watcher";
 import type { SessionRegistry } from "./registry";
+import type { FileWatcher } from "./watcher";
 
 export interface ShutdownHandlerOptions {
   registry: SessionRegistry;

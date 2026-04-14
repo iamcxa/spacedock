@@ -14,5 +14,4 @@ describe("db module", () => {
     const mod = await import("./db");
     expect(mod).toBeDefined();
   });
-
 });

@@ -1,8 +1,8 @@
 // spacebridge/src/ipc/framing.test.ts
 // ABOUTME: Tests for the 4-byte big-endian length-prefix + UTF-8 JSON framing codec.
 
-import { describe, test, expect } from "bun:test";
-import { encodeMessage, createFrameDecoder, MAX_PAYLOAD_BYTES } from "./framing";
+import { describe, expect, test } from "bun:test";
+import { createFrameDecoder, encodeMessage, MAX_PAYLOAD_BYTES } from "./framing";
 
 describe("encodeMessage", () => {
   test("encodes a simple object with 4-byte header", () => {
@@ -38,7 +38,9 @@ describe("encodeMessage", () => {
 describe("createFrameDecoder", () => {
   test("single message encode/decode round-trip", () => {
     const received: unknown[] = [];
-    const decoder = createFrameDecoder((msg) => { received.push(msg); });
+    const decoder = createFrameDecoder((msg) => {
+      received.push(msg);
+    });
 
     const msg = { type: "heartbeat", id: "1", payload: { ts: 123 } };
     decoder(encodeMessage(msg));
@@ -49,17 +51,15 @@ describe("createFrameDecoder", () => {
 
   test("multiple messages in one chunk", () => {
     const received: unknown[] = [];
-    const decoder = createFrameDecoder((msg) => { received.push(msg); });
+    const decoder = createFrameDecoder((msg) => {
+      received.push(msg);
+    });
 
     const msg1 = { type: "a", id: "1", payload: 1 };
     const msg2 = { type: "b", id: "2", payload: 2 };
     const msg3 = { type: "c", id: "3", payload: 3 };
 
-    const combined = Buffer.concat([
-      encodeMessage(msg1),
-      encodeMessage(msg2),
-      encodeMessage(msg3),
-    ]);
+    const combined = Buffer.concat([encodeMessage(msg1), encodeMessage(msg2), encodeMessage(msg3)]);
     decoder(combined);
 
     expect(received.length).toBe(3);
@@ -70,7 +70,9 @@ describe("createFrameDecoder", () => {
 
   test("partial message split across two chunks", () => {
     const received: unknown[] = [];
-    const decoder = createFrameDecoder((msg) => { received.push(msg); });
+    const decoder = createFrameDecoder((msg) => {
+      received.push(msg);
+    });
 
     const msg = { type: "test", id: "x", payload: { hello: "world" } };
     const encoded = encodeMessage(msg);
@@ -86,7 +88,9 @@ describe("createFrameDecoder", () => {
 
   test("partial header split across two chunks", () => {
     const received: unknown[] = [];
-    const decoder = createFrameDecoder((msg) => { received.push(msg); });
+    const decoder = createFrameDecoder((msg) => {
+      received.push(msg);
+    });
 
     const msg = { type: "test", id: "y", payload: null };
     const encoded = encodeMessage(msg);
@@ -102,7 +106,9 @@ describe("createFrameDecoder", () => {
 
   test("empty payload {}", () => {
     const received: unknown[] = [];
-    const decoder = createFrameDecoder((msg) => { received.push(msg); });
+    const decoder = createFrameDecoder((msg) => {
+      received.push(msg);
+    });
     decoder(encodeMessage({}));
     expect(received.length).toBe(1);
     expect(received[0]).toEqual({});
@@ -110,7 +116,9 @@ describe("createFrameDecoder", () => {
 
   test("large payload round-trip", () => {
     const received: unknown[] = [];
-    const decoder = createFrameDecoder((msg) => { received.push(msg); });
+    const decoder = createFrameDecoder((msg) => {
+      received.push(msg);
+    });
     const big = "x".repeat(100_000);
     const msg = { type: "large", id: "big", payload: { data: big } };
     decoder(encodeMessage(msg));

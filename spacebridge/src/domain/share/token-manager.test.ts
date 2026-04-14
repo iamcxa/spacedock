@@ -1,6 +1,6 @@
 // ABOUTME: Unit tests for TokenManager — bearer-token CRUD with lazy expiry cleanup.
 
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { createDb } from "../../db";
 import { TokenManager } from "./token-manager";
 
@@ -44,8 +44,8 @@ describe("TokenManager.verify", () => {
     const created = manager.create({ entitySlug: "alpha", ttlMs: 3600_000 });
     const found = manager.verify(created.token);
     expect(found).not.toBeNull();
-    expect(found!.entitySlug).toBe("alpha");
-    expect(found!.token).toBe(created.token);
+    expect(found?.entitySlug).toBe("alpha");
+    expect(found?.token).toBe(created.token);
   });
 
   test("returns null for expired token (0ms TTL) and lazy-deletes it", () => {
@@ -115,7 +115,7 @@ describe("entity scope isolation", () => {
     const { manager } = makeManager();
     const tok = manager.create({ entitySlug: "alpha", ttlMs: 3600_000 });
     const found = manager.verify(tok.token);
-    expect(found!.entitySlug).toBe("alpha");
-    expect(found!.entitySlug).not.toBe("beta");
+    expect(found?.entitySlug).toBe("alpha");
+    expect(found?.entitySlug).not.toBe("beta");
   });
 });

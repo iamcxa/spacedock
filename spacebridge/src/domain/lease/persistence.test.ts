@@ -1,11 +1,11 @@
 // spacebridge/src/domain/lease/persistence.test.ts
 // ABOUTME: Integration tests for persistence layer using :memory: DB. No production DB.
 
-import { describe, test, expect, beforeEach } from "bun:test";
-import { createDb } from "../../db";
-import { appendEvents, loadAllEvents, upsertSnapshot, deleteSnapshot } from "./persistence";
-import { replay } from "./evolve";
+import { beforeEach, describe, expect, test } from "bun:test";
 import type { SpacebridgeDb } from "../../db";
+import { createDb } from "../../db";
+import { replay } from "./evolve";
+import { appendEvents, deleteSnapshot, loadAllEvents, upsertSnapshot } from "./persistence";
 import type { LeaseEvent } from "./types";
 
 let db: SpacebridgeDb;
@@ -50,15 +50,55 @@ describe("appendEvents + loadAllEvents", () => {
 
   test("replay of 10 events matches in-memory reduce", async () => {
     const events: LeaseEvent[] = [
-      { type: "acquired", token: "t1", entitySlug: "e1", role: "FO", sessionId: "s1", acquiredAt: NOW, expiresAt: NOW + DURATION },
-      { type: "acquired", token: "t2", entitySlug: "e2", role: "SO", sessionId: "s2", acquiredAt: NOW, expiresAt: NOW + DURATION },
+      {
+        type: "acquired",
+        token: "t1",
+        entitySlug: "e1",
+        role: "FO",
+        sessionId: "s1",
+        acquiredAt: NOW,
+        expiresAt: NOW + DURATION,
+      },
+      {
+        type: "acquired",
+        token: "t2",
+        entitySlug: "e2",
+        role: "SO",
+        sessionId: "s2",
+        acquiredAt: NOW,
+        expiresAt: NOW + DURATION,
+      },
       { type: "extended", token: "t1", newExpiresAt: NOW + DURATION + 1000 },
       { type: "released", token: "t2", outcome: "done", releasedAt: NOW + 500 },
-      { type: "acquired", token: "t3", entitySlug: "e3", role: "QO", sessionId: "s3", acquiredAt: NOW, expiresAt: NOW + DURATION },
+      {
+        type: "acquired",
+        token: "t3",
+        entitySlug: "e3",
+        role: "QO",
+        sessionId: "s3",
+        acquiredAt: NOW,
+        expiresAt: NOW + DURATION,
+      },
       { type: "extended", token: "t3", newExpiresAt: NOW + DURATION + 2000 },
-      { type: "acquired", token: "t4", entitySlug: "e4", role: "FO", sessionId: "s4", acquiredAt: NOW, expiresAt: NOW + DURATION },
+      {
+        type: "acquired",
+        token: "t4",
+        entitySlug: "e4",
+        role: "FO",
+        sessionId: "s4",
+        acquiredAt: NOW,
+        expiresAt: NOW + DURATION,
+      },
       { type: "expired", token: "t4", expiredAt: NOW + DURATION + 1 },
-      { type: "acquired", token: "t5", entitySlug: "e5", role: "SO", sessionId: "s5", acquiredAt: NOW, expiresAt: NOW + DURATION },
+      {
+        type: "acquired",
+        token: "t5",
+        entitySlug: "e5",
+        role: "SO",
+        sessionId: "s5",
+        acquiredAt: NOW,
+        expiresAt: NOW + DURATION,
+      },
       { type: "extended", token: "t5", newExpiresAt: NOW + DURATION + 3000 },
     ];
 
@@ -89,7 +129,7 @@ describe("upsertSnapshot + deleteSnapshot", () => {
       expires_at: NOW + DURATION,
     });
 
-    const events2 = await loadAllEvents(db);
+    const _events2 = await loadAllEvents(db);
     // Snapshots don't appear in event log — verify via direct Drizzle query instead
     const { entityLeases } = await import("../../schema");
     const rows = await db.select().from(entityLeases).all();

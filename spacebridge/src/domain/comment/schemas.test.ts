@@ -1,8 +1,8 @@
 // spacebridge/src/domain/comment/schemas.test.ts
 // ABOUTME: Tests for Zod comment command/event schemas. Validates passthrough, discriminated unions.
 
-import { describe, it, expect } from "bun:test";
-import { parseCommand, parseEvent, CommentCommandSchema, CommentEventSchema } from "./schemas";
+import { describe, expect, it } from "bun:test";
+import { parseCommand, parseEvent } from "./schemas";
 
 describe("parseCommand — add_comment", () => {
   it("parses valid add_comment command", () => {
@@ -35,7 +35,7 @@ describe("parseCommand — add_comment", () => {
       extraField: "should survive",
     };
     const cmd = parseCommand(raw) as typeof raw;
-    expect((cmd as Record<string, unknown>)["extraField"]).toBe("should survive");
+    expect((cmd as Record<string, unknown>).extraField).toBe("should survive");
   });
 
   it("throws on missing required field", () => {
@@ -163,6 +163,6 @@ describe("parseEvent — comment_resolved", () => {
       resolvedAt: 1_000_000,
       _traceId: "abc123",
     }) as Record<string, unknown>;
-    expect(evt["_traceId"]).toBe("abc123");
+    expect(evt._traceId).toBe("abc123");
   });
 });

@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for full token lifecycle across TokenManager + schema.
 // Tests create→verify→list→revoke→verify pattern with :memory: DB.
 
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { createDb } from "../../db";
 import { TokenManager } from "./token-manager";
 
@@ -20,7 +20,7 @@ describe("full token lifecycle", () => {
 
     const found = manager.verify(tok.token);
     expect(found).not.toBeNull();
-    expect(found!.token).toBe(tok.token);
+    expect(found?.token).toBe(tok.token);
 
     const list1 = manager.list();
     expect(list1.some((t) => t.token === tok.token)).toBe(true);
@@ -54,8 +54,8 @@ describe("entity scope", () => {
     const manager = makeManager();
     const tok = manager.create({ entitySlug: "alpha", ttlMs: 3600_000 });
     const found = manager.verify(tok.token);
-    expect(found!.entitySlug).toBe("alpha");
-    expect(found!.entitySlug).not.toBe("beta");
+    expect(found?.entitySlug).toBe("alpha");
+    expect(found?.entitySlug).not.toBe("beta");
   });
 });
 

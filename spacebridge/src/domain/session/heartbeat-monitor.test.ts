@@ -1,11 +1,11 @@
 // spacebridge/src/domain/session/heartbeat-monitor.test.ts
 // ABOUTME: Tests for heartbeat monitor — stale session detection, fresh session preservation, stop().
 
-import { describe, test, expect, beforeEach } from "bun:test";
-import { createDb } from "../../db";
-import { createSessionRegistry } from "./registry";
-import { createHeartbeatMonitor } from "./heartbeat-monitor";
+import { beforeEach, describe, expect, test } from "bun:test";
 import type { SpacebridgeDb } from "../../db";
+import { createDb } from "../../db";
+import { createHeartbeatMonitor } from "./heartbeat-monitor";
+import { createSessionRegistry } from "./registry";
 
 let db: SpacebridgeDb;
 

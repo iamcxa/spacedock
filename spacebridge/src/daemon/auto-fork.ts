@@ -3,10 +3,10 @@
 // Implements design doc §4.2 pseudocode: probe → lock → double-check → spawn → wait → connect.
 // Uses mkdir-based lock (O-1 decision) and resolves bin/cli.ts relative to this source file (Q-1 decision, entity 059).
 
-import * as net from "node:net";
 import { spawn } from "node:child_process";
-import { unlinkSync, existsSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { existsSync, unlinkSync } from "node:fs";
+import * as net from "node:net";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acquireLock, releaseLock } from "./lock";
 import { cleanStalePidFile } from "./pid";
@@ -31,8 +31,13 @@ function probeSocket(socketPath: string): Promise<boolean> {
       return;
     }
     const sock = net.createConnection({ path: socketPath });
-    sock.on("connect", () => { sock.destroy(); resolve_(true); });
-    sock.on("error", () => { resolve_(false); });
+    sock.on("connect", () => {
+      sock.destroy();
+      resolve_(true);
+    });
+    sock.on("error", () => {
+      resolve_(false);
+    });
   });
 }
 
@@ -41,15 +46,17 @@ function waitForSocket(socketPath: string, timeoutMs: number): Promise<void> {
   return new Promise((resolve_, reject) => {
     const deadline = Date.now() + timeoutMs;
     const poll = () => {
-      probeSocket(socketPath).then((alive) => {
-        if (alive) {
-          resolve_();
-        } else if (Date.now() >= deadline) {
-          reject(new Error(`waitForSocket timed out after ${timeoutMs}ms`));
-        } else {
-          setTimeout(poll, 100);
-        }
-      }).catch(() => {});
+      probeSocket(socketPath)
+        .then((alive) => {
+          if (alive) {
+            resolve_();
+          } else if (Date.now() >= deadline) {
+            reject(new Error(`waitForSocket timed out after ${timeoutMs}ms`));
+          } else {
+            setTimeout(poll, 100);
+          }
+        })
+        .catch(() => {});
     };
     poll();
   });
@@ -81,7 +88,9 @@ export async function autoForkDaemon(opts: AutoForkOptions): Promise<void> {
   // Step 2: Stale recovery — clean stale PID file, stale socket file, stale lock
   const pidCleaned = cleanStalePidFile(pidPath);
   if (pidCleaned && existsSync(socketPath)) {
-    try { unlinkSync(socketPath); } catch {}
+    try {
+      unlinkSync(socketPath);
+    } catch {}
   }
 
   // Step 3: Acquire lock (mkdir-based, atomic)

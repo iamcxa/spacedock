@@ -6,8 +6,8 @@
 // ─── Envelope ────────────────────────────────────────────────────────────────
 
 export interface IpcMessage {
-  id: string;       // UUID for request/response correlation
-  type: string;     // message type discriminator
+  id: string; // UUID for request/response correlation
+  type: string; // message type discriminator
   payload: unknown; // type-specific payload
 }
 
@@ -20,23 +20,23 @@ export function isIpcMessage(value: unknown): value is IpcMessage {
 // ─── Request types (shim → daemon) ──────────────────────────────────────────
 
 export type IpcRequestType =
-  | "register"             // shim → daemon: session registration
-  | "heartbeat"            // shim → daemon: keepalive
-  | "rpc-request"          // shim → daemon: ChannelProvider method call
+  | "register" // shim → daemon: session registration
+  | "heartbeat" // shim → daemon: keepalive
+  | "rpc-request" // shim → daemon: ChannelProvider method call
   | "coordination-request"; // shim → daemon: CoordinationClient method call
 
 // ─── Response types (daemon → shim) ─────────────────────────────────────────
 
 export type IpcResponseType =
-  | "register-ack"          // daemon → shim: registration acknowledged
-  | "heartbeat-ack"         // daemon → shim: keepalive ack
-  | "rpc-response"          // daemon → shim: method return value
+  | "register-ack" // daemon → shim: registration acknowledged
+  | "heartbeat-ack" // daemon → shim: keepalive ack
+  | "rpc-response" // daemon → shim: method return value
   | "coordination-response"; // daemon → shim: coordination return value
 
 // ─── Push types (daemon → shim, unsolicited) ─────────────────────────────────
 
 export type IpcPushType =
-  | "event-push"   // daemon → shim: inbound event
+  | "event-push" // daemon → shim: inbound event
   | "action-push"; // daemon → shim: inbound action
 
 // ─── Payload shapes ──────────────────────────────────────────────────────────
@@ -54,8 +54,8 @@ export interface RegisterAckPayload {
 }
 
 export interface RpcRequestPayload {
-  method: string;   // ChannelProvider method name
-  args: unknown[];  // method arguments (serializable)
+  method: string; // ChannelProvider method name
+  args: unknown[]; // method arguments (serializable)
 }
 
 export interface RpcResponsePayload {
@@ -64,7 +64,7 @@ export interface RpcResponsePayload {
 }
 
 export interface CoordinationRequestPayload {
-  method: string;   // CoordinationClient method name
+  method: string; // CoordinationClient method name
   args: unknown[];
 }
 

@@ -3,10 +3,10 @@
 // Credential storage: relies on provider-native storage (Q-1 answer) — no spacebridge config needed.
 
 import { execSync } from "node:child_process";
-import type { TunnelProvider } from "./provider";
-import { NgrokProvider } from "./ngrok";
-import { TailscaleProvider } from "./tailscale";
 import { CloudflaredProvider } from "./cloudflared";
+import { NgrokProvider } from "./ngrok";
+import type { TunnelProvider } from "./provider";
+import { TailscaleProvider } from "./tailscale";
 
 function isBinaryAvailable(name: string): boolean {
   try {
@@ -40,14 +40,12 @@ export function detectProvider(override?: string): TunnelProvider | null {
     const factory = PROVIDER_NAMES[override];
     if (!factory) {
       throw new Error(
-        `Unknown tunnel backend: "${override}". Valid options: ngrok, tailscale, cloudflared`
+        `Unknown tunnel backend: "${override}". Valid options: ngrok, tailscale, cloudflared`,
       );
     }
     const provider = factory();
     if (!isBinaryAvailable(provider.name)) {
-      throw new Error(
-        `Tunnel backend "${override}" is not installed. Install it and try again.`
-      );
+      throw new Error(`Tunnel backend "${override}" is not installed. Install it and try again.`);
     }
     return provider;
   }

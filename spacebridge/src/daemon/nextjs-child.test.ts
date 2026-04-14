@@ -1,10 +1,10 @@
 // ABOUTME: TDD tests for nextjs-child.ts — spawn + graceful SIGTERM + SIGKILL fallback.
 // Uses a fake standalone script that listens on PORT, prints "ready", handles SIGTERM.
-import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { spawnNextjsChild, shutdownNextjsChild, resolveNextjsServerScript } from "./nextjs-child";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { resolveNextjsServerScript, shutdownNextjsChild, spawnNextjsChild } from "./nextjs-child";
 
 const TMP = join(tmpdir(), `nextjs-child-test-${Date.now()}`);
 
@@ -13,7 +13,9 @@ const FAKE_SERVER_SCRIPT = join(TMP, "server.js");
 
 beforeAll(() => {
   mkdirSync(TMP, { recursive: true });
-  writeFileSync(FAKE_SERVER_SCRIPT, `
+  writeFileSync(
+    FAKE_SERVER_SCRIPT,
+    `
 const http = require("http");
 const port = parseInt(process.env.PORT || "9999", 10);
 const server = http.createServer((req, res) => { res.end("ok"); });
@@ -23,7 +25,8 @@ server.listen(port, () => {
 process.on("SIGTERM", () => {
   server.close(() => process.exit(0));
 });
-`);
+`,
+  );
 });
 
 afterAll(() => {
@@ -62,10 +65,13 @@ describe("shutdownNextjsChild", () => {
   test("SIGKILL fallback fires if child ignores SIGTERM", async () => {
     // Script that ignores SIGTERM
     const stubbornScript = join(TMP, "stubborn.js");
-    writeFileSync(stubbornScript, `
+    writeFileSync(
+      stubbornScript,
+      `
 process.on("SIGTERM", () => { /* ignore */ });
 setInterval(() => {}, 10000); // keep alive
-`);
+`,
+    );
     const child = spawnNextjsChild({
       serverScript: stubbornScript,
       port: 18422,
@@ -87,7 +93,7 @@ describe("resolveNextjsServerScript", () => {
 
   test("throws clear error if path does not exist (checkExists:true)", () => {
     expect(() => resolveNextjsServerScript("/nonexistent/root", { checkExists: true })).toThrow(
-      /bun run build/
+      /bun run build/,
     );
   });
 });

@@ -1,8 +1,8 @@
 // ABOUTME: Unit tests for share CLI argument parsing and TTL parsing.
 // No IPC mocking needed — tests cover pure argument/TTL logic only.
 
-import { describe, test, expect } from "bun:test";
-import { parseTtl, parseArgs } from "./share";
+import { describe, expect, test } from "bun:test";
+import { parseArgs, parseTtl } from "./share";
 
 // ─── parseTtl ──────────────────────────────────────────────────────────────────
 

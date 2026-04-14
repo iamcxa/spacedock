@@ -7,14 +7,14 @@
 // ─── State ─────────────────────────────────────────────────────────────────────
 
 export interface CommentSnapshot {
-  commentId: string;          // UUID
+  commentId: string; // UUID
   entityPath: string;
   selectedText: string;
   sectionHeading: string;
   content: string;
   author: "captain" | "fo" | "guest";
-  parentId: string | null;    // null = top-level, string = reply to this commentId
-  createdAt: number;          // epoch-ms
+  parentId: string | null; // null = top-level, string = reply to this commentId
+  createdAt: number; // epoch-ms
   resolved: boolean;
   resolvedReason: "manual" | "stage_advanced" | null;
 }
@@ -27,7 +27,7 @@ export const emptyCommentState: CommentState = new Map();
 
 export interface AddCommentCommand {
   type: "add_comment";
-  commentId: string;           // UUID (caller generates)
+  commentId: string; // UUID (caller generates)
   entityPath: string;
   selectedText: string;
   sectionHeading: string;
@@ -37,8 +37,8 @@ export interface AddCommentCommand {
 
 export interface ReplyToCommentCommand {
   type: "reply_to_comment";
-  commentId: string;           // UUID for the new reply
-  parentCommentId: string;     // must exist and not be resolved
+  commentId: string; // UUID for the new reply
+  parentCommentId: string; // must exist and not be resolved
   entityPath: string;
   selectedText: string;
   sectionHeading: string;
@@ -54,7 +54,7 @@ export interface ResolveCommentCommand {
 export interface ResolveByStageAdvanceCommand {
   type: "resolve_by_stage_advance";
   entityPath: string;
-  sectionHeading: string;      // stage heading to bulk-resolve
+  sectionHeading: string; // stage heading to bulk-resolve
 }
 
 export type CommentCommand =
@@ -74,7 +74,7 @@ export interface CommentAddedEvent {
   content: string;
   author: "captain" | "fo" | "guest";
   parentId: null;
-  createdAt: number;           // epoch-ms
+  createdAt: number; // epoch-ms
 }
 
 export interface ReplyAddedEvent {
@@ -86,17 +86,14 @@ export interface ReplyAddedEvent {
   sectionHeading: string;
   content: string;
   author: "captain" | "fo" | "guest";
-  createdAt: number;           // epoch-ms
+  createdAt: number; // epoch-ms
 }
 
 export interface CommentResolvedEvent {
   type: "comment_resolved";
   commentId: string;
   resolvedReason: "manual" | "stage_advanced";
-  resolvedAt: number;          // epoch-ms
+  resolvedAt: number; // epoch-ms
 }
 
-export type CommentEvent =
-  | CommentAddedEvent
-  | ReplyAddedEvent
-  | CommentResolvedEvent;
+export type CommentEvent = CommentAddedEvent | ReplyAddedEvent | CommentResolvedEvent;

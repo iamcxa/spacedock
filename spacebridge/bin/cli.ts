@@ -4,9 +4,9 @@
 // adds mcp subcommand via autoForkDaemon, and stubs share (entity 058).
 // Users invoke via: bun run bin/cli.ts <subcommand>
 
-import { resolve, join } from "node:path";
-import { autoForkDaemon } from "../src/daemon/auto-fork";
 import { homedir } from "node:os";
+import { join, resolve } from "node:path";
+import { autoForkDaemon } from "../src/daemon/auto-fork";
 
 // ─── State directory resolution ──────────────────────────────────────────────
 
@@ -30,13 +30,13 @@ async function spawnDaemon(subcommand: string): Promise<never> {
 function printUsage(): void {
   process.stderr.write(
     "Usage: bun run bin/cli.ts <subcommand>\n" +
-    "\n" +
-    "Subcommands:\n" +
-    "  start   Boot the spacebridge daemon (default port 6535, override with SPACEBRIDGE_PORT)\n" +
-    "  stop    Send SIGTERM to the running daemon\n" +
-    "  status  Print daemon PID, uptime, and session count\n" +
-    "  mcp     Start MCP stdio shim (used by .mcp.json transport)\n" +
-    "  share   Create tunnel for remote access (entity 058)\n"
+      "\n" +
+      "Subcommands:\n" +
+      "  start   Boot the spacebridge daemon (default port 6535, override with SPACEBRIDGE_PORT)\n" +
+      "  stop    Send SIGTERM to the running daemon\n" +
+      "  status  Print daemon PID, uptime, and session count\n" +
+      "  mcp     Start MCP stdio shim (used by .mcp.json transport)\n" +
+      "  share   Create tunnel for remote access (entity 058)\n",
   );
 }
 
@@ -69,7 +69,7 @@ if (import.meta.main) {
     // Daemon is running. The MCP stdio bridge wiring (SocketClient + ChannelProviderBridge)
     // is entity 053's scope — once entity 053 RPC routing is live, this subcommand will
     // pipe stdin/stdout as the MCP stdio transport. For now: confirm daemon is up.
-    process.stderr.write("spacebridge mcp: daemon ready at " + socketPath + "\n");
+    process.stderr.write(`spacebridge mcp: daemon ready at ${socketPath}\n`);
     // Keep the process alive so CC stdio transport can connect
     await new Promise<void>(() => {});
   } else if (subcommand === "share") {

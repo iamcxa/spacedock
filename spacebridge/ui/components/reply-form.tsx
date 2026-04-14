@@ -4,8 +4,8 @@
 // POSTs to /api/entities/[slug]/comments/[id]/reply.
 
 import { useState } from "react";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 interface ReplyFormProps {
   entitySlug: string;
@@ -24,17 +24,14 @@ export function ReplyForm({ entitySlug, parentCommentId, onSubmitted }: ReplyFor
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/entities/${entitySlug}/comments/${parentCommentId}/reply`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: content.trim(),
-            author: "captain",
-          }),
-        },
-      );
+      const res = await fetch(`/api/entities/${entitySlug}/comments/${parentCommentId}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: content.trim(),
+          author: "captain",
+        }),
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError((data as { error?: string }).error ?? "Failed to submit reply");

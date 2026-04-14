@@ -1,9 +1,9 @@
 "use client";
 
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { RepoSection } from "./repo-section";
-import { LiveFeed } from "./live-feed";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { EntityCard } from "@/lib/entity-scan";
+import { LiveFeed } from "./live-feed";
+import { RepoSection } from "./repo-section";
 
 export interface RepoData {
   repoLabel: string;

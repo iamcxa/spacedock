@@ -1,15 +1,15 @@
 // spacebridge/src/ipc/types.test.ts
 // ABOUTME: Type-level and runtime tests for IPC message type definitions.
 
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type {
-  IpcMessage,
-  RegisterPayload,
-  RegisterAckPayload,
-  RpcRequestPayload,
-  RpcResponsePayload,
   CoordinationRequestPayload,
   CoordinationResponsePayload,
+  IpcMessage,
+  RegisterAckPayload,
+  RegisterPayload,
+  RpcRequestPayload,
+  RpcResponsePayload,
 } from "./types";
 import { isIpcMessage } from "./types";
 

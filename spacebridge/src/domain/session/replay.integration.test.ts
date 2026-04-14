@@ -2,10 +2,10 @@
 // ABOUTME: Integration test for daemon restart replay scenario.
 // Creates registry1, does operations, creates registry2 over same DB, verifies state matches.
 
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createDb } from "../../db";
 import { createSessionRegistry } from "./registry";
 
@@ -22,9 +22,24 @@ describe("replay integration — restart scenario", () => {
       const registry1 = await createSessionRegistry({ db: db1, now: () => tick });
 
       // Register 3 sessions
-      await registry1.register({ sessionId: "sess-1", projectRoot: "/repo-a", pid: 11, protocolVersion: 1 });
-      await registry1.register({ sessionId: "sess-2", projectRoot: "/repo-b", pid: 22, protocolVersion: 1 });
-      await registry1.register({ sessionId: "sess-3", projectRoot: "/repo-a", pid: 33, protocolVersion: 1 });
+      await registry1.register({
+        sessionId: "sess-1",
+        projectRoot: "/repo-a",
+        pid: 11,
+        protocolVersion: 1,
+      });
+      await registry1.register({
+        sessionId: "sess-2",
+        projectRoot: "/repo-b",
+        pid: 22,
+        protocolVersion: 1,
+      });
+      await registry1.register({
+        sessionId: "sess-3",
+        projectRoot: "/repo-a",
+        pid: 33,
+        protocolVersion: 1,
+      });
 
       // Heartbeat sess-1 at tick+1000
       tick = 1_001_000;
@@ -67,9 +82,10 @@ describe("replay integration — restart scenario", () => {
       // sess-2 was disconnected so /repo-b is gone
       expect(roots.length).toBe(1);
       expect(roots[0]).toBe("/repo-a");
-
     } finally {
-      try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+      try {
+        rmSync(tmpDir, { recursive: true, force: true });
+      } catch {}
     }
   });
 
@@ -83,13 +99,23 @@ describe("replay integration — restart scenario", () => {
       const registry1 = await createSessionRegistry({ db: db1, now: () => tick });
 
       // session_registered
-      await registry1.register({ sessionId: "sess-A", projectRoot: "/repo-x", pid: 1, protocolVersion: 1 });
+      await registry1.register({
+        sessionId: "sess-A",
+        projectRoot: "/repo-x",
+        pid: 1,
+        protocolVersion: 1,
+      });
       // session_heartbeat
       tick = 1_001_000;
       await registry1.heartbeat("sess-A");
       // session_reconnected (re-register with new pid)
       tick = 1_002_000;
-      await registry1.register({ sessionId: "sess-A", projectRoot: "/repo-x", pid: 99, protocolVersion: 1 });
+      await registry1.register({
+        sessionId: "sess-A",
+        projectRoot: "/repo-x",
+        pid: 99,
+        protocolVersion: 1,
+      });
       // session_disconnected
       await registry1.disconnect("sess-A", "shutdown");
 
@@ -100,9 +126,10 @@ describe("replay integration — restart scenario", () => {
       // sess-A was disconnected — should be absent from state
       expect(registry2.getState().sessions.size).toBe(0);
       expect(registry2.getState().sessions.has("sess-A")).toBe(false);
-
     } finally {
-      try { rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+      try {
+        rmSync(tmpDir, { recursive: true, force: true });
+      } catch {}
     }
   });
 });

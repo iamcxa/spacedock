@@ -4,10 +4,15 @@
 // Return types are Promise<T> — enabled by the ChannelProvider interface update (task-6).
 
 import { randomUUID } from "node:crypto";
-import type { ChannelProvider } from "../../../tools/dashboard/src/channel-provider";
-import type { AgentEvent, SequencedEvent } from "../../../tools/dashboard/src/types";
-import type { EntitySnapshot } from "../../../tools/dashboard/src/types";
-import type { CreateSnapshotInput } from "../../../tools/dashboard/src/channel-provider";
+import type {
+  ChannelProvider,
+  CreateSnapshotInput,
+} from "../../../tools/dashboard/src/channel-provider";
+import type {
+  AgentEvent,
+  EntitySnapshot,
+  SequencedEvent,
+} from "../../../tools/dashboard/src/types";
 import type { SocketClient } from "./socket-client";
 import type { RpcResponsePayload } from "./types";
 

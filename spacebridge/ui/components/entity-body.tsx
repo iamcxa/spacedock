@@ -1,15 +1,16 @@
 "use client";
+
 // spacebridge/ui/components/entity-body.tsx
 // ABOUTME: Client Component — renders markdown body with react-markdown,
 // injects comment threads per section heading with optimistic update support.
 // Supports 3-mode comment UX: document-level, section-level, text-selection popover.
 // Manages local comment state; background router.refresh() keeps RSC in sync.
 
-import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { CommentThread } from "@/components/comment-thread";
 import { AddCommentForm } from "@/components/add-comment-form";
+import { CommentThread } from "@/components/comment-thread";
 import { TextSelectionPopover } from "@/components/text-selection-popover";
 
 interface CommentRow {
@@ -69,7 +70,9 @@ export function EntityBody({
       {/* Document-level comments displayed above body */}
       {documentLevelComments.length > 0 && (
         <div className="mb-6 space-y-2">
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Document Comments</p>
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+            Document Comments
+          </p>
           {documentLevelComments.map((comment) => (
             <CommentThread
               key={comment.commentId}
@@ -91,7 +94,11 @@ export function EntityBody({
                 const commentsForSection = commentsBySection[headingText] ?? [];
                 return (
                   <div>
-                    <h2 {...props} className="text-lg font-semibold mt-6 mb-2 scroll-mt-16" id={headingText}>
+                    <h2
+                      {...props}
+                      className="text-lg font-semibold mt-6 mb-2 scroll-mt-16"
+                      id={headingText}
+                    >
                       {children}
                     </h2>
                     {commentsForSection.length > 0 && (

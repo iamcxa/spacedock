@@ -1,8 +1,8 @@
 // ABOUTME: Tests for entity-scan.ts — scanEntitiesForRepo with fixture dir.
-import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { scanEntitiesForRepo } from "./entity-scan";
 
 const TMP = join(tmpdir(), `entity-scan-test-${Date.now()}`);
@@ -11,33 +11,37 @@ const PIPELINE_DIR = join(TMP, "docs", "build-pipeline");
 beforeAll(() => {
   mkdirSync(PIPELINE_DIR, { recursive: true });
 
-  writeFileSync(join(PIPELINE_DIR, "entity-001.md"), [
-    "---",
-    "id: 001",
-    "title: First Entity",
-    "status: execute",
-    "---",
-    "## Body",
-    "content here",
-  ].join("\n"));
+  writeFileSync(
+    join(PIPELINE_DIR, "entity-001.md"),
+    [
+      "---",
+      "id: 001",
+      "title: First Entity",
+      "status: execute",
+      "---",
+      "## Body",
+      "content here",
+    ].join("\n"),
+  );
 
-  writeFileSync(join(PIPELINE_DIR, "entity-002.md"), [
-    "---",
-    "id: 002",
-    "title: Second Entity",
-    "status: shipped",
-    "---",
-    "## Body",
-    "more content",
-  ].join("\n"));
+  writeFileSync(
+    join(PIPELINE_DIR, "entity-002.md"),
+    [
+      "---",
+      "id: 002",
+      "title: Second Entity",
+      "status: shipped",
+      "---",
+      "## Body",
+      "more content",
+    ].join("\n"),
+  );
 
   // malformed: no closing ---
-  writeFileSync(join(PIPELINE_DIR, "malformed.md"), [
-    "---",
-    "id: bad",
-    "title: Malformed",
-    "no closing delimiter",
-  ].join("\n"));
+  writeFileSync(
+    join(PIPELINE_DIR, "malformed.md"),
+    ["---", "id: bad", "title: Malformed", "no closing delimiter"].join("\n"),
+  );
 });
 
 afterAll(() => {
@@ -57,9 +61,9 @@ describe("scanEntitiesForRepo", () => {
     const cards = await scanEntitiesForRepo(TMP, "test-repo");
     const first = cards.find((c) => c.slug === "entity-001");
     expect(first).toBeDefined();
-    expect(first!.title).toBe("First Entity");
-    expect(first!.status).toBe("execute");
-    expect(first!.repoLabel).toBe("test-repo");
+    expect(first?.title).toBe("First Entity");
+    expect(first?.status).toBe("execute");
+    expect(first?.repoLabel).toBe("test-repo");
   });
 
   test("malformed entity is skipped, no throw", async () => {

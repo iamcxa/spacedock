@@ -4,22 +4,26 @@
 // writes PID file, handles graceful shutdown via SIGTERM/SIGINT.
 // Called by shim auto-fork logic and by entity 059 CLI wrapper.
 
-import { join, resolve } from "node:path";
-import { homedir } from "node:os";
-import { mkdirSync, existsSync, unlinkSync } from "node:fs";
-import * as net from "node:net";
+import type { ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { createSocketServer } from "../src/ipc/socket-server";
-import { createCoordinationClientBridge } from "../src/ipc/coordination-client-bridge";
-import { createDb } from "../src/db";
-import { writePidFile, readPidFile, isProcessAlive } from "../src/daemon/pid";
+import { existsSync, mkdirSync, unlinkSync } from "node:fs";
+import * as net from "node:net";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import { releaseLock } from "../src/daemon/lock";
+import {
+  resolveNextjsServerScript,
+  shutdownNextjsChild,
+  spawnNextjsChild,
+} from "../src/daemon/nextjs-child";
+import { isProcessAlive, readPidFile, writePidFile } from "../src/daemon/pid";
+import { createDb } from "../src/db";
 import { LeaseCommandSchema } from "../src/domain/lease/schemas";
-import { spawnNextjsChild, shutdownNextjsChild, resolveNextjsServerScript } from "../src/daemon/nextjs-child";
 import { TokenManager } from "../src/domain/share/token-manager";
+import { createCoordinationClientBridge } from "../src/ipc/coordination-client-bridge";
+import { createSocketServer } from "../src/ipc/socket-server";
 import { detectProvider, installGuide } from "../src/tunnel/detect";
 import type { TunnelProvider } from "../src/tunnel/provider";
-import type { ChildProcess } from "node:child_process";
 
 // ─── State directory resolution ──────────────────────────────────────────────
 
@@ -32,7 +36,7 @@ function resolvePort(): number {
   const envPort = process.env.SPACEBRIDGE_PORT;
   if (envPort) {
     const parsed = parseInt(envPort, 10);
-    if (!isNaN(parsed) && parsed > 0 && parsed < 65536) return parsed;
+    if (!Number.isNaN(parsed) && parsed > 0 && parsed < 65536) return parsed;
     process.stderr.write(`[WARNING] Invalid SPACEBRIDGE_PORT="${envPort}", using default 6535\n`);
   }
   return 6535;
@@ -93,7 +97,10 @@ async function cmdStart(): Promise<void> {
     socketPath,
     onRegister: (sess) => {
       sessions.set(sess.sessionId, { sessionId: sess.sessionId, registeredAt: Date.now() });
-      if (autoStopTimer) { clearTimeout(autoStopTimer); autoStopTimer = null; }
+      if (autoStopTimer) {
+        clearTimeout(autoStopTimer);
+        autoStopTimer = null;
+      }
       return { sessionToken: randomUUID(), serverVersion: "0.1.0" };
     },
     onRpcRequest: async (_sessionId, req) => {
@@ -123,7 +130,9 @@ async function cmdStart(): Promise<void> {
             }
             tunnelProvider = provider;
             tunnelUrl = await tunnelProvider.start(resolvePort());
-            process.stderr.write(`[${ts()}] tunnel started (${tunnelProvider.name}): ${tunnelUrl}\n`);
+            process.stderr.write(
+              `[${ts()}] tunnel started (${tunnelProvider.name}): ${tunnelUrl}\n`,
+            );
           } catch (err) {
             tunnelProvider = null;
             tunnelUrl = null;
@@ -131,9 +140,14 @@ async function cmdStart(): Promise<void> {
           }
         }
 
-        const shareToken = tokenManager.create({ entitySlug, ttlMs: ttlMs ?? 7 * 24 * 60 * 60 * 1000 });
+        const shareToken = tokenManager.create({
+          entitySlug,
+          ttlMs: ttlMs ?? 7 * 24 * 60 * 60 * 1000,
+        });
         const url = `${tunnelUrl}/share/${shareToken.token}`;
-        return { result: { token: shareToken.token, url, entitySlug, expiresAt: shareToken.expiresAt } };
+        return {
+          result: { token: shareToken.token, url, entitySlug, expiresAt: shareToken.expiresAt },
+        };
       }
 
       // share_revoke: revoke a share token; stop tunnel if no active tokens remain
@@ -169,7 +183,13 @@ async function cmdStart(): Promise<void> {
         const args = req.args as unknown[];
         let rawCmd: unknown;
         if (req.method === "acquireEntity") {
-          rawCmd = { type: "acquire", entitySlug: args[0], role: args[1], sessionId: args[2], leaseDurationMs };
+          rawCmd = {
+            type: "acquire",
+            entitySlug: args[0],
+            role: args[1],
+            sessionId: args[2],
+            leaseDurationMs,
+          };
         } else if (req.method === "releaseEntity") {
           const tok = args[0] as { token?: string };
           rawCmd = { type: "release", token: tok?.token, outcome: args[1] };
@@ -187,7 +207,8 @@ async function cmdStart(): Promise<void> {
       try {
         const method = req.method as keyof typeof bridge;
         const fn = bridge[method];
-        if (typeof fn !== "function") return { error: `Unknown coordination method: ${req.method}` };
+        if (typeof fn !== "function")
+          return { error: `Unknown coordination method: ${req.method}` };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = await (fn as any)(...(req.args as unknown[]));
         return { result };
@@ -214,7 +235,9 @@ async function cmdStart(): Promise<void> {
     });
   }, janitorIntervalMs);
 
-  process.stderr.write(`[${ts()}] spacebridge daemon started (pid: ${process.pid}, socket: ${socketPath})\n`);
+  process.stderr.write(
+    `[${ts()}] spacebridge daemon started (pid: ${process.pid}, socket: ${socketPath})\n`,
+  );
 
   // Spawn Next.js UI child process (skip via SPACEBRIDGE_SKIP_UI=1 for CI / lean tests)
   let nextjsChild: ChildProcess | null = null;
@@ -227,9 +250,13 @@ async function cmdStart(): Promise<void> {
       const dbPath = join(stateDir, "spacebridge.db");
       const uiPort = resolvePort();
       nextjsChild = spawnNextjsChild({ serverScript, port: uiPort, dbPath, stateDir });
-      process.stderr.write(`[${ts()}] spawned Next.js UI (pid: ${nextjsChild.pid}, port: ${uiPort})\n`);
+      process.stderr.write(
+        `[${ts()}] spawned Next.js UI (pid: ${nextjsChild.pid}, port: ${uiPort})\n`,
+      );
     } catch (err) {
-      process.stderr.write(`[${ts()}] WARNING: failed to spawn Next.js UI: ${(err as Error).message}\n`);
+      process.stderr.write(
+        `[${ts()}] WARNING: failed to spawn Next.js UI: ${(err as Error).message}\n`,
+      );
       process.stderr.write(`[${ts()}] Run: cd spacebridge/ui && bun run build\n`);
     }
   }
@@ -238,7 +265,9 @@ async function cmdStart(): Promise<void> {
   const doShutdown = async () => {
     if (janitorTimer) clearInterval(janitorTimer);
     if (tunnelProvider) {
-      try { await tunnelProvider.stop(); } catch {}
+      try {
+        await tunnelProvider.stop();
+      } catch {}
       tunnelProvider = null;
       tunnelUrl = null;
     }
@@ -250,8 +279,12 @@ async function cmdStart(): Promise<void> {
   process.on("SIGINT", doShutdown);
   process.on("exit", () => {
     // Best-effort cleanup on unexpected exit
-    try { if (existsSync(pidPath)) unlinkSync(pidPath); } catch {}
-    try { if (existsSync(socketPath)) unlinkSync(socketPath); } catch {}
+    try {
+      if (existsSync(pidPath)) unlinkSync(pidPath);
+    } catch {}
+    try {
+      if (existsSync(socketPath)) unlinkSync(socketPath);
+    } catch {}
   });
 }
 
@@ -263,8 +296,12 @@ async function shutdown(
 ): Promise<void> {
   if (nextjsChild) await shutdownNextjsChild(nextjsChild);
   await server.close();
-  try { if (existsSync(pidPath)) unlinkSync(pidPath); } catch {}
-  try { if (existsSync(socketPath)) unlinkSync(socketPath); } catch {}
+  try {
+    if (existsSync(pidPath)) unlinkSync(pidPath);
+  } catch {}
+  try {
+    if (existsSync(socketPath)) unlinkSync(socketPath);
+  } catch {}
 }
 
 // ─── stop subcommand ─────────────────────────────────────────────────────────
@@ -284,8 +321,12 @@ function cmdStop(): void {
 
   if (!isProcessAlive(pid)) {
     // Stale files from a crashed daemon
-    try { if (existsSync(pidPath)) unlinkSync(pidPath); } catch {}
-    try { if (existsSync(socketPath)) unlinkSync(socketPath); } catch {}
+    try {
+      if (existsSync(pidPath)) unlinkSync(pidPath);
+    } catch {}
+    try {
+      if (existsSync(socketPath)) unlinkSync(socketPath);
+    } catch {}
     releaseLock(lockPath);
     process.stderr.write(`cleaned stale daemon files (pid ${pid} was dead)\n`);
     return;
@@ -336,7 +377,7 @@ async function cmdStatus(): Promise<void> {
       type: "register",
       payload: {
         projectRoot: process.cwd(),
-        sessionId: "status-probe-" + uuid(),
+        sessionId: `status-probe-${uuid()}`,
         pid: process.pid,
         protocolVersion: 1,
       },
@@ -357,7 +398,10 @@ async function cmdStatus(): Promise<void> {
             // Registered — now send status RPC
             sock.write(msg);
           } else if (parsed.id === reqId && parsed.type === "rpc-response") {
-            const payload = parsed.payload as { result?: { pid: number; uptimeMs: number; sessions: number }; error?: string };
+            const payload = parsed.payload as {
+              result?: { pid: number; uptimeMs: number; sessions: number };
+              error?: string;
+            };
             sock.destroy();
             if (payload.error) {
               process.stderr.write(`status query failed: ${payload.error}\n`);
@@ -365,7 +409,9 @@ async function cmdStatus(): Promise<void> {
             }
             const { pid: daemonPid, uptimeMs, sessions } = payload.result!;
             const uptimeSec = Math.floor(uptimeMs / 1000);
-            process.stdout.write(`daemon running (pid: ${daemonPid}, uptime: ${uptimeSec}s, sessions: ${sessions})\n`);
+            process.stdout.write(
+              `daemon running (pid: ${daemonPid}, uptime: ${uptimeSec}s, sessions: ${sessions})\n`,
+            );
             process.exit(0);
           }
         } catch {}

@@ -8,7 +8,7 @@ export interface SessionRecord {
   sessionId: string;
   projectRoot: string;
   pid: number;
-  connectedAt: number;   // epoch-ms
+  connectedAt: number; // epoch-ms
   lastHeartbeat: number; // epoch-ms
 }
 
@@ -40,10 +40,7 @@ export interface DisconnectCommand {
   reason: "explicit" | "timeout" | "shutdown";
 }
 
-export type SessionCommand =
-  | RegisterCommand
-  | HeartbeatCommand
-  | DisconnectCommand;
+export type SessionCommand = RegisterCommand | HeartbeatCommand | DisconnectCommand;
 
 // ─── Events ───────────────────────────────────────────────────────────────────
 
@@ -52,7 +49,7 @@ export interface SessionRegisteredEvent {
   sessionId: string;
   projectRoot: string;
   pid: number;
-  connectedAt: number;   // epoch-ms
+  connectedAt: number; // epoch-ms
   lastHeartbeat: number; // epoch-ms
 }
 

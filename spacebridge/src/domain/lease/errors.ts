@@ -22,7 +22,10 @@ export class LeaseNotFound extends Error {
 
 export class LeaseExpired extends Error {
   readonly name = "LeaseExpired";
-  constructor(public readonly token: string, public readonly expiredAt: number) {
+  constructor(
+    public readonly token: string,
+    public readonly expiredAt: number,
+  ) {
     super(`LeaseExpired: token ${token} expired at ${expiredAt}`);
   }
 }

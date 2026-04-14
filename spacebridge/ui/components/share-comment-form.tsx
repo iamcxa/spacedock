@@ -38,7 +38,7 @@ export function ShareCommentForm({ token, entitySlug }: ShareCommentFormProps) {
       });
 
       if (!res.ok) {
-        const data = await res.json() as { error?: string };
+        const data = (await res.json()) as { error?: string };
         throw new Error(data.error ?? `HTTP ${res.status}`);
       }
 
@@ -77,7 +77,11 @@ export function ShareCommentForm({ token, entitySlug }: ShareCommentFormProps) {
             {status === "success" && <span className="text-green-600">Comment submitted</span>}
             {status === "error" && <span className="text-destructive">{errorMsg}</span>}
           </div>
-          <Button type="submit" size="sm" disabled={status === "submitting" || !nickname.trim() || !content.trim()}>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={status === "submitting" || !nickname.trim() || !content.trim()}
+          >
             {status === "submitting" ? "Sending..." : "Submit"}
           </Button>
         </div>

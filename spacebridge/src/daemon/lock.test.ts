@@ -2,10 +2,10 @@
 // ABOUTME: Tests for mkdir-based lock file utilities (acquireLock, releaseLock).
 // Uses temp directories for isolation — never touches production ~/.spacedock/ paths.
 
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, existsSync, mkdirSync, utimesSync } from "node:fs";
-import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { acquireLock, releaseLock } from "./lock";
 
 let tmpDir: string;

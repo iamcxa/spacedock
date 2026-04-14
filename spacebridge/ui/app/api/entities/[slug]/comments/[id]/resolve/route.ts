@@ -27,12 +27,8 @@ export async function POST(
     const { appendEvents, loadEvents, markResolved, countEvents } = await import(
       "../../../../../../../../src/domain/comment/persistence"
     );
-    const { decide } = await import(
-      "../../../../../../../../src/domain/comment/decider"
-    );
-    const { replay } = await import(
-      "../../../../../../../../src/domain/comment/evolve"
-    );
+    const { decide } = await import("../../../../../../../../src/domain/comment/decider");
+    const { replay } = await import("../../../../../../../../src/domain/comment/evolve");
 
     const db = createDb(defaultDbPath());
     const entityPath = `/docs/build-pipeline/${slug}.md`;

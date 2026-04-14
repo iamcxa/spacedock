@@ -4,7 +4,7 @@
 // "Comment" button near selection, expands to mini form pre-filled with selected text
 // and auto-detected section heading. Posts to /api/entities/[slug]/comments.
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -107,7 +107,7 @@ export function TextSelectionPopover({
     });
     setContent("");
     setError(null);
-  }, [containerRef]);
+  }, [containerRef, detectSectionHeading]);
 
   // Close popover on outside click
   useEffect(() => {
@@ -229,7 +229,12 @@ export function TextSelectionPopover({
             >
               Cancel
             </Button>
-            <Button type="submit" size="sm" className="text-xs h-7" disabled={submitting || !content.trim()}>
+            <Button
+              type="submit"
+              size="sm"
+              className="text-xs h-7"
+              disabled={submitting || !content.trim()}
+            >
               {submitting ? "Saving..." : "Save"}
             </Button>
           </div>

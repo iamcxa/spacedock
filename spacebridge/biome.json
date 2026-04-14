@@ -1,13 +1,11 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.10/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
-    "useIgnoreFile": true
+    "useIgnoreFile": false
   },
-  "organizeImports": {
-    "enabled": true
-  },
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
@@ -17,7 +15,20 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "suspicious": {
+        "noExplicitAny": "warn",
+        "noImplicitAnyLet": "warn"
+      },
+      "style": {
+        "noNonNullAssertion": "warn"
+      },
+      "a11y": {
+        "noLabelWithoutControl": "warn"
+      },
+      "correctness": {
+        "useExhaustiveDependencies": "warn"
+      }
     }
   },
   "javascript": {
@@ -26,7 +37,17 @@
     }
   },
   "files": {
-    "include": ["src/**", "ui/**/*.ts", "ui/**/*.tsx", "ui/**/*.js", "bin/**"],
-    "ignore": ["node_modules", "dist", ".next", "ui/.next", "drizzle"]
+    "includes": [
+      "**/src/**",
+      "**/ui/**/*.ts",
+      "**/ui/**/*.tsx",
+      "**/ui/**/*.js",
+      "**/bin/**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/.next",
+      "!**/ui/.next",
+      "!**/drizzle"
+    ]
   }
 }

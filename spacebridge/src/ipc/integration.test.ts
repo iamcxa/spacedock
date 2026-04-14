@@ -2,17 +2,17 @@
 // ABOUTME: End-to-end integration test wiring server + client + bridge + stub together.
 // Covers: register→RPC→disconnect→reconnect full cycle.
 
-import { describe, test, expect, afterEach } from "bun:test";
-import { createSocketServer } from "./socket-server";
-import { createSocketClient } from "./socket-client";
-import { createChannelProviderBridge } from "./channel-provider-bridge";
-import { createCoordinationClientStub } from "./coordination-client-stub";
+import { afterEach, describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
+import { existsSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
-import { unlinkSync, existsSync } from "node:fs";
-import type { RpcRequestPayload, RpcResponsePayload } from "./types";
 import type { AgentEvent } from "../../../tools/dashboard/src/types";
+import { createChannelProviderBridge } from "./channel-provider-bridge";
+import { createCoordinationClientStub } from "./coordination-client-stub";
+import { createSocketClient } from "./socket-client";
+import { createSocketServer } from "./socket-server";
+import type { RpcRequestPayload, RpcResponsePayload } from "./types";
 
 function tempSock(): string {
   // macOS unix socket path limit ~104 chars; use short prefix + 8-char hash
@@ -49,7 +49,10 @@ const fakeEvents = [
 ];
 
 /** Mock RPC dispatch — simulates daemon-side ChannelProvider operations */
-async function mockRpcHandler(_sessionId: string, req: RpcRequestPayload): Promise<RpcResponsePayload> {
+async function mockRpcHandler(
+  _sessionId: string,
+  req: RpcRequestPayload,
+): Promise<RpcResponsePayload> {
   switch (req.method) {
     case "publishEvent":
       return { result: 42 };
@@ -69,7 +72,10 @@ describe("IPC Integration", () => {
 
   afterEach(() => {
     for (const p of cleanupSocks.splice(0)) {
-      if (existsSync(p)) try { unlinkSync(p); } catch {}
+      if (existsSync(p))
+        try {
+          unlinkSync(p);
+        } catch {}
     }
   });
 
@@ -79,7 +85,7 @@ describe("IPC Integration", () => {
 
     const server = createSocketServer({
       socketPath: sockPath,
-      onRegister: (sess) => ({ sessionToken: "tok-" + sess.sessionId, serverVersion: "1" }),
+      onRegister: (sess) => ({ sessionToken: `tok-${sess.sessionId}`, serverVersion: "1" }),
       onRpcRequest: mockRpcHandler,
       onCoordinationRequest: async () => ({ result: null }),
       onDisconnect: () => {},

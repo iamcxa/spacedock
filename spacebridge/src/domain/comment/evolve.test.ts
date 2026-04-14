@@ -1,9 +1,9 @@
 // spacebridge/src/domain/comment/evolve.test.ts
 // ABOUTME: Pure unit tests for comment evolve/replay. Zero I/O.
 
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { evolve, replay } from "./evolve";
-import type { CommentEvent, CommentState } from "./types";
+import type { CommentEvent } from "./types";
 
 const NOW = 1_000_000;
 
@@ -54,8 +54,8 @@ describe("evolve — comment_added", () => {
     };
     const state = evolve(evolve(new Map(), e1), e2);
     expect(state.size).toBe(2);
-    expect(state.get("c1")!.sectionHeading).toBe("## Directive");
-    expect(state.get("c2")!.sectionHeading).toBe("## Plan");
+    expect(state.get("c1")?.sectionHeading).toBe("## Directive");
+    expect(state.get("c2")?.sectionHeading).toBe("## Plan");
   });
 });
 
@@ -160,7 +160,7 @@ describe("replay", () => {
     const state = replay(events);
     expect(state.size).toBe(10);
     // c6 is reply to c1
-    expect(state.get("c6")!.parentId).toBe("c1");
+    expect(state.get("c6")?.parentId).toBe("c1");
     // reduce should produce same result
     const manualReduce = events.reduce(evolve, new Map());
     expect(manualReduce.size).toBe(state.size);
@@ -198,8 +198,8 @@ describe("replay", () => {
       },
     ];
     const state = replay(events);
-    expect(state.get("c1")!.resolved).toBe(true);
-    expect(state.get("c1")!.resolvedReason).toBe("stage_advanced");
-    expect(state.get("c2")!.resolved).toBe(false);
+    expect(state.get("c1")?.resolved).toBe(true);
+    expect(state.get("c1")?.resolvedReason).toBe("stage_advanced");
+    expect(state.get("c2")?.resolved).toBe(false);
   });
 });

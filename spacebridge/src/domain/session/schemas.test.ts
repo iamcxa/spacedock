@@ -1,7 +1,7 @@
 // spacebridge/src/domain/session/schemas.test.ts
 // ABOUTME: Smoke tests for session Zod schemas. Validates parseCommand/parseEvent helpers.
 
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { parseCommand, parseEvent } from "./schemas";
 
 const NOW = 1_000_000;

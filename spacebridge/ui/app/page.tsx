@@ -1,28 +1,35 @@
-import { scanEntitiesForRepo } from "@/lib/entity-scan";
-import { sessions, entityLeases } from "@/lib/schema";
 import { gt } from "drizzle-orm";
-import { WarRoom, type RepoData } from "@/components/war-room";
 import { EmptyState } from "@/components/empty-state";
+import { type RepoData, WarRoom } from "@/components/war-room";
+import { scanEntitiesForRepo } from "@/lib/entity-scan";
+import { entityLeases, sessions } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
   let connectedSessions: { projectRoot: string; sessionId: string }[] = [];
-  let leaseMap: Record<string, { role: string; sessionId: string }> = {};
+  const leaseMap: Record<string, { role: string; sessionId: string }> = {};
 
   try {
     const { openReadOnlyDb } = await import("@/lib/db");
     const handle = openReadOnlyDb();
-    connectedSessions = handle.db.select({
-      projectRoot: sessions.projectRoot,
-      sessionId: sessions.sessionId,
-    }).from(sessions).all();
+    connectedSessions = handle.db
+      .select({
+        projectRoot: sessions.projectRoot,
+        sessionId: sessions.sessionId,
+      })
+      .from(sessions)
+      .all();
 
-    const activeLeases = handle.db.select({
-      entitySlug: entityLeases.entitySlug,
-      role: entityLeases.role,
-      sessionId: entityLeases.sessionId,
-    }).from(entityLeases).where(gt(entityLeases.expiresAt, Date.now())).all();
+    const activeLeases = handle.db
+      .select({
+        entitySlug: entityLeases.entitySlug,
+        role: entityLeases.role,
+        sessionId: entityLeases.sessionId,
+      })
+      .from(entityLeases)
+      .where(gt(entityLeases.expiresAt, Date.now()))
+      .all();
 
     for (const lease of activeLeases) {
       leaseMap[lease.entitySlug] = { role: lease.role, sessionId: lease.sessionId };
@@ -46,7 +53,7 @@ export default async function Page() {
       const label = s.projectRoot.split("/").pop() ?? s.projectRoot;
       const entities = await scanEntitiesForRepo(s.projectRoot, label);
       return { repoLabel: label, entities };
-    })
+    }),
   );
 
   const nonEmpty = repoDataList.filter((r) => r.entities.length > 0);

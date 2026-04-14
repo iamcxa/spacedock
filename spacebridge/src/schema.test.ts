@@ -1,13 +1,6 @@
-import { describe, test, expect } from "bun:test";
-import {
-  sessions,
-  entityLeases,
-  events,
-  comments,
-  shareTokens,
-  leaseEvents,
-} from "./schema";
+import { describe, expect, test } from "bun:test";
 import { createDb } from "./db";
+import { comments, entityLeases, events, leaseEvents, sessions, shareTokens } from "./schema";
 
 // ABOUTME: TDD-first schema tests for spacebridge Drizzle LCD schema.
 // Tests run against :memory: SQLite — no production DB contamination.
@@ -26,7 +19,10 @@ function createMemoryDb() {
 describe("sessions table", () => {
   test("exists with expected columns", () => {
     const { sqlite, db: _db } = createMemoryDb();
-    const info = sqlite.query("PRAGMA table_info(sessions)").all() as Array<{ name: string; type: string }>;
+    const info = sqlite.query("PRAGMA table_info(sessions)").all() as Array<{
+      name: string;
+      type: string;
+    }>;
     const cols = info.map((c) => c.name);
     expect(cols).toContain("id");
     expect(cols).toContain("session_id");
@@ -50,7 +46,10 @@ describe("sessions table", () => {
 
   test("timestamps use INTEGER affinity (LCD compliance)", () => {
     const { sqlite } = createMemoryDb();
-    const info = sqlite.query("PRAGMA table_info(sessions)").all() as Array<{ name: string; type: string }>;
+    const info = sqlite.query("PRAGMA table_info(sessions)").all() as Array<{
+      name: string;
+      type: string;
+    }>;
     for (const col of info) {
       if (col.name === "connected_at" || col.name === "last_heartbeat") {
         expect(col.type.toUpperCase()).toBe("INTEGER");
@@ -62,13 +61,15 @@ describe("sessions table", () => {
   test("basic CRUD: insert and select", () => {
     const { sqlite, db } = createMemoryDb();
     const now = Date.now();
-    db.insert(sessions).values({
-      sessionId: "sess-001",
-      projectRoot: "/home/user/project",
-      pid: 12345,
-      connectedAt: now,
-      lastHeartbeat: now,
-    }).run();
+    db.insert(sessions)
+      .values({
+        sessionId: "sess-001",
+        projectRoot: "/home/user/project",
+        pid: 12345,
+        connectedAt: now,
+        lastHeartbeat: now,
+      })
+      .run();
 
     const rows = db.select().from(sessions).all();
     expect(rows.length).toBe(1);
@@ -108,7 +109,10 @@ describe("entity_leases table", () => {
 
   test("timestamps use INTEGER affinity (LCD compliance)", () => {
     const { sqlite } = createMemoryDb();
-    const info = sqlite.query("PRAGMA table_info(entity_leases)").all() as Array<{ name: string; type: string }>;
+    const info = sqlite.query("PRAGMA table_info(entity_leases)").all() as Array<{
+      name: string;
+      type: string;
+    }>;
     for (const col of info) {
       if (col.name === "acquired_at" || col.name === "expires_at") {
         expect(col.type.toUpperCase()).toBe("INTEGER");
@@ -120,14 +124,16 @@ describe("entity_leases table", () => {
   test("basic CRUD: insert and select", () => {
     const { sqlite, db } = createMemoryDb();
     const now = Date.now();
-    db.insert(entityLeases).values({
-      token: "lease-token-abc",
-      sessionId: "sess-001",
-      entitySlug: "my-entity",
-      role: "SO",
-      acquiredAt: now,
-      expiresAt: now + 3600000,
-    }).run();
+    db.insert(entityLeases)
+      .values({
+        token: "lease-token-abc",
+        sessionId: "sess-001",
+        entitySlug: "my-entity",
+        role: "SO",
+        acquiredAt: now,
+        expiresAt: now + 3600000,
+      })
+      .run();
 
     const rows = db.select().from(entityLeases).all();
     expect(rows.length).toBe(1);
@@ -166,7 +172,10 @@ describe("events table", () => {
 
   test("timestamp uses INTEGER affinity (LCD compliance)", () => {
     const { sqlite } = createMemoryDb();
-    const info = sqlite.query("PRAGMA table_info(events)").all() as Array<{ name: string; type: string }>;
+    const info = sqlite.query("PRAGMA table_info(events)").all() as Array<{
+      name: string;
+      type: string;
+    }>;
     const tsCol = info.find((c) => c.name === "timestamp");
     expect(tsCol?.type.toUpperCase()).toBe("INTEGER");
     sqlite.close();
@@ -175,14 +184,16 @@ describe("events table", () => {
   test("basic CRUD: insert and select", () => {
     const { sqlite, db } = createMemoryDb();
     const now = Date.now();
-    db.insert(events).values({
-      type: "dispatch",
-      entity: "my-entity",
-      stage: "plan",
-      agent: "ensign",
-      timestamp: now,
-      workflowDir: "/home/user/project",
-    }).run();
+    db.insert(events)
+      .values({
+        type: "dispatch",
+        entity: "my-entity",
+        stage: "plan",
+        agent: "ensign",
+        timestamp: now,
+        workflowDir: "/home/user/project",
+      })
+      .run();
 
     const rows = db.select().from(events).all();
     expect(rows.length).toBe(1);
@@ -225,7 +236,10 @@ describe("comments table", () => {
 
   test("created_at uses INTEGER affinity (LCD compliance)", () => {
     const { sqlite } = createMemoryDb();
-    const info = sqlite.query("PRAGMA table_info(comments)").all() as Array<{ name: string; type: string }>;
+    const info = sqlite.query("PRAGMA table_info(comments)").all() as Array<{
+      name: string;
+      type: string;
+    }>;
     const createdAtCol = info.find((c) => c.name === "created_at");
     expect(createdAtCol?.type.toUpperCase()).toBe("INTEGER");
     sqlite.close();
@@ -233,7 +247,10 @@ describe("comments table", () => {
 
   test("resolved defaults to 0", () => {
     const { sqlite } = createMemoryDb();
-    const info = sqlite.query("PRAGMA table_info(comments)").all() as Array<{ name: string; dflt_value: string | null }>;
+    const info = sqlite.query("PRAGMA table_info(comments)").all() as Array<{
+      name: string;
+      dflt_value: string | null;
+    }>;
     const resolvedCol = info.find((c) => c.name === "resolved");
     expect(resolvedCol?.dflt_value).toBe("0");
     sqlite.close();
@@ -242,16 +259,18 @@ describe("comments table", () => {
   test("basic CRUD: insert and select", () => {
     const { sqlite, db } = createMemoryDb();
     const now = Date.now();
-    db.insert(comments).values({
-      commentId: "comment-uuid-001",
-      entityPath: "/docs/my-entity.md",
-      selectedText: "some text",
-      sectionHeading: "## Directive",
-      content: "This needs clarification",
-      author: "captain",
-      createdAt: now,
-      workflowDir: "/home/user/project",
-    }).run();
+    db.insert(comments)
+      .values({
+        commentId: "comment-uuid-001",
+        entityPath: "/docs/my-entity.md",
+        selectedText: "some text",
+        sectionHeading: "## Directive",
+        content: "This needs clarification",
+        author: "captain",
+        createdAt: now,
+        workflowDir: "/home/user/project",
+      })
+      .run();
 
     const rows = db.select().from(comments).all();
     expect(rows.length).toBe(1);
@@ -293,7 +312,10 @@ describe("share_tokens table", () => {
 
   test("timestamps use INTEGER affinity (LCD compliance)", () => {
     const { sqlite } = createMemoryDb();
-    const info = sqlite.query("PRAGMA table_info(share_tokens)").all() as Array<{ name: string; type: string }>;
+    const info = sqlite.query("PRAGMA table_info(share_tokens)").all() as Array<{
+      name: string;
+      type: string;
+    }>;
     for (const col of info) {
       if (col.name === "created_at" || col.name === "expires_at") {
         expect(col.type.toUpperCase()).toBe("INTEGER");
@@ -305,12 +327,14 @@ describe("share_tokens table", () => {
   test("basic CRUD: insert and select bearer-token row", () => {
     const { sqlite, db } = createMemoryDb();
     const now = Date.now();
-    db.insert(shareTokens).values({
-      token: "a".repeat(48),
-      entitySlug: "my-entity",
-      createdAt: now,
-      expiresAt: now + 86400000,
-    }).run();
+    db.insert(shareTokens)
+      .values({
+        token: "a".repeat(48),
+        entitySlug: "my-entity",
+        createdAt: now,
+        expiresAt: now + 86400000,
+      })
+      .run();
 
     const rows = db.select().from(shareTokens).all();
     expect(rows.length).toBe(1);
@@ -328,7 +352,10 @@ describe("LCD compliance across all tables", () => {
   test("no REAL or DATETIME column affinity in any table", () => {
     const { sqlite } = createMemoryDb();
     for (const tableName of tableNames) {
-      const info = sqlite.query(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string; type: string }>;
+      const info = sqlite.query(`PRAGMA table_info(${tableName})`).all() as Array<{
+        name: string;
+        type: string;
+      }>;
       for (const col of info) {
         const t = col.type.toUpperCase();
         expect(t).not.toMatch(/REAL|FLOAT|DOUBLE|DATETIME|DATE/);
@@ -358,13 +385,16 @@ describe("test isolation", () => {
     const { sqlite: s1, db: db1 } = createMemoryDb();
     const { sqlite: s2, db: db2 } = createMemoryDb();
 
-    db1.insert(sessions).values({
-      sessionId: "sess-isolation",
-      projectRoot: "/tmp/proj",
-      pid: 999,
-      connectedAt: Date.now(),
-      lastHeartbeat: Date.now(),
-    }).run();
+    db1
+      .insert(sessions)
+      .values({
+        sessionId: "sess-isolation",
+        projectRoot: "/tmp/proj",
+        pid: 999,
+        connectedAt: Date.now(),
+        lastHeartbeat: Date.now(),
+      })
+      .run();
 
     const rows = db2.select().from(sessions).all();
     expect(rows.length).toBe(0);
@@ -379,7 +409,10 @@ describe("test isolation", () => {
 describe("lease_events table", () => {
   test("exists with expected columns", () => {
     const { sqlite } = createMemoryDb();
-    const info = sqlite.query("PRAGMA table_info(lease_events)").all() as Array<{ name: string; type: string }>;
+    const info = sqlite.query("PRAGMA table_info(lease_events)").all() as Array<{
+      name: string;
+      type: string;
+    }>;
     const cols = info.map((c) => c.name);
     expect(cols).toContain("id");
     expect(cols).toContain("aggregate_id");
@@ -392,13 +425,15 @@ describe("lease_events table", () => {
   test("insert and query round-trip", () => {
     const { db } = createMemoryDb();
     const now = Date.now();
-    db.insert(leaseEvents).values({
-      aggregateId: "my-entity::FO",
-      sequenceNumber: 1,
-      eventType: "acquired",
-      payload: JSON.stringify({ token: "tok-1", entitySlug: "my-entity", role: "FO" }),
-      timestamp: now,
-    }).run();
+    db.insert(leaseEvents)
+      .values({
+        aggregateId: "my-entity::FO",
+        sequenceNumber: 1,
+        eventType: "acquired",
+        payload: JSON.stringify({ token: "tok-1", entitySlug: "my-entity", role: "FO" }),
+        timestamp: now,
+      })
+      .run();
 
     const rows = db.select().from(leaseEvents).all();
     expect(rows.length).toBe(1);
@@ -409,7 +444,10 @@ describe("lease_events table", () => {
 
   test("LCD compliance — integer timestamps", () => {
     const { sqlite } = createMemoryDb();
-    const info = sqlite.query("PRAGMA table_info(lease_events)").all() as Array<{ name: string; type: string }>;
+    const info = sqlite.query("PRAGMA table_info(lease_events)").all() as Array<{
+      name: string;
+      type: string;
+    }>;
     const tsCol = info.find((c) => c.name === "timestamp");
     expect(tsCol?.type.toUpperCase()).toBe("INTEGER");
   });

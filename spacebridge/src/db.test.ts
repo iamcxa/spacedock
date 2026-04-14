@@ -1,7 +1,7 @@
-import { describe, test, expect, afterEach } from "bun:test";
-import { rmSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { afterEach, describe, expect, test } from "bun:test";
+import { existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createDb } from "./db";
 import { sessions } from "./schema";
 
@@ -11,7 +11,10 @@ import { sessions } from "./schema";
 const tempDbs: string[] = [];
 
 function makeTempPath(): string {
-  const path = join(tmpdir(), `test-spacebridge-${Date.now()}-${Math.random().toString(36).slice(2)}.db`);
+  const path = join(
+    tmpdir(),
+    `test-spacebridge-${Date.now()}-${Math.random().toString(36).slice(2)}.db`,
+  );
   tempDbs.push(path);
   return path;
 }
@@ -19,7 +22,9 @@ function makeTempPath(): string {
 afterEach(() => {
   for (const p of tempDbs.splice(0)) {
     for (const suffix of ["", "-wal", "-shm"]) {
-      try { rmSync(p + suffix); } catch {}
+      try {
+        rmSync(p + suffix);
+      } catch {}
     }
   }
 });
@@ -35,13 +40,15 @@ describe("createDb(:memory:)", () => {
   test("can insert and retrieve rows via the schema", () => {
     const db = createDb(":memory:");
     const now = Date.now();
-    db.insert(sessions).values({
-      sessionId: "sess-db-test-001",
-      projectRoot: "/tmp/project",
-      pid: 42,
-      connectedAt: now,
-      lastHeartbeat: now,
-    }).run();
+    db.insert(sessions)
+      .values({
+        sessionId: "sess-db-test-001",
+        projectRoot: "/tmp/project",
+        pid: 42,
+        connectedAt: now,
+        lastHeartbeat: now,
+      })
+      .run();
 
     const rows = db.select().from(sessions).all();
     expect(rows.length).toBe(1);
@@ -63,7 +70,9 @@ describe("createDb(tempFilePath)", () => {
     const db = createDb(path);
     // Access underlying sqlite via the drizzle session — use raw query
     // drizzle-orm/bun-sqlite exposes $client as underlying bun:sqlite Database
-    const result = (db as { $client: import("bun:sqlite").Database }).$client.query("PRAGMA journal_mode").get() as { journal_mode: string };
+    const result = (db as { $client: import("bun:sqlite").Database }).$client
+      .query("PRAGMA journal_mode")
+      .get() as { journal_mode: string };
     expect(result.journal_mode).toBe("wal");
   });
 
@@ -73,13 +82,16 @@ describe("createDb(tempFilePath)", () => {
 
     // First open: write a row
     const db1 = createDb(path);
-    db1.insert(sessions).values({
-      sessionId: "persist-test",
-      projectRoot: "/tmp/persist",
-      pid: 1000,
-      connectedAt: now,
-      lastHeartbeat: now,
-    }).run();
+    db1
+      .insert(sessions)
+      .values({
+        sessionId: "persist-test",
+        projectRoot: "/tmp/persist",
+        pid: 1000,
+        connectedAt: now,
+        lastHeartbeat: now,
+      })
+      .run();
     (db1 as { $client: import("bun:sqlite").Database }).$client.close();
 
     // Second open: verify row survives
@@ -96,13 +108,16 @@ describe("isolation between :memory: instances", () => {
     const db1 = createDb(":memory:");
     const db2 = createDb(":memory:");
 
-    db1.insert(sessions).values({
-      sessionId: "isolation-check",
-      projectRoot: "/tmp/proj",
-      pid: 777,
-      connectedAt: Date.now(),
-      lastHeartbeat: Date.now(),
-    }).run();
+    db1
+      .insert(sessions)
+      .values({
+        sessionId: "isolation-check",
+        projectRoot: "/tmp/proj",
+        pid: 777,
+        connectedAt: Date.now(),
+        lastHeartbeat: Date.now(),
+      })
+      .run();
 
     const rows = db2.select().from(sessions).all();
     expect(rows.length).toBe(0);

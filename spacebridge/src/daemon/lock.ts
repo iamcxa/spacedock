@@ -3,7 +3,7 @@
 // mkdir is atomic on all POSIX + Windows filesystems — EEXIST on collision.
 // Stale lock detection via mtime comparison (handles crash without rmdir).
 
-import { mkdirSync, rmdirSync, statSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, rmdirSync, statSync } from "node:fs";
 
 export interface AcquireLockOptions {
   /** Milliseconds after which a held lock is considered stale (default: 10000). */
@@ -31,7 +31,9 @@ export function acquireLock(lockPath: string, opts?: AcquireLockOptions): boolea
     const ageMs = Date.now() - stat.mtimeMs;
     if (ageMs > staleThresholdMs) {
       // Stale lock — remove and re-acquire
-      try { rmdirSync(lockPath); } catch {}
+      try {
+        rmdirSync(lockPath);
+      } catch {}
       try {
         mkdirSync(lockPath);
         return true;
@@ -58,5 +60,7 @@ export function acquireLock(lockPath: string, opts?: AcquireLockOptions): boolea
  */
 export function releaseLock(lockPath: string): void {
   if (!existsSync(lockPath)) return;
-  try { rmdirSync(lockPath); } catch {}
+  try {
+    rmdirSync(lockPath);
+  } catch {}
 }

@@ -4,9 +4,9 @@
 // POST: parse Zod schema, load state via replay, decide, append events, upsert snapshot,
 //       write notification event to events table for SSE feed, return 201.
 
-import { asc } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
+import { asc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -17,13 +17,12 @@ function defaultDbPath(): string {
 const SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/;
 
 function normalizeHeading(h: unknown): string {
-  return String(h ?? "").replace(/^##\s*/, "").trim();
+  return String(h ?? "")
+    .replace(/^##\s*/, "")
+    .trim();
 }
 
-export async function GET(
-  _req: Request,
-  { params }: { params: Promise<{ slug: string }> },
-) {
+export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
   if (!SLUG_RE.test(slug)) {
@@ -55,7 +54,7 @@ export async function GET(
     }
 
     // Group by normalized sectionHeading (strip "## " prefix)
-    const bySection = new Map<string, Array<typeof rows[0] & { replies: typeof rows }>>();
+    const bySection = new Map<string, Array<(typeof rows)[0] & { replies: typeof rows }>>();
     for (const c of topLevel) {
       const withReplies = { ...c, replies: replyMap.get(c.commentId) ?? [] };
       const section = normalizeHeading(c.sectionHeading);
@@ -69,10 +68,7 @@ export async function GET(
   }
 }
 
-export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ slug: string }> },
-) {
+export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
   if (!SLUG_RE.test(slug)) {
@@ -87,9 +83,7 @@ export async function POST(
   }
 
   try {
-    const { parseCommand } = await import(
-      "../../../../../../src/domain/comment/schemas"
-    );
+    const { parseCommand } = await import("../../../../../../src/domain/comment/schemas");
 
     // Validate input
     let cmd: ReturnType<typeof parseCommand>;
@@ -104,25 +98,22 @@ export async function POST(
         author: (body as Record<string, unknown>).author ?? "captain",
       });
     } catch (err) {
-      return Response.json({ error: "Invalid request body", details: String(err) }, { status: 400 });
+      return Response.json(
+        { error: "Invalid request body", details: String(err) },
+        { status: 400 },
+      );
     }
 
     if (cmd.type !== "add_comment") {
       return Response.json({ error: "Invalid command type" }, { status: 400 });
     }
 
-    const { createDb } = await import(
-      "../../../../../../src/db"
-    );
+    const { createDb } = await import("../../../../../../src/db");
     const { appendEvents, loadEvents, upsertSnapshot, countEvents } = await import(
       "../../../../../../src/domain/comment/persistence"
     );
-    const { decide } = await import(
-      "../../../../../../src/domain/comment/decider"
-    );
-    const { replay } = await import(
-      "../../../../../../src/domain/comment/evolve"
-    );
+    const { decide } = await import("../../../../../../src/domain/comment/decider");
+    const { replay } = await import("../../../../../../src/domain/comment/evolve");
 
     const db = createDb(defaultDbPath());
     const entityPath = `/docs/build-pipeline/${slug}.md`;
@@ -159,9 +150,7 @@ export async function POST(
     }
 
     // Write notification event to events table for SSE feed
-    const { events: eventsTable } = await import(
-      "../../../../../../src/schema"
-    );
+    const { events: eventsTable } = await import("../../../../../../src/schema");
     await db.insert(eventsTable).values({
       type: "comment_added",
       entity: slug,
@@ -172,10 +161,7 @@ export async function POST(
       workflowDir: "",
     });
 
-    return Response.json(
-      { commentId: cmd.commentId, ok: true },
-      { status: 201 },
-    );
+    return Response.json({ commentId: cmd.commentId, ok: true }, { status: 201 });
   } catch (err) {
     console.error("[comments POST]", err);
     return Response.json({ error: "Internal server error", details: String(err) }, { status: 500 });

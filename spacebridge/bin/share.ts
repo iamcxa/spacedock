@@ -5,28 +5,31 @@
 //        spacebridge share --list
 // Communicates with daemon via unix socket IPC (same pattern as cmdStatus).
 
-import { join } from "node:path";
-import { homedir } from "node:os";
 import * as net from "node:net";
-import { randomUUID } from "node:crypto";
-import { encodeMessage, createFrameDecoder } from "../src/ipc/framing";
-import { readPidFile, isProcessAlive } from "../src/daemon/pid";
-import type { IpcMessage } from "../src/ipc/types";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { isProcessAlive, readPidFile } from "../src/daemon/pid";
 
 // ─── TTL parsing ─────────────────────────────────────────────────────────────
 
 export function parseTtl(raw: string): number {
   const match = raw.match(/^(\d+)(d|h|m)$/);
   if (!match) {
-    throw new Error(`Invalid TTL format: "${raw}". Use Nd (days), Nh (hours), or Nm (minutes). Example: 7d, 24h, 30m`);
+    throw new Error(
+      `Invalid TTL format: "${raw}". Use Nd (days), Nh (hours), or Nm (minutes). Example: 7d, 24h, 30m`,
+    );
   }
   const value = parseInt(match[1], 10);
   const unit = match[2];
   switch (unit) {
-    case "d": return value * 24 * 60 * 60 * 1000;
-    case "h": return value * 60 * 60 * 1000;
-    case "m": return value * 60 * 1000;
-    default: throw new Error(`Unreachable unit: ${unit}`);
+    case "d":
+      return value * 24 * 60 * 60 * 1000;
+    case "h":
+      return value * 60 * 60 * 1000;
+    case "m":
+      return value * 60 * 1000;
+    default:
+      throw new Error(`Unreachable unit: ${unit}`);
   }
 }
 
@@ -68,9 +71,9 @@ export function parseArgs(argv: string[]): ShareArgs {
   if (entityIdx === -1) {
     throw new Error(
       "Usage:\n" +
-      "  spacebridge share --entity <slug> [--ttl 7d] [--tunnel-backend <name>]\n" +
-      "  spacebridge share --revoke <token>\n" +
-      "  spacebridge share --list"
+        "  spacebridge share --entity <slug> [--ttl 7d] [--tunnel-backend <name>]\n" +
+        "  spacebridge share --revoke <token>\n" +
+        "  spacebridge share --list",
     );
   }
 
@@ -91,7 +94,8 @@ export function parseArgs(argv: string[]): ShareArgs {
   const backendIdx = argv.indexOf("--tunnel-backend");
   if (backendIdx !== -1) {
     const name = argv[backendIdx + 1];
-    if (!name || name.startsWith("--")) throw new Error("--tunnel-backend requires a name (ngrok, tailscale, cloudflared)");
+    if (!name || name.startsWith("--"))
+      throw new Error("--tunnel-backend requires a name (ngrok, tailscale, cloudflared)");
     tunnelBackend = name;
   }
 
@@ -123,7 +127,7 @@ async function sendRpc(socketPath: string, method: string, args: unknown[]): Pro
     type: "register",
     payload: {
       projectRoot: process.cwd(),
-      sessionId: "share-cli-" + uuid(),
+      sessionId: `share-cli-${uuid()}`,
       pid: process.pid,
       protocolVersion: 1,
     },
@@ -157,7 +161,9 @@ async function sendRpc(socketPath: string, method: string, args: unknown[]): Pro
             if (payload.error) reject(new Error(payload.error));
             else resolve(payload.result);
           }
-        } catch { /* skip malformed frame */ }
+        } catch {
+          /* skip malformed frame */
+        }
       }
     });
 
@@ -190,36 +196,37 @@ export async function runShareCommand(argv: string[]): Promise<void> {
   const pid = readPidFile(pidPath);
   if (pid === null || !isProcessAlive(pid)) {
     process.stderr.write(
-      "Error: spacebridge daemon is not running.\n" +
-      "Start it with: spacebridge start\n"
+      "Error: spacebridge daemon is not running.\n" + "Start it with: spacebridge start\n",
     );
     process.exit(1);
   }
 
   try {
     if (args.subcommand === "create") {
-      const result = await sendRpc(socketPath, "share_create", [
+      const result = (await sendRpc(socketPath, "share_create", [
         args.entitySlug,
         args.ttlMs,
         args.tunnelBackend,
-      ]) as { token: string; url: string; entitySlug: string; expiresAt: number };
+      ])) as { token: string; url: string; entitySlug: string; expiresAt: number };
       const expiryDate = new Date(result.expiresAt).toISOString();
       process.stdout.write(`Share URL: ${result.url}\n`);
       process.stdout.write(`Token:     ${result.token}\n`);
       process.stdout.write(`Entity:    ${result.entitySlug}\n`);
       process.stdout.write(`Expires:   ${expiryDate}\n`);
-
     } else if (args.subcommand === "revoke") {
-      const result = await sendRpc(socketPath, "share_revoke", [args.token]) as { revoked: boolean };
+      const result = (await sendRpc(socketPath, "share_revoke", [args.token])) as {
+        revoked: boolean;
+      };
       if (result.revoked) {
         process.stdout.write(`Token revoked: ${args.token}\n`);
       } else {
         process.stdout.write(`Token not found (already expired or revoked): ${args.token}\n`);
       }
-
     } else if (args.subcommand === "list") {
-      const tokens = await sendRpc(socketPath, "share_list", []) as Array<{
-        token: string; entitySlug: string; expiresAt: number;
+      const tokens = (await sendRpc(socketPath, "share_list", [])) as Array<{
+        token: string;
+        entitySlug: string;
+        expiresAt: number;
       }>;
       if (tokens.length === 0) {
         process.stdout.write("No active share tokens.\n");
