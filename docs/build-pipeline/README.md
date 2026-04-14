@@ -85,7 +85,7 @@ stages:
       model: sonnet
       skill: spacedock:build-execute
       # Execute orchestrator (sonnet) builds wave graph from PLAN and dispatches
-      # task subagents via spacedock:task-executor agent with per-task model hint
+      # troop agents via spacedock:troop agent with per-task model hint
       # (haiku for mechanical, sonnet for integration, opus only on BLOCKED escalation).
       # Wave-parallel within each wave (when files_modified don't overlap),
       # serial across waves. Pre-commit hook fires per task commit.
@@ -331,7 +331,7 @@ FO detects signals by scanning the plan for keywords: `migration`, `schema`, `sa
 
 ### `execute`
 
-Implement the plan via wave-based parallel task dispatch. The execute orchestrator (sonnet) builds a wave graph from `## PLAN`, dispatches task subagents through `spacedock:task-executor` agent with per-task model hints, collects changes, and commits serially per task.
+Implement the plan via wave-based parallel task dispatch. The execute orchestrator (sonnet) builds a wave graph from `## PLAN`, dispatches troop agents through `spacedock:troop` agent with per-task model hints, collects changes, and commits serially per task.
 
 - **Inputs:** `## PLAN` from plan stage, context lake (verified patterns + implementation insights)
 - **Outputs:**

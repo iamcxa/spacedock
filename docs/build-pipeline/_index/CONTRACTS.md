@@ -19,6 +19,12 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | Ignore spacebridge/ui build artifacts (.next, node_modules) | 🔵 planned | 2026-04-13 |
 
+### agents/ensign.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| flatten-dispatch-troops-architecture | plan | Add explicit no-sub-dispatch boundary documentation | 🔵 planned | 2026-04-14 |
+
 ### agents/code-explorer.md
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -43,6 +49,12 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent for sharp-edges trailofbits skill | ✅ final | 2026-04-12 |
 
+### agents/troop.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| flatten-dispatch-troops-architecture | execute | Create troop agent (renamed from task-executor, multiple default skills) | ✅ final | 2026-04-14 |
+
 ### agents/variant-analysis-reviewer.md
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -55,6 +67,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | Document war room UI spawn lifecycle + port 8420 + SPACEBRIDGE_SKIP_UI | 🔵 planned | 2026-04-13 |
+
+### docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| flatten-dispatch-troops-architecture | execute | Update execute stage details: task-executor -> troop in dispatch descriptions | ✅ final | 2026-04-14 |
 
 ### docs/build-pipeline/_mods/pr-merge.md
 
@@ -81,6 +99,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Correct pr-review-toolkit bundling claim at line 183 | ✅ final | 2026-04-12 |
 | review-stage-parallel-skill-dispatch | execute | Add dispatch: debate-driven to review stage YAML + update prose | 🟡 in-flight | 2026-04-12 |
 | pre-ship-confidence-gate | execute | Document confidence gate in uat and shipped stage definitions | 🟡 in-flight | 2026-04-13 |
+| flatten-dispatch-troops-architecture | plan | Update execute stage description: task-executor -> troop agent | 🔵 planned | 2026-04-14 |
 
 ### docs/overhaul/recipes/phase-e-plan-3-build-pipeline.yaml
 
@@ -107,11 +126,36 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Conditional Case B deletion gated on AC3 AC4 live verification | ✅ final | 2026-04-12 |
 
+### references/agent-dispatch-guide.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| flatten-dispatch-troops-architecture | plan | Update orchestrator skills section: task-executor -> troop, FO-direct dispatch | 🔵 planned | 2026-04-14 |
+
+### references/claude-ensign-runtime.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| flatten-dispatch-troops-architecture | plan | Update thin wrapper canonical refs: task-executor.md -> troop.md | 🔵 planned | 2026-04-14 |
+
 ### references/claude-first-officer-runtime.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | review-stage-parallel-skill-dispatch | execute | Unbind single-entity mode from bare mode -- only skip teams in -p pipe mode | 🟡 in-flight | 2026-04-12 |
+| flatten-dispatch-troops-architecture | plan | Add Troops Dispatch template for execute-stage wave-parallel dispatch | 🔵 planned | 2026-04-14 |
+
+### references/codex-ensign-runtime.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| flatten-dispatch-troops-architecture | plan | Update any task-executor references to troop for Codex parity | 🔵 planned | 2026-04-14 |
+
+### references/codex-first-officer-runtime.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| flatten-dispatch-troops-architecture | plan | Update any task-executor references to troop for Codex parity | 🔵 planned | 2026-04-14 |
 
 ### references/confidence-gate.md
 
@@ -126,6 +170,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | kc-pr-flow-mod-integration | shipped | Update FO shared core for layered mod scanning and pr-review-loop reference | ✅ final | 2026-04-12 |
 | review-stage-parallel-skill-dispatch | execute | Clarify team creation policy in single-entity mode section | 🟡 in-flight | 2026-04-12 |
 | pre-ship-confidence-gate | execute | Add Pre-Ship Confidence Gate subsection to Completion and Gates + Merge steps | 🟡 in-flight | 2026-04-13 |
+| flatten-dispatch-troops-architecture | plan | Add troops-dispatch subsection to Dispatch Modes | 🔵 planned | 2026-04-14 |
 
 ### skills/build-brainstorm/SKILL.md
 
@@ -151,6 +196,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | execute-staleness-detection | plan | Insert per-wave staleness pre-check into build-execute Step 4 + Stage Report | planned | 2026-04-13 |
+| flatten-dispatch-troops-architecture | plan | Refactor from ensign-internal orchestrator to FO-direct troop dispatch guidance | 🔵 planned | 2026-04-14 |
 
 ### skills/build-explore/SKILL.md
 
@@ -169,6 +215,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add test_first attribute to task schema and TDD plan intelligence in step 4a | in-flight | 2026-04-12 |
+| flatten-dispatch-troops-architecture | plan | Update task-executor references to troop in dispatch constraint notes | 🔵 planned | 2026-04-14 |
 
 ### skills/build-plan/references/plan-checker-prompt.md
 
@@ -213,12 +260,14 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | overhaul-skill-implementation | plan | Add 3 new recipe primitives (replace-table-block, update-yaml-block, update-section) | planned | 2026-04-12 |
+| flatten-dispatch-troops-architecture | plan | Update task-executor example references to troop | 🔵 planned | 2026-04-14 |
 
 ### skills/task-execution/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add TDD Mode RED-GREEN-REFACTOR sub-cycle activated by test_first flag | in-flight | 2026-04-12 |
+| flatten-dispatch-troops-architecture | plan | Update agent references from task-executor to troop | 🔵 planned | 2026-04-14 |
 
 ### spacebridge/.claude-plugin/plugin.json
 

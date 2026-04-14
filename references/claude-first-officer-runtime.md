@@ -53,6 +53,22 @@ Agent(
 
 In bare mode, dispatch blocks until the subagent completes — concurrent dispatch of multiple entities is not possible. Dispatch one entity at a time and process completions inline.
 
+## Troops Dispatch (Execute Stage)
+
+For execute-stage wave-parallel dispatch, FO dispatches troop agents directly with per-task model hints from the PLAN. Load `spacedock:build-execute` via Skill() first to get the full orchestration guidance, then dispatch troops per wave.
+
+```
+Agent(
+    subagent_type="spacedock:troop",
+    name="troop-{slug}-task-{task_id}",
+    model="{task.model}",  // haiku | sonnet | opus from PLAN
+    {if not bare mode: 'team_name="{team_name}"',}
+    prompt="You are executing task-{task_id} for entity: {entity_title}\n\n## Task\n{task block from PLAN}\n\n## Context\n{entity context: acceptance criteria, research findings, relevant sections}\n\nYour working directory is {worktree_path}\nAll file reads and writes MUST use paths under {worktree_path}.\nYour git branch is {branch}. Do NOT commit -- return changed_files and status."
+)
+```
+
+In bare mode, dispatch one troop at a time (sequential). Context isolation is preserved -- each troop gets fresh context per task, unlike ensign which would accumulate context across tasks.
+
 ## Captain Interaction
 
 The captain is the user of the Claude Code session. Communicate with the captain via direct text output (not SendMessage). Gate reviews, status reports, and clarification requests are presented as formatted text in the conversation.

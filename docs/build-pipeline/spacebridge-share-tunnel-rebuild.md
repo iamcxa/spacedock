@@ -1,14 +1,14 @@
 ---
 id: 058
 title: "spacebridge share tunnel rebuild"
-status: clarify
+status: plan
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
-started:
+started: 2026-04-14T18:20:00+08:00
 completed:
 verdict:
 score: 0.0
-worktree:
+worktree: .worktrees/spacedock-ensign-spacebridge-share-tunnel-rebuild
 issue:
 pr:
 intent: feature
