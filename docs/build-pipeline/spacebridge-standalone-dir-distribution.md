@@ -14,6 +14,7 @@ pr:
 intent: feature
 scale: Small
 project: spacedock
+uat_pending_count: 5
 depends-on: [053]
 ---
 
