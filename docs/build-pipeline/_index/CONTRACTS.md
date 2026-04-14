@@ -644,11 +644,18 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | SSE Route Handler polling events table at 500ms interval | 🔵 planned | 2026-04-13 |
 
+### spacebridge/ui/app/entity/[slug]/page.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| comment-ux-polish-right-panel-highlights | plan | Restructure to two-column layout with EntityDetailClient wrapper | 🔵 planned | 2026-04-14 |
+
 ### spacebridge/ui/app/globals.css
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | Tailwind v4 + shadcn theme (CSS-only config, no tailwind.config.js) | 🔵 planned | 2026-04-13 |
+| comment-ux-polish-right-panel-highlights | plan | Add comment highlight + flash CSS styles | 🔵 planned | 2026-04-14 |
 
 ### spacebridge/ui/app/layout.tsx
 
@@ -674,17 +681,35 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | shadcn/UI v4 config (New York style, Neutral base, CSS variables) | 🔵 planned | 2026-04-13 |
 
+### spacebridge/ui/components/comment-panel.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| comment-ux-polish-right-panel-highlights | plan | Right-side comment panel with ScrollArea and scroll-to-comment IDs | 🔵 planned | 2026-04-14 |
+
 ### spacebridge/ui/components/empty-state.tsx
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | Empty-state Server Component when zero connected sessions | 🔵 planned | 2026-04-13 |
 
+### spacebridge/ui/components/entity-body.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| comment-ux-polish-right-panel-highlights | plan | Remove inline comments, add TreeWalker highlight injection | 🔵 planned | 2026-04-14 |
+
 ### spacebridge/ui/components/entity-card.tsx
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | Entity card Server Component -- Card + Badge + Tooltip (slug/title/status/stage/lease) | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/components/entity-detail-client.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| comment-ux-polish-right-panel-highlights | plan | Two-column layout Client Component with state management | 🔵 planned | 2026-04-14 |
 
 ### spacebridge/ui/components/live-feed.tsx
 
