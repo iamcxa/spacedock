@@ -113,19 +113,15 @@ export const sessionEvents = sqliteTable("session_events", {
   timestamp: integer("timestamp").notNull(),         // epoch-ms
 });
 
-// ─── share_tokens — [plain drizzle] ──────────────────────────────────────────
+// ─── share_tokens — [plain drizzle] bearer-token model (O-1: clean recreate) ──
 
 export const shareTokens = sqliteTable("share_tokens", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  token: text("token").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
-  hashAlgorithm: text("hash_algorithm").default("argon2id"), // prepares for future algorithm migration
-  entityPaths: text("entity_paths").notNull(),       // JSON array as text blob
-  stages: text("stages").notNull(),                  // JSON array as text blob
-  label: text("label").notNull(),
+  token: text("token").notNull().unique(),           // 48-char hex, 192-bit entropy
+  entitySlug: text("entity_slug").notNull(),         // scoped to one entity (bearer-token model)
   createdAt: integer("created_at").notNull(),        // epoch-ms
   expiresAt: integer("expires_at").notNull(),        // epoch-ms
-  // fmodel-compatible columns
+  // fmodel-compatible columns (placeholder, [plain drizzle] not event-sourced)
   eventType: text("event_type"),
   aggregateId: text("aggregate_id"),
   sequenceNumber: integer("sequence_number"),
