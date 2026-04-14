@@ -1,8 +1,8 @@
 ---
 id: 096
 title: "Biome lint + Husky precommit hooks for spacebridge"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: captain (2026-04-14)
 created: 2026-04-14T18:00:00+08:00
 started:
@@ -71,18 +71,27 @@ children:
 A-1: No existing linter/formatter config exists in spacebridge — clean slate installation.
 Confidence: 🟢 Confident (0.95)
 Evidence: `glob spacebridge/**/eslint*` returns only bundled Next.js file in node_modules; no `biome.json`, no `.prettierrc`, no `.eslintrc` found. `spacebridge/ui/package.json` has no lint/format scripts.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-2: Bun supports Husky initialization via `bunx husky init` and lint-staged execution.
 Confidence: 🟡 Likely (0.75)
 Evidence: Bun documentation claims npm package compatibility; Husky v9+ uses a simple shell script approach that is runtime-agnostic. No spacedock codebase precedent to confirm.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-3: Biome supports Next.js 16 + React 19 JSX/TSX out of the box.
 Confidence: 🟡 Likely (0.75)
 Evidence: Biome docs claim React/JSX support; no spacedock codebase precedent. Next.js 16 is very new — potential edge cases with App Router patterns.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-4: Single `biome.json` at `spacebridge/` can cover both `ui/` and `src/` without subdirectory configs.
 Confidence: 🟢 Confident (0.85)
 Evidence: Biome's `include`/`exclude` patterns support directory scoping in a single config file. Common pattern in monorepo setups.
+→ Confirmed: captain, 2026-04-14 (batch)
+
+A-5: Husky `.husky/` lives at repo root (git root) with a conditional pre-commit that checks staged files for `spacebridge/` paths before running lint. Non-spacebridge commits have zero hook overhead.
+Confidence: 🟢 Confident (0.90)
+Evidence: Husky requires `.husky/` at git root; conditional check via `git diff --cached --name-only | grep '^spacebridge/'` is standard shell pattern for monorepo hooks.
+→ Confirmed: captain, 2026-04-14 (interactive)
 
 ## Option Comparisons
 
@@ -90,7 +99,15 @@ Evidence: Biome's `include`/`exclude` patterns support directory scoping in a si
 
 ## Open Questions
 
-(none -- all 4 captain-identified decisions resolved by codebase analysis: no ESLint to keep, Biome covers all, single config, no tests in precommit)
+(none from explore)
+
+Q-1: Husky initializes at git root but spacebridge is a subdirectory. How to scope precommit hooks?
+
+Domain: Tooling/DX
+Why it matters: Without scoping, every commit (including engine-only or docs-only) triggers spacebridge lint. With scoping, only commits touching spacebridge files trigger the hook.
+Suggested options: (a) Repo root + conditional check; (b) Repo root + always run; (c) core.hooksPath
+
+→ Answer: Repo root + conditional check -- .husky/pre-commit at git root, script checks if staged files contain spacebridge/ paths before running cd spacebridge && bunx lint-staged. Zero overhead for non-spacebridge commits. (captain, 2026-04-14, interactive)
 
 ## Decomposition Recommendation
 
@@ -116,3 +133,25 @@ Not warranted. Small entity, 3-4 config files to create, no complex logic.
 - [x] Scale assessment: Small confirmed
   3-4 config files to create/modify
 - [x] Research dispatched: 0 researchers (skipped -- A-2 and A-3 are external tech claims but Likely confidence, could warrant research in a larger entity; accepted as-is for Small scope)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- Small infra entity
+- [x] Re-validation: 4 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  Evidence verified same session
+- [x] Assumptions confirmed: 5 / 5 (0 corrected)
+  A-1 through A-4 confirmed via batch; A-5 confirmed interactive (Husky path at repo root + conditional)
+- [x] Options selected: 0 / 0
+  No option comparisons
+- [x] Questions answered: 1 / 1
+  Q-1 Husky hooks at repo root with conditional spacebridge/ check
+- [x] Open exploration: 1 gray area surfaced (0 from templates, 0 from CONTRACTS, 0 from directive, 1 via captain selection)
+  Husky subdirectory scoping (Q-1, A-5)
+- [x] Canonical refs added: 0
+  2 refs already populated from explore
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all Qs answered. Ready for FO execution.
+- [x] Handoff mode: loose
+  auto_advance not set; captain must say "execute 096" to advance
+- [x] Clarify duration: 3 questions asked, session complete
+  1 batch confirmation + 2 exploration iterations
