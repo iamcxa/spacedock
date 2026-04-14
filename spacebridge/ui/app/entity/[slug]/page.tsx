@@ -19,8 +19,14 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+const SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/;
+
 export default async function EntityDetailPage({ params }: PageProps) {
   const { slug } = await params;
+
+  if (!SLUG_RE.test(slug)) {
+    notFound();
+  }
 
   // Resolve entity file path from connected session's projectRoot
   let entityText: string | null = null;

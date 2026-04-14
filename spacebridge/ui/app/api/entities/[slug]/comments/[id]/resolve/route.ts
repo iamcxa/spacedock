@@ -10,11 +10,17 @@ function defaultDbPath(): string {
   return process.env.SPACEBRIDGE_DB_PATH ?? `${homedir()}/.spacedock/spacebridge.db`;
 }
 
+const SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/;
+
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ slug: string; id: string }> },
 ) {
   const { slug, id: commentId } = await params;
+
+  if (!SLUG_RE.test(slug)) {
+    return Response.json({ error: "Invalid slug" }, { status: 400 });
+  }
 
   try {
     const { createDb } = await import("../../../../../../../../src/db");
