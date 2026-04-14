@@ -2,7 +2,7 @@
 id: 104
 title: Brainstorm Nüwa-Style Distillation (v2) -- Multi-Lens Collection + Triple-Verification Gate + Tension Preservation
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: /build (decomposed from epic 102)
 created: 2026-04-14T00:00:00Z
 started:
@@ -67,7 +67,7 @@ You are asking for a restructure of build-brainstorm so that every APPROACH clai
 
 ## Brainstorming Spec
 
-**APPROACH**: Rewrite `skills/build-brainstorm/SKILL.md` to convert it from a leaf skill into an orchestrator skill that (1) dispatches **4 parallel fresh-context subagents** per invocation -- `spacedock:researcher` for captain-stated-intent and captain-unstated-intent lenses, `spacedock:code-explorer` for codebase-current-state and sibling-entity lenses -- and writes structured returns to a new `## Lens Evidence` section with per-lens subsections, each citation tagged `[primary|secondary|tertiary]`; (2) applies a **triple-verification merge gate** (cross-lens recurrence ≥2 of 4 lenses / generative power predicts downstream discoveries / exclusivity distinguishes from sibling entities) where only 3-pass claims land in APPROACH, 1-2 pass demotes to GUARDRAILS, 0-pass discards with a Stage Report line; (3) produces first-class `## Core Tensions` (typed time-based / domain-based / essential) and `## Honest Boundaries` sections that downstream stages annotate but never delete; (4) runs a **5-item quality self-test gate** before returning -- claim cardinality 3-7 as a soft target with α-inflection per epic 102 A-2, ≥2 lens citations per APPROACH claim, tensions/boundaries populated or escape-hatch string present, every citation tiered. The file-read cap rises from 5 to 9 to accommodate 4 lenses × up to 2 files each plus 1 INDEX/CONTRACTS lookup -- the single engine-behavior delta. Cross-entity dedup is absorbed into merge-gate-(iii) exclusivity; the separate `**Dedup flag:**` Captain Context Snapshot line is retired. `(needs clarification -- deferred to explore: self-test gate failure-routing mechanism -- re-dispatch lens collection, emit partial spec with α markers, or hard-fail to FO)`.
+**APPROACH** (⚠ contradicted by explore: "4 parallel subagents per invocation" is the unconditional framing, but `skills/build-explore/SKILL.md:20` + `skills/build-review/SKILL.md:28` + `skills/build-plan/SKILL.md:28` all document an identical **Mode A / Mode B split** for the same constraint -- SO-direct has Agent, ensign does not. The dominant pipeline precedent is "dual-mode skill", not "total leaf→orchestrator conversion" -- see O-1): Rewrite `skills/build-brainstorm/SKILL.md` to convert it from a leaf skill into an orchestrator skill that (1) dispatches **4 parallel fresh-context subagents** per invocation (✓ confirmed by explore: `agents/code-explorer.md:1-21` + `agents/researcher.md:1-21` exist as dispatchable thin-wrapper agents with `spacedock:` namespace; parent 102 explore successfully dispatched 3 `spacedock:code-explorer` in parallel) -- `spacedock:researcher` for captain-stated-intent and captain-unstated-intent lenses, `spacedock:code-explorer` for codebase-current-state and sibling-entity lenses -- and writes structured returns to a new `## Lens Evidence` section with per-lens subsections, each citation tagged `[primary|secondary|tertiary]`; (2) applies a **triple-verification merge gate** (cross-lens recurrence ≥2 of 4 lenses / generative power predicts downstream discoveries / exclusivity distinguishes from sibling entities) where only 3-pass claims land in APPROACH, 1-2 pass demotes to GUARDRAILS, 0-pass discards with a Stage Report line; (3) produces first-class `## Core Tensions` (typed time-based / domain-based / essential) and `## Honest Boundaries` sections that downstream stages annotate but never delete; (4) runs a **5-item quality self-test gate** before returning -- claim cardinality 3-7 as a soft target with α-inflection per epic 102 A-2, ≥2 lens citations per APPROACH claim, tensions/boundaries populated or escape-hatch string present, every citation tiered. The file-read cap rises from 5 to 9 to accommodate 4 lenses × up to 2 files each plus 1 INDEX/CONTRACTS lookup -- the single engine-behavior delta. Cross-entity dedup is absorbed into merge-gate-(iii) exclusivity; the separate `**Dedup flag:**` Captain Context Snapshot line is retired. `(needs clarification -- deferred to explore: self-test gate failure-routing mechanism -- re-dispatch lens collection, emit partial spec with α markers, or hard-fail to FO)`.
 
 **ALTERNATIVE**: Ship brainstorm v2 as an **additive non-blocking layer** -- leave existing Step 2/3 untouched, append a `## Lens Evidence` post-hoc enrichment step after APPROACH is written, make `## Core Tensions` / `## Honest Boundaries` optional output sections, keep the 5-file cap. -- D-01 rejected because the load-bearing value proposition (correction at the moment captain attention is maximally focused on the directive) requires **gating** the APPROACH write, not augmenting it post-hoc; an additive layer preserves the vibes-based Confidence pattern that epic 102 A-2 was explicitly designed to eliminate, and captain rewound a similar v1 (the 2-lens + separate-dedup design, commit `4a3a4f8`) precisely because additive/side-channel treatment fragments the quality signal.
 
@@ -79,8 +79,8 @@ You are asking for a restructure of build-brainstorm so that every APPROACH clai
 - **Parent 102 Q-1 spec-text corrections must land**: APPROACH framing as "4-section brainstorming-spec distiller (APPROACH/ALTERNATIVE/GUARDRAILS/RATIONALE) + Step 2.5 Goal Check" (not "single-paragraph distiller"); file-cap citation at `SKILL.md:277` (not `:233`).
 - **Core Tensions and Honest Boundaries are append-only downstream**: explore/clarify annotate (captain resolutions, discovery timestamps, accepted-as-trade-off markers) but NEVER DELETE. Captain is the only entity authorized to delete via explicit clarify annotation.
 - **Cardinality inflection**: APPROACH claim count 3-7 is a soft target; trivial-scope directives may produce 2, architectural-overhaul directives may produce 8-9. Out-of-range must be α-marked with scale-justification per epic 102 A-2; absence of α-marker on out-of-range cardinality is the ship-blocker.
-- **Leaf→orchestrator contract change** (parent 102 Honest Boundary 6): plan-phase MUST (a) relax the leaf constraint in SKILL.md Rules, (b) add Tools Available entry for Agent dispatch, (c) rewrite Step 1 Context Enrichment around 4-lens fanout, (d) update non-interactive contract wording (main session remains non-interactive to captain; lens subagents run in isolated contexts), (e) enumerate which invocation paths remain valid post-v2 given `subagent-cannot-nest-agent-dispatch` (FO→ensign→brainstorm would be nested-Agent and broken; SO-direct / FO-main / captain-facing `/build` in main session remain valid).
-- **Parent 102 Q-6 coordination**: `build-flow-tdd-discipline` has an in-flight CONTRACTS contract on `skills/build-brainstorm/SKILL.md` Step 4 (TDD-friendly AC guidance). Plan-phase MUST settle merge ordering -- whichever ships second rebases its Step 4 additions.
+- **Leaf→orchestrator contract change** (✓ confirmed by explore: leaf constraint at `skills/build-brainstorm/SKILL.md:275` "NEVER invoke other skills. You are a leaf skill, not an orchestrator." + line 8 skill preamble. Precedent for Agent in Tools Available exists at `skills/graft/SKILL.md:50`) (parent 102 Honest Boundary 6): plan-phase MUST (a) relax the leaf constraint in SKILL.md Rules, (b) add Tools Available entry for Agent dispatch, (c) rewrite Step 1 Context Enrichment around 4-lens fanout, (d) update non-interactive contract wording (main session remains non-interactive to captain; lens subagents run in isolated contexts), (e) enumerate which invocation paths remain valid post-v2 given `subagent-cannot-nest-agent-dispatch` (FO→ensign→brainstorm would be nested-Agent and broken; SO-direct / FO-main / captain-facing `/build` in main session remain valid).
+- **Parent 102 Q-6 coordination** (✓ confirmed by explore: `docs/build-pipeline/_index/CONTRACTS.md:181-185` shows `build-flow-tdd-discipline` at `execute` stage status `in-flight` as of 2026-04-12, contract text "Add given/when/then AC guidance to step 4 for TDD-friendly spec generation"): `build-flow-tdd-discipline` has an in-flight CONTRACTS contract on `skills/build-brainstorm/SKILL.md` Step 4 (TDD-friendly AC guidance). Plan-phase MUST settle merge ordering -- whichever ships second rebases its Step 4 additions.
 
 **RATIONALE**: Multi-lens collection + merge-gate + tension/boundary preservation is the single load-bearing transformation; the other changes are consequential instrumentation. Without the 4-lens floor, cross-lens recurrence is undefined; without the merge gate, APPROACH quality stays vibes-based; without preserved tensions and declared boundaries, captain-facing artifacts get smoothed away downstream where correction is N× more expensive. Huashu-nuwa validates this shape across 13 person-skills, and the captain rewound a 2-lens v1 explicitly to adopt it (commit `4a3a4f8`). Parallelism is non-negotiable: a sequential 4-lens single-session implementation would breach the revised 9-file cap, degrade cache coherence, and -- most critically -- lose the fresh-context isolation that makes each lens agent insulated from the others' framing bias. Genuine triangulation requires structural independence, which only parallel subagents deliver. The leaf→orchestrator contract change is accepted cost; the constraint that SKILL.md currently pins (line 230 "NEVER invoke other skills") was correct for a single-pass distiller and is wrong for a multi-lens synthesizer.
 
@@ -129,3 +129,148 @@ You are asking for a restructure of build-brainstorm so that every APPROACH clai
 - `skills/build-brainstorm/SKILL.md` -- target skill file (modification target; current contents are the pre-v2 baseline)
 - `skills/build-brainstorm/references/alpha-marker-protocol.md` -- α-marker convention this enhancement preserves
 - `MEMORY.md subagent-cannot-nest-agent-dispatch.md` -- constraint documenting why nested Agent calls break for general-purpose subagents; load-bearing for Honest Boundary 6
+- `skills/build-explore/SKILL.md:17-107` -- Mode A / Mode B precedent for dual-mode Agent-dispatch; load-bearing for O-1
+- `skills/build-review/SKILL.md:27-29` + `skills/build-plan/SKILL.md:27-29` -- same Mode A/B pattern, reinforcing precedent uniformity
+- `skills/graft/SKILL.md:50` -- precedent for Agent in a skill's Tools Available list
+- `docs/build-pipeline/_index/CONTRACTS.md:181-185` -- active `build-flow-tdd-discipline` contract on target file; Q-5 coordination
+- `agents/code-explorer.md` + `agents/researcher.md` -- dispatchable thin-wrapper agents (A-2 evidence)
+
+## Assumptions
+
+**A-1**: `skills/build-brainstorm/SKILL.md` currently operates as a leaf skill; the APPROACH's "convert leaf→orchestrator" framing describes a real contract delta, not a rephrase.
+- **Confidence**: Confident (0.95)
+- **Evidence**: `skills/build-brainstorm/SKILL.md:275` "NEVER invoke other skills. You are a leaf skill, not an orchestrator." + line 8 preamble "You are a leaf skill invoked by `/build`." Tools Available section (:283-294) lists only Read/Grep/Glob/Bash + MCP; Agent tool is absent from both the "Can use" and "NOT available" lists -- neither enabled nor explicitly forbidden, matching the implicit-leaf pattern.
+
+**A-2**: `spacedock:researcher` and `spacedock:code-explorer` exist as dispatchable thin-wrapper agents in the current codebase, so the 4-lens dispatch infrastructure already exists at the agent layer.
+- **Confidence**: Confident (0.95)
+- **Evidence**: `agents/code-explorer.md:1-21` + `agents/researcher.md:1-21` define both agents with `spacedock:` namespace. Parent entity 102 explore Stage Report records "3 `spacedock:code-explorer` agents dispatched in parallel" (entity 102 line 304), confirming dispatch pattern works today from SO-direct mode.
+
+**A-3**: Adding `Agent` to a skill's Tools Available list is a supported pipeline pattern, not a novel skill primitive; precedent exists and this child's plan-phase can copy it verbatim.
+- **Confidence**: Confident (0.95)
+- **Evidence**: `skills/graft/SKILL.md:50` lists `Agent` as usable (`"- \`Agent\` -- \`Explore\` subagent for portability scanning (init only)"`), proving at least one shipped skill in this codebase has Agent as a declared tool. No schema changes required in SKILL.md frontmatter to add Agent.
+
+**A-4**: The dominant precedent for "skill that wants to dispatch but may be nested" in this codebase is a **Mode A / Mode B dual-mode split**, NOT a total leaf→orchestrator conversion. Three existing skills (build-explore, build-review, build-plan) all document this identical pattern. v2's implementation should copy the pattern rather than invent a new semantics.
+- **Confidence**: Confident (0.95)
+- **Evidence**: `skills/build-explore/SKILL.md:19-21` + `:87-107` documents Mode A (SO-direct has Agent → dispatches code-explorer) vs Mode B (ensign no Agent → inline fallback). `skills/build-review/SKILL.md:27-29` documents identical split for reviewer teammates. `skills/build-plan/SKILL.md:27-29` documents identical split for researcher teammates. Three-way precedent uniformity makes this the canonical pipeline pattern.
+
+**A-5**: `build-flow-tdd-discipline` is still in-flight on `skills/build-brainstorm/SKILL.md` with Step 4 AC-guidance additions, so merge-ordering risk is real and load-bearing.
+- **Confidence**: Confident (0.95)
+- **Evidence**: `docs/build-pipeline/_index/CONTRACTS.md:181-185` -- table row shows entity `build-flow-tdd-discipline` at `execute` stage, status `in-flight`, last updated 2026-04-12, contract text "Add given/when/then AC guidance to step 4 for TDD-friendly spec generation". Same entity also contracts on SKILL.md lines affecting clarify / plan / quality (lines 223, 230, 275 of CONTRACTS.md) -- surface area is broad but collides with child 104 only on build-brainstorm/SKILL.md Step 4.
+
+**A-6**: Epic 102's Q-3 escape-hatch string (`Checked -- no ...` vs `None identified -- checked` vs `(none -- deliberate)`) was seeded but not resolved at epic clarify (decomposition exited Step 0). This child's clarify must settle the string; the epic Q-3 option set is the candidate pool.
+- **Confidence**: Likely (0.75)
+- **Evidence**: Parent 102 body `## Open Questions` Q-3 lists three candidate options (`Checked -- no notable constraints identified.` matching GUARDRAILS precedent at `skills/build-brainstorm/SKILL.md:139`; `None identified -- checked` matching the child 104 body; or `(none -- deliberate)` general-purpose). Epic 102 frontmatter `verdict: DECOMPOSED` + exit-at-decomposition-gate means no formal resolution was written; the child inherits the candidate set, not a decision.
+
+## Option Comparisons
+
+### O-1: v2 dispatch mode semantics -- total conversion vs Mode A/B split vs hybrid
+
+The APPROACH commits to "4 parallel subagents per invocation" unconditionally, but the codebase precedent for this exact problem (skill that wants to dispatch but may be nested inside an ensign-wrapped Agent context) is a Mode A / Mode B dual-mode split across three existing skills (build-explore, build-review, build-plan). Choosing among these three shapes has load-bearing consequences for Honest Boundary 6's invocation-path audit.
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| **Total conversion (APPROACH as-written)** -- brainstorm becomes unconditional orchestrator; all invocation paths must reach a context with Agent tool | Purest form of huashu-nuwa methodology port; strongest quality signal (every invocation gets 4-lens triangulation); no dual-path maintenance cost | Breaks FO→ensign→brainstorm dispatch graph; requires auditing + refactoring every current invocation path; risk of runtime failure in paths missed by audit; contradicts pipeline precedent | Medium | Viable (preserves APPROACH intent) |
+| **Mode A/B split (copy build-explore pattern)** -- Mode A dispatches lenses when Agent available; Mode B falls back to inline single-pass when Agent unavailable | Matches dominant codebase precedent (3 skills); no dispatch-graph refactor required; backward-compatible with existing ensign-wrapped invocation; Honest Boundary 6 audit becomes a taxonomy exercise (which paths get which mode) rather than a blocker | Mode B invocations get degraded quality (single-pass, not 4-lens); two code paths to maintain; self-test gate semantics need differentiation (strict in Mode A, soft in Mode B) | Low | ✅ Recommended |
+| **Hybrid -- scale-gated lens count** -- Small directives use 1-2 lenses inline; Medium+ directives use 4-lens dispatch; ensign paths always use inline | Addresses parent 102 Core Tension "lens-subagent cost vs brainstorm frequency"; reduces token burn on throwaway invocations; gracefully degrades in nested contexts | Scale threshold is a new tuning knob with unclear default; multiple cost axes (scale × context × lens-count) increase skill-design surface area; less clean to audit | Medium | Viable |
+
+**Decision owner**: captain via clarify. Recommendation: Mode A/B split, matching the 3-skill precedent. Mode A runs full 4-lens triangulation; Mode B emits a Stage Report warning "ensign-mode inline fallback -- single-pass spec; 4-lens quality not achieved this invocation" and skips the self-test gate's cross-lens recurrence check (gates i / ii still run, gate iii on exclusivity still runs via INDEX lookup which Mode B can do inline).
+
+### O-2: Empty-state escape-hatch string for new body sections
+
+Parent 102 Q-3 candidate pool. Every shipped brainstorm v2 output must have `## Core Tensions` and `## Honest Boundaries` sections either populated OR containing an escape-hatch string. Captain must pick one string form and commit to it across v2 + existing v1 GUARDRAILS precedent.
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| **"Checked -- no notable constraints identified."** -- matches existing GUARDRAILS precedent at `skills/build-brainstorm/SKILL.md:139` | Zero migration cost; one string across skill; grep-uniformity preserved today | String wording is tuned for "constraints" (GUARDRAILS context), less natural for "tensions" or "boundaries" contexts | Low | ✅ Recommended |
+| **"None identified -- checked"** -- new form, matches child 104 body draft + acceptance criteria grep | More neutral wording fits all three sections (GUARDRAILS / Core Tensions / Honest Boundaries); the form captain proposed in epic | Forces migration of existing GUARDRAILS precedent OR two strings coexist (grep fragmentation); breaks uniformity with 36+ shipped v1 entities | Medium | Viable |
+| **"(none -- deliberate)"** -- single general-purpose token | Shortest form; reads as a token rather than prose; most grep-friendly (7 chars) | No precedent anywhere in codebase today; requires migrating existing escape-hatch usage; novel form readers must learn | Low | Viable |
+
+**Decision owner**: captain via clarify. Recommendation favors option 1 (existing precedent) unless captain wants to pay migration cost for better semantic fit in the new section contexts.
+
+### O-3: merge-gate semantics per invocation path
+
+Child-specific Core Tension: the 5-item self-test gate's failure semantics (ship-blocking vs ship-advisory) must be settled because different invocation paths have different recovery affordances. Directly tied to O-1's dispatch mode choice.
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| **Universal ship-blocking** -- any gate failure hard-fails the skill | Maximum quality enforcement; zero silent degradation; simple semantics | Breaks headless / unattended invocation (FO dispatch stalls on gate fail); no route-to-recovery for paths that cannot re-dispatch | Low | Viable |
+| **Universal ship-advisory** -- all gate failures become α markers + Stage Report warnings | Universal backward-compat; no pipeline halts; preserves the "fix inline, do not flag" style of current SKILL.md:274 | Load-bearing value proposition (correction at brainstorm time) leaks; gate becomes advisory-only; quality signal weakens to v1-equivalent | Low | Viable |
+| **Path-aware -- captain-facing = blocking, automated = advisory** -- SO-direct / main-session = ship-blocking; ensign-wrapped / FO-dispatch = advisory with warnings | Respects O-1 Mode A/B split (Mode A = blocking; Mode B = advisory); quality enforcement where captain can recover, advisory where they can't; matches build-explore's treatment of Mode B as emergency fallback | Two semantics to document and test; captain must mentally model which path they're on when reading Stage Reports | Medium | ✅ Recommended |
+
+**Decision owner**: captain via clarify. Recommendation hinges on O-1 resolution: if Mode A/B split adopted, path-aware gate semantics follow naturally. If total-conversion adopted, universal ship-blocking is the cleaner fit (ensign path deprecated anyway).
+
+## Open Questions
+
+### Q-1: Self-test gate failure-routing mechanism (from α marker in APPROACH)
+
+**Domain**: Runnable/Invokable (skill control flow)
+
+**Why it matters**: APPROACH commits to a 5-item self-test gate that "blocks return on failure" but does not specify what failure means operationally. Three candidate mechanisms have different downstream costs and different compatibility with O-1 / O-3 decisions.
+
+**Suggested options**:
+1. Re-dispatch lens collection -- gate failure triggers re-dispatch of the failing lens's subagent with a more specific prompt; cap at 2 re-dispatches per invocation. Expensive but recoverable.
+2. Emit partial spec with α markers -- gate failure produces a best-effort spec with α markers on the failing claims, Stage Report logs the gate failure. Matches existing brainstorm v1 "fix inline" style.
+3. Hard-fail to FO -- gate failure returns no output, forces FO (or captain in SO-direct) to re-invoke with adjusted directive. Matches build-plan's plan-checker blocker pattern.
+
+### Q-2: Lens (b) captain-unstated-intent -- source scope and query shape
+
+**Domain**: Runnable/Invokable (skill input boundary)
+
+**Why it matters**: Honest Boundary 7 acknowledges that lens (b) has no ground-truth test. The subagent needs a bounded input space to infer "unstated intent" from -- without bounds, the lens hallucinates. The APPROACH says the lens is "derived from recent journal + `## Canonical References` on sibling entities" but does not specify window size, sibling selection criteria, or query shape.
+
+**Suggested options**:
+1. Time-bounded journal slice (last 7 days of journal entries tagged with the directive's domain) + exact sibling canonical-refs set (entities with overlap in INDEX.md `files_modified`).
+2. Keyword-driven journal search (`search_journal(query: "{directive keywords}", limit: 5)`) + all siblings in the same Core Tension / Honest Boundary cluster.
+3. Captain specifies per-directive via a new `## Lens Hints` optional section in the directive body (opt-in steering).
+4. Open-ended -- captain decides.
+
+### Q-3: Merge-gate-(ii) "generative power" operational definition
+
+**Domain**: Runnable/Invokable (skill classification logic)
+
+**Why it matters**: Gate (ii) requires claims to predict what "downstream stages (explore/plan) will likely discover" rather than restate the directive. This is a subjective LLM-judgment call without an operational definition. Without a test, the gate degrades to "vibes with extra steps" -- the exact failure mode parent 102 A-2 was designed to eliminate.
+
+**Suggested options**:
+1. Predictive marker heuristic -- claim contains a concrete action verb + a file/layer name that was NOT mentioned in the directive (forces novel specificity).
+2. Downstream-trace test -- claim text is compared against the entity's eventual explore Stage Report "Files mapped" list; claims whose content does not appear in explore findings fail gate (ii) retroactively and trigger a brainstorm-v2 learning signal.
+3. Relative-entropy test -- claim text must have ≤50% token overlap with the directive's own text.
+4. Open-ended -- captain decides.
+
+### Q-4: Cardinality α-marker format -- single canonical form or family?
+
+**Domain**: Readable/Textual (body-section conventions)
+
+**Why it matters**: Parent 102 A-2 resolved cardinality 3-7 as soft-target with α-inflection. GUARDRAILS proposes a specific α form `(α: claim count {n} outside default 3-7; scale-justified by {directive-signal})`. This must be fixed verbatim for self-test gate (i) to be testable. A family of forms (`(α: too few ...)`, `(α: too many ...)`) would require separate grep patterns.
+
+**Suggested options**:
+1. Single canonical form `(α: claim count {n} outside default 3-7; scale-justified by {directive-signal})` -- grep-uniform; same string for too-few and too-many cases; signal extraction via regex.
+2. Family of 2 forms `(α: undercount ...)` and `(α: overcount ...)` -- slightly more readable; requires 2 grep patterns but distinguishes cases in Stage Report analytics.
+3. Family of N forms keyed by directive scale (trivial / medium / architectural-overhaul) -- maximum readability; high grep surface area.
+
+### Q-5: CONTRACTS coordination ship-order with `build-flow-tdd-discipline`
+
+**Domain**: Organizational (cross-entity coordination)
+
+**Why it matters**: A-5 confirms `build-flow-tdd-discipline` is still in-flight at execute stage on `skills/build-brainstorm/SKILL.md` Step 4. Both entities add content to Step 4 surface area (TDD has given/when/then AC guidance; v2 has 4-lens + merge gate + self-test). Whichever ships second rebases onto the other's changes. Captain must decide ship order now so plan-phase sequences correctly.
+
+**Suggested options**:
+1. Ship build-flow-tdd-discipline first (already in-flight; smaller contract) -- v2 rebases onto TDD-augmented Step 4. Preserves TDD work momentum.
+2. Ship 104 first (parent epic 102 is frozen; v2 unblocks sibling 105) -- TDD rebases onto v2-restructured Step 4. Preserves sibling-child coordination.
+3. Parallel-ship with explicit merge handoff (first-to-plan-approval wins; second takes rebase cost, captain gates at plan-phase).
+4. Add `depends-on: [build-flow-tdd-discipline]` to this child's frontmatter to force FO dispatch ordering.
+
+## Stage Report: explore
+
+- [x] Files mapped: 7 across skills and docs
+  skills/: 5 (build-brainstorm SKILL.md at :8/:275 leaf confirmation + graft/SKILL.md:50 Agent precedent + build-explore/SKILL.md:17-107 Mode A/B precedent + build-review/SKILL.md:27-29 same + build-plan/SKILL.md:27-29 same), agents/: 2 (code-explorer.md + researcher.md), docs/: 1 (_index/CONTRACTS.md:181-185 TDD collision)
+- [x] Assumptions formed: 6 (Confident: 5, Likely: 1, Unclear: 0)
+  A-1 through A-5 Confident via direct line-number evidence; A-6 Likely (escape-hatch string inherits parent 102 Q-3 candidate pool, not a resolved decision)
+- [x] Options surfaced: 3
+  O-1 dispatch mode semantics (total vs Mode A/B vs hybrid -- Mode A/B recommended per 3-skill precedent); O-2 empty-state escape-hatch string (precedent form recommended); O-3 merge-gate semantics per invocation path (path-aware recommended, follows O-1)
+- [x] Questions generated: 5
+  Q-1 self-test failure-routing (from α-1); Q-2 lens (b) source scope; Q-3 generative-power operational definition; Q-4 cardinality α-marker form; Q-5 CONTRACTS ship-order coordination with build-flow-tdd-discipline
+- [x] α markers resolved: 0 / 1
+  α-1 (self-test failure-routing) -- no codebase precedent for exact routing semantics; brainstorm v1 uses "fix inline" (SKILL.md:274), plan uses blocker-halt (plan-checker) -- both precedents; escalated to Q-1
+- [x] Scale assessment: confirmed Medium
+  frontmatter declared Medium; 7 files mapped across skills/agents/docs layers; well-matched; scope flag "likely-decomposable-already" noted -- NOT warranted to sub-decompose (child of epic already; sub-scopes sequential: merge-gate consumes lens output, tensions surface from merge failures)
+- [x] Research dispatched: 0 researchers (skipped -- all claims codebase architecture, no external technology dependencies; huashu-nuwa methodology already validated inline by parent 102)
