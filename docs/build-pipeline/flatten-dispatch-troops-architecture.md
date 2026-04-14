@@ -11,7 +11,7 @@ verdict:
 score:
 worktree: .worktrees/spacedock-ensign-flatten-dispatch-troops-architecture
 issue:
-pr:
+pr: "#49"
 intent: feature
 scale: Medium
 project: spacedock
