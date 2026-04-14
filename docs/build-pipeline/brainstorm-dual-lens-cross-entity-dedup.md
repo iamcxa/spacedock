@@ -1,6 +1,6 @@
 ---
 id: 102
-title: Brainstorm Nüwa-Style Distillation -- Multi-Lens Synthesis + Merge Gate + Tensions/Boundaries
+title: Brainstorm + Explore Nüwa-Alignment -- Multi-Lens Synthesis + Subagent-First + Cross-Stage Gate Unification
 status: clarify
 context_status: awaiting-clarify
 source: /build
@@ -13,7 +13,7 @@ worktree:
 issue:
 pr:
 intent: feature
-scale: Medium
+scale: Large
 project: spacedock
 profile:
 auto_advance:
@@ -56,6 +56,22 @@ children:
 
 (6) **Quality self-test gate (女媧 Phase 4 port)**: Before returning output, build-brainstorm runs a 5-item self-check -- (i) APPROACH contains 3-7 claims (not 1, not 20 -- 女媧's 心智模型 cardinality rule ported as APPROACH-claim cardinality), (ii) every APPROACH claim is supported by ≥2 lens citations (cross-lens recurrence verified post-hoc), (iii) `## Core Tensions` is populated OR explicitly marked `None identified -- checked`, (iv) `## Honest Boundaries` populated OR explicitly marked `None identified -- checked`, (v) every lens citation carries a `[primary|secondary|tertiary]` tag. Any failure → block return until fixed inline, OR convert to an α marker with specific reason (never a generic "needs clarification"). This is the skill's ship-gate and matches 女媧's "寧可誠實標注局限的 60 分 skill，也不要看起來完美但在編造的 90 分 skill".
 
+---
+
+**Build-explore parallel enhancements (sections 7-11, mirror Nüwa alignment into the explore stage so brainstorm→explore handoff preserves the signal)**:
+
+(7) **Multi-angle parallel explorer fanout (女媧 Phase 1 port into explore)**: Transform `skills/build-explore/SKILL.md` Step 2 from "dispatch 1 code-explorer (Mode A) OR inline read (Mode B)" into "dispatch N=4 parallel code-explorers, each with a fixed angle". Fixed angles: (i) **Prevailing-patterns** -- dominant usage across the codebase; (ii) **Recent-decisions** -- last N commits + ADRs + design docs; (iii) **Sibling-entity** -- `_index/CONTRACTS.md` + `_index/INDEX.md` + active-state entities; (iv) **Negative-space** -- patterns the codebase deliberately avoids (grep for absence: places without try/catch, without sync versions, without locks). Deprecate Mode B as primary path -- reserve it only for emergency fallback when Agent tool is unavailable, with a Stage Report warning. This directly satisfies the captain directive "除 clarify 外都 subagent 跑，包含 explorer".
+
+(8) **Triple-verification as Track-A promotion gate (女媧 Phase 2.1 port into explore)**: Replace `skills/build-explore/SKILL.md` Step 5 Hybrid Classification's soft "2+ usages = Confident, 1 = Likely or Unclear" rule with a hard 3-gate: (i) **Cross-layer recurrence** -- evidence cited across ≥2 distinct layers (domain / contract / router / view / frontend / test / config), not just 2 files in the same layer; (ii) **Predictive power** -- assumption predicts what plan/execute will produce rather than merely describing current state; (iii) **Exclusivity** -- not a generic template match that applies equally to any sibling entity. Three-pass = Confident; 2-pass = Likely; 1-pass = Unclear; 0-pass = demote to Track C Open Question. This addresses the captain-noted "why is everything so low confidence" pattern from today's A-1..A-4 session -- current Confidence assignment is vibes-based; triple-gate makes it signal-based.
+
+(9) **Source weighting tier tags (女媧 Phase 1 source table port into explore)**: Every `Evidence: {file}:{line}` line in `## Assumptions`, `## Option Comparisons`, and `## Open Questions` carries a tier tag `[primary|secondary|tertiary]`, with tier semantics mirroring section (5) for brainstorm: primary = captain directive / Canonical References / ADRs / design docs; secondary = codebase evidence with ≥2 consistent usages; tertiary = single usage / template match / "standard practice". When two Evidence lines on the same assumption conflict, primary wins unless captain clarify override. This closes the pipeline-wide source-hierarchy gap -- without it, brainstorm v2's primary/secondary/tertiary gating degrades at the explore handoff because explore produces un-tiered evidence.
+
+(10) **`## Core Tensions` + `## Honest Boundaries` in explore output (女媧 Phase 2.4 + 2.6 port into explore)**: Explore produces both sections as first-class outputs, mirroring brainstorm v2's sections (3)+(4). Core Tensions in explore = codebase-vs-brainstorm contradictions discovered by Step 3.7 Claim Verification, typed (time-based / domain-based / essential). Honest Boundaries in explore = explicit "this dimension could not be verified" declarations (e.g., "A-5 relies on test evidence but no test file exists for target module"). These surface to clarify and plan as captain-facing artifacts rather than being flattened into Open Questions. The brainstorm→explore handoff becomes symmetrical: both stages preserve tensions, both declare boundaries.
+
+(11) **Self-test gate in explore (女媧 Phase 4 port into explore, OPTIONAL per captain)**: Before Stage Report writes, explore runs a 5-item self-check that blocks return on failure -- (i) every Track A assumption has ≥2 evidence sources across ≥2 layers (enforces Port 8 mechanically); (ii) every Track B option has ≥2 viable alternatives + ≥1 marked `✅ Recommended`; (iii) every Track C question has `Suggested options:` with ≥2 options OR explicit `Open-ended -- captain decides`; (iv) every Evidence line carries a tier tag (enforces Port 9 mechanically); (v) if `## Core Tensions` is populated, every entry is typed. This is optional because it changes explore's ensign routing contract (today's explore is non-blocking by design -- gate failures would need new FO handling). Plan-phase decides whether to include (11) based on complexity budget.
+
+---
+
 **ALTERNATIVE**: Ship the original 2-lens + separate-dedup design (this entity's first brainstorm pass, now rewound) as brainstorm v1.5 incrementally, then open a second entity for 女媧-style v2. -- D-01 rejected because (a) the structural limitations the 女媧 comparison exposed (2 lenses insufficient, no merge gate, no tension/boundary preservation) are **quality-layer defects, not feature-layer gaps** -- shipping the 2-lens version creates compounding downstream cost across every future brainstorm invocation, (b) the captain mid-session redirected to 女媧 methodology after reading the 2-lens explore output, signaling that the 2-lens version would not ship even if prepared for clarify, and (c) splitting into v1.5 + v2 fragments the build-brainstorm contract across two versions, doubling reference-doc and dogfood-entity maintenance cost for negligible time-to-ship savings (rewind is cheap now; SO session is still live).
 
 **GUARDRAILS**:
@@ -81,6 +97,11 @@ children:
 - Given the enhancement ships, when the non-interactive contract is audited, then build-brainstorm issues zero AskUserQuestion / Teammate question calls (how to verify: `grep -cE "AskUserQuestion\|Teammate\(" skills/build-brainstorm/SKILL.md` returns 0).
 - Given 4-lens analysis runs, when the file-read budget is audited across 3 distinct fixture directives, then total file-read count ≤ 9 per invocation (how to verify: instrument a Read counter into the skill run; assert count ≤ 9 for each of the 3 fixtures).
 - Given APPROACH contains a load-bearing factual assertion that only 1 lens supports, when the self-test gate runs, then the skill blocks return with a logged Stage Report entry `gate-ii failed: claim {n} supported by only {lens}; promote to 2+ lenses or demote to GUARDRAILS` (how to verify: seed a directive constructed to produce a single-lens claim; assert the skill returns error-state or α-marks the claim with the specific failure reason).
+- Given build-explore invokes against any entity in v2 mode, when Step 2 runs, then it dispatches ≥4 parallel code-explorer subagents with fixed angles (prevailing-patterns, recent-decisions, sibling-entity, negative-space) and Mode B inline reading is NOT used as primary path (how to verify: `grep -cE "Mode A|4 parallel|prevailing.patterns|recent.decisions|negative.space" skills/build-explore/SKILL.md` returns positive matches; `grep "Mode B" skills/build-explore/SKILL.md` context shows deprecated-fallback framing only).
+- Given any Track A assumption in `## Assumptions`, when explore v2 Stage 5 classification runs, then its Confidence is assigned by the triple-gate rule (cross-layer recurrence + predictive power + exclusivity) -- Confident requires all 3 pass; Likely = 2 pass; Unclear = 1 pass; 0 pass demotes to Track C (how to verify: read the Step 5 spec text; grep for "cross-layer recurrence\|predictive power\|exclusivity" yields ≥3 matches; fixture directive with known-1-layer evidence reliably classified Unclear not Confident).
+- Given any Evidence line in explore v2 output, when the line is inspected, then it carries a `[primary|secondary|tertiary]` tier tag (how to verify: `grep -cE '\[primary\]|\[secondary\]|\[tertiary\]' {entity-body-after-explore}` ≥ count of Evidence lines; no un-tiered Evidence line remains).
+- Given any entity's explore output, when `## Core Tensions` and `## Honest Boundaries` sections are inspected, then both exist either populated or with escape-hatch `None identified -- checked` (how to verify: same grep pattern as sections (3)/(4) acceptance criteria, applied to entity body after explore not after brainstorm).
+- Given the decomposition creates children 102-brainstorm + 102-explore, when both children ship, then `skills/build-brainstorm/SKILL.md` contains sections (1)-(6) and `skills/build-explore/SKILL.md` contains sections (7)-(10) [with (11) optional] (how to verify: post-ship grep both SKILL.md files for the feature names; entity 102 epic's shipped verdict requires both children verdicts PASSED).
 
 ## Assumptions
 
@@ -192,7 +213,44 @@ Gate (iii) exclusivity verdict updated: **pass** on the 036 arm (036 is shipped 
 
 ## Decomposition Recommendation
 
-Not warranted. Scope flag absent in Captain Context Snapshot; explore mapping touched 7 files across 2 layers (skills/ + docs/build-pipeline/) -- well below the 20-files-across-3-layers threshold. The entity is cohesive: all changes target `skills/build-brainstorm/SKILL.md` plus one or two reference docs, coordinated through a single 女媧 methodology port.
+⚠️ **Warranted** (upgraded from "Not warranted" after scope expansion 2026-04-14 to cover build-explore alongside build-brainstorm per captain directive).
+
+Scope now spans 2 skill files (`skills/build-brainstorm/SKILL.md` + `skills/build-explore/SKILL.md`) + reference docs + likely touches to `skills/build-brainstorm/references/` and `skills/build-explore/references/gray-area-templates.md` + potentially dashboard detail.js (deferred per Honest Boundary 5). Estimated file count ≥15 across ≥3 layers (config + frontend-optional + reference). Scale upgraded frontmatter from Medium to Large. The APPROACH now has 11 numbered changes spanning two stages with distinct skill contracts, distinct invocation paths, and distinct ship windows (brainstorm's leaf→orchestrator contract change is independent of explore's Mode B deprecation).
+
+### Proposed children
+
+Epic `102` decomposes into two children that can plan + execute + ship independently, with child 2 consuming child 1's outputs at runtime (via the brainstorm→explore handoff) but NOT blocking at plan-time:
+
+**Child 1: `102-brainstorm-nuwa` — Brainstorm Nüwa-Style Distillation (v2)**
+- **Scope**: APPROACH sections (1)-(6) — multi-lens parallel collection, triple-verification merge gate, Core Tensions, Honest Boundaries, source weighting, quality self-test gate.
+- **Files**: `skills/build-brainstorm/SKILL.md` (structural rewrite) + new reference docs under `skills/build-brainstorm/references/` (e.g., `lens-collection-protocol.md`, `merge-gate.md`).
+- **Domain**: Runnable/Invokable, Readable/Textual.
+- **Contract change**: leaf skill → orchestrator skill (see Honest Boundary 6).
+- **Depends-on**: none at plan time. Can ship first.
+
+**Child 2: `102-explore-nuwa` — Explore Nüwa-Alignment + Subagent-First Enforcement**
+- **Scope**: APPROACH sections (7)-(10) mandatory + (11) optional — multi-angle parallel explorer fanout, triple-verification Track-A promotion gate, source weighting tier tags, `## Core Tensions` + `## Honest Boundaries` in explore output, optional self-test gate.
+- **Files**: `skills/build-explore/SKILL.md` (Step 2 restructure + Step 5 gate + Step 6 output expansion) + `skills/build-explore/references/gray-area-templates.md` (tier-tag updates) + new reference docs (e.g., `parallel-explorer-angles.md`, `triple-verification-gate.md`).
+- **Domain**: Runnable/Invokable, Readable/Textual, Organizational.
+- **Contract change**: Mode B inline reading deprecated as primary; Mode A parallel-fanout becomes default.
+- **Depends-on**: consumes child 1's brainstorm output format at runtime (tier tags, lens citations flow from brainstorm to explore), but plan/execute of child 2 can proceed in parallel with child 1. Plan-time cross-entity coordination: ensure both children agree on tier-tag syntax (settles O-1 for both).
+
+### Shared captain decisions (settle at epic clarify, propagate to both children)
+
+These Q-n items in the epic body apply to BOTH children and should be resolved once at epic clarify, then inherited:
+- **Q-1 spec-text corrections**: applies to brainstorm only
+- **Q-2 dashboard renderer target**: applies to both (both introduce new `##` sections)
+- **Q-3 escape-hatch string consistency**: applies to both (both introduce `## Core Tensions` + `## Honest Boundaries`)
+- **Q-4 primary-tier tie-break**: applies to both (merge-gate / promotion-gate both use tier logic)
+- **Q-5 INDEX.md staleness mitigation**: applies to explore's sibling-entity lens (child 2) but brainstorm's sibling-entity lens (child 1) inherits same decision
+- **Q-6 CONTRACTS coordination**: applies to brainstorm only (`build-flow-tdd-discipline` Step 4 overlap)
+- **O-1 tier tag syntax (bracketed recommended)**: applies to both (must share syntax)
+- **Core Tensions (3 seeds)**: essential tension applies to both; budget tension applies to brainstorm (captain decides via child 1 plan); v1/v2 schema tension applies to both
+
+### Shared artifacts at epic level
+
+- Decomposed canonical references propagate to both children
+- Both children's acceptance criteria reference back to epic's AC line 88-89 (file-count audit: child 1 ≤9 files per brainstorm invocation; child 2 ≥4 parallel explorers per explore invocation)
 
 ## Core Tensions
 
@@ -201,6 +259,9 @@ Not warranted. Scope flag absent in Captain Context Snapshot; explore mapping to
 - **essential**: **deterministic merge gate vs LLM-judged lens-recurrence** -- Gate (i) "cross-lens recurrence" is LLM-judged (a claim is "supported by" a lens based on semantic match), while the GUARDRAILS promise "determinism" inherited from the rewound v1. These are fundamentally in tension; true determinism requires textual exact-match support, which discards the flexibility 女媧's triple-verification exploits. Captain decision needed: lean deterministic (risk under-recalling valid claims) or lean LLM-judged (risk non-reproducibility between invocations).
 - **domain-based**: **file-read budget (9 files) vs "at most 5" historical cap** -- skill currently promises ≤5 reads; 4 lenses need 8-9. The cap is a precedent across the pipeline's non-interactive skills; raising it for one skill creates an asymmetry explore-skill readers will notice. Trade-off is real and unavoidable.
 - **time-based**: **brainstorm-v1 shipping pattern (shipped entities 036 etc.) vs brainstorm-v2 body schema** -- 36+ shipped entities have v1-shape bodies (no `## Lens Evidence`, no `## Core Tensions`). The dashboard's frontmatter-io parser must accept both schemas; the upgrade is forward-only (v2 entities do not backfill into v1 storage). Captain confirmation needed during clarify.
+- **essential (explore-scope, 2026-04-14 expansion)**: **Track-A Confidence signal strength vs clarify throughput** -- Port 8 (triple-gate promotion) makes Track A assignment harder, producing more Track C Open Questions on average. This is epistemically correct (Confidence becomes meaningful) but raises clarify's captain-interaction cost per entity. Trade-off is load-bearing: do we want N entities/session at sharp Confidence, or 2N entities/session at fuzzy Confidence? Captain decision required at epic clarify, propagates to both children.
+- **domain-based (explore-scope)**: **Mode A enforcement vs FO dispatch graph reality** -- Port 7 mandates parallel-explorer subagents, but some existing explore invocation paths (ensign-wrapped) cannot dispatch Agent tool per `subagent-cannot-nest-agent-dispatch.md`. Either we elevate explore out of those paths (breaking FO dispatch graph in N places) OR keep Mode B as emergency fallback with warning markers (partial directive compliance). Both paths are real -- neither is wrong. Captain decision at epic clarify: strict enforcement (break dispatch graph, audit + fix) or pragmatic fallback (Mode B remains but deprecated-labeled).
+- **time-based (cross-child)**: **Child 1 (brainstorm v2) ship-window vs child 2 (explore v2) ship-window** -- if child 1 ships first without child 2, brainstorm emits tier-tagged lens citations that explore v1 doesn't consume (tier tags ignored, contradictions silently flattened into Open Questions). If child 2 ships first without child 1, explore emits tier-tagged evidence that brainstorm v1 can't produce inputs for (explore's Source-Weighting Port 9 partially degrades). Neither ordering is catastrophic -- pipeline still works at reduced quality during the gap. But cross-child coordination at plan-phase must settle the order explicitly, and interim-period quality degradation is an acceptable trade-off only if the gap is short. Captain decision at epic clarify: prefer ordering (brainstorm-first vs explore-first) or accept parallel-ship with both-half-degraded period.
 
 ## Honest Boundaries
 
@@ -212,6 +273,10 @@ Not warranted. Scope flag absent in Captain Context Snapshot; explore mapping to
 - This APPROACH does not include 女媧's Phase 4 quality-self-check script (`quality_check.py`) -- porting a Python quality-gate script is out of scope for a SKILL.md enhancement and would violate the "engine-freeze" GUARDRAIL. The 5-item self-test is LLM-run inside the skill, not script-verified.
 - The new `## Lens Evidence` / `## Core Tensions` / `## Honest Boundaries` sections will not render with any special treatment in the dashboard's entity detail view until `tools/dashboard/src/body-renderer.ts` is updated (⚠ contradicted: no such file exists -- dashboard body rendering happens client-side in `tools/dashboard/static/detail.js` which only special-cases `## Stage Report:` splits at :64; every other H2 already renders as generic markdown. The future-entity update target is `static/detail.js` (or a new server-side renderer, TBD) -- see Q-2) -- that update is explicitly out of scope for this entity and is logged as a future entity candidate. Sections render as generic markdown H2s in the interim.
 - **Boundary 6 (2026-04-14 captain directive addition)**: The parallel-subagent dispatch requirement (see GUARDRAILS) converts build-brainstorm from a **leaf skill** (current SKILL.md:230 "NEVER invoke other skills") into an **orchestrator skill** (dispatches 4 subagents per run). This is a load-bearing contract change that this entity's plan-phase MUST sequence: (a) relax the leaf constraint in SKILL.md Rules, (b) add a Tools Available entry for Agent dispatch, (c) rewrite Step 1 (Context Enrichment) around the 4-lens fanout, (d) update the non-interactive contract wording (the main session remains non-interactive to captain, but lens subagents run in their own contexts). Dogfood risk: the current `/build` invocation path spawns build-brainstorm from inside an Agent dispatch already (FO → ensign → build-brainstorm), meaning v2's subagent dispatches become nested Agent calls, which MEMORY.md `subagent-cannot-nest-agent-dispatch.md` documents as BROKEN for general-purpose subagents. v2's brainstorm invocation therefore MUST originate from either (i) SO-direct mode (main session has Agent), (ii) FO main session (not ensign-wrapped), or (iii) a captain-facing `/build` that runs in main session. The plan-phase must enumerate which invocation paths remain valid post-v2 and which are deprecated.
+- **Boundary 7 (explore scope expansion 2026-04-14)**: Build-explore's v2 enhancement sections (7)-(10) port 女媧 elements but cannot replicate 女媧 Phase 1.5 / 2.5 mid-flow human checkpoints -- build-explore is non-interactive by contract, same structural limitation as Boundary 3. Captain interaction happens at clarify stage (next skill), not inside explore. This means the explore self-test gate (Port 11) can block Stage Report emission but cannot surface captain-facing decisions mid-flow; it only produces stable pre-clarify artifacts.
+- **Boundary 8 (Track-A promotion gate trade-off)**: The triple-gate for Track A (Port 8, cross-layer + predictive + exclusivity) will demote some assumptions that today classify as "Likely" or "Confident" to "Unclear" or Track C. This is intentional -- current Confidence is vibes-based -- but the transition period generates a wave of "previously Likely, now Unclear" entities arriving at clarify with more Open Questions. Clarify throughput may drop 20-40% for the first N entities post-ship. This is a ship-cost, not a forever-cost -- brainstorm v2's tighter APPROACH reduces Open Question seeds upstream, offsetting explore's tightened Track A gate downstream.
+- **Boundary 9 (Mode B deprecation risk)**: Deprecating Mode B as primary path (Port 7) means explore invocations where Agent tool is unavailable (ensign subagent contexts with the `subagent-cannot-nest-agent-dispatch` limitation) can no longer run properly. Plan-phase must audit every explore invocation path in the existing FO dispatch graph and confirm each has Agent access. If any path cannot, either (a) elevate that path to main session / SO-direct mode, OR (b) keep Mode B as fallback with a Stage Report warning marker. This is NOT a blocker but is a non-trivial audit scope the plan-phase must budget.
+- **Boundary 10 (parallel explorer divergence)**: Dispatching 4 parallel code-explorers (Port 7) with different angles will occasionally produce contradictory findings for the same `file:line` citation (e.g., "prevailing-patterns" explorer says this is the canonical pattern; "recent-decisions" explorer finds an ADR deprecating it). Explore v2 handles this by emitting Core Tensions entries for inter-explorer contradictions (Port 10 output path), but the merge logic between explorer returns is LLM-judged synthesis, not deterministic merge. Same tension as brainstorm's "deterministic merge gate vs LLM-judged lens-recurrence" (Core Tension #1) but at a second nesting level. Captain may encounter occasional "explorer A says X, explorer B says Y" Core Tension entries that require clarify resolution.
 
 ## Canonical References
 
