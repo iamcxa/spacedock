@@ -220,3 +220,215 @@ Suggested options: (a) All files -- emit for every file change in watched dirs, 
   No auto_advance in frontmatter; captain must say "execute 057" to advance
 - [x] Clarify duration: 7 questions asked, session complete
   1 batch confirmation + 2 option selections + 1 Q answer + 3 exploration iterations
+
+## Research Findings
+
+### 1. Upstream Constraints
+
+- **Design doc §4.3** mandates session registry as 🟢 full CQRS (commands + decider + events + projections). Type signatures: `SessionCommand` (register/heartbeat/disconnect), `SessionEvent` (session_registered/session_heartbeat/session_disconnected).
+- **Design doc §4.4** mandates file watcher as 🟡 event-log only (observations, no decider). Debounce ~100ms per (file, change-type) pair.
+- **Design doc §3.5** requires `.passthrough()` on all Zod fmodel schemas.
+- **Design doc §3.3** LCD schema discipline: text strings, integer PKs with autoincrement, integer epoch-ms timestamps, no JSON for queryable data.
+- Entity 056 (lease manager) is the canonical sibling pattern — identical domain/ layout, dual-table strategy, Zod+passthrough, pure decider zero-I/O.
+
+### 2. Existing Patterns
+
+- **domain/lease/** layout: `types.ts` (State + Commands + Events), `decider.ts` (pure decide function), `evolve.ts` (pure evolve + replay), `persistence.ts` (impure DB layer), `schemas.ts` (Zod with .passthrough()), `errors.ts` (typed error classes). Session domain mirrors this 1:1.
+- **Dual-table strategy**: `entity_leases` (snapshot) + `lease_events` (append-only event log). Session uses existing `sessions` table (snapshot) + new `session_events` table (event log).
+- **coordination-client-bridge.ts**: Wires decider+evolve+persistence into the CoordinationClient interface. Session registry needs analogous wiring but exposed as a daemon-internal module, not an RPC interface (A-8).
+- **socket-server.ts** handler pattern: type check -> extract payload -> call handler -> send ack. Three existing handlers (register, rpc-request, coordination-request) use identical pattern. Heartbeat handler follows suit.
+- **socket-client.ts** reconnect pattern: exponential backoff with jitter. Heartbeat sender uses setInterval alongside the existing connection lifecycle.
+
+### 3. Library/API Surface
+
+- **Bun `fs.watch`**: `import { watch } from "fs"` with `{ recursive: true }` supported on macOS (FSEvents). Returns `FSWatcher` with `.close()`. macOS FSEvents only emits `"rename"` events (never `"change"`), so debounce key should be filename only (per A-9 research). Watcher silently stops if watched directory is deleted — must proactively `.close()` on disconnect.
+- **Drizzle ORM**: `sqliteTable`, `text`, `integer` from `drizzle-orm/sqlite-core`. Insert via `db.insert(table).values({...})`. Select via `db.select().from(table).orderBy(...)`.
+- **Zod**: `z.object({}).passthrough()`, `z.discriminatedUnion("type", [...])`, `z.literal()`, `z.string()`, `z.number().int()`.
+- **discoverWorkflows(root: string)**: Single-root API in `tools/dashboard/src/discovery.ts`. Returns `Workflow[] = [{dir, commissioned_by}]`. Per O-1 decision, iterate per distinct project root and union results with `Set<string>` dedup by `dir`.
+
+### 4. Known Gotchas
+
+- **macOS FSEvents only emits "rename"**: Debounce key must be filename-only, not (file, change-type) pair. This diverges from design doc §4.4's "(file, change-type) pair" spec but is the correct implementation for macOS.
+- **Watcher silently stops on dir deletion**: When a workflow directory is deleted (e.g., git branch cleanup), the watcher stops without error. Must proactively `.close()` watchers on session disconnect rather than relying on error events.
+- **`sessions` table has fmodel placeholder columns** (event_type, aggregate_id, sequence_number, payload) from entity 050 — these are structural placeholders. The snapshot upsert uses the functional columns (session_id, project_root, pid, connected_at, last_heartbeat).
+- **events table NOT NULL constraints**: entity="*" and stage="watcher" sentinels satisfy NOT NULL per O-2 decision. Must use `agent: "file-watcher"` as well.
+- **A-11 reconnect idempotency**: socket-server.ts:48 already overwrites socket mapping on duplicate sessionId. Domain decider must emit `session_reconnected` (not reject) on duplicate register.
+
+### 5. Reference Examples
+
+- **Entity 056 decider.test.ts**: Pure function tests with `const NOW = 1_000_000`, helper `stateWithLease()`, `expect(events[0].type).toBe(...)` pattern. Session decider tests follow identical style.
+- **Entity 056 persistence.test.ts**: Integration tests with `createDb(":memory:")`, `beforeEach` fresh DB, round-trip write/read/replay assertions. Session persistence tests follow identical style.
+- **Entity 056 replay.integration.test.ts**: Creates bridge over populated DB file, verifies state reconstruction. Session replay test verifies `evolve` replays all session_events to rebuild SessionState on restart.
+- **Entity 056 schemas.test.ts**: Smoke tests for Zod parse helpers. Session schemas tests follow identical style.
+
+## PLAN
+
+### Task 1: Session domain types + error classes
+- **model**: sonnet
+- **wave**: 1
+- **skills_hint**: none (pure TypeScript)
+- **read_first**: `spacebridge/src/domain/lease/types.ts`, `spacebridge/src/domain/lease/errors.ts`, `spacebridge/src/ipc/types.ts`
+- **action**: Create `spacebridge/src/domain/session/types.ts` with `SessionState` (Map<string, SessionRecord>), `emptySessionState`, `SessionCommand` union (register/heartbeat/disconnect), `SessionEvent` union (session_registered/session_heartbeat/session_disconnected/session_reconnected). Create `spacebridge/src/domain/session/errors.ts` with `SessionNotFound` error class. SessionRecord contains: sessionId, projectRoot, pid, connectedAt (epoch-ms), lastHeartbeat (epoch-ms). Register command carries full RegisterPayload fields. Heartbeat command carries sessionId + timestamp. Disconnect command carries sessionId + reason ("explicit" | "timeout" | "shutdown").
+- **acceptance_criteria**: `bun test spacebridge/src/domain/session/` passes. Types compile with `tsc --noEmit`. SessionState uses `Map<string, SessionRecord>` keyed by sessionId. All fields match design doc §4.3 Session type.
+- **files_modified**: `spacebridge/src/domain/session/types.ts` (new), `spacebridge/src/domain/session/errors.ts` (new)
+
+### Task 2: Session decider (pure, zero I/O)
+- **model**: sonnet
+- **wave**: 1
+- **skills_hint**: none (pure TypeScript)
+- **read_first**: `spacebridge/src/domain/lease/decider.ts`, `spacebridge/src/domain/session/types.ts`
+- **action**: Create `spacebridge/src/domain/session/decider.ts` with `decide(cmd: SessionCommand, state: SessionState, now: number): SessionEvent[]`. Register: if sessionId not in state, return `session_registered` event; if sessionId already in state, return `session_reconnected` event (A-11 idempotency — updates pid/projectRoot/timestamp). Heartbeat: if sessionId in state, return `session_heartbeat` event with updated timestamp; if not found, throw `SessionNotFound`. Disconnect: if sessionId in state, return `session_disconnected` event; if not found, return [] (idempotent no-op for double-disconnect). Create `spacebridge/src/domain/session/decider.test.ts` with pure unit tests: register on empty state, register idempotency (reconnect), heartbeat on active session, heartbeat on missing session (throws), disconnect on active session, disconnect on missing session (no-op).
+- **acceptance_criteria**: `bun test spacebridge/src/domain/session/decider.test.ts` passes. Decider has zero imports from DB/fs/net. All 6 test cases pass. Reconnect returns `session_reconnected` event (not error).
+- **files_modified**: `spacebridge/src/domain/session/decider.ts` (new), `spacebridge/src/domain/session/decider.test.ts` (new)
+
+### Task 3: Session evolve + replay (pure, zero I/O)
+- **model**: sonnet
+- **wave**: 1
+- **skills_hint**: none (pure TypeScript)
+- **read_first**: `spacebridge/src/domain/lease/evolve.ts`, `spacebridge/src/domain/session/types.ts`
+- **action**: Create `spacebridge/src/domain/session/evolve.ts` with `evolve(state: SessionState, event: SessionEvent): SessionState` and `replay(events: SessionEvent[]): SessionState`. session_registered: add SessionRecord to Map. session_reconnected: update existing SessionRecord (pid, projectRoot, lastHeartbeat). session_heartbeat: update lastHeartbeat for matching sessionId. session_disconnected: delete from Map. Create `spacebridge/src/domain/session/evolve.test.ts` with pure tests: evolve each event type, replay empty events, replay multi-event sequence matches sequential evolve.
+- **acceptance_criteria**: `bun test spacebridge/src/domain/session/evolve.test.ts` passes. evolve is pure (no imports from DB/fs/net). replay(events) === events.reduce(evolve, emptySessionState).
+- **files_modified**: `spacebridge/src/domain/session/evolve.ts` (new), `spacebridge/src/domain/session/evolve.test.ts` (new)
+
+### Task 4: Session Zod schemas
+- **model**: sonnet
+- **wave**: 1
+- **skills_hint**: none (pure TypeScript + Zod)
+- **read_first**: `spacebridge/src/domain/lease/schemas.ts`, `spacebridge/src/domain/session/types.ts`
+- **action**: Create `spacebridge/src/domain/session/schemas.ts` with Zod schemas for all SessionCommand variants and SessionEvent variants. All schemas use `.passthrough()` per §3.5. Export `parseCommand(raw)` and `parseEvent(raw)` helpers. Create `spacebridge/src/domain/session/schemas.test.ts` with smoke tests: valid command/event accepted, empty object rejected, unknown type rejected.
+- **acceptance_criteria**: `bun test spacebridge/src/domain/session/schemas.test.ts` passes. All schemas use `.passthrough()`. parseCommand/parseEvent accept valid inputs and throw on invalid.
+- **files_modified**: `spacebridge/src/domain/session/schemas.ts` (new), `spacebridge/src/domain/session/schemas.test.ts` (new)
+
+### Task 5: session_events table + DDL
+- **model**: sonnet
+- **wave**: 2
+- **skills_hint**: none (Drizzle ORM)
+- **read_first**: `spacebridge/src/schema.ts`, `spacebridge/src/db.ts`
+- **action**: Add `sessionEvents` table to `schema.ts` mirroring `leaseEvents` pattern: id (integer PK autoincrement), aggregateId (text NOT NULL — sessionId), sequenceNumber (integer NOT NULL), eventType (text NOT NULL), payload (text NOT NULL — JSON-serialized event body), timestamp (integer NOT NULL — epoch-ms). Add corresponding `CREATE TABLE IF NOT EXISTS session_events (...)` DDL to `db.ts` `applySchema()`. Update schema.test.ts if it exists to cover the new table.
+- **acceptance_criteria**: `bun test spacebridge/src/schema.test.ts` passes. `createDb(":memory:")` succeeds and the session_events table is accessible. LCD discipline: text/integer only, no JSON for queryable data, autoincrement PK.
+- **files_modified**: `spacebridge/src/schema.ts` (modify), `spacebridge/src/db.ts` (modify)
+
+### Task 6: Session persistence layer
+- **model**: sonnet
+- **wave**: 2
+- **skills_hint**: none (Drizzle ORM)
+- **read_first**: `spacebridge/src/domain/lease/persistence.ts`, `spacebridge/src/schema.ts`, `spacebridge/src/domain/session/types.ts`
+- **action**: Create `spacebridge/src/domain/session/persistence.ts` mirroring lease persistence: `appendEvents(db, aggregateId, events, seqStart)`, `loadAllEvents(db)`, `countEvents(db, aggregateId)`, `upsertSnapshot(db, session)`, `deleteSnapshot(db, sessionId)`. appendEvents writes to `sessionEvents` table. upsertSnapshot writes to `sessions` table (existing snapshot table). Create `spacebridge/src/domain/session/persistence.test.ts` with integration tests using `:memory:` DB: round-trip write/read/replay, upsert/delete snapshot.
+- **acceptance_criteria**: `bun test spacebridge/src/domain/session/persistence.test.ts` passes. appendEvents writes to session_events. loadAllEvents reads from session_events ordered by sequenceNumber. upsertSnapshot writes to sessions table. deleteSnapshot removes from sessions table. No cross-table leaks.
+- **files_modified**: `spacebridge/src/domain/session/persistence.ts` (new), `spacebridge/src/domain/session/persistence.test.ts` (new)
+
+### Task 7: Session registry bridge (daemon-internal module)
+- **model**: opus
+- **wave**: 3
+- **skills_hint**: none (wiring layer)
+- **read_first**: `spacebridge/src/ipc/coordination-client-bridge.ts`, `spacebridge/src/domain/session/decider.ts`, `spacebridge/src/domain/session/evolve.ts`, `spacebridge/src/domain/session/persistence.ts`, `tools/dashboard/src/discovery.ts`
+- **action**: Create `spacebridge/src/domain/session/registry.ts` — the daemon-internal session registry module. `createSessionRegistry(opts: {db, now?})` returns `SessionRegistry` interface with methods: `register(payload: RegisterPayload): SessionEvent[]` (runs register command through decider pipeline, persists, updates snapshot), `heartbeat(sessionId: string): SessionEvent[]` (runs heartbeat command), `disconnect(sessionId: string, reason): SessionEvent[]` (runs disconnect command, removes snapshot), `disconnectAll(reason: "shutdown"): SessionEvent[]` (A-12 graceful shutdown — iterates all active sessions, emits disconnect for each), `getState(): SessionState` (returns current in-memory state), `getActiveProjectRoots(): string[]` (returns deduplicated list of project roots from active sessions), `discoverActiveWorkflows(): Workflow[]` (calls discoverWorkflows per-root per O-1, unions results). On startup, replays all events from session_events via loadAllEvents + replay. Create `spacebridge/src/domain/session/registry.test.ts` with integration tests: register+heartbeat+disconnect lifecycle, reconnect idempotency, disconnectAll on shutdown, getActiveProjectRoots deduplication, event replay on fresh registry over same DB.
+- **acceptance_criteria**: `bun test spacebridge/src/domain/session/registry.test.ts` passes. Registry wires decider+evolve+persistence correctly. disconnectAll emits N disconnect events for N active sessions. getActiveProjectRoots returns deduplicated roots. Event replay reconstructs state on fresh instance.
+- **files_modified**: `spacebridge/src/domain/session/registry.ts` (new), `spacebridge/src/domain/session/registry.test.ts` (new)
+
+### Task 8: Socket-server heartbeat handler + socket-client heartbeat sender
+- **model**: sonnet
+- **wave**: 3
+- **skills_hint**: none (IPC integration)
+- **read_first**: `spacebridge/src/ipc/socket-server.ts`, `spacebridge/src/ipc/socket-client.ts`, `spacebridge/src/ipc/types.ts`
+- **action**: Modify `socket-server.ts` to add heartbeat message handler following the existing type-check -> extract -> handle -> ack pattern. Add `onHeartbeat: (sessionId: string) => void` to `SocketServerOptions`. In the message decoder, add `if (msg.type === "heartbeat")` branch that calls `opts.onHeartbeat(sessionId)` and sends `heartbeat-ack` response. Modify `socket-client.ts` to add heartbeat sender: after successful register-ack, start `setInterval` that sends `{type: "heartbeat", payload: {sessionId}}` messages at configurable interval (default 10s). Add `heartbeatIntervalMs` to `SocketClientOptions` (optional, default 10_000). Clear interval on close/disconnect. Add `HeartbeatPayload` type to `types.ts`: `{sessionId: string}`. Update existing tests to account for the new onHeartbeat option.
+- **acceptance_criteria**: `bun test spacebridge/src/ipc/socket-server.test.ts` passes (heartbeat handler test added). `bun test spacebridge/src/ipc/socket-client.test.ts` passes (heartbeat sender test added). Heartbeat-ack is sent back to client. Interval is cleared on close.
+- **files_modified**: `spacebridge/src/ipc/socket-server.ts` (modify), `spacebridge/src/ipc/socket-client.ts` (modify), `spacebridge/src/ipc/types.ts` (modify), `spacebridge/src/ipc/socket-server.test.ts` (modify), `spacebridge/src/ipc/socket-client.test.ts` (modify)
+
+### Task 9: Heartbeat monitor (daemon-side timeout detection)
+- **model**: sonnet
+- **wave**: 4
+- **skills_hint**: none (daemon integration)
+- **read_first**: `spacebridge/src/domain/session/registry.ts`, `spacebridge/src/domain/session/types.ts`
+- **action**: Create `spacebridge/src/domain/session/heartbeat-monitor.ts` — a setInterval-based daemon module that scans SessionState for stale sessions. `createHeartbeatMonitor(opts: {registry: SessionRegistry, timeoutMs: number, intervalMs: number})` returns `{start(), stop()}`. On each interval tick, iterates `registry.getState().sessions`, checks `now - session.lastHeartbeat > timeoutMs`, and calls `registry.disconnect(sessionId, "timeout")` for stale sessions. Create `spacebridge/src/domain/session/heartbeat-monitor.test.ts` with tests: detects stale session after timeout, does not disconnect fresh session, stop() clears interval.
+- **acceptance_criteria**: `bun test spacebridge/src/domain/session/heartbeat-monitor.test.ts` passes. Stale sessions detected and disconnected. Fresh sessions left alone. stop() prevents further scans.
+- **files_modified**: `spacebridge/src/domain/session/heartbeat-monitor.ts` (new), `spacebridge/src/domain/session/heartbeat-monitor.test.ts` (new)
+
+### Task 10: File watcher with dynamic scope
+- **model**: opus
+- **wave**: 4
+- **skills_hint**: none (Bun fs.watch)
+- **read_first**: `spacebridge/src/domain/session/registry.ts`, `spacebridge/src/schema.ts`
+- **action**: Create `spacebridge/src/domain/session/watcher.ts`. `createFileWatcher(opts: {registry: SessionRegistry, db: SpacebridgeDb, onFileChange?: (event) => void})` returns `{recomputeScope(), close()}`. Internally maintains a `Map<string, FSWatcher>` of active watchers keyed by workflow directory. `recomputeScope()`: calls `registry.discoverActiveWorkflows()`, compares with current watcher set, adds watchers for new dirs (using `fs.watch(dir, {recursive: true})`), closes watchers for removed dirs. Each watcher filters to `*.md` files only (Q-1 answer). Debounce at ~100ms per filename using `Map<string, Timer>` (filename-only key per A-9 macOS FSEvents gotcha). Debounced events: append to `events` table with sentinel values `entity="*"`, `stage="watcher"`, `agent="file-watcher"` (O-2 decision), `type="file_change"`, `detail=<relative file path>`, `workflowDir=<workflow dir>`. Create `spacebridge/src/domain/session/watcher.test.ts` with tests: scope expand on register, scope contract on disconnect, debounce collapses rapid events, only *.md files pass filter.
+- **acceptance_criteria**: `bun test spacebridge/src/domain/session/watcher.test.ts` passes. Watchers dynamically added/removed. Only *.md events pass through. Debounce collapses burst writes. Events written to events table with correct sentinel values.
+- **files_modified**: `spacebridge/src/domain/session/watcher.ts` (new), `spacebridge/src/domain/session/watcher.test.ts` (new)
+
+### Task 11: Graceful shutdown + SIGTERM/SIGINT handler
+- **model**: sonnet
+- **wave**: 5
+- **skills_hint**: none (process lifecycle)
+- **read_first**: `spacebridge/src/domain/session/registry.ts`, `spacebridge/src/domain/session/watcher.ts`, `spacebridge/src/domain/session/heartbeat-monitor.ts`
+- **action**: Create `spacebridge/src/domain/session/shutdown.ts`. `registerShutdownHandler(opts: {registry: SessionRegistry, watcher: FileWatcher, monitor: HeartbeatMonitor})`: registers SIGTERM and SIGINT handlers. On signal: (1) stop heartbeat monitor, (2) close all file watchers, (3) call `registry.disconnectAll("shutdown")` to persist disconnect events for all active sessions (A-12), (4) log shutdown complete. Create `spacebridge/src/domain/session/shutdown.test.ts` with tests: SIGTERM triggers disconnectAll, all components stopped in correct order.
+- **acceptance_criteria**: `bun test spacebridge/src/domain/session/shutdown.test.ts` passes. Shutdown handler calls disconnectAll. Event log shows session_disconnected events for all active sessions with reason "shutdown". Heartbeat monitor and watchers stopped before registry disconnect.
+- **files_modified**: `spacebridge/src/domain/session/shutdown.ts` (new), `spacebridge/src/domain/session/shutdown.test.ts` (new)
+
+### Task 12: Replay integration test (restart scenario)
+- **model**: sonnet
+- **wave**: 5
+- **skills_hint**: none (integration test)
+- **read_first**: `spacebridge/src/domain/lease/replay.integration.test.ts`, `spacebridge/src/domain/session/registry.ts`
+- **action**: Create `spacebridge/src/domain/session/replay.integration.test.ts`. Test: (1) Create registry1 over a temp DB file, register 3 sessions, heartbeat one, disconnect another. (2) Close registry1. (3) Create registry2 over same DB file — on startup, replays all events from session_events. (4) Assert registry2.getState() matches expected: 2 active sessions (one with updated heartbeat, one original), 1 disconnected (absent from state). (5) Assert getActiveProjectRoots() returns correct deduplicated roots.
+- **acceptance_criteria**: `bun test spacebridge/src/domain/session/replay.integration.test.ts` passes. State reconstruction matches pre-shutdown state exactly. Replay handles all 4 event types (registered, reconnected, heartbeat, disconnected).
+- **files_modified**: `spacebridge/src/domain/session/replay.integration.test.ts` (new)
+
+## UAT Spec
+
+### Browser
+- (none — no UI changes in this entity)
+
+### CLI
+- (none — no CLI changes in this entity)
+
+### API
+- U-1: (api) Register a session via IPC, verify session_registered event appears in session_events table. Verify sessions snapshot table updated.
+- U-2: (api) Send heartbeat via IPC, verify session_heartbeat event in session_events and lastHeartbeat updated in sessions snapshot.
+- U-3: (api) Disconnect a session, verify session_disconnected event in session_events and session removed from sessions snapshot.
+- U-4: (api) Register duplicate session_id, verify session_reconnected event (not error). Verify pid/projectRoot/lastHeartbeat updated.
+- U-5: (api) Start heartbeat monitor with short timeout (500ms), register session, wait >500ms without heartbeat, verify timeout disconnect emitted.
+- U-6: (api) Register 2 sessions with roots /repo-a and /repo-b, call getActiveProjectRoots(), verify ["/repo-a", "/repo-b"].
+- U-7: (api) Register 3 sessions with roots /repo-a, /repo-b, /repo-a, verify getActiveProjectRoots() returns ["/repo-a", "/repo-b"] (deduped).
+- U-8: (api) Create watcher, write a .md file to watched dir, verify file_change event in events table with entity="*", stage="watcher", agent="file-watcher" within ~200ms.
+- U-9: (api) Write a .ts file to watched dir, verify NO event emitted (only *.md passes filter).
+- U-10: (api) Register session B on /repo-b, disconnect session B, verify watchers for /repo-b's workflow dirs are closed (watcher count decreases).
+- U-11: (api) Write events to session_events, create fresh registry over same DB, verify replay reconstructs exact pre-restart state.
+- U-12: (api) Register 2 sessions, send SIGTERM, verify session_disconnected events for both sessions in event log with reason "shutdown".
+
+### Interactive
+- U-13: (interactive) Captain reviews domain module layout: `spacebridge/src/domain/session/` should mirror `domain/lease/` structure with types, decider, evolve, persistence, schemas, errors, registry, watcher, heartbeat-monitor, shutdown.
+
+## Validation Map
+
+| Requirement | Task | Verification Command | Status |
+|---|---|---|---|
+| AC-1: register on empty state returns session_registered | Task 2 | `bun test spacebridge/src/domain/session/decider.test.ts` | pending |
+| AC-2: duplicate register returns session_reconnected (A-11) | Task 2 | `bun test spacebridge/src/domain/session/decider.test.ts` | pending |
+| AC-3: heartbeat on active session returns session_heartbeat | Task 2 | `bun test spacebridge/src/domain/session/decider.test.ts` | pending |
+| AC-4: heartbeat timeout triggers disconnect command | Task 9 | `bun test spacebridge/src/domain/session/heartbeat-monitor.test.ts` | pending |
+| AC-5: discoverWorkflows per-root union, deduplication | Task 7 | `bun test spacebridge/src/domain/session/registry.test.ts` | pending |
+| AC-6: file watcher debounced event → events table | Task 10 | `bun test spacebridge/src/domain/session/watcher.test.ts` | pending |
+| AC-7: watcher scope contracts on disconnect | Task 10 | `bun test spacebridge/src/domain/session/watcher.test.ts` | pending |
+| AC-8: event replay on restart reconstructs SessionState | Task 12 | `bun test spacebridge/src/domain/session/replay.integration.test.ts` | pending |
+| A-3: heartbeat IPC handler in socket-server | Task 8 | `bun test spacebridge/src/ipc/socket-server.test.ts` | pending |
+| A-5: Zod schemas with .passthrough() | Task 4 | `bun test spacebridge/src/domain/session/schemas.test.ts` | pending |
+| A-12: graceful shutdown disconnects all sessions | Task 11 | `bun test spacebridge/src/domain/session/shutdown.test.ts` | pending |
+| A-13: shim-side heartbeat sender | Task 8 | `bun test spacebridge/src/ipc/socket-client.test.ts` | pending |
+| session_events table + DDL | Task 5 | `bun test spacebridge/src/schema.test.ts` | pending |
+| session persistence layer | Task 6 | `bun test spacebridge/src/domain/session/persistence.test.ts` | pending |
+| O-1: per-root discoverWorkflows iteration | Task 7 | `bun test spacebridge/src/domain/session/registry.test.ts` | pending |
+| O-2: events table sentinel values | Task 10 | `bun test spacebridge/src/domain/session/watcher.test.ts` | pending |
+| Q-1: *.md only file filter | Task 10 | `bun test spacebridge/src/domain/session/watcher.test.ts` | pending |
+
+## Stage Report: plan
+
+- [x] Research findings produced (## Research Findings with 5 domains)
+  5 domains: Upstream Constraints, Existing Patterns, Library/API Surface, Known Gotchas, Reference Examples
+- [x] PLAN produced (## PLAN with per-task attributes)
+  12 tasks across 5 waves. Each task has: model, wave, skills_hint, read_first, action, acceptance_criteria, files_modified
+- [x] UAT Spec produced (## UAT Spec with items classified by type)
+  13 items: 0 browser, 0 cli, 12 api, 1 interactive
+- [x] Validation Map produced (## Validation Map linking requirement -> task -> command -> status)
+  17 rows mapping all ACs, assumptions, options, and questions to tasks and verification commands
+- [x] Plan-checker pass within <=3 iterations
+  Self-review pass 1: all 12 tasks have required attributes, wave dependencies are acyclic (W1: types/decider/evolve/schemas independent, W2: schema+persistence depend on types, W3: registry+IPC depend on W1+W2, W4: monitor+watcher depend on W3, W5: shutdown+replay depend on W4), all 8 ACs mapped in Validation Map, all 13 assumptions traceable, both options (O-1, O-2) implemented, Q-1 answer reflected in Task 10. No revision needed.
+- [x] workflow-index append called
+  CONTRACTS.md entries: spacebridge/src/schema.ts (modify, add session_events table), spacebridge/src/db.ts (modify, add session_events DDL), spacebridge/src/ipc/socket-server.ts (modify, add heartbeat handler), spacebridge/src/ipc/socket-client.ts (modify, add heartbeat sender), spacebridge/src/ipc/types.ts (modify, add HeartbeatPayload), spacebridge/src/domain/session/* (new, 12 files)
