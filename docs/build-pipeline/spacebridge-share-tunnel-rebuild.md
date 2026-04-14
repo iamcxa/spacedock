@@ -529,3 +529,80 @@ Suggested options: (a) Add `supportsSSE(): boolean` and `allowedPorts(): number[
 - [x] Workflow-index append: deferred to FO (ensign cannot invoke workflow-index skill per stage definition)
 - [x] Plan-checker: self-review pass (inline, no separate subagent dispatch in ensign mode)
   Dimensions checked: (1) AC coverage complete, (2) task attributes complete, (3) no TBD/placeholder text, (4) wave dependencies valid (each wave's read_first files exist or are created by prior waves), (5) files_modified no overlaps within same wave, (6) model hints all sonnet (appropriate for implementation tasks), (7) validation map covers all requirements
+
+## Stage Report: review
+
+- [x] 1. Pre-scan: stale reference check — DONE
+  **No stale imports found.** All new spacebridge files import from valid paths within the worktree. The `token-verify.ts` and route handlers use dynamic `import()` with correct relative paths from their layer (`../../../../src/domain/share/token-verify`). The agent rename (troop.md deleted → task-executor.md created) is internally consistent: `skills/build-execute/SKILL.md` and `docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md` both updated references from `spacedock:troop` to `spacedock:task-executor`. The deleted `references/first-officer-shared-core.md` is still referenced in `skills/first-officer/SKILL.md` and `skills/knowledge-capture/references/apply-mode.md` — but these are pre-existing files unchanged by 058. **Not a 058 regression.**
+
+- [x] 2. Pre-scan: plan consistency (9 tasks vs actual commits) — DONE
+  PLAN has 9 tasks across 6 waves. Commits: 9 feature commits (cc1d054→fe18015) + 2 fix commits (quality + TypeScript fixes). Task coverage:
+  - Task 1 (schema) → cc1d054
+  - Task 2 (token-manager) → a353dcb
+  - Task 3 (tunnel) → 5096f50
+  - Task 4+5 (daemon+CLI) → d99e84a
+  - Task 6 (middleware) → 1f023a6
+  - Task 7+8 (view+API) → 958ee46
+  - Task 9 (integration) → 09c62da
+  - fix commit 75a2862 resolves quality-stage TypeScript errors
+  All 9 tasks have corresponding commits. **Plan consistent with execution.**
+
+- [x] 3. Security review: token generation, validation, rate limiting — DONE
+
+  **Token generation:** `crypto.getRandomValues(new Uint8Array(24))` → 48-char hex. Exactly matches the A-11/GUARDRAIL spec (192-bit entropy). Correct.
+
+  **Token validation (timing safety):** `verify()` uses Drizzle `WHERE token = ?` SQL lookup. No string comparison in application code — the database does the equality check. The question of timing-safe comparison is not applicable here because the lookup is a parameterized SQL query, not a string comparison loop. No timing oracle exists. **Acceptable.**
+
+  **Middleware token extraction:** Tokens are extracted from URL path or `?token=` query param. No validation of token format (hex pattern) in middleware — any string passes through to the rate limiter. This means garbage tokens consume rate-limit bucket slots, which is acceptable (they'll fail at the DB layer). **Not a vulnerability.**
+
+  **Rate limiter correctness:** `checkRateLimit()` uses a fixed-window algorithm. `bucket.count > RATE_LIMIT_MAX` means request 61 is blocked (count becomes 61, which is > 60). Request 60 is allowed (count = 60, which is not > 60). This matches the AC spec ("request 60 passes, request 61 returns 429") and is verified by middleware.test.ts. **Correct.**
+
+  **Rate limiter bypass:** The `rateLimitMap` is module-level in middleware.ts. In Next.js with Bun, middleware runs in the same process as route handlers. Between process restarts, the map persists — this is the intended single-daemon design (design doc §6.4, A-5). The map cannot be bypassed by changing the token string (different tokens get independent buckets). **No bypass path found.**
+
+  **Rate limiter window reset:** `bucket.resetAt <= nowMs` resets on the next request after the window expires. A client could reset their window by waiting 60 seconds and then bursting again. This is standard fixed-window behavior and accepted by design.
+
+- [x] 4. Correctness review: domain logic, tunnel abstraction, schema — DONE
+
+  **TokenManager.create():** Uses `.returning().all()` to get the inserted row. Returns `rows[0] as ShareToken`. If insert fails (e.g. UNIQUE conflict on token), this would throw at the DB layer rather than return null — acceptable for a 192-bit entropy space where collisions are astronomically unlikely.
+
+  **TokenManager.verify() lazy cleanup:** Uses `lte(shareTokens.expiresAt, Date.now())` boundary. A token with `ttlMs=0` has `expiresAt === createdAt`, which satisfies `<=` and is correctly rejected. **Correct boundary.**
+
+  **TokenManager.revoke():** Uses `.returning().all()` to check if deletion affected a row. Returns `deleted.length > 0`. **Correct.**
+
+  **TokenManager.list():** Deletes expired tokens first, then returns remaining. Side effect on list is consistent with A-10 (lazy cleanup) but is more aggressive than verify() — list cleans ALL expired, not just the accessed one. This is documented and intentional.
+
+  **token-verify.ts:** Creates a new DB connection per call (`createDb(dbPath)`). This is called from Next.js route handlers on every share request. Each call opens a new connection. For a single-daemon pre-SaaS architecture with low concurrency, this is acceptable. No lazy cleanup in `verifyShareToken()` — it checks expiry but does not delete. Minor inconsistency with TokenManager.verify() semantics, but harmless (expired rows accumulate until next list/cleanup call).
+
+  **Tunnel providers — detect() auto-skip logic for cloudflared SSE:** `detectProvider()` iterates PROVIDERS array and skips any provider where `supportsSSE() === false`. CloudflaredProvider returns `false`. The skip is unconditional during auto-detection. `--tunnel-backend cloudflared` override bypasses this check. Matches Q-2 decision exactly. **Correct.**
+
+  **TailscaleProvider.stop():** Runs `tailscale funnel {externalPort} off` before SIGTERM. `externalPort` is always `ALLOWED_EXTERNAL_PORTS[0]` (443). If start() was never called (or failed mid-way), `this.externalPort` defaults to 443, so `stop()` would attempt `tailscale funnel 443 off` regardless. This is idempotent — tailscale does not error on disabling a non-active funnel. **Acceptable.**
+
+  **NgrokProvider URL extraction:** Polls `http://127.0.0.1:4040/api/tunnels` every 500ms. If another ngrok tunnel is already running on the same machine, this will return the existing tunnel's URL rather than the new one. The code takes the first HTTPS tunnel it finds, which may not be the one just started. **LOW risk:** in practice, users with multiple ngrok tunnels need `--tunnel-backend` override anyway. Not a security issue, just a UX edge case.
+
+  **Schema LCD compliance:** `share_tokens` in both `spacebridge/src/schema.ts` and `spacebridge/ui/lib/schema.ts`: integer PK with autoIncrement, text strings for token/entitySlug, integer epoch-ms timestamps, fmodel placeholder columns (text/integer). `ui/lib/schema.ts` mirror is in sync with `src/schema.ts` — both have identical column set. **LCD compliant.**
+
+  **Known deviation (middleware):** Middleware does format extraction + rate limiting only. DB validation (expiry/entity scope) deferred to route handlers. This is documented in middleware.ts ABOUTME comment, in the Stage Report: execute deviations section, and in the stage dispatch instructions. **Correct and documented.**
+
+- [x] 5. Findings classification — DONE
+
+  | ID | Severity | Root | Location | Description |
+  |---|---|---|---|---|
+  | F-1 | MEDIUM | CODE | `spacebridge/src/tunnel/detect.ts:13` | `execSync(\`which ${name}\`)` where `name` comes from `provider.name`. Provider names are `readonly` string literals ("ngrok", "tailscale", "cloudflared") — not user input. However, if `isBinaryAvailable` were ever called with user-controlled input, this would be a command injection. The function is private and only called with `provider.name`. **Not exploitable in current code, but fragile.** Prefer `which` from the `which` npm package or explicit allowlist check. |
+  | F-2 | MEDIUM | CODE | `spacebridge/src/domain/share/token-verify.ts` | Opens a new DB connection per call with no close. `createDb(dbPath)` returns a Drizzle wrapper around a Bun SQLite connection. Route handlers call this on every share request. Each opened connection is not explicitly closed. Bun SQLite connections are GC'd, but under load this could exhaust file descriptors. Compare with `openReadOnlyDb()` in `ui/lib/db.ts` which returns a handle with an explicit `close()` method. **Should use `openReadOnlyDb` or explicitly close after use.** |
+  | F-3 | LOW | CODE | `spacebridge/ui/app/api/share/comments/route.ts:73-74` | `author` field cast: `const cmdWithNickname = { ...cmd, author: author as "guest" }`. The `author` variable is `guest:Bob` (with colon and nickname), but it's cast to the type `"guest"` (literal string). This bypasses TypeScript's type check — the runtime value is `"guest:Bob"` but the type says `"guest"`. The CQRS decider receives this mistyped value. Functionally correct (the decider stores whatever string it gets), but the type cast hides the schema mismatch. |
+  | F-4 | LOW | CODE | `spacebridge/bin/daemon.ts` (share_create handler) | Port 8420 is hardcoded: `tunnelProvider.start(8420)`. The Next.js port could differ (configurable via `PORT` env in nextjs-child.ts). If the daemon starts Next.js on a different port, the tunnel URL would proxy to the wrong port. **Recommend reading port from config or constant rather than hardcoding.** |
+  | F-5 | LOW | CODE | `spacebridge/src/tunnel/detect.ts` | `isBinaryAvailable` uses `execSync` (synchronous). Called at daemon startup and on each `share_create` RPC. For `share_create` specifically, this runs a `which` syscall synchronously in the RPC handler. Acceptable for pre-SaaS single-daemon, but worth noting. |
+  | F-6 | NIT | CODE | `spacebridge/ui/app/share/[token]/page.tsx:34-36` | Double validation: page checks `shareToken !== token` (header vs path param). Middleware injects `x-share-token` from the path, so they will always be equal if the request reaches this page. The check is dead code. Harmless but confusing. |
+  | F-7 | NIT | DOC | `spacebridge/src/domain/share/token-verify.ts` | `verifyShareToken` does not perform lazy cleanup (unlike `TokenManager.verify`). The ABOUTME comment doesn't mention this difference. Low-stakes, but the behavioral divergence between the two verify paths should be documented for future maintainers. |
+
+- [x] 6. Stage Report: review findings table — DONE
+
+  **Overall verdict: PASS with required fixes for F-2.**
+
+  F-2 (DB connection leak in token-verify.ts) is the only finding that could cause operational issues under load. All other findings are LOW or NIT severity. The core implementation is architecturally sound: bearer-token model, 192-bit entropy, correct lazy expiry, rate limiting, Edge Runtime compliance, LCD schema discipline.
+
+  **Required fix before pr-draft:** F-2 — `verifyShareToken` must close the DB connection after use, or be refactored to use `openReadOnlyDb` with explicit close.
+
+  **Recommended fixes (LOW, non-blocking):** F-1 (use allowlist for binary names in isBinaryAvailable), F-3 (fix author type cast), F-4 (read Next.js port from config).
+
+  **NITs (defer):** F-6 (dead code check in page.tsx), F-7 (document verify semantics difference).
