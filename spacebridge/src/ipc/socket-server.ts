@@ -64,7 +64,12 @@ export function createSocketServer(opts: SocketServerOptions): SocketServer {
 
           if (msg.type === "heartbeat") {
             const payload = msg.payload as HeartbeatPayload;
-            opts.onHeartbeat?.(payload.sessionId ?? sessionId);
+            const heartbeatSessionId = payload.sessionId ?? sessionId;
+            if (heartbeatSessionId !== sessionId) {
+              console.warn(`[socket-server] heartbeat sessionId mismatch: socket registered as ${sessionId}, got ${heartbeatSessionId} — ignoring`);
+              return;
+            }
+            opts.onHeartbeat?.(sessionId);
             if (!socket.destroyed) {
               socket.write(encodeMessage({ id: msg.id, type: "heartbeat-ack", payload: {} }));
             }

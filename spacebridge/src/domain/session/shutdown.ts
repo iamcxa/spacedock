@@ -23,17 +23,20 @@ export function registerShutdownHandler(opts: ShutdownHandlerOptions): void {
     // 3. Disconnect all active sessions through decider pipeline (A-12)
     const events = await opts.registry.disconnectAll("shutdown");
     console.log(`[shutdown] disconnected ${events.length} sessions, event log complete`);
+    process.exit(0);
   }
 
   process.on("SIGTERM", () => {
     shutdown("SIGTERM").catch((err) => {
       console.error("[shutdown] SIGTERM handler error:", err);
+      process.exit(1);
     });
   });
 
   process.on("SIGINT", () => {
     shutdown("SIGINT").catch((err) => {
       console.error("[shutdown] SIGINT handler error:", err);
+      process.exit(1);
     });
   });
 }
