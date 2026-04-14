@@ -227,6 +227,53 @@ Suggested options: (a) Add `supportsSSE(): boolean` and `allowedPorts(): number[
 - [x] Clarify duration: 9 questions asked, session complete
   1 batch confirmation + 2 option selections + 2 Q answers + 4 exploration iterations
 
+## Stage Report: quality
+
+- [ ] bun test (full suite from repo root)
+  **FAILED** — 2 test failures in `tests/dashboard/channel.test.ts`:
+  1. Line 202: `expect(foReply!.seq).toBeGreaterThan(captainMsg!.seq)` → Expected: > 1020, Received: 1015
+  2. Line 251: `expect(permRes!.seq).toBeGreaterThan(permReq!.seq)` → Expected: > 1019, Received: 1017
+  
+  Test suite results: 747 pass, 2 fail, 1855 expect() calls across 749 tests.
+  **Evidence**: Failure appears to be a race condition in channel event sequencing (FO reply seq is lower than captain message seq in test 1, permission response seq is lower than request seq in test 2). These tests are in `tests/dashboard/channel.test.ts` which tests the dashboard channel integration, not 058-specific code.
+
+- [ ] tsc --noEmit spacebridge
+  **FAILED** — 10 TypeScript type errors in spacebridge domain code:
+  1. `src/domain/lease/decider.test.ts:15` — Map key type mismatch (string vs template literal `${string}::${string}`)
+  2. `src/domain/session/registry.ts:140` — Property 'disconnect' does not exist on SessionRegistry
+  3. `src/domain/session/registry.ts:159` — Property 'getActiveProjectRoots' does not exist on SessionRegistry
+  4. `src/domain/share/token-manager.ts:63` — Property 'changes' does not exist on void
+  5. `src/domain/share/token-manager.ts:78` — Property 'changes' does not exist on void
+  6. `src/ipc/coordination-client-bridge.ts:79` — String not assignable to template literal type
+  7. `src/ipc/coordination-client-bridge.ts:117` — String not assignable to template literal type
+  8. `src/ipc/coordination-concurrent.test.ts:62-63` — UUID format mismatch in test setup
+  9. `src/ipc/fo-simulator.integration.test.ts:60` — UUID format mismatch in test setup
+  
+  **Evidence**: Multiple type errors in session registry (missing methods), share token manager (incorrect async handling), and coordination layer (template literal type strictness).
+
+- [ ] tsc --noEmit spacebridge/ui
+  **FAILED** — 14 TypeScript type errors in Next.js share view:
+  1. `app/api/share/comments/route.ts` — 5 missing module imports (db, schema, comment domain modules)
+  2. `app/api/share/events/route.ts` — 2 missing module imports (db, schema)
+  3. `app/share/[token]/page.tsx` — 3 missing module imports (db, schema)
+  4. `app/share/[token]/page.tsx:174` — Type 'string | null' not assignable to 'string'
+  5. `app/share/[token]/page.tsx:179-180` — Type 'string | null' not assignable to 'string' (x3)
+  
+  **Evidence**: Import path errors due to nested directory structure (`app/share/` is 6 levels deep from `src/`; paths need adjustment). Type guards missing for nullable values.
+
+- [ ] bun build (if applicable)
+  **SKIPPED** — bun test and tsc failures must be resolved first. Build step cannot proceed with type errors present.
+
+### Summary
+
+**Code Quality Status**: FAILED
+- Dashboard channel tests have pre-existing race condition (not 058-specific)
+- spacebridge domain layer has type errors in session registry and share token manager
+- spacebridge/ui has import path errors (relative path depth miscalculation) and null-safety issues
+- Execute ensign must fix TypeScript errors before FO can proceed with code review
+
+**Recommendation**: Feedback to execute stage with detailed error evidence for targeted fixes.
+
 ## Stage Report: explore
 
 - [x] Files mapped: 14 across schema(2), daemon(1), domain/share(3 new), tunnel(5 new), view(3 new, depends on 053)
