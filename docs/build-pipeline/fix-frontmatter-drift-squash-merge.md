@@ -2,7 +2,7 @@
 id: 098
 title: "Fix frontmatter drift on squash merge — reconcile from main before PR"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: /build
 created: 2026-04-14T12:30:00+08:00
 started:
@@ -56,22 +56,53 @@ children:
 - Given both mod files are modified, when the `## Hook: merge` sections are compared, then the reconciliation step text is identical in both (how to verify: diff the sections, assert no output)
 - Given the `## Rules` section, when read after the fix, then it contains an explicit reconciliation exception clause (how to verify: grep "reconcili" in mod file returns match in Rules section)
 
-## Open Questions
-
-(explore stage will populate)
-
 ## Assumptions
 
-(explore stage will populate)
+A-1: Merge hook exists at correct insertion point (`mods/pr-review-loop.md` lines 47-69) with no reconciliation step present. The fix inserts before existing step 2 (kc-pr-create invocation).
+Confidence: 🟢 Confident (0.95)
+Evidence: `mods/pr-review-loop.md:47-69` -- Hook: merge section; step 1 gathers context, step 1.5 confidence check, step 2 invokes kc-pr-create. Reconciliation inserts between 1.5 and 2.
+
+A-2: Workflow activation copy exists at `docs/build-pipeline/_mods/pr-review-loop.md` with explicit "Keep in sync with the library version" note.
+Confidence: 🟢 Confident (0.95)
+Evidence: `docs/build-pipeline/_mods/pr-review-loop.md:7` -- "This is the build-pipeline activation of mods/pr-review-loop.md. Keep in sync with the library version."
+
+A-3: `git show main:{path}` reliably reads the latest main HEAD's entity file for frontmatter extraction.
+Confidence: 🟢 Confident (0.90)
+Evidence: standard git behavior; used extensively in FO worktree patterns for branch comparison. MEMORY.md "Worktree Drift at Merge" documents `git checkout --theirs` as a related pattern.
+
+A-4: One entity per worktree branch — reconciliation handles one entity file per merge hook invocation.
+Confidence: 🟡 Likely (0.75)
+Evidence: FO dispatch creates one worktree per entity (README.md schema: `worktree` field is singular). Edge case: manual multi-entity branches are possible but not FO-managed.
 
 ## Option Comparisons
 
-(explore stage will populate)
+(none -- approach is unambiguous, single viable implementation path)
+
+## Open Questions
+
+(none -- directive is specific, all gray areas resolved as assumptions)
 
 ## Decomposition Recommendation
 
-(explore stage will populate if scope warrants it)
+Not warranted. 2 files, both the same mod at library and workflow level. Indivisible.
 
 ## Canonical References
 
-(clarify stage will populate)
+- `mods/pr-review-loop.md:47-69` -- merge hook section (insertion point)
+- `docs/build-pipeline/_mods/pr-review-loop.md:7` -- sync note
+
+## Stage Report: explore
+
+- [x] Files mapped: 2 across mod (library + workflow activation)
+  mods/pr-review-loop.md (library, insertion point lines 47-69); docs/build-pipeline/_mods/pr-review-loop.md (workflow copy, keep-in-sync)
+- [x] Assumptions formed: 4 (Confident: 3, Likely: 1, Unclear: 0)
+  A-1 insertion point (0.95), A-2 sync copy (0.95), A-3 git show (0.90), A-4 one entity per branch (0.75)
+- [x] Options surfaced: 0
+  Single viable implementation path
+- [x] Questions generated: 0
+  Directive is specific, all gray areas resolved as assumptions
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorm
+- [x] Scale assessment: Small confirmed
+  2 files, both same mod at library/workflow level
+- [x] Research dispatched: 0 researchers (skipped -- all assumptions internal git/codebase patterns)
