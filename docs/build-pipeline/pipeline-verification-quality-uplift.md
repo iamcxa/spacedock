@@ -2,7 +2,7 @@
 id: 074
 title: Pipeline Verification Quality Uplift — Review + UAT Evidence & Skill Testing
 status: epic
-context_status: awaiting-clarify
+context_status: ready
 source: captain observation during 050/068 pipeline run
 created: 2026-04-12T16:30:00+08:00
 started:
