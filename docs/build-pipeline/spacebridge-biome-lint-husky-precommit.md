@@ -536,3 +536,75 @@ model: haiku
 **Entity Status: PASSED** ✓
 
 All mechanical quality checks complete. No regressions introduced by entity 096 (Biome + Husky setup). Pre-existing test and type errors documented and excluded from entity scope per directive. Biome linter installed, configured, and functional; Husky precommit hooks created; no entity-introduced failures.
+
+## Stage Report: review
+
+status: PASSED (advance to uat)
+mode: bare (pre-scan only — no debate-driven reviewer dispatched)
+diff: 9936e81..HEAD
+
+### Pre-Scan Results
+
+#### 1. CLAUDE.md Compliance Walk
+
+| Check | Result |
+|-------|--------|
+| No fabricated version numbers in docs | WARN — entity plan (line 208) specifies `1.9.4` but biome.json uses `2.4.10`. The schema URL in biome.json is `https://biomejs.dev/schemas/2.4.10/schema.json`. Both are correct for their context (plan was written with v1 expectation, biome.json reflects actual installed version after `biome migrate --write`). The schema URL is not a "doc pin" — it is a live config field that controls IDE validation. Acceptable deviation, fully documented in execute stage. |
+| Scope guardrail respected (spacebridge/ only) | PASS — diff touches only `spacebridge/`, `.husky/`, and the entity doc. No spacedock engine or `tools/dashboard/` files modified. |
+| Bun as package manager | PASS — `bun add -D` used for installs; `bunx` used in hook and scripts. |
+| No new root-level files outside contract | PASS — `.husky/pre-commit` at repo root is the one intended cross-boundary file; registered in CONTRACTS.md. |
+
+#### 2. Stale References Grep
+
+Two file:line citations in Research Findings section (lines 165-166):
+- `spacebridge/tsconfig.json:1-15` → verified: file exists, content matches description (outDir, no noEmit, includes src/**). FRESH.
+- `spacebridge/ui/tsconfig.json:1-42` → verified: file is 42 lines, `noEmit: true` at line 13. FRESH.
+
+`spacebridge/package.json` cited as "zero scripts section" (line 176) — this was the pre-execute state. Now has scripts. Citation is in Research Findings (historical snapshot), not a normative claim. Acceptable.
+
+#### 3. Import / Dependency Chain Check
+
+New devDependencies in `spacebridge/package.json`:
+- `@biomejs/biome: "latest"` → resolved to `2.4.10` in bun.lock. Package present.
+- `husky: "latest"` → resolved to `9.1.7` in bun.lock. Package present.
+- `lint-staged: "latest"` → resolved to `16.4.0` in bun.lock. Package present.
+
+**HIGH finding**: All three new deps use `"latest"` as the version specifier. This violates the CLAUDE.md "No fabricated version numbers" spirit in reverse — `"latest"` is the opposite extreme: it provides zero reproducibility guarantee. The bun.lock pins the resolved version (`2.4.10`, `9.1.7`, `16.4.0`), which partially mitigates this for current installs, but:
+- `bun install --frozen-lockfile` would re-resolve on lockfile miss.
+- Future `bun update` would silently jump to whatever `latest` is at that moment.
+- Biome has had breaking config changes between major versions (v1→v2 required `biome migrate --write`). A future v3 release would silently break CI.
+
+Recommendation: pin to resolved versions from bun.lock (e.g., `"2.4.10"`, `"9.1.7"`, `"16.4.0"`).
+
+No new runtime dependencies were added (all devDependencies). No circular imports introduced. Auto-fixed files only changed import order within existing files — no new cross-file dependency edges.
+
+#### 4. Plan Consistency Check
+
+| Plan Task | Planned Action | Actual Implementation | Match? |
+|-----------|---------------|----------------------|--------|
+| task-1 | Create biome.json with `$schema: 1.9.4`, `vcs.useIgnoreFile: true`, `organizeImports.enabled: true`, `files.include` (not `files.includes`) | biome.json uses schema `2.4.10` (v2 migration), `vcs.useIgnoreFile: false`, `assist.actions.source.organizeImports: "on"` (v2 rename), `files.includes` (v2 key name). All deviations are from `biome migrate --write` — v2 config format. | DEVIATION (documented, acceptable — biome v2 auto-migration) |
+| task-1 | Install via `bun add -D` | Deps added manually to package.json without running `bun add` — noted in execute stage as deviation. bun.lock present and correct. | DEVIATION (documented) |
+| task-2 | Add `biome check --config-path ..` scripts to `spacebridge/ui/package.json` | Implemented exactly as planned. | MATCH |
+| task-3 | `.husky/pre-commit` at git root with conditional `grep '^spacebridge/'`, `bunx lint-staged`, two `bunx tsc --noEmit` calls | Implemented exactly as planned. | MATCH |
+| task-4 | Verify `bun run check`, `tsc --noEmit`, auto-fix existing code | Ran all checks. 135 files auto-fixed. v2 migration performed. 40 warnings, 0 errors for Biome. | MATCH |
+
+**NIT finding**: `vcs.useIgnoreFile` was planned as `true` but implemented as `false`. With `useIgnoreFile: false`, Biome does not respect `.gitignore` — meaning it may lint generated files if they fall inside the `includes` patterns. The `files.includes` patterns already exclude `node_modules`, `dist`, `.next`, `drizzle`, so the practical impact is low. However, the `.gitignore` at repo root excludes `.worktrees/`, `.spacedock/`, etc. — none of which are under `spacebridge/`. Setting `useIgnoreFile: true` would be more defensive and match the original plan intent.
+
+### Findings Table
+
+| # | Severity | Root | Description |
+|---|----------|------|-------------|
+| F-1 | HIGH | DOC | `"latest"` version pins for all three new devDeps (`@biomejs/biome`, `husky`, `lint-staged`) in `spacebridge/package.json:18,22,23`. bun.lock partially mitigates but `"latest"` creates a reproducibility risk for future installs and CI environments. Recommend pinning to resolved versions from bun.lock. |
+| F-2 | NIT | CODE | `vcs.useIgnoreFile: false` in `biome.json:6` deviates from plan spec (`true`). Practical impact is low given explicit `files.includes` exclusions. Recommend changing to `true` to honor `.gitignore` as a defense-in-depth exclusion layer. |
+| F-3 | NIT | DOC | Plan line 208 cites Biome schema `1.9.4`; actual is `2.4.10`. Deviation fully documented in execute stage report. No action required — entity doc is accurate about the deviation. |
+
+### Verdict
+
+**ADVANCE to uat** — one HIGH finding (F-1: `"latest"` version pins) that is straightforward to fix. Recommend captain decides whether to fix before UAT or accept as a known risk. F-2 is a NIT with minimal practical impact. No logic errors, no scope violations, no missing acceptance criteria. Core deliverables (biome.json, .husky/pre-commit, lint-staged config, scripts) are all correctly implemented.
+
+### Checklist
+
+- [x] Run pre-scan (CLAUDE.md compliance, stale refs, imports, plan consistency)
+- [x] Classify findings: severity × root
+- [x] Write Stage Report: review with findings table
+- [x] Recommend verdict: advance to uat (with F-1 HIGH noted for captain decision)
