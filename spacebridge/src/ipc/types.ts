@@ -72,3 +72,7 @@ export interface CoordinationResponsePayload {
   result?: unknown;
   error?: string;
 }
+
+export interface HeartbeatPayload {
+  sessionId: string;
+}

@@ -23,6 +23,7 @@ export interface SocketClientOptions {
     maxDelayMs?: number;     // default 5000
     maxRetries?: number;     // default 5
   };
+  heartbeatIntervalMs?: number; // default 10_000; set 0 to disable
 }
 
 export interface SocketClient {
@@ -45,10 +46,13 @@ export function createSocketClient(opts: SocketClientOptions): SocketClient {
     maxRetries: opts.reconnect?.maxRetries ?? 5,
   };
 
+  const heartbeatIntervalMs = opts.heartbeatIntervalMs ?? 10_000;
+
   let socket: net.Socket | null = null;
   let _connected = false;
   let closed = false;
   let reconnectAttempt = 0;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
   const pending = new Map<string, PendingRequest>();
 
@@ -89,6 +93,18 @@ export function createSocketClient(opts: SocketClientOptions): SocketClient {
         if (msg.type === "register-ack" && msg.id === registerId) {
           _connected = true;
           reconnectAttempt = 0;
+          // Start heartbeat sender after successful registration
+          if (heartbeatIntervalMs > 0) {
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
+            heartbeatTimer = setInterval(() => {
+              if (!socket || socket.destroyed || !_connected) return;
+              socket.write(encodeMessage({
+                id: randomUUID(),
+                type: "heartbeat",
+                payload: { sessionId: opts.sessionId },
+              }));
+            }, heartbeatIntervalMs);
+          }
           resolve(msg.payload as RegisterAckPayload);
           return;
         }
@@ -194,6 +210,10 @@ export function createSocketClient(opts: SocketClientOptions): SocketClient {
 
     close(): void {
       closed = true;
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
       rejectAllPending("Client closed");
       if (socket && !socket.destroyed) {
         socket.destroy();
