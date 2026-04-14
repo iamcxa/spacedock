@@ -1,8 +1,8 @@
 ---
 id: 065
 title: Flatten Dispatch -- FO Direct Troops + Ensign Role Reduction
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: captain
 created: 2026-04-12T13:00:00Z
 started:
@@ -99,26 +99,32 @@ Restructure the agent dispatch hierarchy from FO→ensign→task-executor (broke
 A-1: Agent naming convention uses singular nouns -- use `troop.md` not `troops.md`.
 Confidence: 🟢 Confident (0.95)
 Evidence: `agents/` directory -- all 10 existing agent files use singular noun form: researcher.md, ensign.md, code-explorer.md, task-executor.md, science-officer.md, first-officer.md, etc.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-2: FO already has a task-list-driven dispatch pattern (Mode A) for execute stage that pre-dispatches task-executor teammates.
 Confidence: 🟢 Confident (0.90)
 Evidence: `skills/build-execute/SKILL.md:159` -- "Mode A -- FO task-list-driven (preferred): FO dispatched task-executor teammates per wave before invoking you"
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-3: build-execute SKILL.md explicitly acknowledges the ensign Agent-tool limitation that motivates this entity.
 Confidence: 🟢 Confident (0.95)
 Evidence: `skills/build-execute/SKILL.md:28` -- "you run as an ensign subagent, which does not have the Agent tool. FO dispatches task-executor teammates per wave before or instead of invoking you."
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-4: Cross-reference sweep scope is larger than the directive's 5-file estimate -- 10 active non-archive files reference `task-executor`.
 Confidence: 🟢 Confident (0.85)
 Evidence: grep `task-executor` across `*.md` returns 15 files (10 active): `skills/build-execute/SKILL.md`, `skills/build-plan/SKILL.md`, `skills/task-execution/SKILL.md`, `agents/task-executor.md`, `references/agent-dispatch-guide.md`, `references/claude-ensign-runtime.md`, `docs/build-pipeline/README.md`, `docs/build-pipeline/_index/CONTRACTS.md`, `docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md`, `skills/overhaul/references/recipe-format.md`
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-5: Codex runtime adapters (`references/codex-first-officer-runtime.md`, `references/codex-ensign-runtime.md`) should be updated alongside Claude adapters for consistency.
 Confidence: 🟡 Likely (0.75)
 Evidence: `references/codex-first-officer-runtime.md` and `references/codex-ensign-runtime.md` exist as parallel adapter files to the Claude variants; maintaining parity is the established pattern
+→ Confirmed: captain, 2026-04-14 (batch)
 
-A-6: Inline serial fallback (current Mode B in build-execute) moves from ensign to FO when troops dispatch is unavailable.
+A-6: Mode B fallback changes from "ensign inline serial" to "FO sequential troop dispatch" -- FO dispatches one troop at a time, preserving context isolation while sacrificing parallelism. FO does NOT do inline execution itself.
 Confidence: 🟡 Likely (0.70)
-Evidence: `skills/build-execute/SKILL.md:165` -- current Mode B says "Execute each task yourself in wave order"; after refactor, "yourself" becomes FO instead of ensign since ensign no longer loads this skill for execute
+Evidence: `skills/build-execute/SKILL.md:165` -- current Mode B says "Execute each task yourself in wave order"; after refactor, FO dispatches troops sequentially instead of executing inline, maintaining the troop's context isolation advantage
+→ Corrected by captain, 2026-04-14 (batch): "Mode B fallback is FO sequential troop dispatch (one at a time), not FO inline execution. Troop's context isolation advantage is the key reason -- ensign accumulates context across tasks, troop gets fresh context per task."
 
 ## Option Comparisons
 
@@ -132,6 +138,8 @@ Current `agents/task-executor.md:7` hardcodes `skills: ["spacedock:task-executio
 | No default skill -- FO specifies all skills in dispatch prompt | Maximum flexibility; troop is truly generic; clean separation | FO must always specify skills (no fallback); more dispatch prompt complexity | Medium | Viable |
 | Multiple defaults (task-execution + knowledge-capture) | Troop can always capture findings; richer base capability | More coupling; larger skill surface per dispatch | Medium | Not recommended |
 
+→ Selected: Multiple defaults (task-execution + knowledge-capture) (captain, 2026-04-14, interactive)
+
 ### O-2: build-execute SKILL.md post-refactor loading
 
 After refactor, build-execute is no longer loaded by ensign for execute stage. How does FO consume its orchestration logic?
@@ -141,9 +149,27 @@ After refactor, build-execute is no longer loaded by ensign for execute stage. H
 | FO loads via Skill() before troops dispatch | Consistent with how FO loads other stage skills; auto-context injection; FO gets wave-graph logic, model hints, skill selection | FO skill budget increases; context cost for a guidance doc | Low | Recommended |
 | FO reads as reference doc (Read, not Skill) | Lighter context; FO cherry-picks what it needs | Breaks skill-loading convention; FO must know to Read instead of Skill | Low | Viable |
 
+→ Selected: FO loads via Skill() before troops dispatch (captain, 2026-04-14, interactive)
+
 ## Open Questions
 
-(none -- all gray areas classified as assumptions or options)
+(none from explore -- all gray areas classified as assumptions or options)
+
+Q-1: Entity 065 and 092 (plan file separation) both modify build-execute's Input Contract. Ship order?
+
+Domain: Organizational/Data-transforming
+Why it matters: 065 changes the dispatch consumer (FO + troop), 092 changes the plan location (entity body → separate file). Doing both simultaneously risks merge conflicts and compounded regression risk.
+Suggested options: (a) 065 first, 092 second; (b) 092 first, 065 second; (c) parallel with integration
+
+→ Answer: 065 first, 092 second -- refactor dispatch architecture (larger change) on stable base, then change plan location on refactored base. One change at a time. (captain, 2026-04-14, interactive)
+
+Q-2: Does entity 065 require an ensign transition period for in-flight entities?
+
+Domain: Organizational/Data-transforming
+Why it matters: If entities are mid-execute when 065 ships, the dispatch architecture change could disrupt them.
+Suggested options: (a) No transition needed -- dispatch is stateless; (b) Keep old path as fallback
+
+→ Answer: No transition needed -- dispatch is stateless, each FO dispatch reads latest skill definitions. No engine changes required (plugin.json doesn't reference agent filenames, CC auto-scans agents/ dir). Cross-ref sweep (A-4) is the only migration task. (captain, 2026-04-14, interactive)
 
 ## Decomposition Recommendation
 
@@ -151,7 +177,10 @@ Not warranted. 9 active files across 3 layers (agent, skill, config). Medium sca
 
 ## Canonical References
 
-(clarify stage will populate)
+- `skills/build-execute/SKILL.md` -- primary refactor target, current Mode A/B patterns at lines 159-179
+- `agents/task-executor.md` -- rename target, current frontmatter at line 7
+- `.claude-plugin/plugin.json` -- confirmed no agent filename references (CC auto-scans agents/ dir)
+- `docs/build-pipeline/plan-file-separation-executor-context.md` (entity 092) -- ships after 065 per Q-1 ordering decision
 
 ## Stage Report: explore
 
@@ -168,3 +197,25 @@ Not warranted. 9 active files across 3 layers (agent, skill, config). Medium sca
 - [x] Scale assessment: Medium confirmed, revised scope
   9 active files (vs directive's 5-6 estimate) due to cross-reference sweep; still within Medium range (5-15)
 - [x] Research dispatched: 0 researchers (skipped -- all assumptions internal codebase architecture, no external tech claims)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- entity is Medium scope, explore determined "Not warranted"
+- [x] Re-validation: 6 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  All evidence fresh (written in same session as explore)
+- [x] Assumptions confirmed: 6 / 6 (1 corrected)
+  A-1 through A-5 confirmed via batch; A-6 corrected -- Mode B fallback is FO sequential troop dispatch, not FO inline execution
+- [x] Options selected: 2 / 2
+  O-1 troop default skills -- multiple defaults (task-execution + knowledge-capture); O-2 build-execute loading -- FO loads via Skill()
+- [x] Questions answered: 2 / 2
+  Q-1 ship order 065→092; Q-2 no ensign transition period needed (stateless dispatch)
+- [x] Open exploration: 2 gray areas surfaced (0 from templates, 1 from CONTRACTS, 0 from directive, 1 via captain selection)
+  Entity 092 coordination (Q-1); ensign transition strategy (Q-2)
+- [x] Canonical refs added: 4
+  build-execute SKILL, task-executor agent, plugin.json, entity 092
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected, all Qs answered
+- [x] Handoff mode: loose
+  auto_advance not set; captain must say "execute 065" to advance
+- [x] Clarify duration: 6 questions asked, session complete
+  1 batch confirmation + 2 option AskUserQuestion + 3 exploration iterations
