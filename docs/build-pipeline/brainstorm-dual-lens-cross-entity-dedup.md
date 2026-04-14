@@ -1,13 +1,13 @@
 ---
 id: 102
 title: Brainstorm + Explore Nüwa-Alignment -- Multi-Lens Synthesis + Subagent-First + Cross-Stage Gate Unification
-status: clarify
-context_status: awaiting-clarify
+status: epic
+context_status: ready
 source: /build
 created: 2026-04-14T14:09:45Z
 started:
-completed:
-verdict:
+completed: 2026-04-14T00:00:00Z
+verdict: DECOMPOSED
 score:
 worktree:
 issue:
@@ -18,7 +18,7 @@ project: spacedock
 profile:
 auto_advance:
 parent:
-children:
+children: [brainstorm-nuwa-distillation, explore-nuwa-subagent-first]
 ---
 
 ## Directive
