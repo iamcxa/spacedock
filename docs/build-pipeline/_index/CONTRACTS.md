@@ -49,17 +49,11 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent for sharp-edges trailofbits skill | ✅ final | 2026-04-12 |
 
-### agents/task-executor.md
-
-| Entity | Stage | Intent | Status | Last Updated |
-|--------|-------|--------|--------|--------------|
-| flatten-dispatch-troops-architecture | plan | Delete old agent file (renamed to troop.md) | 🔵 planned | 2026-04-14 |
-
 ### agents/troop.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| flatten-dispatch-troops-architecture | plan | Create troop agent (renamed from task-executor, multiple default skills) | 🔵 planned | 2026-04-14 |
+| flatten-dispatch-troops-architecture | execute | Create troop agent (renamed from task-executor, multiple default skills) | ✅ final | 2026-04-14 |
 
 ### agents/variant-analysis-reviewer.md
 
@@ -78,7 +72,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| flatten-dispatch-troops-architecture | plan | Update execute stage details: task-executor -> troop in dispatch descriptions | 🔵 planned | 2026-04-14 |
+| flatten-dispatch-troops-architecture | execute | Update execute stage details: task-executor -> troop in dispatch descriptions | ✅ final | 2026-04-14 |
 
 ### docs/build-pipeline/_mods/pr-merge.md
 

@@ -161,7 +161,7 @@ Troops are dispatched per wave by FO directly
   -> FO commits serially after wave closes
 
 Stage Report task auto-unblocks
-  -> synthesis teammate reads commits, writes ## Stage Report: execute
+  -> FO writes ## Stage Report: execute
 ```
 
 ### quality (FO-owned, simple subagent)
