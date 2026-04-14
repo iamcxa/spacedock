@@ -366,6 +366,13 @@ Inline serial research (plan-stage fallback per SKILL.md Step 2). Broad technolo
 - **`agents/code-explorer.md` + `agents/researcher.md`** -- one-shot reference for the wrapper shape. Plan confirms no new wrapper file needed (reuse existing).
 - **`docs/build-pipeline/_index/CONTRACTS.md:179-185`** -- reference layout for the Step 4 `skills/build-brainstorm/SKILL.md` table. Plan Task 8's `workflow-index append` payload follows this shape.
 - **Parent 102 `## Decomposition Recommendation`** (referenced indirectly via inheritance) -- per-child scope definitions that this plan's Task list covers for child 104 (brainstorm-only; explore changes are sibling 105's scope).
+- **`docs/build-pipeline/brainstorm-dual-lens-cross-entity-dedup.md` (parent 102, full body)** -- `## Canonical References` section cites the external `extraction-framework.md` path that this plan's Task 5 must update post-vendoring; `## Open Questions` Q-3 holds the extraction-framework candidate pool A-6 inherits; `## Decomposition Recommendation` holds per-child scope. Read-first for Task 5 citation replacement.
+
+### Source Weighting
+
+- Primary: CLAUDE.md, MEMORY.md entries (`engine-freeze-as-skill-design-invariant`, `subagent-cannot-nest-agent-dispatch`, `review-driven-format-drift-detection`), captain directives (O-1/O-2/O-3, Q-1..Q-5, A-7 vendor name).
+- Secondary: `skills/build-brainstorm/SKILL.md`, `skills/build-explore/SKILL.md`, `skills/build-review/SKILL.md`, `skills/build-plan/SKILL.md`, `skills/graft/SKILL.md`, `agents/code-explorer.md`, `agents/researcher.md`, `references/claude-ensign-runtime.md`, `docs/build-pipeline/_index/CONTRACTS.md`, `docs/build-pipeline/brainstorm-dual-lens-cross-entity-dedup.md`, `docs/build-pipeline/explore-nuwa-subagent-first.md`.
+- Tertiary: none.
 
 ---
 
@@ -548,9 +555,10 @@ Inline serial research (plan-stage fallback per SKILL.md Step 2). Broad technolo
   </files_modified>
 </task>
 
-<task id="task-3" model="sonnet" wave="1" skills="" test_first="false">
+<task id="task-3" model="sonnet" wave="2" skills="" test_first="false">
   <read_first>
     - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/skills/build-brainstorm/SKILL.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/docs/build-pipeline/brainstorm-nuwa-distillation.md
   </read_first>
 
   <action>
