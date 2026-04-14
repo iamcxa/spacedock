@@ -1,7 +1,7 @@
 ---
 id: 065
 title: Flatten Dispatch -- FO Direct Troops + Ensign Role Reduction
-status: uat
+status: shipped
 context_status: ready
 source: captain
 created: 2026-04-12T13:00:00Z
