@@ -1,15 +1,15 @@
 ---
 id: 065
 title: Flatten Dispatch -- FO Direct Troops + Ensign Role Reduction
-status: clarify
+status: plan
 context_status: ready
 source: captain
 created: 2026-04-12T13:00:00Z
-started:
+started: 2026-04-14T18:15:00+08:00
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-flatten-dispatch-troops-architecture
 issue:
 pr:
 intent: feature
