@@ -46,6 +46,7 @@ export function CommentThread({ comment, replies, entitySlug }: CommentThreadPro
     <div className="space-y-1">
       <Comment
         commentId={comment.commentId}
+        selectedText={comment.selectedText || undefined}
         content={comment.content}
         author={comment.author}
         createdAt={comment.createdAt}

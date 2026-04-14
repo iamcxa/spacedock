@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 interface CommentProps {
   commentId: string;
+  selectedText?: string;
   content: string;
   author: string;
   createdAt: number;
@@ -47,6 +48,7 @@ function avatarColor(author: string): string {
 
 export function Comment({
   commentId,
+  selectedText,
   content,
   author,
   createdAt,
@@ -86,6 +88,11 @@ export function Comment({
               )}
               <span className="text-xs text-muted-foreground ml-auto">{formatTime(createdAt)}</span>
             </div>
+            {selectedText && (
+              <blockquote className="text-xs text-muted-foreground border-l-2 border-border pl-2 mb-1 italic line-clamp-2">
+                {selectedText}
+              </blockquote>
+            )}
             <p className="text-sm text-foreground break-words">{content}</p>
             {resolved && resolvedReason && (
               <p className="text-xs text-muted-foreground mt-1">

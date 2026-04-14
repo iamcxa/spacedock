@@ -98,8 +98,8 @@ export function AddCommentForm({ entitySlug, sectionHeadings, onCommentAdded }: 
               disabled={submitting}
             >
               {sectionHeadings.map((h) => (
-                <option key={h} value={h}>
-                  {h}
+                <option key={h === "" ? "__general__" : h} value={h}>
+                  {h === "" ? "General (document)" : h}
                 </option>
               ))}
             </select>
