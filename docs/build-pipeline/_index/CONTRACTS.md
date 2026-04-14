@@ -220,6 +220,18 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add TDD Mode RED-GREEN-REFACTOR sub-cycle activated by test_first flag | in-flight | 2026-04-12 |
 
+### spacebridge/.claude-plugin/plugin.json
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-standalone-dir-distribution | plan | Add mcpServers field for MCP stdio entry | 🔵 planned | 2026-04-14 |
+
+### spacebridge/bin/cli.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-standalone-dir-distribution | plan | Unified CLI entry point with 5 subcommands (start/stop/status/mcp/share) | 🔵 planned | 2026-04-14 |
+
 ### spacebridge/bin/daemon.ts
 | spacebridge-nextjs-warroom-sse-feed | plan | Spawn Next.js UI standalone as child process on port 8420 + graceful shutdown | 🔵 planned | 2026-04-13 |
 
@@ -228,17 +240,25 @@ Each section lists a file path with entities that have modified it, their stage,
 | spacebridge-l2-daemon-lifecycle | plan | Daemon entry point with start/stop/status subcommands | 🔵 planned | 2026-04-12 |
 | spacebridge-role-aware-lease-manager | plan | Swap stub→bridge client, mount lease janitor, add lease/janitor env config | 🔵 planned | 2026-04-13 |
 
+### spacebridge/scripts/build.sh
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-standalone-dir-distribution | plan | Next.js standalone build pipeline script | 🔵 planned | 2026-04-14 |
+
 ### spacebridge/src/daemon/auto-fork.test.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | TDD tests for shim-side auto-fork logic | 🔵 planned | 2026-04-12 |
+| spacebridge-standalone-dir-distribution | plan | Update resolveDaemonCommand tests for new cli.ts resolution | 🔵 planned | 2026-04-14 |
 
 ### spacebridge/src/daemon/auto-fork.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | Shim-side auto-fork daemon logic with lock + socket probe | 🔵 planned | 2026-04-12 |
+| spacebridge-standalone-dir-distribution | plan | Fix resolveDaemonCommand to resolve bin/cli.ts instead of bare spacebridge command | 🔵 planned | 2026-04-14 |
 
 ### spacebridge/src/daemon/daemon-coordination.test.ts
 
@@ -391,6 +411,145 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | Add __status RPC response type for daemon status query | 🔵 planned | 2026-04-12 |
+| spacebridge-multi-root-session-registry | plan | Add HeartbeatPayload type for heartbeat IPC message | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/ipc/socket-server.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Add heartbeat message handler + onHeartbeat callback to SocketServerOptions | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/ipc/socket-client.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Add heartbeat setInterval sender after register-ack, configurable interval | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/types.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | SessionState, SessionRecord, SessionCommand union, SessionEvent union, emptySessionState | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/errors.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | SessionNotFound error class | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/decider.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Pure decider(cmd, state, now) for session CQRS aggregate, zero I/O; reconnect idempotency (A-11) | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/decider.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Pure decider unit tests: register, reconnect, heartbeat, disconnect | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/evolve.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Pure evolve(state, event) + replay(events) reducer for SessionState | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/evolve.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Pure evolve + replay unit tests: 4 event types apply to state correctly | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/schemas.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Zod schemas for SessionCommand and SessionEvent variants with .passthrough() | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/schemas.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Spot-check Zod command/event schemas accept valid and reject malformed input | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/persistence.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Session event log append + load; sessions snapshot projection maintenance | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/persistence.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Round-trip tests: appendEvents → loadAllEvents → replay equivalence; snapshot upsert/delete | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/registry.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Daemon-internal session registry wiring decider+evolve+persistence; per-root discoverWorkflows (O-1) | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/registry.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Registry lifecycle + reconnect + disconnectAll + replay integration tests | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/heartbeat-monitor.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | setInterval-based heartbeat timeout detector, emits disconnect for stale sessions | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/heartbeat-monitor.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Heartbeat monitor tests: timeout detection, fresh session pass-through, stop() cleanup | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/watcher.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | File watcher with dynamic scope, *.md filter (Q-1), debounce, events table sentinels (O-2) | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/watcher.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Watcher tests: scope expand/contract, debounce, *.md filter, sentinel values | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/shutdown.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | SIGTERM/SIGINT graceful shutdown: disconnectAll + stop monitor + close watchers (A-12) | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/shutdown.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Shutdown handler tests: disconnectAll called, correct component teardown order | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/domain/session/replay.integration.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Integration: fresh registry over existing DB replays events into equivalent state | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/schema.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Add session_events Drizzle table (append-only event log, dual-table with sessions) | 🔵 planned | 2026-04-14 |
+
+### spacebridge/src/db.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-multi-root-session-registry | plan | Add session_events CREATE TABLE IF NOT EXISTS DDL to applySchema() | 🔵 planned | 2026-04-14 |
 
 
 

@@ -25,6 +25,7 @@ export function openReadOnlyDb(dbPath?: string): ReadOnlyDbHandle {
   };
 }
 
+
 function defaultDbPath(): string {
   return process.env.SPACEBRIDGE_DB_PATH ?? `${homedir()}/.spacedock/spacebridge.db`;
 }

@@ -94,7 +94,33 @@ function applySchema(sqlite: Database): void {
     )
   `);
   sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS comment_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      aggregate_id TEXT NOT NULL,
+      sequence_number INTEGER NOT NULL,
+      event_type TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      timestamp INTEGER NOT NULL
+    )
+  `);
+  // Add parent_id column to comments if it doesn't exist (SQLite lacks IF NOT EXISTS for ALTER)
+  try {
+    sqlite.exec(`ALTER TABLE comments ADD COLUMN parent_id TEXT`);
+  } catch {
+    // Column already exists — safe to ignore
+  }
+  sqlite.exec(`
     CREATE TABLE IF NOT EXISTS lease_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      aggregate_id TEXT NOT NULL,
+      sequence_number INTEGER NOT NULL,
+      event_type TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      timestamp INTEGER NOT NULL
+    )
+  `);
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS session_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       aggregate_id TEXT NOT NULL,
       sequence_number INTEGER NOT NULL,

@@ -71,12 +71,24 @@ export const comments = sqliteTable("comments", {
   resolved: integer("resolved").notNull().default(0), // boolean as integer
   resolvedReason: text("resolved_reason"),
   resolvedVersion: integer("resolved_version"),
+  parentId: text("parent_id"),                       // null = top-level, set = reply (O-1: single-level)
   workflowDir: text("workflow_dir").notNull(),       // scoping key
   // fmodel-compatible columns
   eventType: text("event_type"),
   aggregateId: text("aggregate_id"),
   sequenceNumber: integer("sequence_number"),
   payload: text("payload"),                          // opaque JSON blob
+});
+
+// ─── comment_events — [full CQRS] fmodel event log for comment aggregate ─────
+
+export const commentEvents = sqliteTable("comment_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  aggregateId: text("aggregate_id").notNull(),       // entityPath — scopes events to one entity
+  sequenceNumber: integer("sequence_number").notNull(),
+  eventType: text("event_type").notNull(),           // comment_added | reply_added | comment_resolved
+  payload: text("payload").notNull(),                // JSON-serialized event body
+  timestamp: integer("timestamp").notNull(),         // epoch-ms
 });
 
 // ─── lease_events — [full CQRS] fmodel event log for lease aggregate (design doc §5.3) ──
@@ -86,6 +98,17 @@ export const leaseEvents = sqliteTable("lease_events", {
   aggregateId: text("aggregate_id").notNull(),       // "${entitySlug}::${role}"
   sequenceNumber: integer("sequence_number").notNull(),
   eventType: text("event_type").notNull(),           // acquired | released | extended | expired
+  payload: text("payload").notNull(),                // JSON-serialized event body
+  timestamp: integer("timestamp").notNull(),         // epoch-ms
+});
+
+// ─── session_events — [full CQRS] fmodel event log for session aggregate (design doc §4.3) ──
+
+export const sessionEvents = sqliteTable("session_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  aggregateId: text("aggregate_id").notNull(),       // sessionId
+  sequenceNumber: integer("sequence_number").notNull(),
+  eventType: text("event_type").notNull(),           // session_registered | session_reconnected | session_heartbeat | session_disconnected
   payload: text("payload").notNull(),                // JSON-serialized event body
   timestamp: integer("timestamp").notNull(),         // epoch-ms
 });
