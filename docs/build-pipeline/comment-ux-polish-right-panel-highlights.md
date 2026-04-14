@@ -1,11 +1,12 @@
 ---
 id: 093
 title: "Comment UX polish — right panel layout + text-selection highlights"
-status: clarify
+status: plan
 context_status: ready
 source: /build
 created: 2026-04-14T12:00:00+08:00
-started:
+started: 2026-04-14T17:30:00+08:00
+worktree: .worktrees/spacedock-ensign-comment-ux-polish-right-panel-highlights
 completed:
 verdict:
 score:

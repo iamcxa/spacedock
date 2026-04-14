@@ -1,11 +1,12 @@
 ---
 id: 096
 title: "Biome lint + Husky precommit hooks for spacebridge"
-status: clarify
+status: plan
 context_status: ready
 source: captain (2026-04-14)
 created: 2026-04-14T18:00:00+08:00
-started:
+started: 2026-04-14T17:30:00+08:00
+worktree: .worktrees/spacedock-ensign-spacebridge-biome-lint-husky-precommit
 completed:
 verdict:
 score:
