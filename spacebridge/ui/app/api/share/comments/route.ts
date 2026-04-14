@@ -3,7 +3,6 @@
 // Author format: guest:{nickname} (A-6). Flat comments only (A-9).
 // Reuses existing comment CQRS flow (domain/comment). Defense-in-depth token check.
 
-import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -26,14 +25,12 @@ export async function POST(req: Request) {
   // Validate token and get entity scope
   let entitySlug: string;
   try {
-    const { createDb } = await import("../../../../../../src/db");
-    const { shareTokens } = await import("../../../../../../src/schema");
-    const db = createDb(defaultDbPath());
-    const rows = db.select().from(shareTokens).where(eq(shareTokens.token, token)).all();
-    if (rows.length === 0 || rows[0].expiresAt <= Date.now()) {
+    const { verifyShareToken } = await import("../../../../../src/domain/share/token-verify");
+    const slug = verifyShareToken(defaultDbPath(), token);
+    if (!slug) {
       return Response.json({ error: "Invalid or expired share token" }, { status: 401 });
     }
-    entitySlug = rows[0].entitySlug;
+    entitySlug = slug;
   } catch {
     return Response.json({ error: "Service unavailable" }, { status: 503 });
   }
@@ -58,21 +55,21 @@ export async function POST(req: Request) {
 
   try {
     const { parseCommand } = await import(
-      "../../../../../../src/domain/comment/schemas"
+      "../../../../../src/domain/comment/schemas"
     );
-    const { createDb } = await import("../../../../../../src/db");
+    const { createDb } = await import("../../../../../src/db");
     const { appendEvents, loadEvents, upsertSnapshot, countEvents } = await import(
-      "../../../../../../src/domain/comment/persistence"
+      "../../../../../src/domain/comment/persistence"
     );
-    const { decide } = await import("../../../../../../src/domain/comment/decider");
-    const { replay } = await import("../../../../../../src/domain/comment/evolve");
+    const { decide } = await import("../../../../../src/domain/comment/decider");
+    const { replay } = await import("../../../../../src/domain/comment/evolve");
 
     const db = createDb(defaultDbPath());
 
     // Resolve entity path (requires active session for projectRoot)
     let entityPath = `/docs/build-pipeline/${entitySlug}.md`;
     try {
-      const { sessions } = await import("../../../../../../src/schema");
+      const { sessions } = await import("../../../../../src/schema");
       const sessionRows = db.select({ projectRoot: sessions.projectRoot }).from(sessions).limit(1).all();
       if (sessionRows.length > 0) {
         entityPath = join(sessionRows[0].projectRoot, "docs", "build-pipeline", `${entitySlug}.md`);
@@ -124,7 +121,7 @@ export async function POST(req: Request) {
     }
 
     // Write SSE notification event
-    const { events: eventsTable } = await import("../../../../../../src/schema");
+    const { events: eventsTable } = await import("../../../../../src/schema");
     await db.insert(eventsTable).values({
       type: "comment_added",
       entity: entitySlug,

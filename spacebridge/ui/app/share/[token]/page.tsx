@@ -42,13 +42,11 @@ export default async function SharePage({ params }: PageProps) {
   }
 
   // Validate token in DB (expiry + entity scope)
-  let entitySlug: string | null = null;
+  let entitySlug: string;
   try {
-    const { createDb } = await import("../../../../../src/db");
-    const { shareTokens } = await import("../../../../../src/schema");
-    const db = createDb(defaultDbPath());
-    const rows = db.select().from(shareTokens).where(eq(shareTokens.token, token)).all();
-    if (rows.length === 0 || rows[0].expiresAt <= Date.now()) {
+    const { verifyShareToken } = await import("../../../../src/domain/share/token-verify");
+    const slug = verifyShareToken(defaultDbPath(), token);
+    if (!slug) {
       return (
         <div className="text-center py-16">
           <h1 className="text-2xl font-semibold mb-2">Share link expired</h1>
@@ -56,7 +54,7 @@ export default async function SharePage({ params }: PageProps) {
         </div>
       );
     }
-    entitySlug = rows[0].entitySlug;
+    entitySlug = slug;
   } catch {
     return (
       <div className="text-center py-16">
@@ -150,7 +148,7 @@ export default async function SharePage({ params }: PageProps) {
       </div>
 
       <EntityHeader
-        title={frontmatter.title ?? entitySlug}
+        title={frontmatter.title ?? entitySlug ?? ""}
         status={frontmatter.status ?? "unknown"}
         stage={frontmatter.stage ?? ""}
         id={frontmatter.id ?? ""}
@@ -176,8 +174,8 @@ export default async function SharePage({ params }: PageProps) {
         </div>
 
         <div className="space-y-4">
-          <ShareLiveFeed token={token} entitySlug={entitySlug} />
-          <ShareCommentForm token={token} entitySlug={entitySlug} />
+          <ShareLiveFeed token={token} entitySlug={entitySlug ?? ""} />
+          <ShareCommentForm token={token} entitySlug={entitySlug ?? ""} />
         </div>
       </div>
     </div>

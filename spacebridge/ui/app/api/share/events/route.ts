@@ -25,14 +25,12 @@ export async function GET(req: Request) {
   // Validate token and get entity scope
   let entitySlug: string;
   try {
-    const { createDb } = await import("../../../../../../src/db");
-    const { shareTokens } = await import("../../../../../../src/schema");
-    const db = createDb(defaultDbPath());
-    const rows = db.select().from(shareTokens).where(eq(shareTokens.token, token)).all();
-    if (rows.length === 0 || rows[0].expiresAt <= Date.now()) {
+    const { verifyShareToken } = await import("../../../../../src/domain/share/token-verify");
+    const slug = verifyShareToken(defaultDbPath(), token);
+    if (!slug) {
       return Response.json({ error: "Invalid or expired share token" }, { status: 401 });
     }
-    entitySlug = rows[0].entitySlug;
+    entitySlug = slug;
   } catch {
     return Response.json({ error: "Service unavailable" }, { status: 503 });
   }

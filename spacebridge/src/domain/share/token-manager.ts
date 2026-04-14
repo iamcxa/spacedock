@@ -56,11 +56,12 @@ export class TokenManager {
   }
 
   revoke(token: string): boolean {
-    const result = this.db
+    const deleted = this.db
       .delete(shareTokens)
       .where(eq(shareTokens.token, token))
-      .run();
-    return result.changes > 0;
+      .returning()
+      .all();
+    return deleted.length > 0;
   }
 
   list(): ShareToken[] {
@@ -71,10 +72,11 @@ export class TokenManager {
   }
 
   cleanup(): number {
-    const result = this.db
+    const deleted = this.db
       .delete(shareTokens)
       .where(lte(shareTokens.expiresAt, Date.now()))
-      .run();
-    return result.changes;
+      .returning()
+      .all();
+    return deleted.length;
   }
 }
