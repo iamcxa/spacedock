@@ -234,6 +234,33 @@ Phase 2 — Ensign synthesis (simple subagent):
 
 **Completion:** FO waits on the team task list for all tasks to reach terminal state, then dispatches the ensign for synthesis. The ensign's Stage Report triggers the normal Completion and Gates flow.
 
+#### troops-dispatch (execute stage variant of task-list-driven)
+
+Specialized task-list-driven protocol for execute-stage wave-parallel task dispatch. FO dispatches troop agents directly with per-task model hints from the PLAN. FO IS the orchestrator -- no ensign intermediary for execute stage.
+
+```
+FO reads ## PLAN, builds wave graph
+FO transitions CONTRACTS.md rows: planned -> in-flight
+
+Per wave (sequential across waves, parallel within):
+  1. FO dispatches troop agents for each task in the wave:
+     Agent(subagent_type="spacedock:troop", model=task.model, prompt=...)
+  2. Each troop loads task-execution + knowledge-capture skills
+  3. Troop executes one task: read_first -> action -> acceptance_criteria -> return report
+  4. Troop returns changed_files + status (DONE/NEEDS_CONTEXT/BLOCKED)
+  5. FO commits serially after wave closes (one commit per DONE task)
+
+BLOCKED escalation: haiku -> sonnet -> opus (one attempt per tier)
+
+Bare-mode fallback: FO dispatches one troop at a time (sequential).
+Context isolation preserved -- each troop gets fresh context per task,
+unlike ensign which would accumulate context across tasks.
+```
+
+**Key difference from task-list-driven:** No synthesis ensign. FO handles orchestration, wave-graph dispatch, and Stage Report writing directly. Troops are pure leaf agents -- they execute one task and return.
+
+**Per-task model hints:** FO reads each task's `model` attribute from PLAN (`haiku` / `sonnet` / `opus`) and passes it as the `model` parameter in the Agent() call. This enables cost-optimized dispatch: simple file edits use haiku, complex refactors use opus.
+
 #### debate-driven
 
 Two-phase protocol for stages requiring cross-cutting analysis where reviewers should challenge each other's findings. Produces higher-quality output than independent parallel work.

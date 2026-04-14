@@ -68,7 +68,7 @@ Then read your assignment and follow the skill's instructions.
 **Canonical references in this plugin:**
 
 - `agents/researcher.md` — wraps `spacedock:build-research` for build-plan Step 2 parallel research dispatch
-- `agents/task-executor.md` — wraps `spacedock:task-executor` (+`spacedock:task-execution`) for build-execute Step 4 wave-parallel task dispatch
+- `agents/troop.md` — wraps `spacedock:troop` (+`spacedock:task-execution`, `spacedock:knowledge-capture`) for build-execute wave-parallel task dispatch. Dispatched by FO directly (not via ensign).
 - `agents/code-explorer.md` — wraps `spacedock:code-explorer` for build-explore Step 2 deep codebase mapping (shipped in entity 062)
 - `agents/sharp-edges-reviewer.md`, `agents/variant-analysis-reviewer.md`, `agents/insecure-defaults-reviewer.md`, `agents/differential-review-reviewer.md` — each wraps one trailofbits security skill for build-review Step 2 parallel security review dispatch (shipped in entity 062)
 
