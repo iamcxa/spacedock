@@ -700,3 +700,70 @@ The `wrapTextRange` function mutates `info.node` and `info.start` on split but d
 ### Verdict
 
 **Advance to UAT.** All 4 plan tasks implemented correctly. Two LOW findings (F-1 reply filter gap, F-2 stale ABOUTME) are non-blocking for UAT — F-1 is an edge case (replies with selectedText are not created via the UI), F-2 is documentation only. UAT spec in entity covers all 6 acceptance criteria. No CRITICAL or HIGH findings.
+
+## UAT Results
+
+Ensign UAT run: 2026-04-14
+
+### CLI Verification Evidence
+
+| Check | Command | Result | Status |
+|-------|---------|--------|--------|
+| Build exits 0 | `cd spacebridge/ui && bun run build` | Next.js build success, all routes registered, TypeScript check passed | PASS |
+| tsc exits 0 | `cd spacebridge/ui && npx tsc --noEmit` | "TypeScript compilation completed" — 0 errors | PASS |
+| Responsive grid present | `grep "md:grid-cols-[7fr_3fr]" spacebridge/ui/components/entity-detail-client.tsx` | Line 82: `<div className="mt-6 grid grid-cols-1 md:grid-cols-[7fr_3fr] gap-6">` | PASS |
+| TreeWalker highlight injection | `grep "createTreeWalker" spacebridge/ui/components/entity-body.tsx` | Line 100: `const walker = document.createTreeWalker(bodyEl, NodeFilter.SHOW_TEXT);` | PASS |
+| Click-to-scroll (highlight → panel) | `grep "scrollIntoView" spacebridge/ui/components/entity-body.tsx` | Line 171: `card.scrollIntoView({ behavior: "smooth", block: "center" })` | PASS |
+| Reverse scroll callback | `grep "scrollToHighlight" spacebridge/ui/components/entity-detail-client.tsx` | Lines 64, 99: function defined and passed as prop | PASS |
+| CSS highlight styles | `grep "comment-highlight" spacebridge/ui/app/globals.css` | Lines 124, 130, 133, 137: normal/hover/resolved/flash classes present | PASS |
+| No inline CommentThread | `grep -c "CommentThread" spacebridge/ui/components/entity-body.tsx` | 0 matches (grep exit 1 = no matches) | PASS |
+| spacebridge tests | `bun test spacebridge/` | 378 pass, 0 fail | PASS |
+| repo-root bun test | `bun test` | 586 pass, 23 fail (all failures are pre-existing tools/dashboard infra issues — `@modelcontextprotocol/sdk` and `diff` package missing in worktree; confirmed unrelated to entity 093 spacebridge/ui changes) | PASS (no new failures) |
+
+### Browser Items (Captain Verification Required)
+
+The following items require visual verification in a browser and cannot be confirmed via CLI:
+
+| # | Item | Status |
+|---|------|--------|
+| B-1 | Entity detail page at `/entity/[slug]` on desktop (>=1024px) shows two-column layout: body left (~70%), comment panel right (~30%) with independent scrolling | PENDING CAPTAIN |
+| B-2 | Comments with non-empty `selectedText` produce yellow highlight marks in the entity body | PENDING CAPTAIN |
+| B-3 | Clicking a highlighted text span scrolls the right panel to the corresponding comment card with a flash animation | PENDING CAPTAIN |
+| B-4 | Clicking a comment card with `selectedText` in the right panel scrolls the body to the corresponding highlight with a flash animation | PENDING CAPTAIN |
+| B-5 | Mismatched `selectedText` (comment text doesn't match body) shows comment in panel but no highlight — no error | PENDING CAPTAIN |
+| B-6 | Narrow viewport (<768px) stacks comment panel below body | PENDING CAPTAIN |
+
+### Interactive Items
+
+| # | Item | Status |
+|---|------|--------|
+| I-1 | Captain confirms two-column layout renders correctly on desktop | PENDING CAPTAIN |
+
+### Notes for Captain
+
+- The dev server can be started with `bun run dev` from `spacebridge/ui/`
+- Entity with text-selection comments needed for B-2, B-3, B-4, B-5 testing — create via the text-selection popover on any entity detail page
+- For B-5 (mismatched selectedText): manually edit a comment row's `selectedText` to a string not in the body to verify graceful degradation
+- F-4 from review: entity detail uses `md:` (768px) breakpoint while share page uses `lg:` (1024px) — this is intentional per spec, but confirm B-6 at 768px width
+
+## Stage Report: uat
+
+status: partial — CLI PASSED, browser items PENDING CAPTAIN
+
+### Checklist
+
+- [x] CLI item 1: `bun run build` exits 0 — PASSED
+- [x] CLI item 2: `npx tsc --noEmit` exits 0 — PASSED
+- [x] CLI item 3: responsive grid `md:grid-cols-[7fr_3fr]` confirmed in entity-detail-client.tsx:82
+- [x] CLI item 4: `createTreeWalker` confirmed in entity-body.tsx:100
+- [x] CLI item 5: `scrollIntoView` confirmed in entity-body.tsx:171
+- [x] CLI item 6: `scrollToHighlight` confirmed in entity-detail-client.tsx:64,99
+- [x] CLI item 7: `comment-highlight` CSS classes confirmed in globals.css:124-137
+- [x] CLI item 8: `grep -c "CommentThread" entity-body.tsx` returns 0 (no inline comments)
+- [ ] Browser item B-1: two-column layout on desktop — PENDING CAPTAIN
+- [ ] Browser item B-2: yellow highlight marks for selectedText comments — PENDING CAPTAIN
+- [ ] Browser item B-3: click highlight → scroll panel to comment with flash — PENDING CAPTAIN
+- [ ] Browser item B-4: click comment card → scroll body to highlight with flash — PENDING CAPTAIN
+- [ ] Browser item B-5: mismatched selectedText — comment shows, no highlight, no error — PENDING CAPTAIN
+- [ ] Browser item B-6: narrow viewport (<768px) stacks panel below body — PENDING CAPTAIN
+- [ ] Interactive I-1: captain confirms two-column layout renders correctly on desktop — PENDING CAPTAIN
