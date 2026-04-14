@@ -133,11 +133,7 @@ function applySchema(sqlite: Database): void {
     CREATE TABLE IF NOT EXISTS share_tokens (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       token TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      hash_algorithm TEXT DEFAULT 'argon2id',
-      entity_paths TEXT NOT NULL,
-      stages TEXT NOT NULL,
-      label TEXT NOT NULL,
+      entity_slug TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       expires_at INTEGER NOT NULL,
       event_type TEXT,

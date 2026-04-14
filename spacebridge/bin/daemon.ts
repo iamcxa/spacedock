@@ -16,6 +16,9 @@ import { writePidFile, readPidFile, isProcessAlive } from "../src/daemon/pid";
 import { releaseLock } from "../src/daemon/lock";
 import { LeaseCommandSchema } from "../src/domain/lease/schemas";
 import { spawnNextjsChild, shutdownNextjsChild, resolveNextjsServerScript } from "../src/daemon/nextjs-child";
+import { TokenManager } from "../src/domain/share/token-manager";
+import { detectProvider, installGuide } from "../src/tunnel/detect";
+import type { TunnelProvider } from "../src/tunnel/provider";
 import type { ChildProcess } from "node:child_process";
 
 // ─── State directory resolution ──────────────────────────────────────────────
@@ -62,6 +65,13 @@ async function cmdStart(): Promise<void> {
 
   const db = createDb(join(stateDir, "spacebridge.db"));
 
+  // Share token manager (plain drizzle CRUD, entity 058)
+  const tokenManager = new TokenManager(db);
+
+  // Tunnel state (managed on-demand: start on first share_create, stop when no active tokens)
+  let tunnelProvider: TunnelProvider | null = null;
+  let tunnelUrl: string | null = null;
+
   // entityScanner: trivial stub returning [] for 056; entity 057 supplies DB-backed scanner
   const entityScanner = async () => [];
 
@@ -87,6 +97,58 @@ async function cmdStart(): Promise<void> {
           },
         };
       }
+
+      // share_create: create share token + start tunnel if needed
+      if (req.method === "share_create") {
+        const args = req.args as [string, number, string?];
+        const [entitySlug, ttlMs, tunnelBackend] = args;
+        if (!entitySlug) return { error: "share_create requires entitySlug" };
+
+        // Start tunnel on first share create (or if previous tunnel died)
+        if (!tunnelProvider || !tunnelUrl) {
+          try {
+            const provider = detectProvider(tunnelBackend);
+            if (!provider) {
+              return { error: `No tunnel provider available. ${installGuide()}` };
+            }
+            tunnelProvider = provider;
+            tunnelUrl = await tunnelProvider.start(8420);
+            process.stderr.write(`[${ts()}] tunnel started (${tunnelProvider.name}): ${tunnelUrl}\n`);
+          } catch (err) {
+            tunnelProvider = null;
+            tunnelUrl = null;
+            return { error: `Failed to start tunnel: ${(err as Error).message}` };
+          }
+        }
+
+        const shareToken = tokenManager.create({ entitySlug, ttlMs: ttlMs ?? 7 * 24 * 60 * 60 * 1000 });
+        const url = `${tunnelUrl}/share/${shareToken.token}`;
+        return { result: { token: shareToken.token, url, entitySlug, expiresAt: shareToken.expiresAt } };
+      }
+
+      // share_revoke: revoke a share token; stop tunnel if no active tokens remain
+      if (req.method === "share_revoke") {
+        const args = req.args as [string];
+        const [token] = args;
+        if (!token) return { error: "share_revoke requires token" };
+
+        const revoked = tokenManager.revoke(token);
+        const remaining = tokenManager.list();
+        if (remaining.length === 0 && tunnelProvider) {
+          process.stderr.write(`[${ts()}] no active share tokens — stopping tunnel\n`);
+          await tunnelProvider.stop();
+          tunnelProvider = null;
+          tunnelUrl = null;
+        }
+        return { result: { revoked } };
+      }
+
+      // share_list: list active share tokens
+      if (req.method === "share_list") {
+        const tokens = tokenManager.list();
+        return { result: tokens };
+      }
+
       // Real ChannelProvider RPC forwarding handled by entity 053
       return { error: `RPC method ${req.method} not implemented in daemon stub` };
     },
@@ -164,6 +226,11 @@ async function cmdStart(): Promise<void> {
   // Signal handlers for graceful shutdown
   const doShutdown = async () => {
     if (janitorTimer) clearInterval(janitorTimer);
+    if (tunnelProvider) {
+      try { await tunnelProvider.stop(); } catch {}
+      tunnelProvider = null;
+      tunnelUrl = null;
+    }
     await shutdown(server, pidPath, socketPath, nextjsChild);
     process.exit(0);
   };
