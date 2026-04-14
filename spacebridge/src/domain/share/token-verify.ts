@@ -9,12 +9,17 @@ import { shareTokens } from "../../schema";
 /**
  * Verify a share token and return its entity slug, or null if invalid/expired.
  * Encapsulates all drizzle usage so UI routes never import drizzle-orm directly.
+ * Opens and closes the DB connection within this function to avoid file descriptor leaks.
  */
 export function verifyShareToken(dbPath: string, token: string): string | null {
   const db = createDb(dbPath);
-  const rows = db.select().from(shareTokens).where(eq(shareTokens.token, token)).all();
-  if (rows.length === 0 || rows[0].expiresAt <= Date.now()) {
-    return null;
+  try {
+    const rows = db.select().from(shareTokens).where(eq(shareTokens.token, token)).all();
+    if (rows.length === 0 || rows[0].expiresAt <= Date.now()) {
+      return null;
+    }
+    return rows[0].entitySlug;
+  } finally {
+    db.$client.close();
   }
-  return rows[0].entitySlug;
 }
