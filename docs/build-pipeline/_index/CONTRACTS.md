@@ -220,6 +220,18 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add TDD Mode RED-GREEN-REFACTOR sub-cycle activated by test_first flag | in-flight | 2026-04-12 |
 
+### spacebridge/.claude-plugin/plugin.json
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-standalone-dir-distribution | plan | Add mcpServers field for MCP stdio entry | 🔵 planned | 2026-04-14 |
+
+### spacebridge/bin/cli.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-standalone-dir-distribution | plan | Unified CLI entry point with 5 subcommands (start/stop/status/mcp/share) | 🔵 planned | 2026-04-14 |
+
 ### spacebridge/bin/daemon.ts
 | spacebridge-nextjs-warroom-sse-feed | plan | Spawn Next.js UI standalone as child process on port 8420 + graceful shutdown | 🔵 planned | 2026-04-13 |
 
@@ -228,17 +240,25 @@ Each section lists a file path with entities that have modified it, their stage,
 | spacebridge-l2-daemon-lifecycle | plan | Daemon entry point with start/stop/status subcommands | 🔵 planned | 2026-04-12 |
 | spacebridge-role-aware-lease-manager | plan | Swap stub→bridge client, mount lease janitor, add lease/janitor env config | 🔵 planned | 2026-04-13 |
 
+### spacebridge/scripts/build.sh
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-standalone-dir-distribution | plan | Next.js standalone build pipeline script | 🔵 planned | 2026-04-14 |
+
 ### spacebridge/src/daemon/auto-fork.test.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | TDD tests for shim-side auto-fork logic | 🔵 planned | 2026-04-12 |
+| spacebridge-standalone-dir-distribution | plan | Update resolveDaemonCommand tests for new cli.ts resolution | 🔵 planned | 2026-04-14 |
 
 ### spacebridge/src/daemon/auto-fork.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-l2-daemon-lifecycle | plan | Shim-side auto-fork daemon logic with lock + socket probe | 🔵 planned | 2026-04-12 |
+| spacebridge-standalone-dir-distribution | plan | Fix resolveDaemonCommand to resolve bin/cli.ts instead of bare spacebridge command | 🔵 planned | 2026-04-14 |
 
 ### spacebridge/src/daemon/daemon-coordination.test.ts
 
