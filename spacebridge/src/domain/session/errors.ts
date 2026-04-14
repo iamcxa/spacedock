@@ -8,3 +8,10 @@ export class SessionNotFound extends Error {
     super(`SessionNotFound: no active session for sessionId ${sessionId}`);
   }
 }
+
+export class InvalidProjectRoot extends Error {
+  readonly name = "InvalidProjectRoot";
+  constructor(public readonly projectRoot: string, reason: string) {
+    super(`InvalidProjectRoot: ${reason} — got ${JSON.stringify(projectRoot)}`);
+  }
+}
