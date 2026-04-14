@@ -436,6 +436,49 @@ Create a thin `spacebridge/bin/cli.ts` as the unified CLI entry point with 5 sub
   </files_modified>
 </task>
 
+## Stage Report: execute
+
+### Checklist
+
+1. **All 6 plan tasks executed** — DONE
+   - task-0 (wave-0): verification-only, no commit needed — all 7 checks passed
+   - task-1 (wave-1): 63564e1 — `spacebridge/bin/cli.ts` created
+   - task-2 (wave-1): 63564e1 — `auto-fork.ts` + `auto-fork.test.ts` updated
+   - task-3 (wave-2): 7c5d76b — `spacebridge/scripts/build.sh` created
+   - task-4 (wave-2): 7c5d76b — `spacebridge/.claude-plugin/plugin.json` updated
+   - task-5 (wave-3): stage report commit — integration verification passed
+
+2. **Wave order respected** — DONE
+   Wave 0 → Wave 1 (task-1 + task-2 parallel) → Wave 2 (task-3 + task-4 parallel) → Wave 3 (task-5)
+
+3. **All acceptance criteria verified** — DONE
+   - task-0: All 7 environment checks passed (branch, daemon cmds, autoForkDaemon, standalone config, plugin.json, cli.ts absent, scripts/ absent)
+   - task-1: `import.meta.main` guard found; `autoForkDaemon` import found; `Not yet implemented` found; usage lists all 5 subcommands; `--help` exits 1; `share` exits 0
+   - task-2: bare `spacebridge start` removed; `cli.ts` path in resolveDaemonCommand; SPACEBRIDGE_DEV branching removed from code; `bun test auto-fork.test.ts` → 7 pass, 0 fail
+   - task-3: file executable; `#!/usr/bin/env bash`; `set -euo pipefail`; `bun run --bun next build`; `cp -r` static + public; `server.js` validation; `bash -n` exits 0
+   - task-4: `mcpServers` field present; `bin/cli.ts` referenced; `"mcp"` arg present; JSON valid
+   - task-5: tsc pre-existing errors confirmed unchanged; `bun test` → 200 pass, 0 fail; cli help exits 1; share exits 0; `bash -n build.sh` exits 0; mcpServers.spacebridge.command = "bun"; resolveDaemonCommand and plugin.json both reference `bin/cli.ts`
+
+4. **No scope creep** — DONE
+   Only files listed in `files_modified` per task were touched.
+
+5. **Files Modified**
+   - `spacebridge/bin/cli.ts` (new) — unified CLI entry point with 5 subcommands
+   - `spacebridge/src/daemon/auto-fork.ts` (modified) — `resolveDaemonCommand` resolves `bin/cli.ts` relative path, no global CLI assumption
+   - `spacebridge/src/daemon/auto-fork.test.ts` (modified) — updated test for new single-path resolution, removed SPACEBRIDGE_DEV branch test
+   - `spacebridge/scripts/build.sh` (new) — Next.js standalone build pipeline with prereq validation, asset copy, output validation
+   - `spacebridge/.claude-plugin/plugin.json` (modified) — `mcpServers` entry wires `bun run bin/cli.ts mcp` as stdio transport
+
+6. **Pre-commit hooks passed** — DONE
+   Both commits (`63564e1`, `7c5d76b`) completed without hook failures.
+
+### Notes
+
+- tsc errors (7 total) are pre-existing; entity 059 introduced no new type errors (confirmed by stash comparison before/after)
+- `bun test` runs 200 tests across 27 files, all pass
+- `mcp` subcommand calls `autoForkDaemon` then keeps process alive; full stdio bridge wiring deferred to entity 053 scope (per PLAN task-1 NOTE)
+- U-4 through U-7 UAT items require running daemon + entity 053 UI — classified `interactive`, captain tests manually
+
 ## UAT Spec
 
 ### cli — CLI subcommand verification
