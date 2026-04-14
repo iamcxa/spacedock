@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+
+# Only run for commits touching spacebridge/ files
+if git diff --cached --name-only | grep -q '^spacebridge/'; then
+  cd spacebridge
+
+  # Lint + format staged files
+  bunx lint-staged
+
+  # Type-check both projects
+  bunx tsc --noEmit
+  bunx tsc --noEmit -p ui/tsconfig.json
+fi
