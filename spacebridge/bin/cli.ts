@@ -32,7 +32,7 @@ function printUsage(): void {
     "Usage: bun run bin/cli.ts <subcommand>\n" +
     "\n" +
     "Subcommands:\n" +
-    "  start   Boot the spacebridge daemon (port 8420)\n" +
+    "  start   Boot the spacebridge daemon (default port 6535, override with SPACEBRIDGE_PORT)\n" +
     "  stop    Send SIGTERM to the running daemon\n" +
     "  status  Print daemon PID, uptime, and session count\n" +
     "  mcp     Start MCP stdio shim (used by .mcp.json transport)\n" +

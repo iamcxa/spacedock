@@ -28,6 +28,16 @@ function resolveStateDir(): string {
   return process.env.SPACEBRIDGE_STATE_DIR ?? join(homedir(), ".spacedock");
 }
 
+function resolvePort(): number {
+  const envPort = process.env.SPACEBRIDGE_PORT;
+  if (envPort) {
+    const parsed = parseInt(envPort, 10);
+    if (!isNaN(parsed) && parsed > 0 && parsed < 65536) return parsed;
+    process.stderr.write(`[WARNING] Invalid SPACEBRIDGE_PORT="${envPort}", using default 6535\n`);
+  }
+  return 6535;
+}
+
 // ─── Startup timestamp for uptime tracking ───────────────────────────────────
 
 // Module-level: runs once when daemon.ts is executed (always as daemon process)
@@ -112,7 +122,7 @@ async function cmdStart(): Promise<void> {
               return { error: `No tunnel provider available. ${installGuide()}` };
             }
             tunnelProvider = provider;
-            tunnelUrl = await tunnelProvider.start(8420);
+            tunnelUrl = await tunnelProvider.start(resolvePort());
             process.stderr.write(`[${ts()}] tunnel started (${tunnelProvider.name}): ${tunnelUrl}\n`);
           } catch (err) {
             tunnelProvider = null;
@@ -215,8 +225,9 @@ async function cmdStart(): Promise<void> {
       const pluginRoot = resolve(import.meta.dir, "..");
       const serverScript = resolveNextjsServerScript(pluginRoot);
       const dbPath = join(stateDir, "spacebridge.db");
-      nextjsChild = spawnNextjsChild({ serverScript, port: 8420, dbPath, stateDir });
-      process.stderr.write(`[${ts()}] spawned Next.js UI (pid: ${nextjsChild.pid}, port: 8420)\n`);
+      const uiPort = resolvePort();
+      nextjsChild = spawnNextjsChild({ serverScript, port: uiPort, dbPath, stateDir });
+      process.stderr.write(`[${ts()}] spawned Next.js UI (pid: ${nextjsChild.pid}, port: ${uiPort})\n`);
     } catch (err) {
       process.stderr.write(`[${ts()}] WARNING: failed to spawn Next.js UI: ${(err as Error).message}\n`);
       process.stderr.write(`[${ts()}] Run: cd spacebridge/ui && bun run build\n`);
