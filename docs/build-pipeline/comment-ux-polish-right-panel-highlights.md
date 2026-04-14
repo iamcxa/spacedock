@@ -786,3 +786,17 @@ Rationale:
 ### Verdict
 
 UAT status: PASSED (captain sign-off on CLI evidence, browser items deferred via uat-resume path)
+
+## Confidence Assessment
+
+Iteration: 1 of 3
+
+| Factor | Weight | Score | Contribution | Evidence |
+|---|---|---|---|---|
+| test_coverage | 25% | 80% | 20.0% | 586 spacebridge tests pass, no ratchet baseline |
+| type_coverage | 20% | 100% | 20.0% | tsc --noEmit clean (0 errors) |
+| review_severity | 20% | 100% | 20.0% | 0 CRITICAL, 0 HIGH. Findings: 2 LOW (F-1 replies filter, F-2 stale ABOUTME), 2 NIT |
+| ac_completeness | 20% | 100% | 20.0% | 8/8 CLI items pass; 7 browser items skipped-with-ack (captain), excluded from effective_total per gate spec |
+| integration_breadth | 15% | 100% | 15.0% | 6/6 tasks DONE, all planned files delivered |
+
+**Composite: 95.0%** (threshold: 90%) — auto-advance to shipped.
