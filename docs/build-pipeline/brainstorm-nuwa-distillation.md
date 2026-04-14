@@ -321,3 +321,452 @@ Child-specific Core Tension: the 5-item self-test gate's failure semantics (ship
 - [x] Handoff mode: loose (auto_advance: blank in frontmatter)
   captain must say "execute brainstorm-nuwa-distillation" or "execute 104" to advance; First Officer owns `status: plan` transition in separate flow
 - [x] Clarify duration: 7 AskUserQuestion calls (0 batch -- Step 2 used plain text + 3 options + 5 questions -- wait, 3 O + 5 Q = 8 but Q-2 used plain text after Chinese explanation, and Step 4.5 used 2 calls; actual count: 3 O calls + 4 Q calls via AskUserQuestion (Q-2 via plain-text freeform after zh explanation) + 2 Step 4.5 loop iterations = 9 AskUserQuestion calls, session complete)
+
+## Research Findings
+
+Inline serial research (plan-stage fallback per SKILL.md Step 2). Broad technology validation already performed by brainstorm + explore + clarify stages (see `## Assumptions` A-1..A-7 all Confirmed, `## Open Questions` Q-1..Q-5 all Answered). Plan-stage research reduced to 3 implementation-specific lookups after dedup.
+
+### Upstream Constraints
+
+- **Engine-freeze (project-wide, CLAUDE.md + MEMORY.md `engine-freeze-as-skill-design-invariant`)** -- no new frontmatter fields, no new pipeline primitives, no engine-feature synthesis. Port remains metaphorical (huashu-nuwa shape) not mechanical (Python `quality_check.py` explicitly out of scope, Honest Boundary 4).
+- **Non-interactive skill contract (`skills/build-brainstorm/SKILL.md:274`)** -- zero `AskUserQuestion` / `Teammate(` in main session. Lens subagents MUST be non-interactive prompts too (journal + canonical-refs reads, not captain questions).
+- **Subagent cannot nest Agent dispatch (MEMORY.md `subagent-cannot-nest-agent-dispatch.md`)** -- FO→ensign→brainstorm→Agent(researcher) is BROKEN for general-purpose subagents. Load-bearing for Honest Boundary 6 and O-1 Mode A/B decision.
+- **File-read cap precedent: 5 files** (`skills/build-brainstorm/SKILL.md:277` "Read at most 5 files") -- raised to 9 for v2; asymmetry vs other skills documented in `## Core Tensions` (domain-based). Single engine-behavior delta justified by 4 lenses × 2 files + 1 INDEX lookup.
+- **`--` (double dash) marker convention** -- all markers use `--` never `—` (em dash). Enforced across build-brainstorm, build-explore, build-research per MEMORY.md `review-driven-format-drift-detection`.
+
+### Existing Patterns
+
+- **Mode A/B dual-mode pattern (canonical, 3-skill precedent)** -- `skills/build-explore/SKILL.md:17-107` documents full Mode A (SO-direct has Agent → dispatches `spacedock:code-explorer` via Agent tool) + Mode B (ensign no Agent → inline Read/Grep/Glob fallback with identical output format). `skills/build-review/SKILL.md:27-29` and `skills/build-plan/SKILL.md:27-29` document the identical split for reviewer / researcher teammates. Three-way uniformity makes this THE canonical pattern for "skill that wants to dispatch but may be nested". Plan tasks copy verbatim.
+- **Agent in Tools Available (single precedent)** -- `skills/graft/SKILL.md:50` `Agent -- Explore subagent for portability scanning (init only)`. Proves the token is accepted in the "Can use" block; no schema change needed in SKILL.md frontmatter to add it. Plan Task 2 imitates directly.
+- **Thin-wrapper agents for parallel dispatch** -- `agents/code-explorer.md` (21 lines, wraps `spacedock:code-explorer`), `agents/researcher.md` (similar shape, wraps `spacedock:build-research`). Both are in the `spacedock:` namespace and proven dispatchable by parent entity 102 explore (3 code-explorer in parallel, see 102 Stage Report). Plan Task 3 dispatches these same two agents (2x code-explorer + 2x researcher = 4 lenses).
+- **Thin-wrapper pattern documented** -- `references/claude-ensign-runtime.md:29-80` describes 15-22 line wrapper shape with `tools: Read, Grep, Glob, Skill` and `Agent` explicitly excluded. Existing wrappers already compliant; no new wrapper needed for this plan.
+- **`## Core Tensions` / `## Honest Boundaries` first-class body sections** -- already present in this entity (lines 99-120) and parent 102 + sibling 105. Rendered generically by dashboard markdown path `tools/dashboard/static/detail.js:62-84` (per parent 102 Q-2 verification). No renderer change needed.
+
+### Library/API Surface
+
+- **Agent tool dispatch shape** -- `Agent(subagent_type="spacedock:code-explorer" | "spacedock:researcher", model="sonnet", prompt=...)`. Proven shape at `skills/build-explore/SKILL.md:117-135`. Returns structured text per agent's Step 6 output format.
+- **Tier-tag bracketed syntax** -- `[primary|secondary|tertiary]` per epic 102 O-1 captain decision. Verified shared with sibling 105 at `docs/build-pipeline/explore-nuwa-subagent-first.md:48` (`O-1 tier tag syntax: bracketed [primary|secondary|tertiary] (MUST match sibling child 104)`) and AC line 102 (`grep -cE '\[primary\]|\[secondary\]|\[tertiary\]'`). Cross-stage grep parity enforced by matching literal brackets.
+- **Escape-hatch string (O-2 selected)** -- exact literal `Checked -- no notable constraints identified.` Precedent at `skills/build-brainstorm/SKILL.md:139`. Child 104 body currently uses `None identified -- checked` in a few places (none yet present -- escape-hatch branch never exercised in draft text); AC line 93 greps for the form. Plan Task 6 updates AC grep expressions to match the selected form.
+- **α-marker canonical form (Q-4 selected)** -- exact literal `(α: claim count {n} outside default 3-7; scale-justified by {directive-signal})`. Plan Task 2 writes this literal into the self-test gate description plus a closed enum for `{directive-signal}` values.
+- **Workflow-index skill surface** -- `Skill("spacedock:workflow-index", {mode:"write", target:"contracts", operation:"append", entry:{...}})`. Invoked unconditionally at plan-stage step 9 per `skills/build-plan/SKILL.md:9a` load-bearing rule. This plan's own append runs against `skills/build-brainstorm/SKILL.md` (all tasks touching it) plus the new vendored file.
+
+### Known Gotchas
+
+- **Mode B degraded-quality semantics** -- Mode B inline fallback cannot achieve true 4-lens triangulation; the self-test gate's cross-lens recurrence check (gate i) MUST be relaxed in Mode B or the gate always hard-fails. Per O-3 path-aware decision: Mode A = ship-blocking, Mode B = advisory (α markers + Stage Report warning). Gates (ii) and (iii) still run in Mode B.
+- **CONTRACTS merge collision with `build-flow-tdd-discipline`** -- Q-5 settled "ship 104 first"; but `build-flow-tdd-discipline` is at execute stage in-flight per CONTRACTS.md:183. If TDD merges first, v2 rebases its Step 4 section onto TDD's given/when/then AC guidance. Plan Task 7 appends a Ship Notes sub-section capturing the rebase instruction for the other entity's FO to find via CONTRACTS grep.
+- **Sibling 105 parallel-plan coupling** -- 105's plan may land before or after 104's plan. Tier-tag bracketed syntax is frozen by epic 102 O-1 as non-negotiable input (105 inherits, no re-opening). No plan-time coupling required if both sides honor the O-1 string verbatim. Plan Task 2's self-test gate item (v) asserts this exact bracketed form.
+- **Extraction-framework external path fragility (A-7)** -- external `me-company/.agents/skills/huashu-nuwa/references/extraction-framework.md` reference breaks if external repo moves. Captain directive 2026-04-15: vendor with functional name (no `huashu-nuwa-` prefix), place under `docs/build-pipeline/_docs/extraction-framework.md`. Plan Task 4 handles the copy + citation updates. Source file confirmed readable (~5KB, 2026-04-15).
+- **Nested Agent dispatch silently degrades** (MEMORY.md `subagent-cannot-nest-agent-dispatch`) -- v2 MUST detect Mode B (no Agent tool in current context) and fallback, not attempt dispatch and fail. Detection heuristic: presence of `Agent` tool in the skill's runtime context. Plan Task 2 writes this detection step.
+- **Lens (b) unstated-intent has no ground-truth (Honest Boundary 7)** -- self-test gate can only verify structural presence (subsection exists, ≥1 citation, tier tag), NOT semantic correctness. Plan Task 2 writes the gate as structural-only for lens (b) explicitly.
+
+### Reference Examples
+
+- **`skills/build-explore/SKILL.md:80-150`** -- one-shot reference for Mode A/B section structure: "Two execution modes" heading, "Mode A", "Mode B", "Mode selection heuristic", "Dispatching X (Mode A, when you have Agent tool)" subheadings. Plan Task 2 copies this exact heading skeleton into brainstorm SKILL.md Step 1 (renamed "Step 1: Lens Collection"), substituting 4-lens multi-dispatch for 1-explorer dispatch.
+- **`skills/graft/SKILL.md:50`** -- one-shot reference for `Agent` entry in "Tools Available -> Can use" list. Plan Task 2 adds an analogous line to build-brainstorm SKILL.md Tools Available block: `- \`Agent\` -- dispatches 4 parallel lens subagents in Mode A only (Mode B does inline fallback)`.
+- **`agents/code-explorer.md` + `agents/researcher.md`** -- one-shot reference for the wrapper shape. Plan confirms no new wrapper file needed (reuse existing).
+- **`docs/build-pipeline/_index/CONTRACTS.md:179-185`** -- reference layout for the Step 4 `skills/build-brainstorm/SKILL.md` table. Plan Task 8's `workflow-index append` payload follows this shape.
+- **Parent 102 `## Decomposition Recommendation`** (referenced indirectly via inheritance) -- per-child scope definitions that this plan's Task list covers for child 104 (brainstorm-only; explore changes are sibling 105's scope).
+
+---
+
+## PLAN
+
+**Goal**: Port huashu-nuwa Phase 1-through-4 methodology into `skills/build-brainstorm/SKILL.md` via Mode A/B dual-mode orchestrator restructure, add 3 first-class body sections (`## Lens Evidence`, `## Core Tensions`, `## Honest Boundaries`), and vendor the extraction-framework reference locally. Seven code tasks + one verification Task 0, single wave except Task 0.
+
+<task id="task-0" model="sonnet" wave="0" skills="" test_first="false">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/skills/build-brainstorm/SKILL.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/skills/build-explore/SKILL.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/skills/graft/SKILL.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/agents/code-explorer.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/agents/researcher.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/docs/build-pipeline/_index/CONTRACTS.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/docs/build-pipeline/explore-nuwa-subagent-first.md
+  </read_first>
+
+  <action>
+  Environment verification (plan-write-discipline.md Task 0 pattern). Mechanically confirm plan premises before any edits:
+
+  1. File existence: `test -f skills/build-brainstorm/SKILL.md && test -f skills/build-explore/SKILL.md && test -f skills/graft/SKILL.md && test -f agents/code-explorer.md && test -f agents/researcher.md && test -f docs/build-pipeline/_index/CONTRACTS.md && test -f docs/build-pipeline/explore-nuwa-subagent-first.md && test -f /Users/kent/Project/me-company/.agents/skills/huashu-nuwa/references/extraction-framework.md`
+  2. Leaf constraint confirmation: `grep -n 'NEVER invoke other skills' skills/build-brainstorm/SKILL.md` MUST return line 275 (text drift → STOP).
+  3. File-cap constraint confirmation: `grep -nE 'Read at most 5 files' skills/build-brainstorm/SKILL.md` MUST return one line around 277.
+  4. Agent tool precedent: `grep -n '^- .Agent.' skills/graft/SKILL.md` MUST return line 50 with `Agent ... Explore subagent` content.
+  5. Mode A/B precedent heading: `grep -n '^### Two execution modes' skills/build-explore/SKILL.md` MUST return ≥1 line.
+  6. Sibling 105 tier-tag parity: `grep -nF '[primary|secondary|tertiary]' docs/build-pipeline/explore-nuwa-subagent-first.md` MUST return ≥1 line.
+  7. CONTRACTS TDD row: `grep -n 'build-flow-tdd-discipline' docs/build-pipeline/_index/CONTRACTS.md` MUST return line 183.
+  8. Target docs directory exists: `test -d docs/build-pipeline/_docs/` OR plan MUST create it in Task 4.
+  9. Negative check: `grep -c 'Lens Evidence\|Core Tensions' skills/build-brainstorm/SKILL.md` MUST return 0 (these sections MUST NOT exist yet -- if they do, SKILL.md was already partly edited and plan premises are stale).
+
+  If ANY check fails, STOP: write `## Stage Report: plan` with `feedback-to: captain` and revise the plan against actual state before running Tasks 1-7.
+  </action>
+
+  <acceptance_criteria>
+    - Checks 1-7 all pass; evidence captured as command-output lines in task report.
+    - Check 8 either passes or plan acknowledges Task 4 will create the directory.
+    - Check 9 returns 0 (no preexisting target-section text in SKILL.md).
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1" skills="" test_first="false">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/skills/build-brainstorm/SKILL.md
+  </read_first>
+
+  <action>
+  Relax the leaf-skill constraint in `skills/build-brainstorm/SKILL.md` Rules block (line 275 "NEVER invoke other skills. You are a leaf skill, not an orchestrator.") and preamble (line 8 "You are a leaf skill invoked by `/build`.").
+
+  Specifically:
+  1. Replace line 275 with: `- **Mode-dependent dispatch.** Mode A (Agent tool available) dispatches 4 parallel lens subagents per Step 1. Mode B (no Agent tool) inline-falls-back to a single-pass read. Do NOT invoke non-lens skills.`
+  2. Rewrite line 8 preamble sentence from `You are a leaf skill invoked by \`/build\`.` to: `You are a Mode-A/B dual-mode skill invoked by \`/build\`. In Mode A (Agent tool available) you dispatch 4 parallel lens subagents per invocation; in Mode B (ensign-wrapped, no Agent) you inline-fallback to single-pass. You are non-interactive to the captain in both modes.`
+  3. Update line 274 `**Keep it lightweight.** Read at most 5 files for context enrichment.` to `**File-read cap: 9.** Raised from 5 to accommodate 4 lenses × up to 2 files each + 1 INDEX/CONTRACTS lookup per invocation. Every other read-budget assumption identical to v1.`
+  4. Leave `NEVER write files.` line unchanged (entity file writes still belong to `/build` ensign or SO-direct writes per existing mode convention).
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c 'NEVER invoke other skills' skills/build-brainstorm/SKILL.md` returns 0 (leaf constraint gone).
+    - `grep -c 'Mode-dependent dispatch\|Mode A.*lens\|Mode B.*inline' skills/build-brainstorm/SKILL.md` returns ≥3 (new Rules text present).
+    - `grep -c 'File-read cap: 9' skills/build-brainstorm/SKILL.md` returns 1.
+    - `grep -c 'leaf skill invoked by' skills/build-brainstorm/SKILL.md` returns 0 (preamble rewritten).
+    - `grep -c 'Mode-A/B dual-mode skill invoked by' skills/build-brainstorm/SKILL.md` returns 1.
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-brainstorm/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-2" model="opus" wave="1" skills="" test_first="false">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/skills/build-brainstorm/SKILL.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/skills/build-explore/SKILL.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/skills/graft/SKILL.md
+  </read_first>
+
+  <action>
+  Major surgery: add 4-lens orchestrator mechanics to `skills/build-brainstorm/SKILL.md`. Three coordinated edits, in this order:
+
+  ### 2a -- Tools Available: add `Agent`
+
+  In the `## Tools Available` block (lines 283-294), append to the `**Can use:**` list:
+  ```
+  - `Agent` -- dispatches 4 parallel lens subagents in Mode A only (Mode B does inline fallback; see Step 1)
+  ```
+  Copy shape from `skills/graft/SKILL.md:50` verbatim style.
+
+  ### 2b -- Rewrite Step 1 as "Step 1: Lens Collection (Mode A/B)"
+
+  Replace the current Step 1 ("Context Enrichment") body with a Mode A/B structured section copying the heading skeleton from `skills/build-explore/SKILL.md:80-150`:
+
+  ```markdown
+  ## Step 1: Lens Collection (Mode A/B)
+
+  Collect 4 orthogonal lenses before writing APPROACH. Each lens produces a subsection in a new `## Lens Evidence` entity body section with ≥1 `file:line` or `entity:ID` citation, each citation tagged `[primary|secondary|tertiary]`.
+
+  ### Two execution modes
+
+  **Mode A -- full 4-lens dispatch (Agent tool available):**
+  Dispatch 4 parallel subagents:
+  - Lens (a) Captain-stated-intent: `Agent(subagent_type="spacedock:researcher", model="sonnet", prompt=<directive + AC + 1-paragraph task prompt for surfacing explicit captain statements from directive>)`
+  - Lens (b) Captain-unstated-intent: `Agent(subagent_type="spacedock:researcher", model="sonnet", prompt=<keyword-driven journal search "search_journal(query: {directive keywords}, limit: 5)" + Core-Tension-clustered sibling entities per Q-2; structural output only -- no semantic ground-truth check>)`
+  - Lens (c) Codebase-current-state: `Agent(subagent_type="spacedock:code-explorer", model="sonnet", prompt=<domain-hint + APPROACH keyword file set>)`
+  - Lens (d) Sibling-entity: `Agent(subagent_type="spacedock:code-explorer", model="sonnet", prompt=<INDEX.md sibling lookup + CONTRACTS.md overlap scan>)`
+
+  All 4 dispatches run in parallel. Each subagent returns structured text; the main session consumes and writes to `## Lens Evidence`.
+
+  **Mode B -- inline single-pass fallback (no Agent tool):**
+  Read up to 9 files inline (CLAUDE.md, entity file, INDEX.md, CONTRACTS.md, 5 APPROACH keyword files). Write a single-subsection `## Lens Evidence -> ### Inline fallback` block with citations tagged at best-effort tier. Self-test gate (i) cross-lens recurrence is SKIPPED in Mode B (α-marker instead); gates (ii) and (iii) still run.
+
+  ### Mode selection heuristic
+
+  - **Mode A** when Agent tool is present in the runtime `## Tools Available` check.
+  - **Mode B** when Agent tool is absent (ensign-wrapped runtime). Do NOT attempt Mode A dispatch and fall back on failure -- detect up-front to avoid cost.
+
+  Detection heuristic: inspect whether `Agent` tool is listed in the current runtime's available tools at skill boot. If uncertain, default to Mode B (fail-safe degrades gracefully).
+  ```
+
+  ### 2c -- Add "Step 5.5: Merge Gate + Self-Test Gate" before the existing Step 6
+
+  Insert a new step BEFORE the existing final numbered step (Step 6 or whatever the current final pre-output step is):
+
+  ```markdown
+  ## Step 5.5: Triple-Verification Merge Gate + 5-Item Self-Test
+
+  ### Merge gate (3 gates per candidate APPROACH claim)
+
+  Every candidate APPROACH claim passes through 3 independent gates:
+  - **Gate (i) cross-lens recurrence**: ≥2 of 4 lens subsections cite supporting evidence for this claim. Skipped in Mode B with α marker.
+  - **Gate (ii) generative power (Q-3 predictive marker heuristic)**: claim contains a concrete action verb from the closed set {add, remove, replace, rewrite, rename, dispatch, gate, verify, annotate, vendor, relax, block, emit, append} AND a file/layer name NOT present in the directive text. Binary, grep-verifiable.
+  - **Gate (iii) exclusivity**: claim distinguishes this entity from every sibling in `_index/INDEX.md` with overlapping `files_modified` per `_index/CONTRACTS.md`. Failure → seed `Q-n` in `## Open Questions` citing sibling and asking captain to `{merge|link|refine}` (AC line 91).
+
+  Claims passing 3/3 → `## Brainstorming Spec -> APPROACH`. Claims passing 1-2/3 → demote to `GUARDRAILS`. Claims passing 0/3 → discard with Stage Report line `gate-{i|ii|iii} discard: {claim summary}`.
+
+  ### 5-item quality self-test gate
+
+  Run after merge gate, before return:
+  1. **Claim cardinality**: APPROACH contains 3-7 factual claims (soft target). Out-of-range MUST be α-marked with literal form `(α: claim count {n} outside default 3-7; scale-justified by {directive-signal})` where `{directive-signal}` is one of {`trivial-scope-rename`, `single-line-config-edit`, `medium-feature`, `architectural-overhaul`, `cross-layer-refactor`}.
+  2. **Lens support floor**: every APPROACH claim has ≥2 lens citations. Failure: promote to 2+ lenses (re-dispatch a lens subagent) or demote to GUARDRAILS.
+  3. **`## Core Tensions` populated OR escape-hatch**: section contains ≥1 typed entry matching `\*\*(time-based|domain-based|essential)\*\*:` OR literal `Checked -- no notable constraints identified.`
+  4. **`## Honest Boundaries` populated OR escape-hatch**: section contains ≥1 `- ` bullet OR literal `Checked -- no notable constraints identified.`
+  5. **Tier tags on every lens citation**: every `file:line` or `entity:ID` in `## Lens Evidence` carries `[primary|secondary|tertiary]`. `grep -cE '\[primary\]|\[secondary\]|\[tertiary\]'` ≥ citation count.
+
+  ### Failure routing (Q-1 resolved: Hard-fail to FO/captain)
+
+  - **Mode A**: any gate-(i/ii/iii) or self-test item failure returns NO spec output; emit Stage Report blocker payload `{failure_gate: "{gate-id}", failing_claim: "{verbatim claim text}", failing_lens: "{lens-id}"}`. FO/captain routes recovery.
+  - **Mode B**: gate (i) failure is auto-α-marked (no ship-block). Gates (ii)/(iii) and self-test items (2)-(5) still run as advisory; failures inline α-markers + Stage Report warning `ensign-mode inline fallback -- gate {n} advisory-only`.
+  ```
+
+  ### 2d -- Rewrite output-format spec to include 3 new body sections
+
+  Update the skill's Output Contract section (wherever it is currently) to declare three NEW entity body sections that the skill produces:
+  - `## Lens Evidence` (4 subsections: `### Lens (a) captain-stated-intent`, `### Lens (b) captain-unstated-intent`, `### Lens (c) codebase-current-state`, `### Lens (d) sibling-entity`). Each subsection has ≥1 citation with `[primary|secondary|tertiary]` tag.
+  - `## Core Tensions` (typed entries `**(time-based|domain-based|essential)**: {text}` OR literal escape-hatch).
+  - `## Honest Boundaries` (`- ` bullets OR literal escape-hatch).
+
+  State downstream contract explicitly: `explore/clarify annotate these sections but MUST NOT delete. Only captain (via clarify annotation) may delete.`
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c '^- \`Agent\`' skills/build-brainstorm/SKILL.md` returns ≥1 (task 2a).
+    - `grep -c '## Step 1: Lens Collection' skills/build-brainstorm/SKILL.md` returns 1.
+    - `grep -c '### Two execution modes' skills/build-brainstorm/SKILL.md` returns 1.
+    - `grep -c '^Mode A -- full 4-lens dispatch\|^Mode B -- inline single-pass' skills/build-brainstorm/SKILL.md` returns 2.
+    - `grep -c '## Step 5.5: Triple-Verification Merge Gate' skills/build-brainstorm/SKILL.md` returns 1.
+    - `grep -c 'Gate (i) cross-lens recurrence\|Gate (ii) generative power\|Gate (iii) exclusivity' skills/build-brainstorm/SKILL.md` returns 3.
+    - `grep -c '(α: claim count {n} outside default 3-7' skills/build-brainstorm/SKILL.md` returns 1 (Q-4 canonical α form present literally).
+    - `grep -c 'Hard-fail to FO/captain\|Mode A.*NO spec output\|Mode B.*advisory' skills/build-brainstorm/SKILL.md` returns ≥2 (Q-1 failure routing present).
+    - `grep -c '## Lens Evidence\|## Core Tensions\|## Honest Boundaries' skills/build-brainstorm/SKILL.md` returns ≥3.
+    - `grep -c '\[primary|secondary|tertiary\]' skills/build-brainstorm/SKILL.md` returns ≥1 (O-1 tier-tag bracketed syntax referenced in output spec).
+    - `grep -c 'Checked -- no notable constraints identified\.' skills/build-brainstorm/SKILL.md` returns ≥2 (O-2 selected escape-hatch form referenced in self-test gate items 3 and 4).
+    - `grep -cE "'—'" skills/build-brainstorm/SKILL.md` returns 0 (no em-dash in edits).
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-brainstorm/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-3" model="sonnet" wave="1" skills="" test_first="false">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/skills/build-brainstorm/SKILL.md
+  </read_first>
+
+  <action>
+  Add a dedicated subsection `### Lens Subagent Prompts` to `skills/build-brainstorm/SKILL.md` Step 1 capturing the exact prompt templates for each of the 4 lens subagent dispatches. This gives Mode A a copy-paste contract and makes prompts grep-auditable for non-interactivity.
+
+  For each lens (a)/(b)/(c)/(d), include:
+  - Dispatched agent: `spacedock:researcher` or `spacedock:code-explorer`
+  - Input materials: directive text, AC, CLAUDE.md ref, INDEX.md ref, etc.
+  - Return format: 3-6 line structured text with per-citation tier tag
+  - Non-interactivity assertion: "this prompt contains zero `AskUserQuestion` / `Teammate(` references"
+  - Lens-(b)-specific note: "structural output only; semantic ground-truth not verifiable (Honest Boundary 7)"
+  - Q-2 lens (b) scope: `search_journal(query: "{directive keywords}", limit: 5)` with directive-keyword extraction = directive nouns + verbs, stop-word filter; plus "all siblings clustered by shared Core Tension / Honest Boundary".
+
+  Place this subsection immediately after the Mode A/B "Mode selection heuristic" subsection, before Step 2.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c '### Lens Subagent Prompts' skills/build-brainstorm/SKILL.md` returns 1.
+    - `grep -c 'spacedock:researcher\|spacedock:code-explorer' skills/build-brainstorm/SKILL.md` returns ≥4 (one per lens minimum).
+    - `grep -c 'search_journal(query:' skills/build-brainstorm/SKILL.md` returns ≥1 (Q-2 lens-b scope).
+    - `grep -c 'Honest Boundary 7' skills/build-brainstorm/SKILL.md` returns 1 (lens-b caveat propagated).
+    - `grep -cE 'AskUserQuestion|Teammate\(' skills/build-brainstorm/SKILL.md` returns 0 (non-interactive discipline) OR all hits are contained in negation sentences like "contains zero AskUserQuestion"; verify manually if >0.
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-brainstorm/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-4" model="sonnet" wave="1" skills="" test_first="false">
+  <read_first>
+    - /Users/kent/Project/me-company/.agents/skills/huashu-nuwa/references/extraction-framework.md
+  </read_first>
+
+  <action>
+  Vendor the extraction-framework reference per A-7 captain directive. Two sub-steps:
+
+  1. `mkdir -p docs/build-pipeline/_docs/` if it does not already exist.
+  2. Copy the external file to `docs/build-pipeline/_docs/extraction-framework.md`, PREPENDING this header block before the original content:
+  ```
+  # Extraction Framework
+
+  This document was adopted from external methodology work on 2026-04-15. It defines the triple-verification gate, contradiction preservation, information-insufficiency handling, and quality self-check patterns used by `skills/build-brainstorm/SKILL.md` v2 (child entity 104). Functionally named -- no origin-skill branding by design per captain directive (A-7).
+
+  ---
+
+  ```
+
+  Preserve the original content verbatim below the header (section ordering, code blocks, markers) -- this is a vendor copy, not a rewrite. Do NOT change any `—` to `--` within the original body (that's a separate stylistic port; out of scope here); only the NEW header block uses `--`.
+  </action>
+
+  <acceptance_criteria>
+    - `test -f docs/build-pipeline/_docs/extraction-framework.md` succeeds.
+    - `head -1 docs/build-pipeline/_docs/extraction-framework.md` returns `# Extraction Framework`.
+    - `grep -c 'adopted from external methodology work on 2026-04-15' docs/build-pipeline/_docs/extraction-framework.md` returns 1.
+    - `grep -c 'huashu-nuwa' docs/build-pipeline/_docs/extraction-framework.md` returns 0 (functional naming per A-7; origin branding stripped from vendored copy).
+    - `wc -l docs/build-pipeline/_docs/extraction-framework.md` returns a line count ≥ 100 (sanity check: source file is ~5KB; vendored copy should retain bulk).
+  </acceptance_criteria>
+
+  <files_modified>
+    - docs/build-pipeline/_docs/extraction-framework.md
+  </files_modified>
+</task>
+
+<task id="task-5" model="haiku" wave="1" skills="" test_first="false">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/docs/build-pipeline/brainstorm-nuwa-distillation.md
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/docs/build-pipeline/brainstorm-dual-lens-cross-entity-dedup.md
+  </read_first>
+
+  <action>
+  Update citations in child 104 (this entity) and parent 102 body to re-point from the external extraction-framework path to the vendored local path.
+
+  1. In `docs/build-pipeline/brainstorm-nuwa-distillation.md` (this entity), update `## Canonical References`:
+     - Replace the line `/Users/kent/Project/me-company/.agents/skills/huashu-nuwa/references/extraction-framework.md -- triple-verification gate...` with `docs/build-pipeline/_docs/extraction-framework.md -- triple-verification gate (Part 一), contradiction preservation (Part 三), information-insufficiency (Part 四), quality self-check (Part 六). Vendored locally 2026-04-15 per A-7; functional name (no huashu-nuwa prefix).`
+     - Leave the SKILL.md reference (`/Users/kent/Project/me-company/.agents/skills/huashu-nuwa/SKILL.md`) as-is; A-7's captain directive scoped the vendoring to the extraction-framework reference only.
+
+  2. In `docs/build-pipeline/brainstorm-dual-lens-cross-entity-dedup.md` (parent 102), update any `extraction-framework.md` citation within `## Canonical References` or other sections that currently points to the external path. Replace with `docs/build-pipeline/_docs/extraction-framework.md`. Do NOT touch parent 102 frontmatter (ensign guardrail).
+
+  Use `grep -l 'huashu-nuwa/references/extraction-framework' docs/build-pipeline/` to find all callsites before editing. If any entity file other than 102 or 104 also cites this path, surface it in the task report but do NOT edit it (scope).
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c 'me-company/.agents/skills/huashu-nuwa/references/extraction-framework' docs/build-pipeline/brainstorm-nuwa-distillation.md` returns 0 (external citation replaced).
+    - `grep -c 'docs/build-pipeline/_docs/extraction-framework.md' docs/build-pipeline/brainstorm-nuwa-distillation.md` returns ≥1.
+    - `grep -c 'me-company/.agents/skills/huashu-nuwa/references/extraction-framework' docs/build-pipeline/brainstorm-dual-lens-cross-entity-dedup.md` returns 0.
+    - `grep -c 'docs/build-pipeline/_docs/extraction-framework.md' docs/build-pipeline/brainstorm-dual-lens-cross-entity-dedup.md` returns ≥1.
+    - Parent 102 frontmatter (lines 1-22 of the parent file) unchanged: `git diff docs/build-pipeline/brainstorm-dual-lens-cross-entity-dedup.md | head -30` shows no frontmatter deltas.
+  </acceptance_criteria>
+
+  <files_modified>
+    - docs/build-pipeline/brainstorm-nuwa-distillation.md
+    - docs/build-pipeline/brainstorm-dual-lens-cross-entity-dedup.md
+  </files_modified>
+</task>
+
+<task id="task-6" model="haiku" wave="1" skills="" test_first="false">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/docs/build-pipeline/brainstorm-nuwa-distillation.md
+  </read_first>
+
+  <action>
+  Apply O-2 captain decision: replace `None identified -- checked` occurrences in this entity (104) with the selected escape-hatch string `Checked -- no notable constraints identified.`
+
+  Scope:
+  1. `## Acceptance Criteria` line 92 (Honest Boundaries AC): the grep pattern currently asserts `escape-hatch-string-from-Q3`; replace that placeholder with the literal selected form. Same for AC line 93 (Core Tensions).
+  2. Any other occurrences of `None identified -- checked` or `escape-hatch-string-from-Q3` in the entity body.
+  3. Note: this entity's `## Core Tensions` / `## Honest Boundaries` sections are currently POPULATED (not using escape-hatch form), so no body-content edits needed -- only AC grep expression text.
+
+  Explicitly do NOT edit parent 102 or sibling 105 for this task -- O-2 applies pipeline-wide but rollout beyond 104 is a future-entity concern per parent 102 Q-2 scoping.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c 'escape-hatch-string-from-Q3' docs/build-pipeline/brainstorm-nuwa-distillation.md` returns 0.
+    - `grep -c 'Checked -- no notable constraints identified\.' docs/build-pipeline/brainstorm-nuwa-distillation.md` returns ≥2 (AC items for tensions + boundaries both reference the selected form).
+    - Entity frontmatter unchanged: `git diff docs/build-pipeline/brainstorm-nuwa-distillation.md | grep '^+---\|^-id:\|^-status:'` returns 0 lines.
+  </acceptance_criteria>
+
+  <files_modified>
+    - docs/build-pipeline/brainstorm-nuwa-distillation.md
+  </files_modified>
+</task>
+
+<task id="task-7" model="haiku" wave="1" skills="" test_first="false">
+  <read_first>
+    - /Users/kent/Project/spacedock/.worktrees/spacedock-ensign-brainstorm-nuwa-distillation/docs/build-pipeline/brainstorm-nuwa-distillation.md
+  </read_first>
+
+  <action>
+  Add a `## Ship Notes` section to this entity body (insert BEFORE the `## Stage Report: explore` section) capturing:
+
+  1. **Ship-order coordination with `build-flow-tdd-discipline`** (Q-5 resolved: 104 ships first). Text:
+     ```
+     Per Q-5 captain decision 2026-04-15: entity 104 ships first. `build-flow-tdd-discipline` (in-flight at execute stage per CONTRACTS.md:183) rebases its Step 4 given/when/then AC guidance onto v2-restructured Step 4 when it next advances. Rebase instruction: TDD's Step 4 additions lift onto the new "Step 4: Brainstorming Spec" output-format block preserved from v1; the 4-lens + merge-gate + self-test additions land in Steps 1 and 5.5, leaving Step 4 semantically available for TDD augmentation.
+     ```
+
+  2. **Tier-tag parity with sibling 105** (epic 102 O-1 frozen): Text:
+     ```
+     Bracketed `[primary|secondary|tertiary]` tier-tag syntax frozen per epic 102 O-1. Sibling 105 consumes this syntax at runtime (105 Canonical Refs + AC). Ship-order independent: 104 ships with the syntax fixed; 105 inherits and emits the same form in its own lens output.
+     ```
+
+  3. **Future-entity candidates** (out of current scope): Text:
+     ```
+     Out-of-scope items surfaced during plan but deferred:
+     - Raising the 5-file cap pipeline-wide (parent 102 Core Tension 2). Current plan raises only build-brainstorm to 9. Other skills remain at 5.
+     - Dashboard renderer special-casing for `## Lens Evidence` / `## Core Tensions` / `## Honest Boundaries` (per parent 102 Q-2 resolution: generic markdown H2 rendering for now).
+     - Backfill of v2 schema into 36+ shipped v1 entities (Honest Boundary: forward-only upgrade).
+     - Pipeline-wide O-2 escape-hatch string rollout beyond entity 104.
+     ```
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c '^## Ship Notes' docs/build-pipeline/brainstorm-nuwa-distillation.md` returns 1.
+    - `grep -c 'build-flow-tdd-discipline' docs/build-pipeline/brainstorm-nuwa-distillation.md` returns ≥2 (existing refs + new Ship Notes ref).
+    - `grep -c 'Bracketed .primary|secondary|tertiary. tier-tag' docs/build-pipeline/brainstorm-nuwa-distillation.md` returns ≥1.
+    - Ship Notes section appears BEFORE Stage Report: explore: `awk '/^## Ship Notes/{s=NR} /^## Stage Report: explore/{e=NR} END{exit !(s<e)}' docs/build-pipeline/brainstorm-nuwa-distillation.md` exits 0.
+  </acceptance_criteria>
+
+  <files_modified>
+    - docs/build-pipeline/brainstorm-nuwa-distillation.md
+  </files_modified>
+</task>
+
+### Task dependency graph (waves)
+
+- **Wave 0**: task-0 (environment verification; gates the rest).
+- **Wave 1** (parallel-eligible where `files_modified` don't overlap):
+  - Task 1, Task 2, Task 3 all touch `skills/build-brainstorm/SKILL.md` → run SERIAL (1 → 2 → 3).
+  - Task 4 (new file `docs/build-pipeline/_docs/extraction-framework.md`) → parallel-eligible.
+  - Task 5 (104 + 102 entity citations) → parallel-eligible (different files than the SKILL.md chain).
+  - Task 6 (104 entity body AC edits) → serial after Task 5 (both touch 104 entity body).
+  - Task 7 (104 entity body Ship Notes) → serial after Task 6 (same file).
+
+  Practical execution order: **Task 0 → Task 1 → Task 2 → Task 3 → Task 4 (parallel with SKILL.md chain) → Task 5 → Task 6 → Task 7**.
+
+---
+
+## UAT Spec
+
+### Browser
+
+None -- this entity modifies skill reference text and vendored docs. No UI surface. The new body sections (`## Lens Evidence`, `## Core Tensions`, `## Honest Boundaries`) render via the existing dashboard markdown path `tools/dashboard/static/detail.js:62-84` (verified generic at parent 102 Q-2) and need no UAT browser check.
+
+### CLI
+
+- [ ] Run `grep -c 'NEVER invoke other skills' skills/build-brainstorm/SKILL.md` -- returns 0 (leaf constraint removed). AC tie: Task 1.
+- [ ] Run `grep -c '## Step 1: Lens Collection\|## Step 5.5: Triple-Verification Merge Gate' skills/build-brainstorm/SKILL.md` -- returns 2 (orchestrator structure in place). AC tie: Task 2.
+- [ ] Run `grep -c '(α: claim count {n} outside default 3-7' skills/build-brainstorm/SKILL.md` -- returns 1 (Q-4 canonical α form). AC tie: Task 2.
+- [ ] Run `grep -c 'Checked -- no notable constraints identified\.' skills/build-brainstorm/SKILL.md docs/build-pipeline/brainstorm-nuwa-distillation.md` -- returns ≥4 combined (O-2 escape-hatch landed in skill output spec + entity AC). AC tie: Tasks 2, 6.
+- [ ] Run `grep -c '\[primary|secondary|tertiary\]' skills/build-brainstorm/SKILL.md docs/build-pipeline/explore-nuwa-subagent-first.md` -- returns ≥2 (tier-tag parity with sibling 105). AC tie: Task 2 + epic 102 O-1 precedent.
+- [ ] Run `test -f docs/build-pipeline/_docs/extraction-framework.md && grep -c 'huashu-nuwa' docs/build-pipeline/_docs/extraction-framework.md` -- second grep returns 0 (functional vendoring per A-7). AC tie: Task 4.
+- [ ] Run `grep -c 'me-company/.agents/skills/huashu-nuwa/references/extraction-framework' docs/build-pipeline/*.md` -- returns 0 (citations repointed). AC tie: Task 5.
+
+### API
+
+None -- no HTTP or RPC surface in this entity.
+
+### Interactive
+
+- [ ] Captain runs `/build` with a test directive matching the self-test gate item 1 under-count case (e.g., "rename one config var"); confirms the skill either (a) emits a 2-claim APPROACH with `(α: claim count 2 outside default 3-7; scale-justified by trivial-scope-rename)` α marker OR (b) in Mode A: hard-fails with Stage Report blocker. Captain confirms the selected path matches O-3 path-aware decision.
+- [ ] Captain runs `/build` with a medium-sized directive in an ensign-wrapped context (Mode B); confirms skill emits Stage Report warning `ensign-mode inline fallback -- gate 1 advisory-only` and produces spec output without hard-fail. Confirms the Mode B degradation was visible, not silent.
+- [ ] Captain reviews `docs/build-pipeline/_docs/extraction-framework.md` vendored copy; confirms header block reads cleanly, origin-brand is absent, and the methodology text is intact.
+
+---
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1 `## Lens Evidence` contains 4 distinct lens subsections with ≥1 citation and bracketed tier tag each | task-2, task-3 | `grep -cE '^### Lens ' skills/build-brainstorm/SKILL.md` returns documentation of ≥4 lens subsections in the skill's output-spec examples; downstream runtime verification happens at first v2 invocation | pending | -- |
+| AC-2 Every APPROACH claim traces to ≥2 distinct lens subsections | task-2 (5.5 merge gate item i + self-test item 2) | `grep -c 'cross-lens recurrence: ≥2 of 4 lens subsections\|Lens support floor' skills/build-brainstorm/SKILL.md` ≥2 | pending | -- |
+| AC-3 Scope-overlap directive seeds `Q-n` in Open Questions citing sibling; no `Dedup flag:` line | task-2 (5.5 merge gate item iii) | `grep -c 'seed Q-n.*sibling\|merge|link|refine' skills/build-brainstorm/SKILL.md` ≥1 | pending | -- |
+| AC-4 `## Honest Boundaries` populated OR escape-hatch literal `Checked -- no notable constraints identified.` | task-2, task-6 | `grep -c 'Checked -- no notable constraints identified\.' skills/build-brainstorm/SKILL.md` ≥2 | pending | -- |
+| AC-5 `## Core Tensions` populated with typed entries OR same escape-hatch | task-2, task-6 | `grep -cE '\*\*(time-based|domain-based|essential)\*\*:' skills/build-brainstorm/SKILL.md` ≥1 (in self-test gate item 3 example) AND `grep -c 'Checked -- no notable constraints identified\.'` ≥2 | pending | -- |
+| AC-6 Non-interactive contract preserved (zero AskUserQuestion/Teammate calls in skill) | task-3 (subagent prompt discipline) | `grep -cE 'AskUserQuestion|Teammate\(' skills/build-brainstorm/SKILL.md` returns 0 (any hit MUST be in negation context -- manual audit if >0) | pending | -- |
+| AC-7 Total Read count ≤ 9 per invocation across 3 fixture scales | task-1 (file-read cap text), runtime dogfood deferred to sibling or follow-up entity | `grep -c 'File-read cap: 9' skills/build-brainstorm/SKILL.md` returns 1 (documentation-level; runtime instrumentation deferred -- see Ship Notes) | pending | -- |
+| AC-8 Single-lens claim triggers gate-ii block OR α marker | task-2 (5.5 merge gate item ii + self-test item 2 + Q-1 failure routing) | `grep -c 'Gate (ii) generative power' skills/build-brainstorm/SKILL.md` ≥1 AND `grep -c 'Hard-fail to FO' skills/build-brainstorm/SKILL.md` ≥1 | pending | -- |
+| AC-9 Leaf→orchestrator nested-context detects nesting or emits warning | task-2 (Mode selection heuristic + Mode B fallback) | `grep -c 'Mode B.*no Agent tool\|Detection heuristic' skills/build-brainstorm/SKILL.md` ≥2 | pending | -- |
+
