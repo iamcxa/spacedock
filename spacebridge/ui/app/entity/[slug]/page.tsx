@@ -116,21 +116,25 @@ export default async function EntityDetailPage({ params }: PageProps) {
 
   const { frontmatter, body } = parseEntity(entityText);
 
-  // Group comments by sectionHeading
+  // Group comments by normalized sectionHeading (strip "## " prefix for consistent matching)
+  function normalizeHeading(h: string): string {
+    return h.replace(/^##\s*/, "").trim();
+  }
   const topLevel = commentRows.filter((c) => !c.parentId);
   const replies = commentRows.filter((c) => c.parentId);
   const commentsBySection = new Map<string, typeof topLevel>();
   for (const comment of topLevel) {
-    const existing = commentsBySection.get(comment.sectionHeading) ?? [];
+    const key = normalizeHeading(comment.sectionHeading);
+    const existing = commentsBySection.get(key) ?? [];
     existing.push(comment);
-    commentsBySection.set(comment.sectionHeading, existing);
+    commentsBySection.set(key, existing);
   }
 
-  // Build sections from body headings (## headings only)
+  // Build sections from body headings (## headings only), normalized (no "## " prefix)
   const sectionHeadings = body
     .split("\n")
     .filter((line) => line.startsWith("## "))
-    .map((line) => line.trim());
+    .map((line) => line.trim().replace(/^##\s*/, ""));
 
   return (
     <main className="container mx-auto px-4 py-8 max-w-4xl">

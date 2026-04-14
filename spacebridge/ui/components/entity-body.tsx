@@ -43,7 +43,7 @@ export function EntityBody({
         <ReactMarkdown
           components={{
             h2: ({ node, children, ...props }) => {
-              const headingText = `## ${typeof children === "string" ? children : String(children)}`;
+              const headingText = typeof children === "string" ? children : String(children);
               const commentsForSection = commentsBySection[headingText] ?? [];
               return (
                 <div>

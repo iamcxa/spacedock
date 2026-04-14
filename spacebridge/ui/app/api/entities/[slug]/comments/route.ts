@@ -16,6 +16,10 @@ function defaultDbPath(): string {
 
 const SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/;
 
+function normalizeHeading(h: unknown): string {
+  return String(h ?? "").replace(/^##\s*/, "").trim();
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ slug: string }> },
@@ -50,11 +54,11 @@ export async function GET(
       replyMap.set(key, [...(replyMap.get(key) ?? []), r]);
     }
 
-    // Group by sectionHeading
+    // Group by normalized sectionHeading (strip "## " prefix)
     const bySection = new Map<string, Array<typeof rows[0] & { replies: typeof rows }>>();
     for (const c of topLevel) {
       const withReplies = { ...c, replies: replyMap.get(c.commentId) ?? [] };
-      const section = c.sectionHeading;
+      const section = normalizeHeading(c.sectionHeading);
       bySection.set(section, [...(bySection.get(section) ?? []), withReplies]);
     }
 
@@ -95,7 +99,7 @@ export async function POST(
         commentId: randomUUID(),
         entityPath: `/docs/build-pipeline/${slug}.md`,
         selectedText: (body as Record<string, unknown>).selectedText ?? "",
-        sectionHeading: (body as Record<string, unknown>).sectionHeading,
+        sectionHeading: normalizeHeading((body as Record<string, unknown>).sectionHeading),
         content: (body as Record<string, unknown>).content,
         author: (body as Record<string, unknown>).author ?? "captain",
       });
