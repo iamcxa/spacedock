@@ -2,7 +2,7 @@
 id: 105
 title: Explore Nüwa-Alignment + Subagent-First Enforcement (v2) -- Multi-Angle Parallel Explorer + Track-A Triple-Gate + Tension Output
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: /build (decomposed from epic 102)
 created: 2026-04-14T00:00:00Z
 started:
@@ -151,3 +151,87 @@ You are asking for a restructure of build-explore so every mapping pass dispatch
 - [x] Sibling 104 decisions inherited: O-1, O-2, O-3, Q-4 (format), Q-5, A-7 -- 6 inherited decisions reduce clarify question surface
 - [x] Scope flag: likely-decomposable-already -- NOT acted on (sub-scopes sequential; ports 7/8/9/10 share tier-tag + Mode A/B infrastructure)
 - [x] Self-review: APPROACH vs ALTERNATIVE genuinely different (dual-mode vs total-conversion); AC testable; GUARDRAILS consistent with APPROACH; Goal Check serves APPROACH expected outcome
+
+## Assumptions
+
+**A-1**: The current Step 5 Hybrid Classification soft rule ("2+ consistent usages = Confident; 1 usage clear-fit = Likely; 1 usage unclear = Unclear") is exactly the heuristic Port 8 replaces with the triple-gate. No hidden precedent exists that Port 8 would conflict with.
+- **Confidence**: Confident (0.95) `[primary]`
+- **Evidence**: `skills/build-explore/references/hybrid-classification-heuristic.md:19-21` verbatim matches the quoted soft rule; `:157-158` restates it operationally ("Found 2+ consistent usages? --> Track A (Confident); Found 1 usage? --> Track A (Likely or Unclear depending on fit)"). Port 8's triple-gate replaces these lines directly.
+
+**A-2**: No in-flight CONTRACTS collision exists on `skills/build-explore/SKILL.md`. 105 has no ship-order coordination cost (contrast with sibling 104 which has `build-flow-tdd-discipline` in-flight collision).
+- **Confidence**: Confident (0.95) `[primary]`
+- **Evidence**: `docs/build-pipeline/_index/CONTRACTS.md:207-211` lists only one entity on build-explore/SKILL.md -- `phase-e-plan-4-dogfood-trailofbits-integration` with status `✅ final` (already shipped 2026-04-12). No `in-flight` or `planned` entries on Step 2 / Step 5 / Step 6 surface. 105 can plan + execute + ship without rebase concerns on this file.
+
+**A-3**: The 4-parallel `spacedock:code-explorer` dispatch pattern is already proven in production -- parent epic 102 successfully used this exact pattern (3 concurrent explorers) during its explore stage. Port 7's 4-angle fanout is an elaboration of validated infrastructure, not novel.
+- **Confidence**: Confident (0.95) `[primary]`
+- **Evidence**: Parent entity 102 `## Stage Report: explore` line 304 records "Three `spacedock:code-explorer` agents dispatched in parallel for Lens (c)+(d)". Dispatch mechanism (`Agent(subagent_type="spacedock:code-explorer", ...)`) + parallel-return synthesis already works in SO-direct mode. Port 7 adds angle specialization to the prompt, not a new dispatch primitive.
+
+**A-4**: The Track-B "Recommendation Validation" logic in `hybrid-classification-heuristic.md` (return-value-trace + design-doc-invariant cross-reference) is orthogonal to Port 8's Track-A triple-gate and is preserved unchanged by Port 8. Port 8 changes only Track A classification, not Track B validation.
+- **Confidence**: Confident (0.95) `[primary]`
+- **Evidence**: `skills/build-explore/SKILL.md:166-168` ("Recommendation Validation (Track B only): before marking any option as `Recommended`, run the two validation checks..."); `references/hybrid-classification-heuristic.md` structure separates Track A gating (lines 19-21, 157-158) from Track B recommendation validation (separate section). Port 8's triple-gate target is lines 19-21 + 157-158 only.
+
+## Option Comparisons
+
+### O-1: Vendored `extraction-framework.md` target path (inherited from sibling 104 A-7)
+
+Sibling 104 A-7 committed the captain to vendoring `extraction-framework.md` locally with functional naming, but the specific target path within the repo was left for plan-phase. 105 must commit alongside 104 because both entities cite the same file; diverging paths would fragment the citation anchor.
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| **`docs/build-pipeline/_docs/extraction-framework.md`** `[secondary]` | Matches existing `_docs/` convention (SO-FO-DISPATCH-SPLIT.md already lives here); discoverable alongside other pipeline design docs; zero new directory creation | Slightly leaks build-pipeline scope -- the framework is methodology for build-brainstorm + build-explore specifically, not pipeline-wide | Low | ✅ Recommended |
+| **`skills/build-brainstorm/references/extraction-framework.md`** `[secondary]` | Scopes the reference to the skill that first needs it (104 primary consumer); matches pattern of skill-scoped reference docs | 105 and 104 both cite the file; placing under brainstorm implies secondary status for explore -- asymmetry | Low | Viable |
+| **`skills/_shared/extraction-framework.md`** (new directory) `[tertiary]` | Makes the cross-skill nature explicit via directory placement | Creates a new top-level convention (no `skills/_shared/` exists today); requires convention-documentation overhead | Medium | Viable |
+
+**Decision owner**: captain via clarify. Recommendation favors `docs/build-pipeline/_docs/` (option 1) matching existing pipeline-doc convention. Plan-phase for 104 + 105 must agree on identical path.
+
+## Open Questions
+
+### Q-1: Port 11 ship-blocking precedence vs explore's historically non-blocking contract (from α-1 in APPROACH)
+
+**Domain**: Runnable/Invokable (skill control flow)
+
+**Why it matters**: Current explore skill's FO ensign routing contract presumes explore always emits a Stage Report (build-explore/SKILL.md:232 "Seven metrics, always in this order"). Port 11 under Mode A semantics (sibling 104 O-3 propagated) blocks Stage Report emission on gate failure. This breaks downstream FO logic waiting for explore output. Captain must decide scope commitment for Port 11.
+
+**Suggested options**:
+1. **Include Port 11 as MANDATORY** under path-aware semantics (Mode A blocks, Mode B advises) -- accept that FO dispatch graph audit is needed to confirm downstream paths handle blocker payloads. Matches sibling 104 Q-1 hard-fail pattern fully.
+2. **Include Port 11 as OPTIONAL** at invocation time -- skip flag in the dispatch prompt allows callers to opt-out when caller cannot handle blocker. Preserves backward-compat.
+3. **Defer Port 11 entirely to Phase-E+1** -- ship Ports 7-10 in this entity; open a sibling entity for self-test gate later when FO dispatch graph has Agent-tool audit already complete.
+
+### Q-2: Negative-space angle (iv) operational definition
+
+**Domain**: Runnable/Invokable (skill subagent prompt contract)
+
+**Why it matters**: APPROACH Port 7 angle (iv) is "negative-space -- patterns the codebase deliberately avoids (grep for absence: places without try/catch, without sync versions, without locks)". Detecting absence is structurally harder than detecting presence -- an explorer cannot prove a pattern is absent-by-intent vs absent-by-accident. Without a tighter operational definition, the negative-space explorer returns noise or false signals.
+
+**Suggested options**:
+1. **Explorer is given a seed list of "expected absences"** in the dispatch prompt -- e.g., "check for try/catch absence in files matching {glob}". Captain or parent stage provides seed; explorer confirms or refutes.
+2. **Explorer searches for deprecation markers** (comments, docs, ADRs) that explicitly flag "we avoid X" patterns -- restricts to documented absences, rejects inferred-absences.
+3. **Drop angle (iv) entirely** -- use only 3 angles (prevailing / recent / sibling). Accept reduced coverage; negative-space is too fragile to operationalize reliably.
+4. **Open-ended -- captain decides at clarify**.
+
+### Q-3: 4-angle list as static SKILL.md text vs editable reference doc (inherited from Core Tension essential child-specific)
+
+**Domain**: Readable/Textual (skill definition location)
+
+**Why it matters**: The 4 angles (prevailing-patterns, recent-decisions, sibling-entity, negative-space) are captured as of 2026-04-15 and hardcoded in SKILL.md text. As codebase evolves, angle definitions may drift (Honest Boundary 7). If angles are static SKILL.md text, every angle-definition edit is a SKILL.md commit; if moved to a reference doc, edits are lighter but an additional file must be maintained.
+
+**Suggested options**:
+1. **Static SKILL.md text** -- 4 angles fixed in SKILL.md body; angle-definition changes require full skill-rewrite entity. Simplest but highest churn cost.
+2. **`references/parallel-explorer-angles.md` reference doc** -- angle definitions in a dedicated ref doc (as parent 102 section 7 suggested); SKILL.md cites the ref doc. Lighter iteration cost.
+3. **Angle-discovery-per-invocation meta-step** -- before dispatching explorers, a meta-step determines which angles apply to this directive (e.g., greenfield projects skip "negative-space"). Most flexible, highest complexity.
+
+## Stage Report: explore
+
+- [x] Files mapped: 4 across skills and docs
+  skills/: 2 (build-explore/SKILL.md :20/:166-168/:232 + references/hybrid-classification-heuristic.md :19-21/:157-158 for Port 8 target), docs/: 1 (_index/CONTRACTS.md :207-211 CONTRACTS collision check), entity: 1 (parent 102 line 304 dispatch-pattern precedent)
+- [x] Assumptions formed: 4 (Confident: 4, Likely: 0, Unclear: 0)
+  A-1 current soft-rule target identified; A-2 no CONTRACTS collision; A-3 4-parallel dispatch pattern proven; A-4 Track-B Recommendation Validation preserved by Port 8
+- [x] Options surfaced: 1
+  O-1 extraction-framework.md vendoring target path (docs/build-pipeline/_docs/ recommended; aligns with sibling 104 A-7 plan-phase coordination)
+- [x] Questions generated: 3
+  Q-1 Port 11 ship-blocking precedence (from α-1); Q-2 negative-space angle operational definition; Q-3 4-angle list static-vs-reference-doc
+- [x] α markers resolved: 0 / 1
+  α-1 (Port 11 routing) -- no codebase precedent resolves the blocking-vs-non-blocking contract conflict; escalated to Q-1
+- [x] Scale assessment: confirmed Medium
+  frontmatter declared Medium; 4 files mapped (lower than brainstorm 7 files estimate -- heavy inheritance from sibling 104 explore reduced re-mapping cost); scope flag "likely-decomposable-already" noted -- NOT warranted to sub-decompose (ports share tier-tag + Mode A/B infrastructure)
+- [x] Research dispatched: 0 researchers (skipped -- all 4 assumptions Confident ≥0.95 AND no external technology claims; all claims are codebase-architecture citations)
