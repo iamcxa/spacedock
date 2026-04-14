@@ -553,3 +553,42 @@ issues:
 ### Commits
 - chore(index): add contracts for entity-comment-ux-polish-right-panel-highlights entering plan (5 files)
 - chore(plan): comment-ux-polish-right-panel-highlights two-column layout + highlight injection plan
+
+## Stage Report: execute
+
+status: passed
+execute_base: f80f32b
+wave_count: 4
+task_count: 6
+
+### Per-Task Results
+
+| Task | Model | Wave | Status | Commit | Deviation |
+|------|-------|------|--------|--------|-----------|
+| task-0 | haiku | 0 | DONE | (no files) | Environment verification only |
+| task-1 | sonnet | 1 | DONE | f193f1e | None |
+| task-2 | sonnet | 1 | DONE | a96026a | None |
+| task-3 | sonnet | 2 | DONE | 3534cef | None |
+| task-4 | sonnet | 2 | DONE | c4936f9 | None |
+| task-5 | sonnet | 3 | DONE | d9fc3d7 | Fixed optional prop + share page cleanup (build was failing) |
+
+### Deviations
+
+1. **task-5 build fix**: `onCommentAdded` made optional in EntityBody props to match TextSelectionPopover signature. Share page updated to use refactored EntityBody interface (removed stale props). These are integration fixes caught by the verification task as designed.
+
+### Files Modified
+
+- spacebridge/ui/app/entity/[slug]/page.tsx
+- spacebridge/ui/components/entity-body.tsx
+- spacebridge/ui/components/entity-detail-client.tsx (new)
+- spacebridge/ui/components/comment-panel.tsx (new)
+- spacebridge/ui/app/globals.css
+- spacebridge/ui/app/share/[token]/page.tsx (integration fix)
+
+### Checklist
+- [x] task-0: Environment verification (DONE — all 6 files, ScrollArea dep, exports confirmed)
+- [x] task-1: Two-column layout with EntityDetailClient wrapper (DONE)
+- [x] task-2: CommentPanel with ScrollArea + sticky positioning (DONE)
+- [x] task-3: TreeWalker yellow highlight injection + click-to-scroll (DONE)
+- [x] task-4: Reverse click-to-scroll from comment panel to highlight (DONE)
+- [x] task-5: Integration verification — build, tsc, responsive, cleanup (DONE)
