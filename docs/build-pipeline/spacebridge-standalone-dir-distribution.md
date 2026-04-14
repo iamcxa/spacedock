@@ -1,14 +1,14 @@
 ---
 id: 059
 title: "Standalone directory distribution + wrapper CLI"
-status: clarify
+status: plan
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md); scope revised 2026-04-10 after entity 049 spike
-started:
+started: 2026-04-14T09:00:00+08:00
+worktree: .worktrees/spacedock-ensign-spacebridge-standalone-dir-distribution
 completed:
 verdict:
 score: 0.0
-worktree:
 issue:
 pr:
 intent: feature
