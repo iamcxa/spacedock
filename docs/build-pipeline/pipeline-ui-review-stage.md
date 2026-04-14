@@ -2,7 +2,7 @@
 id: 095
 title: "Pipeline UI review stage -- visual parity audit before ship"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: captain (2026-04-14 -- entity 054 UX gap diagnosis)
 created: 2026-04-14T18:00:00+08:00
 started:
@@ -80,22 +80,65 @@ Captain to decide positioning during brainstorm/clarify.
 - Given an entity with no frontend files (pure backend/pipeline/skill), when build-explore and build-review run, then no UI parity checks are triggered (how to verify: run explore+review on a non-UI entity, assert no UI parity questions or findings)
 - Given the UI parity check in review finds a missing interaction pattern (e.g., hover state in old UI absent from new), when the finding is classified, then it is rated as at minimum a MEDIUM finding with `feedback-to: execute` routing (how to verify: review Stage Report shows finding with MEDIUM+ severity and feedback routing)
 
-## Open Questions
-
-(explore stage will populate)
-
 ## Assumptions
 
-(explore stage will populate)
+A-1: UI Interaction Parity added as a new row in the `## 1. User-facing Visual` table of `gray-area-templates.md`. Format matches existing 5 rows: `| Gray Area | What to Assess | Example |`.
+Confidence: 🟢 Confident (0.95)
+Evidence: `skills/build-explore/references/gray-area-templates.md:23-29` -- existing table has 5 rows with consistent 3-column format
+
+A-2: Review pre-scan UI parity check is Step 1f, placed after existing checks 1a-1e. Each check is a markdown subsection (`### 1f -- UI Spec Parity`). The check reads `## UI Spec` from the entity body and compares against interaction patterns in the diff's frontend files.
+Confidence: 🟢 Confident (0.90)
+Evidence: `skills/build-review/SKILL.md:139-182` -- pre-scan has 5 checks (1a-1e), each as a `### 1{letter}` subsection; adding 1f follows established pattern
+
+A-3: Pre-scan activation is conditional: only runs when (a) the diff touches frontend files (`*.tsx`, `*.jsx`, `*.css`, or paths containing `components/`, `app/`) AND (b) the entity body contains a `## UI Spec` section. Non-UI entities skip entirely (zero overhead).
+Confidence: 🟢 Confident (0.90)
+Evidence: `skills/build-review/SKILL.md:157-161` -- Step 1d (Plan Consistency) already conditionally reads `## PLAN` section; same conditional pattern applies
+
+A-4: No changes to `docs/build-pipeline/README.md` stage definitions. This entity modifies skill reference docs only.
+Confidence: 🟢 Confident (0.95)
+Evidence: GUARDRAILS explicitly state "No new pipeline stages in README.md stages.states -- enhance existing explore + review stages only"
+
+A-5: Pre-scan UI parity findings use the existing severity/classification schema: MEDIUM severity, root CODE, source `pre-scan:ui-parity`, routing `feedback-to: execute`.
+Confidence: 🟢 Confident (0.85)
+Evidence: `skills/build-review/SKILL.md:168-178` -- Step 1e uses severity HIGH/CRITICAL, root CODE, source `pre-scan:goal-backward`; UI parity follows same schema at MEDIUM severity (interaction gap is less severe than orphan code)
 
 ## Option Comparisons
 
-(explore stage will populate)
+### O-1: Explore template depth -- passive questions vs active old-UI inspection
 
-## Decomposition Recommendation
+The gray-area template row can either (a) prompt explore to ASK about interaction parity, or (b) instruct explore to actively READ old UI files for interaction patterns. The 054 gap was that explore never looked at the old UI code.
 
-(explore stage will populate if scope warrants it)
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| Template instructs active inspection | Addresses root cause directly; explore greps replaced files for event listeners, CSS :hover/:focus/:selection rules, keyboard handlers | Requires explore to identify which files are "old UI" (may not be obvious from entity context alone); increases explore Step 4 complexity | Medium | Recommended |
+| Template prompts questions only | Minimal change; template row generates Track C questions for captain to answer about interaction patterns | Doesn't fix root cause; depends on captain knowing all old interaction patterns; 054 gap would recur if captain forgets | Low | Viable |
+
+## Open Questions
+
+Q-1: What specific interaction pattern categories should the gray-area template row enumerate in its "What to Assess" column?
+
+Domain: Readable/Textual
+
+Why it matters: The template row must be specific enough that explore produces useful gray areas (like "text-selection anchoring exists in old UI but not in UI Spec"), but general enough to catch novel patterns beyond the 054 case.
+
+Suggested options: (a) Event-driven: event listeners (click, hover, drag, text-selection, keyboard shortcuts), CSS interaction states (:hover, :focus, :active, transitions), responsive breakpoints, (b) GSD 6-pillar: layout, hierarchy, interactions, states, responsiveness, accessibility -- map to explore-friendly checks, (c) Minimal: "Compare interaction patterns in replaced/modified files against ## UI Spec" -- let explore use judgment
 
 ## Canonical References
 
 (clarify stage will populate)
+
+## Stage Report: explore
+
+- [x] Files mapped: 6 across skill-docs, reference-docs, pipeline-config
+  skill-docs: 2 (build-explore/SKILL.md, build-review/SKILL.md); reference-docs: 1 (gray-area-templates.md); pipeline-config: 1 (README.md); entity-refs: 2 (054 gap analysis, 093 UX fix)
+- [x] Assumptions formed: 5 (Confident: 5, Likely: 0, Unclear: 0)
+  A-1 template row format (0.95); A-2 pre-scan Step 1f (0.90); A-3 conditional activation (0.90); A-4 no README changes (0.95); A-5 finding severity schema (0.85)
+- [x] Options surfaced: 1
+  O-1 explore template depth (active inspection vs passive questions)
+- [x] Questions generated: 1
+  Q-1 interaction pattern categories for template row
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorming spec
+- [x] Scale assessment: confirmed Medium
+  6 files mapped; 2 skill files + 1 reference doc to modify + tests = ~7-8 total files
+- [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident 0.85-0.95, no external tech claims, purely internal skill doc modifications)
