@@ -1,17 +1,17 @@
 ---
 name: build-execute
-description: "Execute stage orchestrator dispatched by FO. Sonnet orchestrator + haiku/sonnet/opus task subagents per task model hint. Pre-task skill selection, wave-parallel task dispatch via spacedock:task-executor agent, serial commits per task, unconditional workflow-index status transition on stage entry."
+description: "Execute stage guidance loaded by FO via Skill(). FO builds wave graph from PLAN, dispatches spacedock:troop agents directly per task with model hints, collects reports, commits serially per wave."
 ---
 
 # Build-Execute -- Wave-Parallel Task Dispatch Orchestrator
 
-**Namespace note.** This skill lives at `skills/build-execute/`; namespace migration to `spacebridge:build-execute` happens when spacebridge plugin skeleton is created (entity 050). When FO dispatches the execute stage, the ensign loads this skill via its flat `skills/build-execute/` path.
+**Namespace note.** This skill lives at `skills/build-execute/`; namespace migration to `spacebridge:build-execute` happens when spacebridge plugin skeleton is created (entity 050). FO loads this skill via `Skill("spacedock:build-execute")` before dispatching troops for the execute stage.
 
-You are the execute-stage orchestrator invoked by First Officer through the execute ensign. You read a planned entity, transition its CONTRACTS rows to in-flight, build the wave graph, dispatch `spacedock:task-executor` agents wave-by-wave with per-task model hints, collect their reports, commit serially after each wave, and finally write a `## Stage Report: execute` section back to the entity body. You are the execute-side counterpart to `build-plan`'s plan-approval workflow-index append.
+You are the execute-stage orchestrator loaded by First Officer directly. FO reads a planned entity, transitions its CONTRACTS rows to in-flight, builds the wave graph, dispatches `spacedock:troop` agents wave-by-wave with per-task model hints, collects their reports, commits serially after each wave, and finally writes a `## Stage Report: execute` section back to the entity body. You are the execute-side counterpart to `build-plan`'s plan-approval workflow-index append.
 
 **Nine steps, in strict order. Never skip, never reorder, never combine.**
 
-See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 217-290 for the execute stage orchestration diagram (your contract), line 467 for the skill matrix row, lines 274-276 for the BLOCKED escalation ladder, and line 497 for the `spacedock:task-executor` agent definition.
+See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 217-290 for the execute stage orchestration diagram (your contract), line 467 for the skill matrix row, lines 274-276 for the BLOCKED escalation ladder, and line 497 for the `spacedock:troop` agent definition.
 
 ---
 
@@ -23,9 +23,9 @@ See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 
 - `Write` / `Edit` -- append the `## Stage Report: execute` section to the entity body and update the `## Validation Map` status column per task
 - `Bash` -- `git status`, `git diff`, `git rev-parse`, `git add`, `git commit` for serial per-task commits; `bun` for pre-task ToolSearch fallback if needed
 - `Skill` -- invoke `spacedock:workflow-index` (step 2, mandatory stage-entry transition) and `spacedock:knowledge-capture` (step 8, optional)
+- `Agent` -- FO has the Agent tool and dispatches troop agents directly per task with per-task model hints. FO IS the orchestrator; `Agent(subagent_type="spacedock:troop", model=task.model, ...)` is the dispatch call.
 
-**NOT available (see `references/agent-dispatch-guide.md`):**
-- `Agent` -- you run as an ensign subagent, which does not have the Agent tool. FO dispatches task-executor teammates per wave before or instead of invoking you. When FO uses the task-list-driven pattern, task-executors self-claim wave tasks and commit directly; you read their commits and write the Stage Report. When running in inline fallback mode (no FO team dispatch), you execute tasks serially in your own context.
+**NOT available:**
 - `AskUserQuestion` -- FO owns captain interaction. If escalation is needed at step 7 or 8, write `feedback-to: {execute|plan|captain}` in the Stage Report and return; FO routes.
 
 ---
@@ -36,7 +36,7 @@ FO dispatches you after the plan stage completes. The entity body contains:
 
 1. `## PLAN` -- task list with `id`, `model`, `wave`, `skills`, `read_first`, `action`, `acceptance_criteria`, `files_modified` per task (schema from `skills/build-plan/SKILL.md` step 4)
 2. `## Validation Map` -- requirement/task/command/status/last-run table; you update status + last-run as tasks close
-3. `## Research Findings`, `## UAT Spec`, `## Acceptance Criteria` -- informational context for task-executors
+3. `## Research Findings`, `## UAT Spec`, `## Acceptance Criteria` -- informational context for troops
 4. `## Stage Report: plan` -- confirms plan approval and lists the `workflow-index append` commit that created CONTRACTS rows at `status: planned`
 5. Frontmatter status: `execute` (or equivalent terminal execute state advanced by FO on entry)
 
@@ -49,7 +49,7 @@ If `## PLAN` is missing, malformed, or `## Stage Report: plan` indicates plan di
 After successful completion, the entity body contains:
 
 - `## Validation Map` with `status`/`last run` columns updated per completed task
-- `## Stage Report: execute` -- wave-by-wave dispatch log, per-task status (DONE/NEEDS_CONTEXT/BLOCKED transitions), BLOCKED escalations if any, serial commit SHAs, any findings surfaced by task-executors
+- `## Stage Report: execute` -- wave-by-wave dispatch log, per-task status (DONE/NEEDS_CONTEXT/BLOCKED transitions), BLOCKED escalations if any, serial commit SHAs, any findings surfaced by troops
 - Entity frontmatter status: advanced to `quality` (or remains `execute` with `feedback-to: {plan|execute}` if step 7 escalated)
 
 Additionally, outside the entity body:
@@ -113,21 +113,21 @@ For every task in the wave graph (all waves, not just wave 1), resolve its skill
    - Judge the match; if none match, dispatch with an empty skills list and log a `skill_selection_fallback` finding in the Stage Report
 3. **Record selected skills** in orchestrator state, keyed by task id. Cache across tasks in the same plan -- if task-3 and task-7 both request `typescript-strict`, resolve once.
 
-Rationale: you (sonnet orchestrator) have reasoning budget for skill selection; task-executors (often haiku) do not. Skill selection is also plan-level -- caching across tasks in the same plan keeps the execution log coherent.
+Rationale: you (sonnet orchestrator) have reasoning budget for skill selection; troops (often haiku) do not. Skill selection is also plan-level -- caching across tasks in the same plan keeps the execution log coherent.
 
-**Do NOT substitute skills a task-executor suggests mid-wave.** Skill selection happens here, once, before dispatch. If a task-executor returns a `skill_suggestion` finding, log it into the Stage Report and let plan ensign update the plan in the next iteration. You do not re-resolve skills mid-wave on a subagent's opinion.
+**Do NOT substitute skills a troop suggests mid-wave.** Skill selection happens here, once, before dispatch. If a troop returns a `skill_suggestion` finding, log it into the Stage Report and let plan ensign update the plan in the next iteration. You do not re-resolve skills mid-wave on a subagent's opinion.
 
 ---
 
 ## Step 4: Wave Execution Loop
 
-Iterate waves sequentially (wave 0, then wave 1, then wave 2, ...). Inside each wave, tasks may have been executed by FO-dispatched task-executor teammates or need to be executed inline by you.
+Iterate waves sequentially (wave 0, then wave 1, then wave 2, ...). Inside each wave, FO dispatches troop agents in parallel (or serially in bare mode).
 
-See `docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md` for the dispatch ownership model and `references/agent-dispatch-guide.md` for why ensigns cannot dispatch Agent.
+See `docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md` for the dispatch ownership model.
 
 ### 4.0 -- Per-Wave Staleness Pre-Check
 
-Before dispatching wave N's tasks (or verifying teammate commits in Mode A), compare the wave's `files_modified` targets against a baseline git state. This is a WARNING mechanism -- staleness does not block dispatch.
+Before dispatching wave N's troops, compare the wave's `files_modified` targets against a baseline git state. This is a WARNING mechanism -- staleness does not block dispatch.
 
 **Baseline selection:**
 - Wave 0 and wave 1: use `execute_base_sha` (captured at stage entry, functionally equivalent to plan-approval state for source files per entity 080 A-2).
@@ -141,7 +141,7 @@ git diff --diff-filter=M --name-only {baseline} -- {file1} {file2} ...
 The `--diff-filter=M` flag restricts output to modified files only, excluding files with "added" status (new files the plan will create -- per entity 080 A-1, these are not stale).
 
 **Two outcomes:**
-- **(a) No output** -- all target files unchanged since baseline. Proceed silently to wave dispatch.
+- **(a) No output** -- all target files unchanged since baseline. Proceed silently to troop dispatch.
 - **(b) One or more file paths returned** -- these files were modified externally since the baseline. Emit a warning to orchestrator output:
   ```
   wave {N}: ⚠ stale-files [{file1}, {file2}] -- baseline {baseline_sha} ({baseline_sha_short})
@@ -154,51 +154,44 @@ wave_baseline=$(git rev-parse HEAD)
 ```
 This `wave_baseline` replaces `execute_base_sha` as the comparison target for wave N+1's pre-check.
 
-### Two execution modes
+### Troop dispatch (standard)
 
-**Mode A -- FO task-list-driven (preferred):** FO dispatched task-executor teammates per wave before invoking you. Teammates self-claimed tasks via the shared task list, wrote files, and committed on the worktree branch. Your job is to:
-1. Read the git log to identify per-task commits since the wave base SHA.
-2. Run each task's `acceptance_criteria` commands to verify the work.
-3. Record per-task results (commit SHA, pass/fail, deviations) for the Stage Report.
-4. If any task was not completed by a teammate (no matching commit), execute it inline per Mode B.
+FO dispatches troop agents for each task in the wave with per-task model hints from the PLAN:
 
-**Mode B -- Inline serial fallback:** No task-executor teammates were dispatched (FO ran in simple subagent mode, or this is a re-entry after feedback). Execute each task yourself in wave order:
-1. Read the task's `read_first` files.
-2. Write/Edit the `files_modified` per the task's `action` block.
-3. Run the task's `acceptance_criteria` commands via Bash.
-4. Commit per task with a conventional commit message.
-
-Wave parallelism exists only in Mode A (via FO's task-list dispatch). Mode B is always serial. Log which mode was used in `## Stage Report: execute` under `### Dispatch Mode`.
-
-### Detect which mode you are in
-
-Check for teammate commits since the execute base SHA:
-```bash
-git log --oneline {execute_base_sha}..HEAD
 ```
-If commits exist with task-executor conventional messages (e.g., `feat(execute): {slug} task-{N} -- ...`), you are in Mode A. If no such commits exist, you are in Mode B.
+Agent(
+    subagent_type="spacedock:troop",
+    name="troop-{slug}-task-{task_id}",
+    model="{task.model}",  // haiku | sonnet | opus from PLAN
+    prompt="You are executing task-{task_id} for entity: {entity_title}\n\n## Task\n{task block from PLAN}\n\n## Context\n{entity context: acceptance criteria, research findings, relevant sections}\n\nYour working directory is {worktree_path}\nAll file reads and writes MUST use paths under {worktree_path}.\nYour git branch is {branch}. Do NOT commit -- return changed_files and status."
+)
+```
 
-### 4a -- Parallelism Decision (Mode B only)
+Tasks within a wave may be dispatched in parallel (using team dispatch if available). Tasks across waves are always sequential -- wave N+1 does not start until wave N is fully committed.
 
-When executing inline (Mode B), tasks within a wave run serially. For Mode A, parallelism was already handled by FO's task-list dispatch.
+### Bare-mode fallback (sequential troop dispatch)
 
-### 4b -- Per-Task Execution (Mode B) or Verification (Mode A)
+When team dispatch is unavailable, FO dispatches one troop at a time (sequential within the wave). Context isolation is preserved -- each troop gets fresh context per task, unlike an inline approach where the orchestrator would accumulate context across tasks. Log which mode was used in `## Stage Report: execute` under `### Dispatch Mode`.
 
-**Mode A (verify):** For each task in wave order, find its commit, run `acceptance_criteria`, record pass/fail.
+### 4a -- Parallelism Decision
 
-**Mode B (execute):** For each task in wave order:
-1. Read `read_first` files.
-2. Execute `action` block (Write/Edit files per `files_modified`).
-3. Run `acceptance_criteria` via Bash.
-4. Commit: `git add {files_modified} && git commit -m "{type}(execute): {slug} task-{id} -- {summary}"`.
+Tasks within a wave may run in parallel via team dispatch. In bare mode, dispatch one troop at a time serially.
+
+### 4b -- Per-Task Troop Dispatch
+
+For each task in wave order (or parallel if team dispatch available):
+1. Dispatch a troop agent via `Agent(subagent_type="spacedock:troop", model=task.model, ...)`.
+2. Troop reads `read_first` files, executes `action`, runs `acceptance_criteria`, returns changed_files + status.
+3. Collect the troop's return (DONE/NEEDS_CONTEXT/BLOCKED).
+4. For DONE tasks: schedule for serial commit in step 4d.
 5. If task returns BLOCKED, escalate per Step 7.
 
-### 4c -- Collect Subagent Results
+### 4c -- Collect Troop Results
 
-For each task-executor return:
+For each troop return:
 
 - **DONE** -- record changed_files list; schedule for serial commit in step 4d. Any findings surfaced (skill_suggestion, scope_observation, pre_existing_failure) are logged to the Stage Report but do not block the commit.
-- **NEEDS_CONTEXT** -- the task-executor named a specific piece of missing information. Gather it from the entity body, the plan, or the worktree. Re-dispatch the same task-executor (same model) with the extra context prepended to the prompt. Cap at 2 NEEDS_CONTEXT rounds per task; if still NEEDS_CONTEXT on the 3rd dispatch, reclassify as BLOCKED and follow the escalation ladder.
+- **NEEDS_CONTEXT** -- the troop named a specific piece of missing information. Gather it from the entity body, the plan, or the worktree. Re-dispatch the same troop (same model) with the extra context prepended to the prompt. Cap at 2 NEEDS_CONTEXT rounds per task; if still NEEDS_CONTEXT on the 3rd dispatch, reclassify as BLOCKED and follow the escalation ladder.
 - **BLOCKED** -- follow the BLOCKED escalation ladder below.
 
 ### 4d -- Serial Git Commits After Wave Closes
@@ -250,11 +243,11 @@ Once every wave has completed (all tasks DONE, all committed, all Validation Map
 
 ## Step 7: Deviations and Findings Triage
 
-Before writing the Stage Report, consolidate all findings surfaced by task-executors:
+Before writing the Stage Report, consolidate all findings surfaced by troops:
 
 - **skill_suggestion** findings -- log verbatim in the Stage Report under a `### Skill suggestions` subsection for plan ensign to consider in the next iteration
 - **scope_observation** findings -- log verbatim under `### Scope observations`
-- **pre_existing_failure** findings -- log verbatim under `### Pre-existing failures` with a note that the task classified DONE by proving the failure was unrelated
+- **pre_existing_failure** findings -- log verbatim under `### Pre-existing failures` with a note that the troop classified DONE by proving the failure was unrelated
 - **scope_gap** findings (from BLOCKED tasks) -- these are the terminal failure evidence; log under `### Unresolved scope gaps` with the cited file and required change description
 
 Classify deviations per the spec's GSD-style taxonomy (line 284): bug-fix / critical-missing / blocker / architectural. This is a short judgment call -- for each terminal BLOCKED or unusual finding, pick one category and log it. If you cannot classify confidently, tag `uncategorized` and surface in the Stage Report.
@@ -263,7 +256,7 @@ Classify deviations per the spec's GSD-style taxonomy (line 284): bug-fix / crit
 
 ## Step 8: Knowledge Capture (Optional, Capture Mode)
 
-**Conditional step.** Only run step 8 if a task-executor surfaced a `scope_observation`, `pre_existing_failure`, or `skill_suggestion` finding that generalizes beyond this entity. Invoke:
+**Conditional step.** Only run step 8 if a troop surfaced a `scope_observation`, `pre_existing_failure`, or `skill_suggestion` finding that generalizes beyond this entity. Invoke:
 
 ```
 Skill("spacedock:knowledge-capture", args={
@@ -392,10 +385,10 @@ All of these mean: re-dispatch the BLOCKED task at the next model tier up, inclu
 
 ### Task Dispatch Contract
 
-- **Every task dispatches via `Agent(subagent_type="spacedock:task-executor", model=task.model, prompt=...)`** -- never with a different subagent type, never inline, never via `Skill`. The task-executor agent is the only authorized execution vessel for plan tasks, and it loads `skills/task-execution/SKILL.md` automatically.
-- **NEVER commit from inside a task-executor dispatch.** Task-executors return `changed_files` lists; you commit serially after the wave closes. Per-task commits batched into a wave are the orchestrator's job, not the subagent's.
+- **Every task dispatches via `Agent(subagent_type="spacedock:troop", model=task.model, prompt=...)`** -- never with a different subagent type, never inline, never via `Skill`. The troop agent is the only authorized execution vessel for plan tasks, and it loads `skills/task-execution/SKILL.md` automatically.
+- **NEVER commit from inside a troop dispatch.** Troops return `changed_files` lists; you commit serially after the wave closes. Per-task commits batched into a wave are the orchestrator's job, not the subagent's.
 - **NEVER skip an acceptance_criteria command.** The task-execution skill already enforces this at the subagent level, but your orchestrator prompt must not override it with "skip X for speed" instructions. Prior green in a neighbor task is stale evidence.
-- **NEVER dispatch a task-executor with `serial="true"` tasks in parallel.** The serial hint is a plan-level decision; honoring it is a contract.
+- **NEVER dispatch a troop with `serial="true"` tasks in parallel.** The serial hint is a plan-level decision; honoring it is a contract.
 
 ### Serial Commits After Each Wave
 
@@ -406,7 +399,7 @@ All of these mean: re-dispatch the BLOCKED task at the next model tier up, inclu
 ### Scope and Interaction
 
 - **Never invoke other stage skills.** You are the execute orchestrator; you do not call build-quality, build-review, or build-uat. FO routes entities between stages.
-- **Never edit files outside task dispatch.** Your Write/Edit scope is strictly the entity body's `## Stage Report: execute` section and the `## Validation Map` status columns. All code edits happen inside task-executor subagents.
+- **Never edit files outside task dispatch.** Your Write/Edit scope is strictly the entity body's `## Stage Report: execute` section and the `## Validation Map` status columns. All code edits happen inside troop subagents.
 - **Use `--` (double dash)** everywhere. Never `—` (em dash). Matches the rest of the build skill family.
 - **Preserve task ids verbatim** in the Stage Report. Do not rephrase or abbreviate them.
 

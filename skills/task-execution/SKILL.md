@@ -1,17 +1,17 @@
 ---
 name: task-execution
-description: "Per-task execution subroutine for build-execute. Loaded by the spacedock:task-executor agent when build-execute dispatches one task from the plan. Defines: load skills from prompt, read_first files, execute action, verify acceptance_criteria, return changed_files with DONE/NEEDS_CONTEXT/BLOCKED status. Does NOT commit."
+description: "Per-task execution subroutine for build-execute. Loaded by the spacedock:troop agent when build-execute dispatches one task from the plan. Defines: load skills from prompt, read_first files, execute action, verify acceptance_criteria, return changed_files with DONE/NEEDS_CONTEXT/BLOCKED status. Does NOT commit."
 ---
 
 # Task-Execution -- Per-Task Execution Subroutine
 
-**Namespace note.** This skill lives at `skills/task-execution/`; namespace migration to `spacebridge:task-execution` happens when spacebridge plugin skeleton is created (entity 050). When `build-execute` dispatches the `spacedock:task-executor` agent, the agent loads this skill via its flat `skills/task-execution/` path plus any additional skills named in the dispatch prompt's `skills` field.
+**Namespace note.** This skill lives at `skills/task-execution/`; namespace migration to `spacebridge:task-execution` happens when spacebridge plugin skeleton is created (entity 050). When `build-execute` dispatches the `spacedock:troop` agent, the agent loads this skill via its flat `skills/task-execution/` path plus any additional skills named in the dispatch prompt's `skills` field.
 
-You are a leaf subroutine invoked by `build-execute` through the `spacedock:task-executor` agent. You receive one plan task in the dispatch prompt and implement it against the current worktree. You do NOT commit -- you return a `changed_files` list and a status code that the orchestrator collects, then commits serially after the wave closes.
+You are a leaf subroutine invoked by `build-execute` through the `spacedock:troop` agent. You receive one plan task in the dispatch prompt and implement it against the current worktree. You do NOT commit -- you return a `changed_files` list and a status code that the orchestrator collects, then commits serially after the wave closes.
 
 **Seven steps, in strict order. No interaction with the captain at any point.**
 
-See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 217-290 (Execute stage orchestration), line 477 (skill matrix row), and line 497 (spacedock:task-executor agent definition) for the plan-stage contract this skill implements.
+See `docs/superpowers/specs/2026-04-11-phase-e-build-flow-restructure.md` lines 217-290 (Execute stage orchestration), line 477 (skill matrix row), and line 497 (spacedock:troop agent definition) for the plan-stage contract this skill implements.
 
 ---
 
@@ -234,7 +234,7 @@ The orchestrator does NOT negotiate this shape -- it parses field names mechanic
 - **NEVER edit files outside files_modified.** Revert any out-of-scope in-memory edits and return BLOCKED. Triviality is not a defense.
 - **NEVER substitute or augment the skills list.** Use the skills list from the dispatch prompt exactly. Log skill_suggestion findings for plan ensign; do not act on them yourself.
 - **NEVER ask the captain questions.** You are non-interactive. Return NEEDS_CONTEXT with a specific question, or BLOCKED with a finding. You have no channel to the captain.
-- **NEVER invoke another task-executor.** You are a leaf subroutine. No Agent dispatch, no recursion. If decomposition is needed, return BLOCKED.
+- **NEVER invoke another troop.** You are a leaf subroutine. No Agent dispatch, no recursion. If decomposition is needed, return BLOCKED.
 - **NEVER invent a status value.** The enum is exactly DONE | NEEDS_CONTEXT | BLOCKED. Concerns go in the `findings` channel, not the status.
 - **NEVER expand the read scope.** `task.read_first` plus what Grep surfaces within those files is the cap. You are not here to explore the codebase.
 - **Use `--` (double dash)** in markers and annotations, never `—` (em dash). Matches build-brainstorm, build-explore, build-research conventions.
