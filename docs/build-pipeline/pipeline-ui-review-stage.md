@@ -1,8 +1,8 @@
 ---
 id: 095
 title: "Pipeline UI review stage -- visual parity audit before ship"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: captain (2026-04-14 -- entity 054 UX gap diagnosis)
 created: 2026-04-14T18:00:00+08:00
 started:
@@ -85,22 +85,32 @@ Captain to decide positioning during brainstorm/clarify.
 A-1: UI Interaction Parity added as a new row in the `## 1. User-facing Visual` table of `gray-area-templates.md`. Format matches existing 5 rows: `| Gray Area | What to Assess | Example |`.
 Confidence: 🟢 Confident (0.95)
 Evidence: `skills/build-explore/references/gray-area-templates.md:23-29` -- existing table has 5 rows with consistent 3-column format
+→ Confirmed: captain, 2026-04-15 (batch)
 
 A-2: Review pre-scan UI parity check is Step 1f, placed after existing checks 1a-1e. Each check is a markdown subsection (`### 1f -- UI Spec Parity`). The check reads `## UI Spec` from the entity body and compares against interaction patterns in the diff's frontend files.
 Confidence: 🟢 Confident (0.90)
 Evidence: `skills/build-review/SKILL.md:139-182` -- pre-scan has 5 checks (1a-1e), each as a `### 1{letter}` subsection; adding 1f follows established pattern
+→ Confirmed: captain, 2026-04-15 (batch)
 
 A-3: Pre-scan activation is conditional: only runs when (a) the diff touches frontend files (`*.tsx`, `*.jsx`, `*.css`, or paths containing `components/`, `app/`) AND (b) the entity body contains a `## UI Spec` section. Non-UI entities skip entirely (zero overhead).
 Confidence: 🟢 Confident (0.90)
 Evidence: `skills/build-review/SKILL.md:157-161` -- Step 1d (Plan Consistency) already conditionally reads `## PLAN` section; same conditional pattern applies
+→ Confirmed: captain, 2026-04-15 (batch)
 
 A-4: No changes to `docs/build-pipeline/README.md` stage definitions. This entity modifies skill reference docs only.
 Confidence: 🟢 Confident (0.95)
 Evidence: GUARDRAILS explicitly state "No new pipeline stages in README.md stages.states -- enhance existing explore + review stages only"
+→ Confirmed: captain, 2026-04-15 (batch)
 
 A-5: Pre-scan UI parity findings use the existing severity/classification schema: MEDIUM severity, root CODE, source `pre-scan:ui-parity`, routing `feedback-to: execute`.
 Confidence: 🟢 Confident (0.85)
 Evidence: `skills/build-review/SKILL.md:168-178` -- Step 1e uses severity HIGH/CRITICAL, root CODE, source `pre-scan:goal-backward`; UI parity follows same schema at MEDIUM severity (interaction gap is less severe than orphan code)
+→ Confirmed: captain, 2026-04-15 (batch)
+
+A-6: Step 1f is the correct numbering claim. CONTRACTS.md `skills/build-review/SKILL.md` section (lines 238-244) shows 3 existing entries: phase-e-plan-4 (final), review-stage-parallel-skill-dispatch (in-flight), quality-goal-backward-regression (planned, claims Step 1e). No entity claims Step 1f. Plan approval must append a new CONTRACTS.md row: `| pipeline-ui-review-stage | plan | Insert Step 1f UI Spec Parity check in pre-scan | 🔵 planned | 2026-04-15 |`.
+Confidence: 🟢 Confident (0.90)
+Evidence: `docs/build-pipeline/_index/CONTRACTS.md:238-244` -- 3 existing entries under build-review/SKILL.md, none claiming 1f; 1e is claimed by quality-goal-backward-regression. (Note: CONTRACTS shows 1e as 🔵 planned but build-review/SKILL.md:168 already implements 1e -- stale CONTRACTS state, hygiene issue for another entity.)
+→ Confirmed: captain, 2026-04-15 (Step 4.5 exploration)
 
 ## Option Comparisons
 
@@ -113,6 +123,8 @@ The gray-area template row can either (a) prompt explore to ASK about interactio
 | Template instructs active inspection | Addresses root cause directly; explore greps replaced files for event listeners, CSS :hover/:focus/:selection rules, keyboard handlers | Requires explore to identify which files are "old UI" (may not be obvious from entity context alone); increases explore Step 4 complexity | Medium | Recommended |
 | Template prompts questions only | Minimal change; template row generates Track C questions for captain to answer about interaction patterns | Doesn't fix root cause; depends on captain knowing all old interaction patterns; 054 gap would recur if captain forgets | Low | Viable |
 
+→ Selected: Template instructs active inspection (captain, 2026-04-15, interactive)
+
 ## Open Questions
 
 Q-1: What specific interaction pattern categories should the gray-area template row enumerate in its "What to Assess" column?
@@ -123,9 +135,18 @@ Why it matters: The template row must be specific enough that explore produces u
 
 Suggested options: (a) Event-driven: event listeners (click, hover, drag, text-selection, keyboard shortcuts), CSS interaction states (:hover, :focus, :active, transitions), responsive breakpoints, (b) GSD 6-pillar: layout, hierarchy, interactions, states, responsiveness, accessibility -- map to explore-friendly checks, (c) Minimal: "Compare interaction patterns in replaced/modified files against ## UI Spec" -- let explore use judgment
 
+→ Answer: Event-driven + ARIA grep (captain, 2026-04-15, interactive). Template enumerates: event listeners (click, hover, drag, text-selection, keyboard shortcuts) + CSS interaction states (:hover, :focus, :active, transitions) + responsive breakpoints (@media) + ARIA attribute grep (role, aria-*). Covers GSD pillars Interactions/States/Responsiveness/Accessibility (4/6). Layout + Hierarchy remain covered by existing gray-area-templates.md User-facing Visual table rows (Layout integration, Shared component impact) -- no duplication.
+
 ## Canonical References
 
-(clarify stage will populate)
+- `skills/build-explore/references/gray-area-templates.md` -- target for new UI Interaction Parity row
+- `skills/build-review/SKILL.md:139-182` -- pre-scan pattern precedent; Step 1f will follow existing `### 1{letter}` subsection format
+- Entity 054 `entity-detail-management-ui` (shipped, archived) -- motivating UX gap example (Notion-like text-selection commenting missing)
+- MEMORY rule `ui-spec-before-plan.md` -- `## UI Spec` producer contract (SO-owned, synthesized during clarify when UI detected)
+
+## Honest Boundaries
+
+- **UI Spec producer contract is MEMORY-based, not skill-enforced** (2026-04-15 captain decision via Step 4.5): The `## UI Spec` section is produced by SO based on the MEMORY rule `ui-spec-before-plan.md` -- there is no formal build-clarify/build-brainstorm skill contract enforcing its presence or format. build-review Step 1f relies on A-3's conditional activation: if `## UI Spec` is absent, Step 1f silently skips (no UI parity check fires). Risk: if SO misjudges "UI detected" for a UI entity, 054-type gaps may recur. Mitigation: Stage Report Step 1f should note "Skipped -- no ## UI Spec section" as a visible trace. Formalizing the UI Spec schema (required sub-sections, format enforcement) is explicitly out of scope for this entity -- deferred to a future build-clarify contract uplift entity.
 
 ## Stage Report: explore
 
@@ -142,3 +163,23 @@ Suggested options: (a) Event-driven: event listeners (click, hover, drag, text-s
 - [x] Scale assessment: confirmed Medium
   6 files mapped; 2 skill files + 1 reference doc to modify + tests = ~7-8 total files
 - [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident 0.85-0.95, no external tech claims, purely internal skill doc modifications)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- entity is Medium scope, no Decomposition Recommendation section
+- [x] Re-validation: 5 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+- [x] Assumptions confirmed: 6 / 6 (0 corrected)
+  A-1..A-5 confirmed via batch; A-6 added during Step 4.5 (CONTRACTS Step 1f claim) and confirmed inline
+- [x] Options selected: 1 / 1
+  O-1 Explore template depth -- Template instructs active inspection (recommended)
+- [x] Questions answered: 1 / 1 (0 deferred)
+  Q-1 Event-driven + ARIA grep: event listeners + CSS interaction states + responsive breakpoints + ARIA grep. Covers GSD pillars Interactions/States/Responsiveness/Accessibility (4/6). Layout + Hierarchy covered by existing User-facing Visual template rows.
+- [x] Open exploration: 2 gray areas surfaced (0 from templates, 1 from MEMORY `ui-spec-before-plan`, 1 from CONTRACTS numbering check)
+  Iter 1: UI Spec producer contract → recorded as Honest Boundary. Iter 2: CONTRACTS Step 1f numbering → added as A-6. Iter 3: Complete.
+- [x] Canonical refs added: 4
+  gray-area-templates.md; build-review/SKILL.md:139-182; entity 054 (shipped, archived); MEMORY rule ui-spec-before-plan.md
+- [x] Context status: ready
+  Gate passed: all assumptions confirmed, O-1 selected, Q-1 answered, AC 4 criteria with no α markers, Canonical References + Honest Boundaries populated
+- [x] Handoff mode: loose
+  No auto_advance in frontmatter; captain must say "execute 095" to trigger FO plan stage in new CC instance
+- [x] Clarify duration: 8 AskUserQuestion calls (1 batch + 1 option + 3 Q-1 iterations for clarify-Q + 3 Step 4.5 exploration rounds), session complete
