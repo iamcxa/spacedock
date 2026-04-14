@@ -741,3 +741,66 @@ Wave structure:
 7. [x] Self-review: every AC maps to >=1 task, every task has all required attributes, no placeholder text
 8. [x] Invoke workflow-index append unconditionally -- 15 files, committed
 9. [x] Write ## Stage Report: plan
+
+## Stage Report: execute
+
+status: passed
+base SHA: 83752a6
+final SHA: (post-task-7 commit)
+waves: 5 waves completed (0, 1, 2, 3, 4)
+tasks: 9 done, 0 blocked, 0 needs_context-rounds
+dispatch mode: inline serial (ensign context -- no FO team dispatch available)
+
+### Per-task summary
+
+- task-0: DONE (sonnet) -- environment verification: all 15 files confirmed present, agents/troop.md confirmed absent, archive files confirmed out-of-scope
+- task-1: DONE (sonnet) -- created agents/troop.md with name:troop, skills:[task-execution, knowledge-capture], leaf constraint documented
+- task-2: DONE (sonnet) -- updated agents/ensign.md with Dispatch Boundary section and description update
+- task-3: DONE (sonnet) -- major refactor of skills/build-execute/SKILL.md: FO-direct dispatch, Mode A/B eliminated, troop dispatch pattern, zero task-executor refs
+- task-4: DONE (sonnet) -- updated skills/task-execution/SKILL.md: all 5 task-executor refs replaced with troop
+- task-5a: DONE (sonnet) -- added troops-dispatch subsection to references/first-officer-shared-core.md
+- task-5b: DONE (sonnet) -- added Troops Dispatch section to references/claude-first-officer-runtime.md
+- task-6: DONE (sonnet) -- cross-reference sweep: 6 active files updated (agent-dispatch-guide, claude-ensign-runtime, build-plan, README, SO-FO-DISPATCH-SPLIT, recipe-format); codex adapters had zero refs; historical migration table in SO-FO-DISPATCH-SPLIT preserved as historical record
+- task-7: DONE (sonnet) -- git rm agents/task-executor.md; replacement agents/troop.md confirmed present
+- task-8: DONE (sonnet) -- final consistency verification: zero active task-executor refs, all AC checks passed
+
+### Wave commits
+
+- wave 0: no files modified (verification only)
+- wave 1: feat(065): create troop agent + ensign dispatch boundary
+- wave 2: feat(065): refactor build-execute + task-execution + FO refs for troop dispatch
+- wave 3: feat(065): cross-reference sweep -- replace task-executor with troop across 6 active files
+- wave 4: feat(065): delete agents/task-executor.md -- replaced by agents/troop.md
+
+### AC verification
+
+| AC | Verify command | Result |
+|----|----------------|--------|
+| AC1: agents/troop.md exists | `grep "name: troop" agents/troop.md && grep "spacedock:task-execution" agents/troop.md && grep "spacedock:knowledge-capture" agents/troop.md` | PASS |
+| AC2: build-execute FO-direct dispatch | `grep -c "task-executor" skills/build-execute/SKILL.md` returns 0; `grep -c "spacedock:troop" skills/build-execute/SKILL.md` returns 7 | PASS |
+| AC3: FO shared core troops-dispatch | `grep "troops-dispatch" references/first-officer-shared-core.md` | PASS |
+| AC4: FO runtime troops template | `grep "Troops Dispatch" references/claude-first-officer-runtime.md` | PASS |
+| AC5: ensign no sub-dispatch boundary | `grep -i "does not dispatch" agents/ensign.md` returns 2 matches | PASS |
+| AC6: dogfood | post-merge live validation required -- see UAT Spec Interactive section | PENDING (post-merge) |
+| Cross-ref sweep | zero active files with task-executor (grep returns empty) | PASS |
+
+### Stale-file warnings
+
+None detected.
+
+### Findings
+
+#### Scope observations
+- SO-FO-DISPATCH-SPLIT.md migration table "Current assumption" column preserves "You dispatch task-executors" as historical record -- correct semantics for a migration table (old vs new). Not a sweep miss.
+- codex-first-officer-runtime.md and codex-ensign-runtime.md had zero task-executor references -- no changes needed.
+
+#### Skill suggestions
+None.
+
+#### Pre-existing failures
+None.
+
+#### Unresolved scope gaps
+None.
+
+knowledge capture: skipped -- no findings met D1/D2 threshold (all changes are entity-specific rename/refactor, not generalizable patterns beyond what MEMORY.md already captures)
