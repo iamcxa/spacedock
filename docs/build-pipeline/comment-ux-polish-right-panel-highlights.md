@@ -767,3 +767,22 @@ status: partial — CLI PASSED, browser items PENDING CAPTAIN
 - [ ] Browser item B-5: mismatched selectedText — comment shows, no highlight, no error — PENDING CAPTAIN
 - [ ] Browser item B-6: narrow viewport (<768px) stacks panel below body — PENDING CAPTAIN
 - [ ] Interactive I-1: captain confirms two-column layout renders correctly on desktop — PENDING CAPTAIN
+
+### Captain Decisions (2026-04-14)
+
+Captain accepted CLI evidence + structural verification as sufficient. Browser items (B-1..B-6 + I-1) deferred to post-merge via `/spacedock:uat-resume 093`.
+
+Rationale:
+- All 8 CLI items pass (build, tsc, responsive breakpoint, TreeWalker, scrollIntoView, scrollToHighlight, CSS, zero inline CommentThread)
+- Review pre-scan: 0 blockers, 2 LOW + 2 NIT
+- TreeWalker algorithm ported from entity 013 proven pattern
+- Dev-server setup had orthogonal issues (bun:sqlite under Node runtime, session/projectRoot path mismatch) unrelated to this entity's code changes
+- 7 browser items logged for `/spacedock:uat-resume`
+
+### Skipped with Ack (contributes to uat_pending_count)
+
+- B-1, B-2, B-3, B-4, B-5, B-6, I-1 (7 items, all visual verification)
+
+### Verdict
+
+UAT status: PASSED (captain sign-off on CLI evidence, browser items deferred via uat-resume path)
