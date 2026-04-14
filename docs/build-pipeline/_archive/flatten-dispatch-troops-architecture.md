@@ -6,10 +6,10 @@ context_status: ready
 source: captain
 created: 2026-04-12T13:00:00Z
 started: 2026-04-14T18:15:00+08:00
-completed:
-verdict:
+completed: 2026-04-14T13:17:03Z
+verdict: PASSED
 score:
-worktree: .worktrees/spacedock-ensign-flatten-dispatch-troops-architecture
+worktree:
 issue:
 pr: "#49"
 intent: feature
