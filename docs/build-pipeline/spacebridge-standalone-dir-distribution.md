@@ -588,3 +588,49 @@ Create a thin `spacebridge/bin/cli.ts` as the unified CLI entry point with 5 sub
 - All 2 build acceptance criteria (AC-6 script syntax, AC-7 plugin install UX) verified working.
 
 **Disposition**: Ready for feedback. If socket timeouts in spacebridge/src/daemon/* represent a critical blocker, escalate to captain for guidance (entity 059 is not the root cause). Otherwise, auto-advance to shipped.
+
+## Stage Report: review
+
+### Checklist
+
+1. **Pre-scan completed** — DONE
+   - CLAUDE.md compliance: no hardcoded version pins, no fabricated URLs, no destructive ops. CONTRACTS.md updated correctly with 3 new file entries.
+   - Stale refs: `auto-fork.ts` ABOUTME comment (line 4) still says "SPACEBRIDGE_DEV env var for invocation (O-2 decision)" — env var branching was removed by this entity. Stale comment, does not affect runtime.
+   - Import graph: `cli.ts` imports `autoForkDaemon` from `../src/daemon/auto-fork` (correct relative path from `bin/`). `auto-fork.ts` unchanged imports. `auto-fork.test.ts` imports unchanged.
+   - Plan consistency: all 5 tasks executed in declared wave order. Files modified match `files_modified` lists. No scope creep detected.
+
+2. **Correctness review** — DONE, 3 findings
+
+   **C-1 (MEDIUM): Duplicate `node:path` import in `cli.ts`**
+   `cli.ts` lines 7 and 9 both import from `node:path` (`resolve` on line 7, `join` on line 9). Should be merged into a single import statement. Runtime-harmless (Bun deduplicates), but a correctness / lint issue.
+
+   **C-2 (LOW): `mcp` subcommand has no SIGTERM handler on infinite promise**
+   `cli.ts` line 75: `await new Promise<void>(() => {});` — intentional keep-alive for interim stub. No SIGTERM/SIGINT handler registered in this branch. When CC kills the shim, OS signal kills the process; `autoForkDaemon` lock has already been released so no corruption risk. Acceptable for current scope given the comment is explicit.
+
+   **C-3 (LOW): Stale ABOUTME in `auto-fork.ts`**
+   Line 4: "...SPACEBRIDGE_DEV env var for invocation (O-2 decision)." — env var branching removed by task-2. Misleading for future readers.
+
+   **C-4 (LOW): `plugin.json` mcpServers uses relative path with no explicit cwd**
+   `"args": ["run", "bin/cli.ts", "mcp"]` — relative path works only if CC spawns with cwd = plugin root. Standard CC plugin convention, but not verified against spec. Low risk.
+
+3. **Style review** — DONE, 1 finding
+
+   **S-1 (LOW): Duplicate import (same as C-1)**
+   Merge `import { resolve } from "node:path"` and `import { join } from "node:path"` on lines 7 and 9 into one line.
+
+4. **Classified findings table**
+
+   | ID | Severity | Root | File | Description |
+   |----|----------|------|------|-------------|
+   | C-1/S-1 | MEDIUM | Style/correctness | `spacebridge/bin/cli.ts` | Duplicate `node:path` import (lines 7 + 9) |
+   | C-2 | LOW | Design gap (acceptable) | `spacebridge/bin/cli.ts` | Infinite promise in `mcp` has no SIGTERM handler |
+   | C-3 | LOW | Stale comment | `spacebridge/src/daemon/auto-fork.ts` | ABOUTME still references removed SPACEBRIDGE_DEV O-2 decision |
+   | C-4 | LOW | Unverified assumption | `spacebridge/.claude-plugin/plugin.json` | mcpServers.args relative path; CC spawn cwd not confirmed against spec |
+
+5. **Verdict: feedback-to execute**
+
+   C-1/S-1 (duplicate import) is MEDIUM — trivial 1-line fix. C-3 (stale ABOUTME) should also be fixed. Both are cosmetic/lint issues with zero logic impact. No CRITICAL/HIGH CODE findings.
+
+   Required fixes before UAT:
+   - Merge duplicate `node:path` imports in `cli.ts` (lines 7+9 → one import)
+   - Remove stale "SPACEBRIDGE_DEV env var for invocation (O-2 decision)" phrase from `auto-fork.ts` ABOUTME line 4
