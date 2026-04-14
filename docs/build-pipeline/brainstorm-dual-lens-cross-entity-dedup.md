@@ -165,7 +165,7 @@ APPROACH (5) requires every citation to carry a `[primary|secondary|tertiary]` t
 
 **Domain**: Organizational (cross-entity similarity)
 
-**Why it matters**: Gate (iii) exclusivity requires sibling-entity lens (d) to detect overlap with "active/in-flight entities touching the same files or domain tags". `_index/INDEX.md` was last rebuilt `2026-04-12` (observed during explore) and does not include entity 102 or its siblings (`build-explore-domain-aware-gray-areas`, `stage-report-evidence-and-confidence`, `clarify-pre-presentation-evidence-gate`, `shape-pre-build-alignment-skill`) -- two days of drift already accumulated. Lens (d) operating on INDEX alone will miss recent entities. The APPROACH does not specify an alternative (CONTRACTS.md? inline grep over the workflow directory?).
+**Why it matters**: Gate (iii) exclusivity requires sibling-entity lens (d) to detect overlap with "active/in-flight entities touching the same files or domain tags". `_index/INDEX.md` was last rebuilt `2026-04-12` (observed during explore) and does not include entity 102 or its siblings (`build-explore-domain-aware-gray-areas`, `stage-report-evidence-and-confidence`, `clarify-pre-presentation-evidence-gate`, `shape-pre-build-alignment-skill`) -- two days of drift already accumulated. Lens (d) operating on INDEX alone will miss recent entities. The APPROACH does not specify an alternative (CONTRACTS.md? inline grep over the workflow directory?). **(✓ concrete drift evidence found by explore: INDEX.md:41 lists entity 036 as `explore` status, but inline read of `_archive/pipeline-brainstorm-integration.md:1-15` shows 036 is actually `status: shipped, completed: 2026-04-12T15:33:00Z, verdict: PASSED`. Staleness is not hypothetical -- a shipped entity is still surfaced in an active-state column. Lens (d) relying only on INDEX.md would produce false-positive exclusivity flags for 036-style already-shipped work, AND false-negative misses for recently-drafted siblings.)**
 
 **Suggested options**:
 1. Lens (d) reads BOTH INDEX.md AND CONTRACTS.md to cover the 2-day staleness window (CONTRACTS.md is append-only and updates per-stage).
@@ -179,14 +179,14 @@ APPROACH (5) requires every citation to carry a `[primary|secondary|tertiary]` t
 **Why it matters**: A parallel subagent code-explorer sweep of `_index/CONTRACTS.md` and active-state INDEX entries surfaced two cross-entity surfaces not covered by the sibling-entity lens check in the main explore pass:
 
 - `docs/build-pipeline/_index/CONTRACTS.md:181-185` records a **pre-existing in-flight contract** from entity `build-flow-tdd-discipline` on `skills/build-brainstorm/SKILL.md`: "Add given/when/then AC guidance to step 4 for TDD-friendly spec generation". Orthogonal-additive to entity 102's 6 enhancements (AC format rule vs structural pipeline restructure), BUT the two edits both touch Step 4 surface area, so merge ordering is load-bearing -- whichever ships second must rebase on the other.
-- `docs/build-pipeline/_index/INDEX.md:41` lists entity `036 pipeline-brainstorm-integration` in `explore` status. Title suggests brainstorm-adjacent scope (integration with profiles + pipeline E2E); body was not inspected during this explore. If 036's scope includes structural changes to `build-brainstorm` output shape, it could collide with entity 102's `## Lens Evidence` / `## Core Tensions` / `## Honest Boundaries` introductions.
+- `docs/build-pipeline/_index/INDEX.md:41` lists entity `036 pipeline-brainstorm-integration` in `explore` status. Title suggests brainstorm-adjacent scope (integration with profiles + pipeline E2E); body was not inspected during the initial subagent sweep. **(✓ resolved by explore: inline read of `docs/build-pipeline/_archive/pipeline-brainstorm-integration.md:1-15` -- entity 036 is `status: shipped`, completed 2026-04-12, `verdict: PASSED`; scope is INTEGRATION + E2E testing of FO triage / express-standard-full profiles / dashboard collaboration / version history / profile routing -- does NOT modify `skills/build-brainstorm/SKILL.md`; no collision with entity 102. INDEX.md listing 036 in `explore` column is confirmed staleness -- concrete evidence strengthening Q-5.)**
 
-Gate (iii) exclusivity verdict from the subagent: **conditional-pass** -- no direct contradictions with active siblings, but these two surfaces require captain disposition before plan commits.
+Gate (iii) exclusivity verdict updated: **pass** on the 036 arm (036 is shipped + orthogonal scope); **conditional-pass remains** on the CONTRACTS arm where `build-flow-tdd-discipline` Step 4 coordination is still open.
 
-**Suggested options**:
-1. Accept merge-order risk with `build-flow-tdd-discipline` (102 ships either before or after; both paths require a small AC-section rebase). Read entity 036's body now to confirm scope boundary -- if brainstorm-touching, add `depends-on: [036]` or captain-resolve via decomposition.
-2. Defer both coordination questions to plan-phase dimension-7 cross-entity coherence check (workflow-index skill). Let plan-checker surface collisions at PLAN time rather than here.
-3. Captain rewrites the coordination plan: which entity ships first, and how does the later entity rebase.
+**Suggested options** (scope reduced to CONTRACTS arm after 036 arm resolved inline):
+1. Accept merge-order risk with `build-flow-tdd-discipline` (102 ships either before or after; whichever lands second rebases its Step 4 additions onto the new structure). Captain explicitly chooses ship order.
+2. Defer to plan-phase dimension-7 cross-entity coherence check (workflow-index skill). Let plan-checker surface collisions at PLAN time; captain annotates via plan-approval gate.
+3. Add `depends-on: [build-flow-tdd-discipline]` or `blocks-on: [build-flow-tdd-discipline]` to force explicit ordering via FO dispatch graph.
 
 ## Decomposition Recommendation
 
