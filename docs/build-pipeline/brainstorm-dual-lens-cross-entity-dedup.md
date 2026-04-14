@@ -2,7 +2,7 @@
 id: 102
 title: Brainstorm Nüwa-Style Distillation -- Multi-Lens Synthesis + Merge Gate + Tensions/Boundaries
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: /build
 created: 2026-04-14T14:09:45Z
 started:
@@ -114,11 +114,67 @@ APPROACH (5) requires every citation to carry a `[primary|secondary|tertiary]` t
 
 ## Open Questions
 
-(explore stage will populate)
+### Q-1: Spec-text corrections for two factual inaccuracies
+
+**Domain**: Readable/Textual (spec wording)
+
+**Why it matters**: The Brainstorming Spec contains two factual errors that will propagate into plan and execute if not corrected during clarify. Both are simple wording fixes but they undermine spec credibility if left unaddressed.
+
+- APPROACH opening calls build-brainstorm a "single-paragraph APPROACH distiller" -- current skill at `skills/build-brainstorm/SKILL.md:117-146` produces 4 sections (APPROACH + ALTERNATIVE + GUARDRAILS + RATIONALE), plus a Step 2.5 Goal Check at :78-109. The "single-paragraph" framing understates existing structure and may mislead future readers evaluating the proposed delta.
+- GUARDRAILS (4) cites file cap at `SKILL.md:233` -- actual cap is at line 277 ("Read at most 5 files for context enrichment" in the Rules section). Line 233 is entity-template output text.
+
+**Suggested options**:
+1. Correct both in-place during clarify: change "single-paragraph APPROACH distiller" → "4-section brainstorming-spec distiller (APPROACH/ALTERNATIVE/GUARDRAILS/RATIONALE) plus Step 2.5 Goal Check"; change `SKILL.md:233` → `SKILL.md:277`.
+2. Rewrite the surrounding GUARDRAILS paragraph to frame the delta as "raising a 5-file cap defined in the Rules section" without line-number citation at all.
+3. Captain-authored rewrite.
+
+### Q-2: Dashboard rendering target file
+
+**Domain**: Readable/Textual (dashboard entity detail rendering)
+
+**Why it matters**: Honest Boundary 5 commits this entity to leaving new sections unstyled "until `tools/dashboard/src/body-renderer.ts` is updated" -- but no such file exists in the repo. Dashboard body rendering is handled client-side in `tools/dashboard/static/detail.js` which only special-cases `## Stage Report:` splits at line 64. Every other `##` section (including existing `## Brainstorming Spec`, `## Open Questions`) already renders as generic markdown with no special treatment. The boundary claim as written is non-actionable because the referenced file does not exist.
+
+**Suggested options**:
+1. Update Honest Boundary 5 to reference `tools/dashboard/static/detail.js` as the rendering target.
+2. Rewrite Honest Boundary 5 to acknowledge that "generic markdown rendering is the permanent current state" and drop the future-entity hook (client-side detail.js already handles this by omission of special cases).
+3. Commit to a server-side body renderer as the long-term target, keep the path as-is but add a note "(file does not exist yet; target for future entity)".
+
+### Q-3: Empty-state escape-hatch string consistency
+
+**Domain**: Readable/Textual (body-section conventions)
+
+**Why it matters**: Existing precedent at `skills/build-brainstorm/SKILL.md:139` uses `Checked -- no notable constraints identified.` for empty GUARDRAILS; entity 102 proposes `None identified -- checked` for empty `## Core Tensions` and `## Honest Boundaries`. Two escape-hatch conventions in one skill is confusing and breaks grep-uniformity. Acceptance-criteria grep (entity 102 lines 77-78) hardcodes the new string, so this must be settled before plan.
+
+**Suggested options**:
+1. Adopt `Checked -- no notable constraints identified.` for both new sections, matching existing GUARDRAILS precedent.
+2. Keep `None identified -- checked` for new sections and migrate GUARDRAILS to the new form in a sibling refactor entity.
+3. Use a single general-purpose token `(none -- deliberate)` across all empty-state positions.
+
+### Q-4: Primary-tier tie-break when two primary citations contradict
+
+**Domain**: Runnable/Invokable (skill logic)
+
+**Why it matters**: APPROACH (5) specifies "when two lenses contradict on a load-bearing fact, primary wins unless the captain has explicitly documented an override reason". This handles primary-vs-secondary conflicts but is silent when two primary-tier citations themselves contradict (e.g., captain directive at entity 102 line X contradicts captain directive at sibling entity Y line Z). Both are primary. The merge gate has no specified fallback.
+
+**Suggested options**:
+1. Escalate to Core Tension (time-based) -- "captain directive evolved between entities, both cited primary".
+2. Escalate to Open Question and block APPROACH emission until captain resolves.
+3. Prefer the most-recent primary by timestamp, log the older one as a Core Tension annotation.
+
+### Q-5: Lens (d) exclusivity check mechanism -- operational gap
+
+**Domain**: Organizational (cross-entity similarity)
+
+**Why it matters**: Gate (iii) exclusivity requires sibling-entity lens (d) to detect overlap with "active/in-flight entities touching the same files or domain tags". `_index/INDEX.md` was last rebuilt `2026-04-12` (observed during explore) and does not include entity 102 or its siblings (`build-explore-domain-aware-gray-areas`, `stage-report-evidence-and-confidence`, `clarify-pre-presentation-evidence-gate`, `shape-pre-build-alignment-skill`) -- two days of drift already accumulated. Lens (d) operating on INDEX alone will miss recent entities. The APPROACH does not specify an alternative (CONTRACTS.md? inline grep over the workflow directory?).
+
+**Suggested options**:
+1. Lens (d) reads BOTH INDEX.md AND CONTRACTS.md to cover the 2-day staleness window (CONTRACTS.md is append-only and updates per-stage).
+2. Lens (d) performs inline `grep -l '{keyword}' docs/build-pipeline/*.md` as a freshness fallback, capped at 3 sibling hits.
+3. INDEX.md staleness is an upstream bug (workflow-index-maintainer idle hook) that needs separate fix -- lens (d) depends on INDEX being current and captain accepts this preconditional risk.
 
 ## Decomposition Recommendation
 
-(explore stage will populate if scope warrants it)
+Not warranted. Scope flag absent in Captain Context Snapshot; explore mapping touched 7 files across 2 layers (skills/ + docs/build-pipeline/) -- well below the 20-files-across-3-layers threshold. The entity is cohesive: all changes target `skills/build-brainstorm/SKILL.md` plus one or two reference docs, coordinated through a single 女媧 methodology port.
 
 ## Core Tensions
 
@@ -145,3 +201,20 @@ APPROACH (5) requires every citation to carry a `[primary|secondary|tertiary]` t
 - `/Users/kent/Project/me-company/.agents/skills/huashu-nuwa/SKILL.md` -- huashu-nuwa skill spec, Phase 0 through Phase 4 methodology
 - `/Users/kent/Project/me-company/.agents/skills/huashu-nuwa/references/extraction-framework.md` -- triple-verification gate methodology (Part 一), contradiction preservation (Part 三), information-insufficiency handling (Part 四), quality self-check (Part 六)
 - `/Users/kent/Project/me-company/.agents/skills/huashu-nuwa/references/skill-template.md` -- persona-skill template structure (referenced for section-ordering inspiration, not directly ported)
+
+## Stage Report: explore
+
+- [x] Files mapped: 7 across skills and docs
+  skills/: 2 (build-brainstorm SKILL.md + references/alpha-marker-protocol.md), docs/build-pipeline/: 4 (INDEX.md + 1 sibling entity 072 read in full + 3 siblings confirmed by grep), external /Users/kent/Project/me-company/.agents/skills/huashu-nuwa/: 2 (SKILL.md + references/extraction-framework.md), tools/dashboard/: 1 (static/detail.js inspected for renderer claim)
+- [x] Assumptions formed: 4 (Confident: 2, Likely: 2, Unclear: 0)
+  A-1 (4-lens floor sufficiency) Likely via APPROACH commitment + Honest Boundary 1 caveat; A-2 (3-7 cardinality port) Likely via inline read of extraction-framework.md:130; A-3 (captain-authored spec) Confident via frontmatter source + rewind commit; A-4 (non-interactive preserved) Confident via SKILL.md:293-294
+- [x] Options surfaced: 1
+  O-1 tier tag syntax (bracketed recommended over parenthetical/key-value)
+- [x] Questions generated: 5
+  Q-1 two spec-text corrections (single-paragraph framing + line-ref 233→277); Q-2 dashboard rendering target file (body-renderer.ts does not exist); Q-3 empty-state escape-hatch string consistency (Checked vs None identified); Q-4 primary-tier tie-break mechanism gap; Q-5 lens (d) exclusivity operational mechanism (INDEX staleness)
+- [x] α markers resolved: 0 / 0
+  entity body contained no `(needs clarification -- deferred to explore)` markers at explore entry
+- [x] Scale assessment: confirmed Medium
+  frontmatter declared Medium; mapping found 7 files across 2 layers; well-matched
+- [x] Research dispatched: 0 researchers
+  A-2 verified inline via direct read of extraction-framework.md:130 (3-7 cardinality rule confirmed in source); A-1 is a design-choice assumption not researchable; A-3/A-4 Confident via codebase citations. No external technology claims requiring dispatch.
