@@ -2,7 +2,7 @@
 id: 091
 title: "Clarify pre-presentation evidence gate -- SO must Read-verify before asking captain"
 status: clarify
-context_status: awaiting-clarify
+context_status: ready
 source: captain feedback (2026-04-14 SO session -- captain caught unverified citations in assumption batch)
 started:
 completed:
@@ -82,6 +82,11 @@ Confidence: 🟢 Confident (0.95)
 Evidence: Both target files are markdown specs: `skills/build-clarify/SKILL.md` and `agents/science-officer.md`. Skill behavior is defined by spec text that the LLM follows. MEMORY.md: "Skill Contract Fixes Are Plan-Driven, Not Pipeline-Driven."
 → Confirmed: captain, 2026-04-14 (batch)
 
+A-5: Stage Report: clarify's Re-validation line should include an "Evidence provenance" detail sub-line reporting how many citations were Read-verified vs skipped (Mode B personal Read). Format: `Evidence provenance: {n}/{total} Read-verified (Mode A citations), {n}/{total} skipped (Mode B — SO personal Read in explore)`. This makes the verification audit trail visible to captain and future reviewers without changing any Stage Report field names.
+Confidence: 🟢 Confident (0.90)
+Evidence: Current Stage Report: clarify format (SKILL.md Step 6) has Re-validation as a checklist item with a detail line. Adding a second detail line for provenance follows the existing 2-space-indent pattern used by other Stage Report items.
+→ Confirmed: captain, 2026-04-14 (interactive) -- visible provenance audit trail in Stage Report
+
 ## Open Questions
 
 Q-1: Should the provenance rule be strict (always Read every file:line before presenting, even if SO already Read it during explore in the same session) or smart (only Read files that SO did NOT personally Read)?
@@ -94,6 +99,8 @@ Suggested options:
 - (a) Smart provenance: "If you cannot recall a Read tool call for the cited file in this session, Read it now." Efficient, but requires honest self-assessment.
 - (b) Strict always-Read: "Before presenting Step 2 batch, Read every file:line citation regardless of prior reads in this session." Redundant but bulletproof. ~5-10 extra Read calls per entity.
 - (c) Strict for Mode A only: "If explore used code-explorer dispatch (Mode A), Step 1.5 1a is mandatory. If explore used inline mapping (Mode B), Step 1.5 1a may skip file:line citations that SO Read during explore." Targets the actual gap without penalizing Mode B.
+
+→ Answer: (c) Mode-A-only strict -- mandatory Read for code-explorer-dispatched evidence; Mode B inline-mapped evidence may skip since SO already Read those files. Targets the actual gap precisely. (captain, 2026-04-14, interactive)
 
 ## Stage Report: explore
 
@@ -117,3 +124,26 @@ Suggested options:
 - `skills/build-clarify/SKILL.md:119` -- Read mandate text (the rule that should fire but doesn't)
 - `agents/science-officer.md:99` -- Step 3 build-clarify delegation text (A-2 gap location)
 - `agents/science-officer.md:93-99` -- full Step 3 per-skill execution rules section (insertion point for checkpoint)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  Small scope, 2-file spec fix, no decomposition
+- [x] Re-validation: 4 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  All evidence verified via personal Read in this session (SKILL.md and science-officer.md both Read by SO directly)
+- [x] Assumptions confirmed: 5 / 5 (0 corrected)
+  A-1..A-4 batch-confirmed; A-5 (Stage Report provenance visibility) surfaced in exploration loop
+- [x] Options selected: 0 / 0
+  No option comparisons in this entity
+- [x] Questions answered: 1 / 1 (0 deferred)
+  Q-1: Mode-A-only strict — mandatory Read for code-explorer-dispatched evidence; Mode B skippable
+- [x] Open exploration: 1 gray area surfaced (0 from templates, 0 from CONTRACTS, 0 from directive, 1 via captain interaction)
+  A-5 Stage Report provenance audit trail visibility
+- [x] Canonical refs added: 0
+  No new refs during clarify (all 4 from explore)
+- [x] Context status: ready
+  Gate passed: 5 assumptions confirmed, 0 options, 1 question answered, 3 acceptance criteria α-clean
+- [x] Handoff mode: loose
+  No auto_advance; captain must say "execute 091" to FO
+- [x] Clarify duration: 3 AskUserQuestion calls + 1 assumption batch
+  Batch(1) + Q-1(1) + exploration(2 iterations: Stage Report visibility + Complete)
