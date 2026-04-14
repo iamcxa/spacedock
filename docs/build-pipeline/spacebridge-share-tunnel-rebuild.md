@@ -10,7 +10,7 @@ verdict:
 score: 0.0
 worktree: .worktrees/spacedock-ensign-spacebridge-share-tunnel-rebuild
 issue:
-pr:
+pr: "#50"
 intent: feature
 scale: Medium
 project: spacedock
