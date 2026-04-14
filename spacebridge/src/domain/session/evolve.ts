@@ -21,7 +21,12 @@ export function evolve(state: SessionState, event: SessionEvent): SessionState {
 
     case "session_reconnected": {
       const existing = state.sessions.get(event.sessionId);
-      if (!existing) return state;
+      if (!existing) {
+        // Defensive guard: session_reconnected arrived for an unknown session (e.g. replay
+        // of an orphaned event after a session_disconnected). Safe to no-op.
+        console.warn(`[session/evolve] session_reconnected for unknown session ${event.sessionId} — no-op`);
+        return state;
+      }
       const newSessions = new Map(state.sessions);
       newSessions.set(event.sessionId, {
         ...existing,
