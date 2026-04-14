@@ -1,7 +1,7 @@
 ---
 id: 102
 title: Brainstorm Nüwa-Style Distillation -- Multi-Lens Synthesis + Merge Gate + Tensions/Boundaries
-status: draft
+status: clarify
 context_status: awaiting-clarify
 source: /build
 created: 2026-04-14T14:09:45Z
@@ -172,6 +172,22 @@ APPROACH (5) requires every citation to carry a `[primary|secondary|tertiary]` t
 2. Lens (d) performs inline `grep -l '{keyword}' docs/build-pipeline/*.md` as a freshness fallback, capped at 3 sibling hits.
 3. INDEX.md staleness is an upstream bug (workflow-index-maintainer idle hook) that needs separate fix -- lens (d) depends on INDEX being current and captain accepts this preconditional risk.
 
+### Q-6: Pre-existing CONTRACTS entry + entity 036 scope verification
+
+**Domain**: Organizational (cross-entity coordination)
+
+**Why it matters**: A parallel subagent code-explorer sweep of `_index/CONTRACTS.md` and active-state INDEX entries surfaced two cross-entity surfaces not covered by the sibling-entity lens check in the main explore pass:
+
+- `docs/build-pipeline/_index/CONTRACTS.md:181-185` records a **pre-existing in-flight contract** from entity `build-flow-tdd-discipline` on `skills/build-brainstorm/SKILL.md`: "Add given/when/then AC guidance to step 4 for TDD-friendly spec generation". Orthogonal-additive to entity 102's 6 enhancements (AC format rule vs structural pipeline restructure), BUT the two edits both touch Step 4 surface area, so merge ordering is load-bearing -- whichever ships second must rebase on the other.
+- `docs/build-pipeline/_index/INDEX.md:41` lists entity `036 pipeline-brainstorm-integration` in `explore` status. Title suggests brainstorm-adjacent scope (integration with profiles + pipeline E2E); body was not inspected during this explore. If 036's scope includes structural changes to `build-brainstorm` output shape, it could collide with entity 102's `## Lens Evidence` / `## Core Tensions` / `## Honest Boundaries` introductions.
+
+Gate (iii) exclusivity verdict from the subagent: **conditional-pass** -- no direct contradictions with active siblings, but these two surfaces require captain disposition before plan commits.
+
+**Suggested options**:
+1. Accept merge-order risk with `build-flow-tdd-discipline` (102 ships either before or after; both paths require a small AC-section rebase). Read entity 036's body now to confirm scope boundary -- if brainstorm-touching, add `depends-on: [036]` or captain-resolve via decomposition.
+2. Defer both coordination questions to plan-phase dimension-7 cross-entity coherence check (workflow-index skill). Let plan-checker surface collisions at PLAN time rather than here.
+3. Captain rewrites the coordination plan: which entity ships first, and how does the later entity rebase.
+
 ## Decomposition Recommendation
 
 Not warranted. Scope flag absent in Captain Context Snapshot; explore mapping touched 7 files across 2 layers (skills/ + docs/build-pipeline/) -- well below the 20-files-across-3-layers threshold. The entity is cohesive: all changes target `skills/build-brainstorm/SKILL.md` plus one or two reference docs, coordinated through a single 女媧 methodology port.
@@ -210,11 +226,11 @@ Not warranted. Scope flag absent in Captain Context Snapshot; explore mapping to
   A-1 (4-lens floor sufficiency) Likely via APPROACH commitment + Honest Boundary 1 caveat; A-2 (3-7 cardinality port) Likely via inline read of extraction-framework.md:130; A-3 (captain-authored spec) Confident via frontmatter source + rewind commit; A-4 (non-interactive preserved) Confident via SKILL.md:293-294
 - [x] Options surfaced: 1
   O-1 tier tag syntax (bracketed recommended over parenthetical/key-value)
-- [x] Questions generated: 5
-  Q-1 two spec-text corrections (single-paragraph framing + line-ref 233→277); Q-2 dashboard rendering target file (body-renderer.ts does not exist); Q-3 empty-state escape-hatch string consistency (Checked vs None identified); Q-4 primary-tier tie-break mechanism gap; Q-5 lens (d) exclusivity operational mechanism (INDEX staleness)
+- [x] Questions generated: 6
+  Q-1 two spec-text corrections (single-paragraph framing + line-ref 233→277); Q-2 dashboard rendering target file (body-renderer.ts does not exist); Q-3 empty-state escape-hatch string consistency (Checked vs None identified); Q-4 primary-tier tie-break mechanism gap; Q-5 lens (d) exclusivity operational mechanism (INDEX staleness); Q-6 pre-existing CONTRACTS entry from build-flow-tdd-discipline (Step 4 overlap) + entity 036 pipeline-brainstorm-integration scope verification (from parallel subagent Lens-d sweep)
 - [x] α markers resolved: 0 / 0
   entity body contained no `(needs clarification -- deferred to explore)` markers at explore entry
 - [x] Scale assessment: confirmed Medium
   frontmatter declared Medium; mapping found 7 files across 2 layers; well-matched
-- [x] Research dispatched: 0 researchers
-  A-2 verified inline via direct read of extraction-framework.md:130 (3-7 cardinality rule confirmed in source); A-1 is a design-choice assumption not researchable; A-3/A-4 Confident via codebase citations. No external technology claims requiring dispatch.
+- [x] Research dispatched: 0 researchers; 3 code-explorer subagents dispatched in parallel
+  A-2 verified inline via direct read of extraction-framework.md:130 (3-7 cardinality rule confirmed in source); A-1 is a design-choice assumption not researchable; A-3/A-4 Confident via codebase citations. No external technology claims requiring researcher dispatch. Three `spacedock:code-explorer` agents dispatched in parallel for Lens (c)+(d): (1) build-brainstorm SKILL.md anatomy → confirmed Q-1 line-number corrections (cap at :277, Step 2.5 Goal Check at :78-109); (2) dashboard rendering pipeline → confirmed Q-2 target is `tools/dashboard/static/detail.js:62-84` with no server-side renderer; (3) sibling coherence + CONTRACTS + DECISIONS + INDEX → no-overlap on 072/085/091, conditional-pass exclusivity with Q-6 surfacing pre-existing CONTRACTS contract and entity 036 scope gap.
