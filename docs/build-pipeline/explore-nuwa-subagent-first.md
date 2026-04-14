@@ -1,7 +1,7 @@
 ---
 id: 105
 title: Explore Nüwa-Alignment + Subagent-First Enforcement (v2) -- Multi-Angle Parallel Explorer + Track-A Triple-Gate + Tension Output
-status: plan
+status: execute
 context_status: ready
 source: /build (decomposed from epic 102)
 created: 2026-04-14T00:00:00Z
