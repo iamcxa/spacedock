@@ -768,3 +768,46 @@ Post-fix: `bun test spacebridge` → 250 pass, 0 fail.
 - **tsc --noEmit**: PASS — TypeScript 0 errors.
 - **bun build**: PASS — Next.js production build succeeds.
 - **Overall verdict**: PASS — All quality gates clear. Stage auto-advances.
+
+## Stage Report: review (cycle 2)
+
+Scope: fix commits c2b86ce, 450ab7e, e29ebb4, 67e917c, 3b7acda only.
+
+### Checklist
+
+**HIGH — Path traversal (c2b86ce)**
+
+- [x] Fix addresses the original finding: `SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/` added as module-level constant in all 5 entry points: `comments/route.ts` (GET + POST both guarded), `comments/[id]/reply/route.ts`, `comments/[id]/resolve/route.ts`, `auto-resolve/route.ts`, and `entity/[slug]/page.tsx`. All rejections happen before any filesystem `readFile` or DB access. Page returns `notFound()`; API routes return `{ error: "Invalid slug" }` with status 400.
+- [x] New issues introduced: None. The `[id]` path segment (UUID-valued commentId/parentCommentId) is not validated with SLUG_RE — correctly so, since it is passed only into decider logic (DB lookup by string equality), never into path construction. No path traversal vector exists there.
+
+**MEDIUM — Stage timeline type filter (450ab7e)**
+
+- [x] Fix addresses the original finding: `page.tsx` now imports `and` instead of `gt`, and the events query uses `.where(and(eq(events.entity, slug), eq(events.type, "stage_transition")))`. Only stage_transition rows are returned to `StageTimeline`. The unused `gt` import was removed cleanly.
+- [x] New issues introduced: None.
+
+**MEDIUM — Reply-to-reply blocked (e29ebb4)**
+
+- [x] Fix addresses the original finding: `decider.ts` `reply_to_comment` case checks `parent.parentId !== null` before the existing `parent.resolved` check, throwing `ParentCommentNotFound`. A dedicated test covers this path: state with c1 (top-level) and c2 (reply to c1), attempt to reply to c2 → throws `ParentCommentNotFound`. Test is isolated and passes without touching other cases.
+- [x] Error type is appropriate: reusing `ParentCommentNotFound` (rather than a new error type) is consistent — the parent is not a valid reply target, so "not found as a valid parent" is semantically correct and matches how the route handler already handles it (returns 404).
+- [x] New issues introduced: None.
+
+**MEDIUM — Auto-resolve heading match (67e917c)**
+
+- [x] Fix addresses the original finding: `triggerAutoResolve()` signature changed from `previousSectionHeading: string` to `stageName: string`. The function collects all unique `sectionHeading` values from unresolved comments whose heading contains the stage name (case-insensitive `includes()`), then calls `decide(resolve_by_stage_advance, ...)` once per matching heading. Route handler now passes `previousStage` directly without any capitalization transformation.
+- [x] New test covers the concrete failure case: `seedComment("c1", "## Stage Report: explore")` + `seedComment("c2", "## Stage Report: plan")` → `triggerAutoResolve(db, ENTITY_PATH, "explore")` resolves only c1 (resolvedCount=1, c2 remains unresolved).
+- [x] seqStart seed fix (67e917c): `seedComment()` now calls `countEvents()` before `appendEvents()` to get a sequential seqStart. This prevents sequence number collisions in multi-comment test scenarios.
+- [x] New issues introduced: One observation worth noting (LOW, not blocking): `triggerAutoResolve` does two passes over state — one to collect matching headings, then one `decide()` call per heading while passing the original `state` (pre-mutation). Since `decide(resolve_by_stage_advance, ...)` is a pure function that only reads state and produces events without mutating it, and because events are only appended to the DB after all decides complete, this is correct. No double-resolve hazard exists.
+
+**LOW — Unused imports / dead code (3b7acda)**
+
+- [x] Fix addresses `eq` removal: `comments/route.ts` GET handler import changed from `{ eq, asc }` to `{ asc }`. Verified: `eq` is not used anywhere in the GET handler body after the import change.
+- [x] Fix addresses `openWritableDb` removal: `ui/lib/db.ts` had 72 lines of `openWritableDb` + `WritableDbHandle` dead code. All removed. The corresponding test assertion `expect(typeof mod.openWritableDb).toBe("function")` removed from `db.test.ts`. Route handlers import `createDb` from `src/db` directly — confirmed in all 4 write-path handlers. No reference to `openWritableDb` remains.
+- [x] New issues introduced: None.
+
+### New issues introduced by fixes
+
+None. All five fix commits are clean and contained. No scope creep, no regressions introduced (confirmed by quality cycle 2: 572/572 tests pass, tsc clean, Next.js build succeeds).
+
+### Verdict
+
+PASS — advance to UAT.
