@@ -1,8 +1,8 @@
 ---
 id: 094
 title: "War room pipeline graph — stage visualization + mod hooks"
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: /build
 created: 2026-04-14T12:00:00+08:00
 started:
@@ -64,39 +64,52 @@ depends-on: [053]
 
 A-1: Entity stage counts derived from filesystem scan data already fetched by page.tsx, not from a new Drizzle DB query. The `scanEntitiesForRepo` function returns `status` per entity from markdown frontmatter. Counts per stage are computed by grouping these results -- no new `/api/pipeline-status` endpoint needed for initial render.
 Confidence: 🟢 Confident (0.95)
-Evidence: `spacebridge/ui/app/page.tsx:44-49` -- scanEntitiesForRepo returns EntityCard[] with status field; `spacebridge/ui/lib/entity-scan.ts:39` -- status extracted from frontmatter parsing
+Evidence: `spacebridge/ui/app/page.tsx:44-49` -- scanEntitiesForRepo returns EntityCard[] with status field; `spacebridge/ui/lib/entity-scan.ts:39` -- status extracted from frontmatter parsing. Also confirmed: `tools/dashboard/src/discovery.ts:73-79` -- old dashboard computes entityCountByStage with identical grouping pattern.
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-2: Pipeline graph renders above the WarRoom Tabs component in page.tsx, not inside a tab. The graph represents the whole workflow (one pipeline definition shared across repos), while Tabs are per-repo entity lists.
 Confidence: 🟢 Confident (0.90)
 Evidence: `spacebridge/ui/app/page.tsx:63-67` -- WarRoom is the single main content block; `spacebridge/ui/components/war-room.tsx:24-53` -- Tabs are repo-level grouping
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-3: Mod hook types extracted by parsing `## Hook: {type}` markdown headings from `_mods/*.md` files. This pattern is consistent across both known mod files in different workflow directories.
 Confidence: 🟢 Confident (0.90)
 Evidence: `docs/build-pipeline/_mods/pr-review-loop.md:17,31,47` -- `## Hook: startup`, `## Hook: idle`, `## Hook: merge`; `docs/plans/_mods/pr-merge.md:11,23,28` -- same `## Hook:` heading pattern
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-4: SSE event stream already carries stage transition data (type, entity, stage fields) sufficient for real-time badge count updates. The client-side EventSource pattern is proven in LiveFeed.
 Confidence: 🟢 Confident (0.90)
 Evidence: `spacebridge/ui/lib/schema.ts:35-38` -- events table has type, entity, stage columns; `spacebridge/ui/components/live-feed.tsx:29-39` -- parses these fields from SSE stream
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-5: Graceful fallback when README.md is missing or unparseable -- return an empty pipeline definition and render no graph. The codebase consistently follows this pattern for missing data sources.
 Confidence: 🟢 Confident (0.90)
 Evidence: `spacebridge/ui/lib/entity-scan.ts:22-25` -- try/catch returns [] on readdir failure; `spacebridge/ui/app/page.tsx:13-31` -- try/catch around DB reads with graceful fallback
+→ Confirmed: captain, 2026-04-14 (batch)
 
 A-6: Entity 064 (Dashboard -- Mod Visibility in Pipeline UI) should be superseded by this entity. Entity 094's mod hook feature fully implements 064's directive (show mod hooks on stage graph).
 Confidence: 🟢 Confident (0.85)
 Evidence: `docs/build-pipeline/dashboard-mod-visibility.md:26-30` -- 064's directive is "show registered mods alongside stage graph, display hook types"; 094 GUARDRAILS explicitly note the overlap
+→ Confirmed: captain, 2026-04-14 (batch). Captain also confirmed mod hooks stay in 094 scope (not split out).
+
+A-7: React port uses Tailwind CSS variables instead of hardcoded Primer hex colors. SVG attributes use `fill="hsl(var(--primary))"` pattern for theme-aware rendering (dark/light mode support). Mapping: blue→primary, dark-bg→card, border→border, orange→amber-500, green→green-500, purple→purple-400, text→foreground.
+Confidence: 🟢 Confident (0.90)
+Evidence: `spacebridge/ui/components/entity-card.tsx` -- all existing components use shadcn/Tailwind classes; `tools/dashboard/static/visualizer.js` -- 14 hardcoded Primer hex values to replace
+→ Confirmed: captain, 2026-04-14 (interactive, Step 4.5 exploration)
 
 ## Option Comparisons
 
 ### O-1: README YAML frontmatter parsing approach
 
-The README.md frontmatter uses complex nested YAML (arrays of objects with comments). The existing `entity-parse.ts` is a line-based `key: value` parser that cannot handle this. Three approaches:
+The README.md frontmatter uses complex nested YAML (arrays of objects with comments). The existing `entity-parse.ts` is a line-based `key: value` parser that cannot handle this. However, the old dashboard already has `parseStagesBlock()` in `tools/dashboard/src/parsing.ts:30-129` -- a custom line-based parser (~100 LOC) that handles the exact README format, returns typed `Stage[]`, and is battle-tested. Three approaches:
 
 | Option | Pros | Cons | Complexity | Recommendation |
 |---|---|---|---|---|
-| Add `js-yaml` dependency | Handles full YAML spec including comments and nested arrays; battle-tested (50M+ weekly downloads); future-proof for README schema changes | +50KB bundle (server-only, no client impact); new dependency to maintain | Low | Recommended |
-| Custom line-by-line parser | Zero dependencies; tailored to known fixed structure (~10 stages, 3 property levels) | Fragile if README format changes; must handle YAML comments, arrays of objects, indentation; ~100-150 LOC of custom parsing | Medium | Viable |
-| Regex extraction | Zero dependencies; fast for known patterns | Extremely fragile; hard to maintain; breaks on any format variation; not suitable for nested structures | Low | Not recommended |
+| Port `parseStagesBlock()` from old dashboard | Already validated against same README format; zero new dependencies; follows `entity-parse.ts` inline-duplicate pattern; typed `Stage` interface exists | Another inline duplicate (but codebase accepts this pattern per entity-parse.ts ABOUTME) | Low | Recommended |
+| Add `js-yaml` dependency | Handles full YAML spec; future-proof | New dependency (+50KB) when a working custom parser already exists; overkill for one file | Low | Not needed |
+| Write new custom parser from scratch | Zero dependencies | Reinventing `parseStagesBlock()` which already exists and works | Medium | Not recommended |
+
+→ Selected: Port parseStagesBlock() from old dashboard (captain, 2026-04-14, interactive)
 
 ### O-2: Real-time badge count update mechanism
 
@@ -108,6 +121,8 @@ PipelineGraph needs SSE events to update stage count badges in real-time. LiveFe
 | PipelineGraph opens own EventSource | Self-contained; no refactor of existing code | Two SSE connections to same endpoint; wastes server resources and client memory | Low | Not recommended |
 | Lift SSE to page.tsx via custom hook | Clean separation of data fetching; reusable `useSSE` hook | Larger refactor; page.tsx is currently a Server Component, would need to split SSE logic to a Client Component wrapper | Medium | Viable |
 
+→ Selected: Shared SSE context provider (captain, 2026-04-14, interactive)
+
 ### O-3: Multi-session entity routing fix approach (bundled fix)
 
 Entity detail page `/entity/[slug]` currently picks the first session's projectRoot via `limit(1)` -- breaks with multiple CC sessions. Two approaches for the bundled fix:
@@ -116,6 +131,8 @@ Entity detail page `/entity/[slug]` currently picks the first session's projectR
 |---|---|---|---|---|
 | Scan all projectRoots for matching slug | Backward compatible; no URL changes; entity slugs are unique within workflows so first match is correct | O(n) filesystem scan per detail page load (n = connected sessions, typically 1-3) | Low | Recommended |
 | Pass repo context via URL param | Explicit O(1) lookup; handles theoretical cross-repo slug collisions | Requires updating all entity links (card, graph node clicks); changes URL structure; breaks existing bookmarks | Medium | Viable |
+
+→ Selected: Scan all projectRoots for matching slug (captain, 2026-04-14, interactive). Captain note: this is the best approach given entity slugs are unique within workflows and N is small.
 
 ## Open Questions
 
@@ -127,13 +144,24 @@ Why it matters: Mod files declare hook types (startup, idle, merge) but do NOT d
 
 Suggested options: (a) Add a structured `hooks:` or `mods:` field to README stage definitions -- clean but requires README schema change, (b) Parse free-text references from README stage comment lines -- works for existing format but fragile, (c) Show mod hooks globally (separate legend/sidebar) without mapping to specific stages -- simple but loses stage-level insight, (d) Infer from hook name conventions (merge → shipped/terminal stages, startup/idle → global FO lifecycle indicators shown outside the graph)
 
+→ Answer: Verified FO hook semantics (references/first-officer-shared-core.md:18-22, claude-first-officer-runtime.md:104). Only 3 hook types exist: `merge` is stage-specific (fired at terminal/shipped boundary) → pill on `shipped` node. `startup` and `idle` are FO lifecycle hooks (not stage-specific) → show as mod summary annotation outside the stage graph (e.g., header or legend). No schema change needed. Hardcode the 3-type mapping. (captain, 2026-04-14, interactive)
+
 ## Bundled Fix: Multi-Session Entity Routing
 
 Entity detail page (`/entity/[slug]`) currently uses `limit(1)` to pick the first session's projectRoot -- breaks when multiple CC sessions are connected with different repos. Fix: pass repo context via URL param or scan all projectRoots to find the matching entity file. This is a natural fit for 094 since the war room home page already handles multi-session correctly. (See O-3 for option comparison.)
 
+## Cross-Entity Notes
+
+- **Entity 060 (cutover) ordering**: 060 will delete `tools/dashboard/static/*` including `visualizer.js` (094's reference implementation). 094 should ship before 060. Currently 060 `depends-on: [059]` does not include 094. Recommend updating 060's depends-on to include 094 during 060's plan stage. (Surfaced in clarify Step 4.5, captain, 2026-04-14)
+
 ## Canonical References
 
-(clarify stage will populate)
+- `tools/dashboard/static/visualizer.js` -- old pipeline graph SVG renderer (310 LOC, reference implementation for React port: node shapes, forward/feedback edges, badges, click-to-filter)
+- `tools/dashboard/src/parsing.ts:30-129` -- `parseStagesBlock()` to port as inline-duplicate to spacebridge/ui/lib/
+- `tools/dashboard/src/types.ts:5-15` -- `Stage` interface (name, worktree, concurrency, gate, terminal, initial, feedback_to, conditional, model)
+- `tools/dashboard/src/discovery.ts:73-79` -- `entityCountByStage` grouping pattern (group entities by `status` field)
+- `references/first-officer-shared-core.md:18-22` -- FO hook discovery: scans `_mods/*.md` for `## Hook:` sections, registers startup/idle/merge
+- `references/claude-first-officer-runtime.md:104` -- FO event loop: idle hooks fire when nothing dispatchable
 
 ## Stage Report: explore
 
@@ -150,3 +178,25 @@ Entity detail page (`/entity/[slug]`) currently uses `limit(1)` to pick the firs
 - [x] Scale assessment: confirmed Medium
   15 files across 4 layers; 3 options + 1 question align with Medium complexity
 - [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident 0.85-0.95 via deep file reads, no external tech claims in assumptions, purely internal codebase patterns)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- entity is Medium scope, no children proposed
+- [x] Re-validation: 6 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps (responsive below threshold), 0 research re-validated
+  All evidence lines re-read in-session; all hold
+- [x] Assumptions confirmed: 7 / 7 (0 corrected)
+  A-1~A-6 confirmed via batch; A-7 (color scheme) added and confirmed via Step 4.5 exploration
+- [x] Options selected: 3 / 3
+  O-1 Port parseStagesBlock() (recommended); O-2 Shared SSE context provider (recommended); O-3 Scan all projectRoots (recommended)
+- [x] Questions answered: 1 / 1
+  Q-1 mod hook mapping -- hardcode 3-type semantics (merge→shipped pill, startup/idle→FO annotation)
+- [x] Open exploration: 2 gray areas surfaced (0 from templates, 1 from cross-entity, 0 from directive, 1 via captain question)
+  A-7 color scheme (Primer→Tailwind); cross-entity note (060 cutover ordering)
+- [x] Canonical refs added: 6
+  visualizer.js, parsing.ts, types.ts, discovery.ts, first-officer-shared-core.md, claude-first-officer-runtime.md
+- [x] Context status: ready
+  gate passed: all assumptions confirmed, all options selected, all Qs answered
+- [x] Handoff mode: loose
+  captain must say "execute 094" or FO picks up in separate session
+- [x] Clarify duration: 7 questions asked, session complete
+  1 batch confirmation + 3 options (O-1, O-2, O-3) + 1 question (Q-1) + 2 exploration iterations
