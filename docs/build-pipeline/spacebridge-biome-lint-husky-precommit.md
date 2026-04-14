@@ -2,7 +2,7 @@
 id: 096
 title: "Biome lint + Husky precommit hooks for spacebridge"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: captain (2026-04-14)
 created: 2026-04-14T18:00:00+08:00
 started:
@@ -35,18 +35,84 @@ children:
 - **Related entities**: 054 -- Entity detail page (shipped) -- recent spacebridge work that would benefit from lint. 053 -- War room (shipped) -- established the Next.js + Bun + Tailwind stack.
 - **Created**: 2026-04-14T18:00:00+08:00
 
-## Notes
+## Brainstorming Spec
+
+**APPROACH**: Install Biome as the sole linter/formatter for spacebridge (no ESLint — no existing config to preserve). Configure a single `spacebridge/biome.json` covering both `ui/` (Next.js React) and `src/` (plain TypeScript). Install Husky via `bunx husky init` at the spacebridge root, configure lint-staged in `spacebridge/package.json` to run `biome check --staged` (lint + format in one pass) on staged `.ts`/`.tsx`/`.js` files. Add `tsc --noEmit` as a separate precommit step for type-checking. No tests in precommit — defer to CI/quality stage for fast commit feedback. Add `biome:check` and `biome:fix` scripts to `spacebridge/ui/package.json` for manual invocation.
+
+**ALTERNATIVE**: Add ESLint with `eslint-config-next` alongside Biome (Biome for format, ESLint for Next.js-specific lint rules). -- D-01 Rejected: no existing ESLint config to preserve (grep returns 0 eslint config files), Biome covers lint + format in one tool with 10-100x speed advantage over ESLint + Prettier, and Biome already supports JSX/TSX with React-specific rules.
+
+**GUARDRAILS**:
+- Scope strictly limited to `spacebridge/` — do NOT touch spacedock engine, `tools/dashboard/`, or repo root config
+- Must work with Bun as package manager (`bun add -D`, `bunx husky init`, not npm/yarn)
+- Biome config must handle both Next.js React JSX (`spacebridge/ui/`) and plain TypeScript (`spacebridge/src/`) in one config
+- Precommit must be fast (<5s) — lint + format + typecheck only, no tests
+
+**RATIONALE**: Biome is the correct choice for a greenfield setup — no existing ESLint config to migrate, Biome is orders of magnitude faster, and covers both lint and format in a single binary. A single `biome.json` at the spacebridge root avoids config duplication between ui/ and src/. Husky + lint-staged is the standard precommit solution that works with Bun. Excluding tests from precommit keeps commit friction low — the pipeline's quality stage handles comprehensive testing.
+
+## Acceptance Criteria
+
+- `spacebridge/biome.json` exists with lint + format rules covering `.ts`, `.tsx`, `.js` files (how to verify: `cat spacebridge/biome.json` parses as valid JSON with `linter` and `formatter` sections)
+- Husky is initialized at spacebridge root with a precommit hook that runs lint-staged (how to verify: `.husky/pre-commit` exists and contains `lint-staged` or `bunx lint-staged`)
+- lint-staged config runs `biome check --staged` on staged TypeScript/JavaScript files (how to verify: `grep -r "biome" spacebridge/package.json` or `spacebridge/.lintstagedrc`)
+- `tsc --noEmit` runs as part of the precommit flow (how to verify: precommit hook or lint-staged config includes tsc)
+- A deliberately malformatted file is caught by precommit and blocks the commit (how to verify: create a file with bad formatting, `git add` it, attempt `git commit`, observe precommit failure)
+
+## Notes (Captain Context)
 
 ### Spacebridge Stack Context
 
-- **Frontend**: Next.js 15 (App Router) + Tailwind CSS v4 + shadcn/ui -- at `spacebridge/ui/`
+- **Frontend**: Next.js 16 (App Router) + Tailwind CSS v4 + shadcn/ui -- at `spacebridge/ui/`
 - **Backend/Domain**: TypeScript with Drizzle ORM, fmodel CQRS pattern -- at `spacebridge/src/`
 - **Runtime**: Bun (package manager + test runner + bundler)
-- **Existing lint**: check what's currently configured (may have eslint from Next.js scaffolding)
+- **Existing lint**: NONE — no ESLint config, no Biome config, no Prettier config. Clean slate.
 
-### Key Decisions for Brainstorm
+## Assumptions
 
-1. **Biome vs ESLint**: Biome as full replacement or alongside ESLint? (Biome covers lint + format in one tool, much faster than ESLint + Prettier)
-2. **Scope of tsc in precommit**: Full `tsc --noEmit` vs incremental `tsc --noEmit --incremental`? Full is safer but slower.
-3. **Test in precommit**: Run affected tests (`bun test --changed`) or defer to CI? Fast precommit = lint + format + typecheck only.
-4. **Biome config location**: Root `biome.json` at `spacebridge/` or separate configs per subdirectory?
+A-1: No existing linter/formatter config exists in spacebridge — clean slate installation.
+Confidence: 🟢 Confident (0.95)
+Evidence: `glob spacebridge/**/eslint*` returns only bundled Next.js file in node_modules; no `biome.json`, no `.prettierrc`, no `.eslintrc` found. `spacebridge/ui/package.json` has no lint/format scripts.
+
+A-2: Bun supports Husky initialization via `bunx husky init` and lint-staged execution.
+Confidence: 🟡 Likely (0.75)
+Evidence: Bun documentation claims npm package compatibility; Husky v9+ uses a simple shell script approach that is runtime-agnostic. No spacedock codebase precedent to confirm.
+
+A-3: Biome supports Next.js 16 + React 19 JSX/TSX out of the box.
+Confidence: 🟡 Likely (0.75)
+Evidence: Biome docs claim React/JSX support; no spacedock codebase precedent. Next.js 16 is very new — potential edge cases with App Router patterns.
+
+A-4: Single `biome.json` at `spacebridge/` can cover both `ui/` and `src/` without subdirectory configs.
+Confidence: 🟢 Confident (0.85)
+Evidence: Biome's `include`/`exclude` patterns support directory scoping in a single config file. Common pattern in monorepo setups.
+
+## Option Comparisons
+
+(none -- approach is clear, captain pre-identified decisions in Notes resolve to single path)
+
+## Open Questions
+
+(none -- all 4 captain-identified decisions resolved by codebase analysis: no ESLint to keep, Biome covers all, single config, no tests in precommit)
+
+## Decomposition Recommendation
+
+Not warranted. Small entity, 3-4 config files to create, no complex logic.
+
+## Canonical References
+
+- `spacebridge/ui/package.json` -- current scripts and dependencies (no lint scripts)
+- `spacebridge/package.json` -- root package.json (lint-staged config target)
+
+## Stage Report: explore
+
+- [x] Files mapped: 3 across config targets
+  spacebridge/biome.json (to create), spacebridge/package.json (lint-staged config), spacebridge/ui/package.json (scripts + existing deps)
+- [x] Assumptions formed: 4 (Confident: 2, Likely: 2, Unclear: 0)
+  A-1 clean slate (0.95), A-2 Bun+Husky compat (0.75), A-3 Biome+Next16 compat (0.75), A-4 single config (0.85)
+- [x] Options surfaced: 0
+  Captain pre-identified decisions resolve to single path
+- [x] Questions generated: 0
+  All resolved by codebase analysis
+- [x] α markers resolved: 0 / 0
+  No α markers
+- [x] Scale assessment: Small confirmed
+  3-4 config files to create/modify
+- [x] Research dispatched: 0 researchers (skipped -- A-2 and A-3 are external tech claims but Likely confidence, could warrant research in a larger entity; accepted as-is for Small scope)
