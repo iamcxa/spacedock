@@ -84,9 +84,13 @@ export default async function SharePage({ params }: PageProps) {
     const { sessions, comments } = await import("@/lib/schema");
     const handle = openReadOnlyDb();
 
-    const sessionRows = handle.db.select({ projectRoot: sessions.projectRoot }).from(sessions).limit(1).all();
-    if (sessionRows.length > 0) {
-      projectRoot = sessionRows[0].projectRoot;
+    // Try env var first (reliable when no active CC session), then sessions table
+    projectRoot = process.env.SPACEBRIDGE_PROJECT_ROOT ?? null;
+    if (!projectRoot) {
+      const sessionRows = handle.db.select({ projectRoot: sessions.projectRoot }).from(sessions).limit(1).all();
+      if (sessionRows.length > 0) {
+        projectRoot = sessionRows[0].projectRoot;
+      }
     }
 
     if (projectRoot) {
