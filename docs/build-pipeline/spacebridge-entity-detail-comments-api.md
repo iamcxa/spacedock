@@ -811,3 +811,26 @@ None. All five fix commits are clean and contained. No scope creep, no regressio
 ### Verdict
 
 PASS — advance to UAT.
+
+### Feedback Cycle 2
+
+**Scope**: Captain UAT live browser testing — scope expansion (bugs + new features)
+
+**Commits delivered**:
+- `96815a4` — fix(054): replace window.location.reload() with router.refresh()
+- `36d7633` — fix(054): normalize section headings for comment matching
+- `c7f3cc9` — feat(054): optimistic comment update with local state
+- `46e574c` — feat(054): 3-mode comment UX — document-level, section-level, text-selection
+
+**Fix 1 — router.refresh()**: Replaced `window.location.reload()` in `add-comment-form.tsx` and `window.location.reload()` in `comment-thread.tsx` (reply submitted handler) with `useRouter().refresh()`. Triggers RSC re-fetch without full page reload; client state preserved.
+
+**Fix 2 — Heading normalization**: Strip `## ` prefix before storing and grouping everywhere. Normalized in: POST route (before persist), GET route (before grouping), `page.tsx` (sectionHeadings extraction + commentsBySection key), `entity-body.tsx` (h2 lookup key). "## Directive" and "Directive" now always resolve to the same section.
+
+**Fix 3 — Optimistic update**: Converted `entity-body.tsx` to Client Component with `useState(initialCommentsBySection)`. `AddCommentForm` now accepts `onCommentAdded?: (comment: CommentRow) => void` callback and returns the new comment object on POST success. Parent appends optimistically then calls `router.refresh()` in background for RSC re-sync.
+
+**Feature 4 — 3-mode comment UX**:
+- **(a) Document-level**: `sectionHeading: ""` — "General (document)" option added to dropdown. Document-level comments display above body under "Document Comments" label.
+- **(b) Section-level**: existing dropdown (normalized via Fix 2).
+- **(c) Text-selection**: New `TextSelectionPopover` Client Component. Listens for `mouseup` on article element via `containerRef`. Detects selection within container, positions floating button via `getBoundingClientRect()`. Expands to mini form pre-filled with `selectedText` and auto-detected nearest `h2` heading. `Comment.tsx` updated to accept optional `selectedText` prop and renders it as a blockquote above comment content.
+
+**Test results**: 250/250 pass (no regressions). `bun run --bun next build` from `spacebridge/ui/` — compiled successfully, TypeScript 0 errors.
