@@ -1,15 +1,15 @@
 ---
 id: 104
 title: Brainstorm Nüwa-Style Distillation (v2) -- Multi-Lens Collection + Triple-Verification Gate + Tension Preservation
-status: clarify
-context_status: awaiting-clarify
+status: plan
+context_status: ready
 source: /build (decomposed from epic 102)
 created: 2026-04-14T00:00:00Z
-started:
+started: 2026-04-14T23:11:25Z
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-brainstorm-nuwa-distillation
 issue:
 pr:
 intent: feature
