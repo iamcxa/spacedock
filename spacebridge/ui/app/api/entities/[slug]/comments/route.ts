@@ -4,7 +4,7 @@
 // POST: parse Zod schema, load state via replay, decide, append events, upsert snapshot,
 //       write notification event to events table for SSE feed, return 201.
 
-import { eq, asc } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 

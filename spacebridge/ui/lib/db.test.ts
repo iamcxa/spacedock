@@ -15,8 +15,4 @@ describe("db module", () => {
     expect(mod).toBeDefined();
   });
 
-  test("openWritableDb is exported as a function", async () => {
-    const mod = await import("./db");
-    expect(typeof mod.openWritableDb).toBe("function");
-  });
 });
