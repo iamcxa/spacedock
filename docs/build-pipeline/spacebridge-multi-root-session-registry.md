@@ -418,6 +418,77 @@ Suggested options: (a) All files -- emit for every file change in watched dirs, 
 | O-2: events table sentinel values | Task 10 | `bun test spacebridge/src/domain/session/watcher.test.ts` | pending |
 | Q-1: *.md only file filter | Task 10 | `bun test spacebridge/src/domain/session/watcher.test.ts` | pending |
 
+## Stage Report: execute
+
+- [x] All 12 plan tasks executed (per-task commit SHAs recorded)
+  - Task 1 (types + errors): 1b88a0b
+  - Task 2 (decider + tests): 7aa4e40
+  - Task 3 (evolve + replay + tests): 278e619
+  - Task 4 (Zod schemas + tests): de94698
+  - Task 5 (session_events DDL): 1153249
+  - Task 6 (persistence layer): 6f5fc50
+  - Task 7 (registry bridge): f60cd8e
+  - Task 8 (heartbeat IPC handler + shim sender): 18cd5b1
+  - Task 9 (heartbeat monitor): b27ab2c
+  - Task 10 (file watcher): 4270573
+  - Task 11 (graceful shutdown): 92228dc
+  - Task 12 (replay integration test): a9c74d5
+- [x] Wave order respected (Wave 1→2→3→4→5)
+  - Wave 1 (Tasks 1-4): types, decider, evolve, schemas — pure, no DB deps
+  - Wave 2 (Tasks 5-6): session_events DDL, persistence layer — depend on Wave 1 types
+  - Wave 3 (Tasks 7-8): registry bridge, IPC heartbeat — depend on Wave 2
+  - Wave 4 (Tasks 9-10): heartbeat monitor, file watcher — depend on Wave 3
+  - Wave 5 (Tasks 11-12): graceful shutdown, replay integration — depend on Wave 4
+- [x] All acceptance criteria from each task verified
+  - AC-1: register on empty state → session_registered (decider.test.ts PASS)
+  - AC-2: duplicate register → session_reconnected idempotent (decider.test.ts PASS)
+  - AC-3: heartbeat on active → session_heartbeat (decider.test.ts PASS)
+  - AC-4: heartbeat timeout → disconnect (heartbeat-monitor.test.ts PASS)
+  - AC-5: discoverWorkflows per-root union, deduplication (registry.test.ts PASS)
+  - AC-6: file watcher debounced event → events table (watcher.test.ts PASS)
+  - AC-7: watcher scope contracts on disconnect (watcher.test.ts PASS)
+  - AC-8: event replay on restart reconstructs SessionState (replay.integration.test.ts PASS)
+  - A-3: heartbeat IPC handler in socket-server (socket-server.test.ts PASS — existing tests pass)
+  - A-5: Zod schemas with .passthrough() (schemas.test.ts PASS)
+  - A-12: graceful shutdown disconnects all sessions (shutdown.test.ts PASS)
+  - A-13: shim-side heartbeat sender (socket-client.test.ts PASS — existing tests pass)
+  - session_events table + DDL (schema.test.ts + db.test.ts PASS)
+  - session persistence layer (persistence.test.ts PASS)
+  - O-1: per-root discoverWorkflows iteration (registry.ts implementation + registry.test.ts)
+  - O-2: events table sentinel values entity="*", stage="watcher" (watcher.test.ts PASS)
+  - Q-1: *.md only file filter (watcher.test.ts PASS)
+- [x] No scope creep beyond files_modified per task
+  - Only files listed in each task's files_modified were touched
+  - spacebridge/node_modules: bun install was needed (zod not yet installed — first time running tests)
+- [x] Files Modified
+  - spacebridge/src/domain/session/types.ts (new)
+  - spacebridge/src/domain/session/errors.ts (new)
+  - spacebridge/src/domain/session/decider.ts (new)
+  - spacebridge/src/domain/session/decider.test.ts (new)
+  - spacebridge/src/domain/session/evolve.ts (new)
+  - spacebridge/src/domain/session/evolve.test.ts (new)
+  - spacebridge/src/domain/session/schemas.ts (new)
+  - spacebridge/src/domain/session/schemas.test.ts (new)
+  - spacebridge/src/schema.ts (modify — added sessionEvents table)
+  - spacebridge/src/db.ts (modify — added session_events DDL in applySchema)
+  - spacebridge/src/domain/session/persistence.ts (new)
+  - spacebridge/src/domain/session/persistence.test.ts (new)
+  - spacebridge/src/domain/session/registry.ts (new)
+  - spacebridge/src/domain/session/registry.test.ts (new)
+  - spacebridge/src/ipc/types.ts (modify — added HeartbeatPayload)
+  - spacebridge/src/ipc/socket-server.ts (modify — added onHeartbeat option + heartbeat handler)
+  - spacebridge/src/ipc/socket-client.ts (modify — added heartbeatIntervalMs + setInterval sender)
+  - spacebridge/src/domain/session/heartbeat-monitor.ts (new)
+  - spacebridge/src/domain/session/heartbeat-monitor.test.ts (new)
+  - spacebridge/src/domain/session/watcher.ts (new)
+  - spacebridge/src/domain/session/watcher.test.ts (new)
+  - spacebridge/src/domain/session/shutdown.ts (new)
+  - spacebridge/src/domain/session/shutdown.test.ts (new)
+  - spacebridge/src/domain/session/replay.integration.test.ts (new)
+- [x] Pre-commit hooks passed on all commits
+  - All 12 task commits succeeded with no hook failures
+  - Full test suite: 241 pass, 0 fail across 32 files (bun test spacebridge/src/)
+
 ## Stage Report: plan
 
 - [x] Research findings produced (## Research Findings with 5 domains)
