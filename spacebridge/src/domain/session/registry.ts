@@ -4,11 +4,13 @@
 // A-8: daemon-internal only — not an RPC interface like CoordinationClient.
 
 import { discoverWorkflows } from "../../../../tools/dashboard/src/discovery";
+import { sessionEvents as sessionEventsTable } from "../../schema";
 import type { SpacebridgeDb } from "../../db";
 import type { RegisterPayload } from "../../ipc/types";
 import { decide } from "./decider";
 import { evolve, replay } from "./evolve";
-import { appendEvents, countEvents, deleteSnapshot, loadAllEvents, upsertSnapshot } from "./persistence";
+import { InvalidProjectRoot } from "./errors";
+import { appendEvents, deleteSnapshot, upsertSnapshot } from "./persistence";
 import type { SessionEvent, SessionRecord, SessionState } from "./types";
 
 export interface Workflow {
@@ -36,16 +38,16 @@ export async function createSessionRegistry(
 ): Promise<SessionRegistry> {
   const getNow = opts.now ?? (() => Date.now());
 
-  // Replay all events on startup to rebuild in-memory state
-  const allEvents = await loadAllEvents(opts.db);
-  let state: SessionState = replay(allEvents);
-
-  // Track next sequence number per aggregate (sessionId)
-  const seqCounters = new Map<string, number>();
+  // Single DB scan: load all rows to build both in-memory state and seqCounters
   const rows = await opts.db
     .select()
-    .from((await import("../../schema")).sessionEvents)
-    .orderBy((await import("../../schema")).sessionEvents.sequenceNumber);
+    .from(sessionEventsTable)
+    .orderBy(sessionEventsTable.sequenceNumber);
+  const allEvents = rows.map((r) => JSON.parse(r.payload) as SessionEvent);
+  let state: SessionState = replay(allEvents);
+
+  // Compute next sequence number per aggregate from loaded rows
+  const seqCounters = new Map<string, number>();
   for (const row of rows) {
     const cur = seqCounters.get(row.aggregateId) ?? 0;
     if (row.sequenceNumber >= cur) {
@@ -53,15 +55,15 @@ export async function createSessionRegistry(
     }
   }
 
-  function nextSeq(aggregateId: string): number {
+  function nextSeq(aggregateId: string, count: number): number {
     const n = seqCounters.get(aggregateId) ?? 1;
-    seqCounters.set(aggregateId, n + 1);
+    seqCounters.set(aggregateId, n + count);
     return n;
   }
 
   async function applyEvents(aggregateId: string, events: SessionEvent[]): Promise<void> {
     if (events.length === 0) return;
-    await appendEvents(opts.db, aggregateId, events, nextSeq(aggregateId));
+    await appendEvents(opts.db, aggregateId, events, nextSeq(aggregateId, events.length));
     for (const ev of events) {
       state = evolve(state, ev);
     }
@@ -69,6 +71,13 @@ export async function createSessionRegistry(
 
   return {
     async register(payload: RegisterPayload): Promise<SessionEvent[]> {
+      const { projectRoot } = payload;
+      if (!projectRoot.startsWith("/")) {
+        throw new InvalidProjectRoot(projectRoot, "must be an absolute path");
+      }
+      if (projectRoot.split("/").includes("..")) {
+        throw new InvalidProjectRoot(projectRoot, "must not contain '..' segments");
+      }
       const now = getNow();
       const events = decide(
         {
