@@ -306,8 +306,9 @@ Step 0.5 evidence re-validation result: A-1 holds (SKILL hybrid-classification-h
 - Sibling child 104 `docs/build-pipeline/brainstorm-nuwa-distillation.md` Plan (forthcoming sibling worktree) is reference implementation for brainstorm-stage Nüwa port; 105 mirrors the tier-tag + Core Tensions + Honest Boundaries + escape-hatch patterns at explore.
 - Epic 102 Stage Report: explore demonstrates 3-parallel `spacedock:code-explorer` dispatch; 105 extends to 4-angle with fixed prompt-level specialization.
 - `skills/build-brainstorm/references/` + `skills/build-plan/references/` show the skill-scoped references/ pattern 105 reuses for `references/parallel-explorer-angles.md`.
-
-## PLAN
+- `docs/build-pipeline/README.md` `stages:` block `[primary]` -- FO dispatch-graph source of truth; Task 6 audit artifact enumerates every explore invocation path against this frontmatter's stage ordering + `skill:` bindings for build-explore.
+- `agents/ensign.md` `[primary]` -- ensign wrapper agent definition (tools list, Skill/Read/Grep/Glob available, Agent explicitly absent); Task 6 audit classifies which FO dispatch paths land here (Mode B) vs SO-direct (Mode A).
+- `references/claude-ensign-runtime.md` `[primary]` -- ensign shared-core runtime contract documenting Agent tool absence; Task 6 audit cites for Mode A/B availability per invocation path.
 
 <task id="task-0" model="sonnet" wave="0" skills="" test_first="false">
   <read_first>
@@ -558,10 +559,10 @@ Step 0.5 evidence re-validation result: A-1 holds (SKILL hybrid-classification-h
 
 <task id="task-6" model="sonnet" wave="3" skills="" test_first="false">
   <read_first>
-    - skills/build-pipeline/README.md
+    - docs/build-pipeline/README.md
     - skills/build-explore/SKILL.md
     - agents/ensign.md
-    - references/ensign-shared-core.md
+    - references/claude-ensign-runtime.md
     - docs/build-pipeline/brainstorm-dual-lens-cross-entity-dedup.md
   </read_first>
 
