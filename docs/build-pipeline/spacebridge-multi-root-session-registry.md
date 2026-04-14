@@ -10,7 +10,7 @@ completed:
 verdict:
 score: 0.0
 issue:
-pr:
+pr: "#47"
 uat_pending_count: 1
 intent: feature
 scale: Medium
