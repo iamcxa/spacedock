@@ -218,12 +218,38 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Refactor Step 2 to dispatch spacedock:code-explorer for fresh-context mapping | ✅ final | 2026-04-12 |
+| explore-nuwa-subagent-first | plan | Port 7/8/9/10/11: Mode A 4-angle fanout + Track-A triple-gate + tier tags + Core Tensions/Honest Boundaries + path-aware self-test | 🔵 planned | 2026-04-15 |
+
+### skills/build-explore/references/hybrid-classification-heuristic.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| explore-nuwa-subagent-first | plan | Port 8: Track-A triple-gate (cross-angle recurrence + generative-power + exclusivity) replacing single-path assumption classification | 🔵 planned | 2026-04-15 |
 
 ### skills/build-explore/references/output-format.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | entity-body-rendering-hotfixes | plan | Add canonical detail line exemplars subsection per Q-2 answer | 🔵 planned | 2026-04-13 |
+| explore-nuwa-subagent-first | plan | Port 9/10: tier-tag syntax [primary|secondary|tertiary] on Evidence lines + first-class Core Tensions + Honest Boundaries sections with escape-hatch literal | 🔵 planned | 2026-04-15 |
+
+### skills/build-explore/references/parallel-explorer-angles.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| explore-nuwa-subagent-first | plan | New file: 4-angle specialization (prevailing patterns / recent decisions / sibling entity / negative space) with per-angle seed patterns | 🔵 planned | 2026-04-15 |
+
+### docs/build-pipeline/_docs/explore-invocation-path-audit.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| explore-nuwa-subagent-first | plan | New file: FO dispatch-graph audit enumerating explore invocation paths + Mode A/B classification per path (Honest Boundary 9) | 🔵 planned | 2026-04-15 |
+
+### docs/build-pipeline/explore-nuwa-subagent-first.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| explore-nuwa-subagent-first | plan | Entity body Canonical References + Ship Notes updates post-implementation; coordinates with sibling 104 extraction-framework vendoring | 🔵 planned | 2026-04-15 |
 
 ### skills/build-plan/SKILL.md
 
