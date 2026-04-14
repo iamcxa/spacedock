@@ -262,18 +262,21 @@ describe("comments table", () => {
 });
 
 describe("share_tokens table", () => {
-  test("exists with expected columns", () => {
+  test("exists with expected columns (bearer-token model)", () => {
     const { sqlite } = createMemoryDb();
     const info = sqlite.query("PRAGMA table_info(share_tokens)").all() as Array<{ name: string }>;
     const cols = info.map((c) => c.name);
     expect(cols).toContain("id");
     expect(cols).toContain("token");
-    expect(cols).toContain("password_hash");
-    expect(cols).toContain("entity_paths");
-    expect(cols).toContain("stages");
-    expect(cols).toContain("label");
+    expect(cols).toContain("entity_slug");
     expect(cols).toContain("created_at");
     expect(cols).toContain("expires_at");
+    // Old password-based columns removed per O-1
+    expect(cols).not.toContain("password_hash");
+    expect(cols).not.toContain("entity_paths");
+    expect(cols).not.toContain("stages");
+    expect(cols).not.toContain("label");
+    expect(cols).not.toContain("hash_algorithm");
     sqlite.close();
   });
 
@@ -299,23 +302,20 @@ describe("share_tokens table", () => {
     sqlite.close();
   });
 
-  test("basic CRUD: insert and select", () => {
+  test("basic CRUD: insert and select bearer-token row", () => {
     const { sqlite, db } = createMemoryDb();
     const now = Date.now();
     db.insert(shareTokens).values({
-      token: "share-abc123",
-      passwordHash: "hashed_password",
-      entityPaths: JSON.stringify(["/docs/entity-001.md"]),
-      stages: JSON.stringify(["plan", "execute"]),
-      label: "Review Access",
+      token: "a".repeat(48),
+      entitySlug: "my-entity",
       createdAt: now,
       expiresAt: now + 86400000,
     }).run();
 
     const rows = db.select().from(shareTokens).all();
     expect(rows.length).toBe(1);
-    expect(rows[0].token).toBe("share-abc123");
-    expect(rows[0].label).toBe("Review Access");
+    expect(rows[0].token).toBe("a".repeat(48));
+    expect(rows[0].entitySlug).toBe("my-entity");
     sqlite.close();
   });
 });
