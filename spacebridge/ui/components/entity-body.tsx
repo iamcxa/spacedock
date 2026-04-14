@@ -26,7 +26,7 @@ interface EntityBodyProps {
   sectionHeadings: string[];
   allComments: CommentRow[];
   entitySlug: string;
-  onCommentAdded: (comment: CommentRow) => void;
+  onCommentAdded?: (comment: CommentRow) => void;
 }
 
 function wrapTextRange(
