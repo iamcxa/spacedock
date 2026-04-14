@@ -2,7 +2,7 @@
 id: 093
 title: "Comment UX polish — right panel layout + text-selection highlights"
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: /build
 created: 2026-04-14T12:00:00+08:00
 started:
@@ -58,22 +58,63 @@ depends-on: [054]
 - Given a text-selection comment whose `selectedText` no longer matches body content, when rendered, then no error occurs and the comment still appears in the panel without a highlight (how to verify: bun test — render with mismatched selectedText, assert no exception)
 - Given a narrow viewport (<768px), when rendered, then the comment panel stacks below the entity body (how to verify: resize browser, assert vertical stacking)
 
-## Open Questions
-
-(explore stage will populate)
-
 ## Assumptions
 
-(explore stage will populate)
+A-1: Current layout is single-column `max-w-4xl` with comments rendered inline under section headings via `EntityBody` component.
+Confidence: 🟢 Confident (0.95)
+Evidence: `spacebridge/ui/app/entity/[slug]/page.tsx:140` -- `<main className="container mx-auto px-4 py-8 max-w-4xl">`; `:163-175` -- `<EntityBody>` receives `commentsBySection` and renders comments inline
+
+A-2: Comments already have `selectedText` field in DB schema, available on the page as `commentRows[].selectedText`.
+Confidence: 🟢 Confident (0.95)
+Evidence: `spacebridge/ui/app/entity/[slug]/page.tsx:37` -- `selectedText: string` in commentRows type; `spacebridge/ui/lib/schema.ts` defines the column
+
+A-3: shadcn ScrollArea, Card, Badge components already in project dependencies (from 054 ship).
+Confidence: 🟢 Confident (0.95)
+Evidence: `spacebridge/ui/package.json:12-13` -- `@radix-ui/react-scroll-area`, `@radix-ui/react-tabs`; shadcn component set established by 053
+
+A-4: Text-selection popover component already exists from 054 — can be extended for highlight click behavior.
+Confidence: 🟡 Likely (0.75)
+Evidence: `spacebridge/ui/components/text-selection-popover.tsx` exists. Needs verification that it handles `selectedText` matching for highlight injection.
+
+A-5: EntityBody currently receives and renders comments inline — refactor must separate body rendering from comment rendering to enable the two-column layout.
+Confidence: 🟢 Confident (0.90)
+Evidence: `page.tsx:163-175` -- EntityBody receives `commentsBySection`, `repliesByParent`, `entitySlug` props alongside `body` and `sectionHeadings`. The component is responsible for both markdown body AND comment display.
 
 ## Option Comparisons
 
-(explore stage will populate)
+### O-1: Text highlight injection method
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| useEffect + DOM TreeWalker post-hydration | Matches entity 013 proven pattern; works on any rendered HTML; decoupled from markdown parser | DOM manipulation in React is fragile; must re-run on body changes | Medium | Recommended |
+| React-level: custom remark plugin during markdown parse | Type-safe; React-native; no post-hydration DOM surgery | Tightly coupled to markdown parser; harder to match arbitrary selectedText spans that cross markdown nodes | High | Not recommended |
+
+## Open Questions
+
+(none -- approach is clear, 054 provides all needed infrastructure)
 
 ## Decomposition Recommendation
 
-(explore stage will populate if scope warrants it)
+Not warranted. 5-6 files, all UI components in the same app. Single coherent change.
 
 ## Canonical References
 
-(clarify stage will populate)
+- `spacebridge/ui/app/entity/[slug]/page.tsx:140-179` -- current single-column layout (refactor target)
+- `spacebridge/ui/components/entity-body.tsx` -- inline comment rendering (must separate body from comments)
+- `spacebridge/ui/components/text-selection-popover.tsx` -- text selection infrastructure from 054
+
+## Stage Report: explore
+
+- [x] Files mapped: 6 across view, component layers
+  page: 1 (entity/[slug]/page.tsx), components: 4 (entity-body, comment, comment-thread, text-selection-popover), api: 1 (comments route -- no changes, reference only)
+- [x] Assumptions formed: 5 (Confident: 4, Likely: 1, Unclear: 0)
+  A-1 layout (0.95), A-2 selectedText field (0.95), A-3 shadcn deps (0.95), A-4 popover extension (0.75), A-5 EntityBody separation (0.90)
+- [x] Options surfaced: 1
+  O-1 highlight injection method (useEffect TreeWalker vs remark plugin)
+- [x] Questions generated: 0
+  054 infrastructure sufficient
+- [x] α markers resolved: 0 / 0
+  No α markers
+- [x] Scale assessment: Small confirmed
+  5-6 UI files, no backend changes
+- [x] Research dispatched: 0 researchers (skipped -- all internal UI patterns, entity 013 prior art in codebase)
