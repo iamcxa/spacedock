@@ -4,6 +4,7 @@
 // Uses Collapsible for reply expansion. Single-level threading (O-1).
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Comment } from "@/components/comment";
@@ -28,6 +29,7 @@ interface CommentThreadProps {
 }
 
 export function CommentThread({ comment, replies, entitySlug }: CommentThreadProps) {
+  const router = useRouter();
   const [showReply, setShowReply] = useState(false);
   const [localResolved, setLocalResolved] = useState(comment.resolved === 1);
 
@@ -37,8 +39,7 @@ export function CommentThread({ comment, replies, entitySlug }: CommentThreadPro
 
   function handleReplySubmitted() {
     setShowReply(false);
-    // Reload to show new reply
-    window.location.reload();
+    router.refresh();
   }
 
   return (

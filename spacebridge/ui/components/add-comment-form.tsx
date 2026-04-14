@@ -4,6 +4,7 @@
 // POSTs to /api/entities/[slug]/comments.
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,7 @@ interface AddCommentFormProps {
 }
 
 export function AddCommentForm({ entitySlug, sectionHeadings }: AddCommentFormProps) {
+  const router = useRouter();
   const [section, setSection] = useState(sectionHeadings[0] ?? "");
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -45,8 +47,7 @@ export function AddCommentForm({ entitySlug, sectionHeadings }: AddCommentFormPr
       } else {
         setContent("");
         setSuccess(true);
-        // Reload to show new comment inline
-        window.location.reload();
+        router.refresh();
       }
     } catch {
       setError("Network error — please try again");
