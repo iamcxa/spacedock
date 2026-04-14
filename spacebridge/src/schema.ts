@@ -90,6 +90,17 @@ export const leaseEvents = sqliteTable("lease_events", {
   timestamp: integer("timestamp").notNull(),         // epoch-ms
 });
 
+// ─── session_events — [full CQRS] fmodel event log for session aggregate (design doc §4.3) ──
+
+export const sessionEvents = sqliteTable("session_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  aggregateId: text("aggregate_id").notNull(),       // sessionId
+  sequenceNumber: integer("sequence_number").notNull(),
+  eventType: text("event_type").notNull(),           // session_registered | session_reconnected | session_heartbeat | session_disconnected
+  payload: text("payload").notNull(),                // JSON-serialized event body
+  timestamp: integer("timestamp").notNull(),         // epoch-ms
+});
+
 // ─── share_tokens — [plain drizzle] ──────────────────────────────────────────
 
 export const shareTokens = sqliteTable("share_tokens", {
