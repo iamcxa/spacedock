@@ -5,10 +5,10 @@ status: shipped
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started: 2026-04-14T18:20:00+08:00
-completed:
-verdict:
+completed: 2026-04-14T08:23:10Z
+verdict: PASSED
 score: 0.0
-worktree: .worktrees/spacedock-ensign-spacebridge-share-tunnel-rebuild
+worktree:
 issue:
 pr: "#50"
 intent: feature
