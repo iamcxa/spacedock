@@ -632,3 +632,71 @@ status: PASSED
 ### Verdict
 
 All mechanical checks pass. Pre-existing test failures are unrelated to this entity's UI changes. Quality stage **auto-advances**.
+
+## Stage Report: review
+
+status: PASSED (with LOW findings — no blockers)
+
+### Pre-scan Checklist
+
+1. **CLAUDE.md compliance walk**: DONE
+2. **Stale references grep**: DONE
+3. **Import/dependency chain check**: DONE
+4. **Plan consistency check**: DONE
+
+### Findings Table
+
+| # | Severity | Root | Location | Description |
+|---|----------|------|----------|-------------|
+| F-1 | LOW | CODE | `entity-detail-client.tsx:79` | `allHighlightComments` includes replies (`parentId !== null`) — replies rarely have `selectedText` in practice, but the filter is logically incomplete. Should add `&& c.parentId === null` to match the intent of highlighting top-level text-selection comments only. |
+| F-2 | LOW | CODE | `entity-body.tsx:3-6` (ABOUTME) | ABOUTME stale after refactor: says "injects comment threads per section heading" — comment threads were moved to CommentPanel in this entity. Non-blocking (documentation drift only). |
+| F-3 | NIT | CODE | `entity-body.tsx:173` | `setTimeout(..., 700)` for flash cleanup uses a magic number. CSS animation is 0.6s (600ms). 700ms margin is reasonable but inconsistent with `animationend` approach used in `entity-detail-client.tsx:71-73`. No functional issue. |
+| F-4 | NIT | DOC | Entity doc Research Findings:186 | Share page reference says `lg:grid-cols-3` pattern — the implemented share page fix kept `lg:grid-cols-3` (1024px breakpoint) while entity-detail-client uses `md:grid-cols-[7fr_3fr]` (768px). The two pages now have different responsive breakpoints. Acceptable per plan (spec said 768px for entity detail; share page was not in scope), but worth noting for UAT. |
+
+### CLAUDE.md Compliance
+
+- `"use client"` directive present on all 3 new/modified Client Components: PASS
+- ABOUTME header present on all new files: PASS (entity-body.tsx stale — F-2)
+- No new API routes, schema changes, or Route Handlers introduced: PASS
+- shadcn components used (ScrollArea, Badge) — no new dependencies: PASS
+- Strict TypeScript: tsc passes per quality stage: PASS
+- CommentRow interface duplicated across 6 files (pre-existing pattern in this codebase, not introduced by this entity): NIT only
+
+### Stale References
+
+- `tools/dashboard/static/detail.js:1281-1385` — citation correct, TreeWalker function starts at 1281: VALID
+- `tools/dashboard/static/detail.css:594-617` — citation correct, `.comment-highlight` at 594: VALID
+- `spacebridge/ui/app/share/[token]/page.tsx:163` share page two-column pattern — file updated in this entity, citation still valid: VALID
+
+### Import/Dependency Chain
+
+- `comment-panel.tsx` → `ScrollArea`, `Badge`, `CommentThread`, `AddCommentForm`: all 4 files exist, exports match
+- `entity-detail-client.tsx` → `EntityBody`, `CommentPanel`: both exist and export correct names
+- `entity-body.tsx` → `TextSelectionPopover`: `containerRef: React.RefObject<HTMLElement | null>` matches `articleRef = useRef<HTMLElement>(null)`: PASS
+- `page.tsx` → `EntityDetailClient`: import present at line 13, usage at line 150: PASS
+- `share/[token]/page.tsx` → `EntityBody` with new `allComments` prop: `allComments={commentRows}` passed (line 156), `onCommentAdded` optional (no crash): PASS
+
+### Plan Consistency
+
+| Task | Plan AC | Implemented | Status |
+|------|---------|-------------|--------|
+| task-1 | `grid-cols-1 md:grid-cols-[7fr_3fr]` | `entity-detail-client.tsx:82` — confirmed | PASS |
+| task-1 | `max-w-7xl` in page.tsx | `page.tsx:128` — confirmed | PASS |
+| task-2 | `id="comment-{commentId}"` on each card | `comment-panel.tsx:84,115` — confirmed | PASS |
+| task-2 | `ScrollArea` wrapping panel | `comment-panel.tsx:65` — confirmed | PASS |
+| task-3 | `createTreeWalker` in entity-body | `entity-body.tsx:100` — confirmed | PASS |
+| task-3 | `scrollIntoView` on highlight click | `entity-body.tsx:171` — confirmed | PASS |
+| task-3 | CSS in globals.css (normal/hover/resolved/flash/card-flash) | `globals.css:124-150` — all 5 rules present | PASS |
+| task-4 | `scrollToHighlight` callback in entity-detail-client | `entity-detail-client.tsx:64` — confirmed | PASS |
+| task-4 | `onScrollToHighlight` prop in comment-panel | `comment-panel.tsx:31,88,119` — confirmed | PASS |
+| task-5 | No inline CommentThread in entity-body | `grep -c CommentThread entity-body.tsx` → 0 | PASS |
+
+### React Reconciliation Safety
+
+The TreeWalker useEffect dependencies are `[body, allComments]`. On each dependency change, existing marks are unwrapped and DOM normalized before re-applying — this correctly resets the DOM before React re-renders. The `handleArticleClick` is a plain function (not a useEffect hook), so it reads the live DOM at click time without stale closure issues. The approach is safe.
+
+The `wrapTextRange` function mutates `info.node` and `info.start` on split but does not update `info.end`. For the reverse-order segment traversal this is benign: each text node is consumed once per useEffect run, and the full cleanup-before-reapply strategy prevents accumulation. No React reconciliation conflict identified.
+
+### Verdict
+
+**Advance to UAT.** All 4 plan tasks implemented correctly. Two LOW findings (F-1 reply filter gap, F-2 stale ABOUTME) are non-blocking for UAT — F-1 is an edge case (replies with selectedText are not created via the UI), F-2 is documentation only. UAT spec in entity covers all 6 acceptance criteria. No CRITICAL or HIGH findings.
