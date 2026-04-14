@@ -114,15 +114,10 @@ export async function autoForkDaemon(opts: AutoForkOptions): Promise<void> {
 
 /**
  * Resolve the daemon spawn command.
- * SPACEBRIDGE_DEV=1: use bun + relative path to daemon.ts source.
- * Production: use `spacebridge` wrapper CLI on PATH.
+ * Resolves bin/cli.ts relative to this file — no global CLI required (Q-1 decision, entity 059).
  */
 export function resolveDaemonCommand(): string[] {
-  if (process.env.SPACEBRIDGE_DEV === "1") {
-    // Resolve relative to this file: ../../bin/daemon.ts
-    const thisFile = fileURLToPath(import.meta.url);
-    const daemonPath = resolve(dirname(thisFile), "../../bin/daemon.ts");
-    return ["bun", "run", daemonPath, "start"];
-  }
-  return ["spacebridge", "start"];
+  const thisFile = fileURLToPath(import.meta.url);
+  const cliPath = resolve(dirname(thisFile), "../../bin/cli.ts");
+  return ["bun", "run", cliPath, "start"];
 }
