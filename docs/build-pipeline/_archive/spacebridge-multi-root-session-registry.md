@@ -1,16 +1,16 @@
 ---
 id: 057
 title: "Multi-root session registry + file watcher"
-status: plan
+status: shipped
 context_status: ready
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started: 2026-04-14T09:00:00+08:00
-worktree: .worktrees/spacedock-ensign-spacebridge-multi-root-session-registry
-completed:
-verdict:
-score: 0.0
+worktree:
+completed: 2026-04-14T12:00:00+08:00
+verdict: PASSED
+score: 0.95
 issue:
-pr:
+pr: "#47"
 intent: feature
 scale: Medium
 project: spacedock
