@@ -1,14 +1,14 @@
 ---
 id: 109
 title: Plan-Checker Dim Utility Audit -- Empirical Fire Count + Merge/Retire Recommendations
-status: draft
-context_status: pending
+status: shipped
+context_status: ready
 source: /build
 created: 2026-04-15T00:00:00Z
-started:
-completed:
-verdict:
-score:
+started: 2026-04-15T00:00:00Z
+completed: 2026-04-15T00:00:00Z
+verdict: PASSED (direct-sweep retro-ship)
+score: retroactive
 worktree:
 issue:
 pr:
@@ -82,4 +82,24 @@ You are asking for a one-shot audit: look at real plan-checker output from past 
 
 ## Canonical References
 
-(clarify stage will populate)
+- `docs/build-pipeline/_docs/plan-checker-dim-audit.md` -- audit deliverable
+- `skills/build-plan/references/plan-checker-prompt.md:19-172` -- ground-truth dim definitions
+- `skills/build-execute/SKILL.md:353-370` -- Dim 3 duplication explicit by-design note
+- `skills/task-execution/SKILL.md` -- Circular-AC Rule (entity 106) that makes Dim 10 redundant
+- `docs/build-pipeline/plan-checker-multi-angle-nuwa.md` (entity 107, parked) -- audit consumer
+
+## Stage Report: retro-ship
+
+- [x] Retro-ship reason: Small-scale read-only markdown audit; full pipeline ceremony (brainstorm/explore/clarify/plan/execute/quality/review) is overkill for "grep archives + produce report". Direct-sweep retro-ship matches MEMORY "Skill Contract Fixes Are Plan-Driven, Not Pipeline-Driven" precedent (entity 061). Consumer entity 107 is time-sensitive (parked mid-clarify).
+- [x] Deliverable produced: `docs/build-pipeline/_docs/plan-checker-dim-audit.md` (7.8K markdown audit with per-dim verdicts)
+- [x] Data sources swept: 18 archived entities, git log --all, tests/pressure/*.yaml, plan-checker-prompt.md (definitions), build-execute/SKILL.md (Dim 3 duplication)
+- [x] Captured fires extracted: 8 (Dim 3: 3, Dim 7: 5, all other dims: 0 captured)
+- [x] Data scarcity caveat: fire counts are lower-bound (revision-loop resolved fires disappear from history); audit relies on structural analysis + reasoning, NOT statistics
+- [x] Acceptance Criteria satisfied:
+  - AC-1 (10 dim headings): ✓ `grep -cE '^## Dim [0-9]+' = 10`
+  - AC-2 (fire count cells): ✓ blocker_count + warning_count per dim, Dim 9/10 explicit no-data note
+  - AC-3 (verdict per dim): ✓ all 10 have keep / merge-with / retire / defer
+  - AC-4 (merge rationale cites shared sources): ✓ Dim 4+5 merge cites 2 shared data sources
+  - AC-5 (Dim 3 vs build-execute Step 1): ✓ cites build-execute/SKILL.md:353-370 defense-in-depth note
+- [x] Recommendations: 6 keep + 2 merged + 1 defer + 1 retire = 7-unit architecture for 107
+- [x] Verdict: PASSED (direct-sweep retro-ship); unblocks entity 107 resume

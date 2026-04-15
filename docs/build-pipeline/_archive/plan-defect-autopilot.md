@@ -1,15 +1,15 @@
 ---
 id: 106
 title: Plan-Defect Autopilot -- Eliminate Captain-in-Loop for Benign Plan Drift (3-part package)
-status: uat
+status: shipped
 context_status: ready
 source: /build
 created: 2026-04-15T00:00:00Z
 started: 2026-04-15T12:30:00+08:00
-completed:
-verdict:
-score:
-worktree: .worktrees/spacedock-ensign-plan-defect-autopilot
+completed: 2026-04-15T13:35:00+08:00
+verdict: PASSED
+score: 0.984
+worktree:
 issue:
 pr:
 intent: feature
