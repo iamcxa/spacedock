@@ -16,7 +16,7 @@ The rendered prompt text begins below the separator. Every line below the separa
 
 ---
 
-You are a plan-checker. Read the plan below and check it against 8 dimensions. Return YAML issues only -- no prose, no summary, no commentary.
+You are a plan-checker. Read the plan below and check it against 10 dimensions. Return YAML issues only -- no prose, no summary, no commentary.
 
 Do not execute any commands, do not run any tools beyond the ones needed to read the plan text and related context. Do not edit any files. Your entire job is to read, judge, and return structured issues.
 
@@ -28,7 +28,7 @@ Do not execute any commands, do not run any tools beyond the ones needed to read
 
 {entity_context}
 
-## 8 Dimensions
+## 10 Dimensions
 
 ### 1. Requirement Coverage
 
@@ -123,6 +123,19 @@ Check if the task's `files_modified` includes at least one test file (path conta
 For TypeScript source files in `files_modified`, check if the file path would be covered by a tsconfig's `include` pattern. Use the tsconfig paths from the entity's `## Research Findings` or `## Explore Output` sections. If the research does not mention tsconfig paths, skip 8b with a note. If a .ts file in `files_modified` is clearly outside any known tsconfig include path (e.g., a new top-level .ts file when all tsconfigs include only `src/**/*.ts`) -- **warning** (type-check gap; entity 052 class error).
 
 Note: Dimension 8 warnings are **warning** severity, not **blocker**. The quality stage ratchet (Step 4.75) is the enforcement point. Dimension 8 is a plan-time early warning that shifts detection left.
+
+### 9. Stale-Line-Anchor (new)
+
+- For every `read_first` or `acceptance_criteria` entry matching regex `(\S+\.(ts|js|md|py|go|rs|yaml)):(\d+)`, use Read on the cited file + line range.
+- If file does not exist OR asserted content no longer resolves at that line: emit blocker with `fix_hint: "rewrite to content anchor: 'returns >=1 match for \"<snippet>\"'"`.
+- **Auto-rewrite policy (Q-5)**: plan ensign rewrites ONLY when Read finds exactly one unambiguous match for the semantic content on a different line; otherwise emit blocker for captain advisory.
+- Severity: blocker (stale) / warning (slightly drifted but findable).
+
+### 10. Circular-AC (new)
+
+- For every `acceptance_criteria` command matching `grep -c '<pattern>' <file>`, execute two dry-runs: (a) raw count on the working tree, (b) count with the entity's `## PLAN` / `## UAT Spec` / `<task>` / `<action>` / `<acceptance_criteria>` / `<read_first>` / `<files_modified>` blocks excluded.
+- If (a) and (b) differ: the AC is circular -- emit blocker with `fix_hint: "scope grep to a line range excluding the entity file's PLAN/UAT/task-definition blocks, or rewrite the AC to target a specific source file outside docs/build-pipeline/"`.
+- Severity: blocker when counts differ; silent pass when equal.
 
 ## Output Format
 

@@ -115,6 +115,36 @@ All of these mean: run the command exactly as `task.acceptance_criteria` specifi
 
 ---
 
+## Circular-AC Rule
+
+> **Circular-AC rule.** When a grep-count acceptance_criteria command returns 0 but the literal search string appears inside a guard-listed block of the same entity file (`## PLAN | ## UAT Spec | <task | <action | <acceptance_criteria | <read_first | <files_modified`), classify the failure as a **semantic pass** -- return DONE with a `scope_observation` finding describing the circular reference, and surface the AC for plan-author rewrite in a future iteration.
+
+**Guard list** (the only blocks that trigger the semantic-pass classification when they contain the literal search string lives inside PLAN/UAT/task-definition blocks of the current entity file):
+
+- `## PLAN` sections
+- `## UAT Spec` sections
+- `<task>` blocks
+- `<action>` blocks
+- `<acceptance_criteria>` blocks
+- `<read_first>` blocks
+- `<files_modified>` blocks
+
+**No exceptions:**
+
+- NEVER expand the guard list at runtime. If the literal search string lives in a block not on the list above (e.g., a fenced code example, a quoted comment, a section heading outside PLAN/UAT), the rule does NOT apply -- classify BLOCKED instead.
+- NEVER apply the rule to ACs referencing other entities' files. The circular-reference defense only fires when the grep target file is the same entity file whose plan defined the AC. Cross-entity grep-count zero is a real failure.
+- NEVER use the rule to skip a grep that returned count > 0. A non-zero count means the AC passed on its own terms; the rule only converts a count-zero result into a semantic pass, never the reverse.
+
+**Red flags -- STOP and classify BLOCKED instead:**
+
+- "The search string is non-trivially close to a guard-listed block but not technically inside one..." -- if it's not literally inside a guard-listed block, the rule does not apply.
+- "The matched block is in a different entity file but the AC clearly meant to reference this one..." -- cross-entity scope means the plan is broken; surface as BLOCKED with a `scope_gap` finding so plan ensign rewrites the AC.
+- "The AC targets a real source file (src/, skills/, tests/) that exists and grep returned 0..." -- count > 0 vs count == 0 against a real source file is a real verification result. Do not invoke the circular-AC rule to paper over a missing implementation.
+
+**Rationale.** The Circular-AC Rule was extracted from the entity 104 task-5 replay (`docs/build-pipeline/_archive/brainstorm-nuwa-distillation.md:896`), where a grep-count AC matched only its own definition inside the plan body, leaving the troop with no real artifact to verify. Without this rule, the troop oscillates between BLOCKED (literal grep-zero against source) and DONE-by-citation (counting the plan-body match) -- neither of which captures the true situation, which is "the AC is malformed and needs the plan author to rewrite it." Semantic-pass classification preserves forward motion while surfacing the defect for the next plan iteration.
+
+---
+
 ## Scope Discipline -- files_modified Is The Writable Boundary
 
 `task.files_modified` is the **writable boundary** for this dispatch. You edit those files and only those files. Every other file in the repo is read-only to you.
