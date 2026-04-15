@@ -58,7 +58,7 @@ The build pipeline's Alignment Gate is a consequential captain control point —
 - `docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md` annotated with a supersession notice pointing to the new `skills/build-alignment-gate/SKILL.md`
 - `effective_stages()` routing in `skills/first-officer/` or `shared-core` updated so the alignment-gate stage identity is recognized and the stage is included/excluded per profile correctly
 - The four existing smoke tests in `skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml` remain passing without modification (behavioral parity guarantee: extraction does not alter the gate's logic)
-- Dashboard activity stream auto-picks up alignment-gate events with no new dashboard code, verified by confirming the graph is data-driven against the stage registry (acceptance criterion: alignment-gate stage name appears in dashboard stage graph after a pipeline run)
+- Dashboard activity stream auto-picks up alignment-gate events with no new dashboard code, verified by confirming the graph is data-driven against the stage registry (acceptance criterion: alignment-gate stage name appears in dashboard stage graph after a pipeline run) (✓ confirmed by explore: references/first-officer-shared-core.md:181 -- FO dispatch event uses ${NEXT_STAGE} variable, no hardcoded stage allowlist; ⚠ partially contradicted: entity 094 client-side rendering not yet verified -- see Q-1)
 
 ## Scope: Out
 
@@ -152,7 +152,7 @@ You are asking for the alignment-gate (currently a sub-step inside the science-o
 
 ## Brainstorming Spec
 
-**APPROACH**: Perform a targeted extraction refactor in 4 coordinated edits. (1) Create `skills/build-alignment-gate/SKILL.md` by lifting `agents/science-officer.md:153-206` (Step 3.6 body) verbatim, re-framing it as a first-class skill with its own Stage Report contract (`## Stage Report: alignment-gate` with fields `branch`, `retries`, `alignment_confidence`). (2) Add `alignment-gate` as the 11th entry in `docs/build-pipeline/README.md` `stages.states`, positioned between `brainstorm` and `explore`, with `gate: true, worktree: false, dispatch: simple, skill: spacedock:build-alignment-gate`. (3) Replace `agents/science-officer.md:153-206` with a 5-10 line routing hint: "After brainstorm completes, FO dispatches the alignment-gate stage (see `skills/build-alignment-gate/SKILL.md`). SO returns control." (4) Annotate `docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md` with a supersession note pointing to entity 114 and the new skill path. CONTRACTS transitions: entity 113's 7 in-flight rows → `final`; add a new row scoped to entity 114 tracking the alignment-gate stage promotion. Because `effective_stages()` reads `stages.states` as the source of truth (Lens (c) primary finding at `references/first-officer-shared-core.md:88-115`), routing updates happen automatically once README is edited — no separate routing-table edit needed. Dashboard auto-pickup is verified as an acceptance criterion by running any entity through the pipeline and observing the stage appears in the graph. F5 smoke fixture stays unmodified; since `skill:` field names SO (who now dispatches rather than hosts), assertions remain semantically valid.
+**APPROACH**: Perform a targeted extraction refactor in 4 coordinated edits. (1) Create `skills/build-alignment-gate/SKILL.md` by lifting `agents/science-officer.md:153-206` (Step 3.6 body) verbatim, re-framing it as a first-class skill with its own Stage Report contract (`## Stage Report: alignment-gate` with fields `branch`, `retries`, `alignment_confidence`). (2) Add `alignment-gate` as the 11th entry in `docs/build-pipeline/README.md` `stages.states`, positioned between `brainstorm` and `explore`, with `gate: true, worktree: false, dispatch: simple, skill: spacedock:build-alignment-gate`. (3) Replace `agents/science-officer.md:153-206` with a 5-10 line routing hint: "After brainstorm completes, FO dispatches the alignment-gate stage (see `skills/build-alignment-gate/SKILL.md`). SO returns control." (4) Annotate `docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md` with a supersession note pointing to entity 114 and the new skill path. CONTRACTS transitions: entity 113's 7 in-flight rows → `final`; add a new row scoped to entity 114 tracking the alignment-gate stage promotion. Because `effective_stages()` reads `stages.states` as the source of truth (Lens (c) primary finding at `references/first-officer-shared-core.md:88-115`), routing updates happen automatically once README is edited — no separate routing-table edit needed. (✓ confirmed by explore: references/first-officer-shared-core.md:92-108 -- effective_stages() reads full_pipeline_stage_order from README states list verbatim, no hardcoded stage names) Dashboard auto-pickup is verified as an acceptance criterion by running any entity through the pipeline and observing the stage appears in the graph. F5 smoke fixture stays unmodified; since `skill:` field names SO (who now dispatches rather than hosts), assertions remain semantically valid.
 
 **ALTERNATIVE**: Keep Step 3.6 inside science-officer.md but add an `alignment-gate` entry to `stages.states` as a "virtual stage" that dispatches back into SO (essentially a stage alias). -- D-01 Rejected: this preserves the accretion problem (SO still hosts gate logic) while adding stage-list complexity. It creates a worse architecture than either the current state or full extraction: visibility improves superficially but the skill-contract boundary remains blurred, and future skill authors still cannot bind contracts to a clean skill file. Captain's Scope: In item "all alignment decision logic removed from the SO god-object" explicitly rules this out.
 
@@ -167,6 +167,99 @@ You are asking for the alignment-gate (currently a sub-step inside the science-o
 
 **RATIONALE**: Extraction (APPROACH) is chosen over virtual-stage aliasing (ALTERNATIVE) because only extraction achieves the full set of declared outcomes. The captain's explicit Scope: In bullet "all alignment decision logic removed from the SO god-object" (US-4) eliminates any design that leaves the body inside SO. Once extraction is chosen, the only remaining design decisions are mechanical: where the new skill file lives, how the routing hint reads, and what the new Stage Report looks like. The cost of extraction is modest — one new skill file, four small edits across README/SO/archive — and the correctness surface is small because F5 smoke fixtures already cover the behavioral contract that must survive. Precedent strongly supports this path: clarify is already a first-class gated stage (Lens (c) confirms symmetry); entity 113's own O-1 analysis already enumerated the extraction option and rejected it only on implementation-convenience grounds that captain now overrides explicitly. Risk is concentrated on cross-entity merge coordination (Core Tension time-based with 082/083) and CONTRACTS schema assumptions (Honest Boundary), both of which are plan-phase concerns not APPROACH-phase showstoppers.
 
+## Assumptions
+
+**A-1**: `effective_stages()` auto-includes `alignment-gate` once it is added to README `stages.states` -- no separate routing-table edit is needed.
+- Confidence: Confident (0.95)
+- Evidence: `references/first-officer-shared-core.md:92-108` -- effective_stages() reads `full_pipeline_stage_order` from README states list verbatim; the algorithm has no hardcoded stage names, only a profile-subtraction pass. Adding a row to `stages.states` is sufficient to make the stage appear in every profile-default entity's dispatch sequence. [primary]
+- Evidence: `docs/build-pipeline/README.md:7-82` -- all 10 current stages are enumerated in `stages.states` with no supplemental routing table; the pattern holds consistently across all stage types (gate, terminal, feedback, manual). [secondary]
+
+**A-2**: F5 smoke fixture (`build-shape-f5-alignment-gate.smoke.yaml`) will continue to pass without modification after extraction.
+- Confidence: Confident (0.92)
+- Evidence: `skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml:6` -- `skill: spacedock:science-officer` is the top-level skill field; SO still routes to alignment-gate (now a delegated stage), so the entry point is unchanged. [primary]
+- Evidence: `skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml:12-37` -- all 4 scenario assertions test behavioral outputs (`alignment_confidence: 1.0`, `context_status: blocked`, `supersedes:`, `Lens Evidence`) not skill boundary names; extraction that preserves behavior preserves all assertions. [secondary]
+
+**A-3**: CONTRACTS.md schema is file-keyed (`### {filename}` headers), not stage-keyed -- a new CONTRACTS row for `alignment-gate` must be added under `### skills/build-alignment-gate/SKILL.md` (a new header) rather than a stage-identity row.
+- Confidence: Confident (0.90)
+- Evidence: `docs/build-pipeline/_index/CONTRACTS.md:106-110` -- observed pattern: `### agents/science-officer.md` header → table with `(entity, stage, intent, status, date)` rows; no stage-identity-only rows exist anywhere in the file. The schema is `file → [(entity, task, intent)]` not `stage → [entity]`. [primary]
+- Evidence: `docs/build-pipeline/_index/CONTRACTS.md:256-260` -- `### references/confidence-gate.md` follows the same pattern; even reference files use filename headers, not role/stage names. Consistent across all 20+ headers sampled. [secondary]
+
+**A-4**: `skills/build-brainstorm/SKILL.md` "Stage Report format addition" section references `alignment_confidence` as owned by SO Step 3.6 -- after extraction, the ownership comment must be updated to point to `skills/build-alignment-gate/SKILL.md` (but the field itself stays in `## Stage Report: brainstorm` for backward-compat).
+- Confidence: Likely (0.80)
+- Evidence: `skills/build-brainstorm/SKILL.md:498-505` -- verbatim: "The alignment-gate is owned by `agents/science-officer.md` Step 3.6, not by brainstorm itself." This ownership pointer goes stale when Step 3.6 is extracted. The field location (`## Stage Report: brainstorm`) is unchanged -- alignment gate still annotates brainstorm's Stage Report because the gate fires post-brainstorm. Only the ownership pointer needs updating. [secondary]
+- Evidence: Entity 114 Scope: In does not explicitly list this file -- but the ownership comment is a CONTRACTS violation risk if left stale (memory:contract-tests-cover-unconditional-calls pattern). [tertiary]
+
+**A-5**: Dashboard activity stream will auto-pick up `alignment-gate` events via FO's existing `dispatch` event emission at `references/first-officer-shared-core.md:181` -- no new dashboard code is needed for the event to appear.
+- Confidence: Likely (0.78)
+- Evidence: `references/first-officer-shared-core.md:41-66` -- FO emits a `dispatch` event after step 6 frontmatter commit for every stage transition; the `stage` field is set from `entity.next_stage`; no hardcoded stage allowlist exists in the event emission code. [primary]
+- Evidence: `references/first-officer-shared-core.md:181` -- the `curl` POST template uses `${NEXT_STAGE}` (variable), not a literal stage name. If FO dispatches `alignment-gate`, the event is emitted with `stage: alignment-gate` automatically. [secondary]
+- Caveat: Client-side rendering in entity 094's dashboard graph is not verified in this codebase -- see Honest Boundary HB-1 and Q-1.
+
+**A-6**: Entity 113's 7 CONTRACTS rows are confirmed `🟡 in-flight` and must be transitioned to `✅ final` as part of entity 114's CONTRACTS update.
+- Confidence: Confident (0.95)
+- Evidence: `docs/build-pipeline/_index/CONTRACTS.md:110,281,289,290,378,402,415` -- all 7 rows match `build-entry-routing-and-alignment-gate` with `🟡 in-flight` status across files: `agents/science-officer.md`, `skills/build-brainstorm/SKILL.md` (×2), `skills/build-clarify/SKILL.md` (×2), `skills/build-shape/references/output-format.md`, `skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml`, `skills/build-uat/SKILL.md`. [primary]
+
+---
+
+## Option Comparisons
+
+### O-1: Where `alignment_confidence` is reported after extraction
+
+After extraction, alignment gate runs as a first-class stage. The question is: does `alignment_confidence` stay in `## Stage Report: brainstorm` (backward-compat) or migrate to `## Stage Report: alignment-gate` (canonical ownership)?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|--------|------|------|------------|----------------|
+| Keep in `## Stage Report: brainstorm` (as today) | Zero breakage -- existing parsers, confidence-gate, CONTRACTS rows for `build-brainstorm/SKILL.md` all unchanged; F5 assertions reference `alignment_confidence` and continue to pass | Ownership is semantically wrong after extraction: brainstorm stage report documents a gate that brainstorm did not run | Low | -- |
+| Migrate to `## Stage Report: alignment-gate` | Canonical -- stage report lives in the stage that ran the gate; sets correct precedent for future gate stages | F5 fixture assertions reference `alignment_confidence` without stage-report context; CONTRACTS for `skills/build-brainstorm/SKILL.md` rows need no update (field removed from brainstorm); `confidence-gate.md` sourcing would eventually need updating | Medium | -- |
+| Dual-write: `## Stage Report: alignment-gate` canonical + backward-compat line in `## Stage Report: brainstorm` | Both parsers work; migration can happen incrementally | Two sources of truth; drift risk across sessions | Medium | -- |
+| Keep in `## Stage Report: brainstorm` as a forwarding annotation only (e.g., "see Stage Report: alignment-gate") | Clean separation with migration path | Requires two-file edit; parsers depending on brainstorm Stage Report break until updated | High | -- |
+
+No single option is unambiguously correct without knowing whether `confidence-gate.md` parses `alignment_confidence` (it does NOT currently -- confirmed by reading the file: 5 factors, none is `alignment_confidence`). The field is brainstorm-stage context only today. Recommended approach: keep in `## Stage Report: brainstorm` for this entity (Scope: Out: no new factors) and update the ownership pointer in `skills/build-brainstorm/SKILL.md` to reference `skills/build-alignment-gate/SKILL.md`. ✅ Recommended: Keep in brainstorm Stage Report (update ownership pointer only).
+
+### O-2: How SO's Step 3.6 body is replaced
+
+After extraction, SO Step 3.6 needs a routing hint. Two viable forms:
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|--------|------|------|------------|----------------|
+| Single-sentence delegation: "FO dispatches `alignment-gate` stage (see `skills/build-alignment-gate/SKILL.md`). SO returns control after gate completes." | Minimal; SO body shrinks maximally; consistent with Scope: In "5-10 line routing hint" | SO must have enough context to handle the gate-outcome routing (continue/retry/escalate) at Step 2 routing table level | Low | ✅ Recommended |
+| Step 3.6 replaced by explicit outcome-handling stubs (3 branches listed as one-liners with skill reference) | Self-documenting in SO context; captain reading SO sees outcomes | 15-20 lines, not "5-10"; partial god-object remnant | Medium | -- |
+
+---
+
+## Open Questions
+
+**Q-1**: Does entity 094's dashboard client-side rendering enumerate stage names, or is it truly data-driven from the server-parsed `stages.states`?
+- Domain: frontend / dashboard
+- Why it matters: AC-7 ("dashboard activity stream shows `stage: alignment-gate` event") depends on whether the client renders arbitrary stage names or has a hardcoded list. If hardcoded, `alignment-gate` would be invisible even after FO emits a correctly-formed event.
+- Suggested options: (a) Read entity 094's execute commits or skill files to check client rendering code; (b) Accept that FO event emission is data-driven (confirmed) and flag client rendering as a plan-phase verification task; (c) Treat as out-of-scope for entity 114 (dashboard UI is Scope: Out) and accept that event emission is the deliverable, client rendering is 094's responsibility.
+- SO self-investigation: entity 094 is in `status: clarify` (not yet shipped); its client-side source is not yet finalized; reading draft code would be unreliable. Plan phase should add a verification task to check 094's current state before merging 114. → Not self-resolvable without reading 094's unfinished code.
+
+**Q-2**: Should `skills/build-brainstorm/SKILL.md:505` ownership pointer ("owned by `agents/science-officer.md` Step 3.6") be updated as part of entity 114, or deferred?
+- Domain: skill-contract / documentation
+- Why it matters: If left stale, future skill authors reading brainstorm's Stage Report format spec will believe alignment gate is still owned by SO Step 3.6 -- a CONTRACTS drift that the memory:contract-tests-cover-unconditional-calls pattern warns against.
+- Suggested options: (a) Update the ownership pointer in entity 114's execute tasks (one-line edit to `skills/build-brainstorm/SKILL.md`); (b) Defer to a follow-up annotation task on the brainstorm skill; (c) Add a supersession comment in `skills/build-alignment-gate/SKILL.md` that back-references brainstorm's format spec (avoids touching brainstorm).
+- SO self-investigation: Entity 114 Scope: In lists 6 files but does NOT list `skills/build-brainstorm/SKILL.md`. Adding it would be a minor Scope: In amendment. The stale pointer is a real CONTRACTS risk (Track A A-4 confidence: Likely). → Captain decision: amend Scope: In to include the brainstorm ownership pointer update, or explicitly accept the stale pointer as a known gap.
+
+---
+
+## Core Tensions
+
+- **(time-based)**: entity 082/083 (pre-ship-confidence-gate) has 5 CONTRACTS rows `🟡 in-flight` on `references/confidence-gate.md` and `references/first-officer-shared-core.md`. Entity 114 also touches both files. Ship-order conflict confirmed. Resolution options: sequence 114 after 082/083 ships, OR restrict 114's touch to `references/confidence-gate.md` sourcing-correction only (which the Brainstorming Spec already permits -- "no new factors, only sourcing reference corrected"). If 082/083 ships first, 114 rebases cleanly. If 114 ships first, 082/083 must merge around 114's changes.
+- **(domain-based)**: CONTRACTS schema is file-keyed (`### {filename}` rows), NOT stage-keyed. Scope: In's "add a new row for the alignment-gate stage" is correct in spirit but requires a new `### skills/build-alignment-gate/SKILL.md` header in CONTRACTS.md -- not a stage-identity row. The plan task must describe this precisely to avoid an execute ensign adding a malformed row.
+- **(essential)**: `alignment_confidence` field ownership is semantically ambiguous post-extraction. The field lives in `## Stage Report: brainstorm` (for SO's backward-compat annotation), but the logic that computes it now lives in `skills/build-alignment-gate/SKILL.md`. Until `confidence-gate.md` adds an `alignment_confidence` factor (Scope: Out for 114), this split is tolerable but creates a documentation trap for future skill authors. O-1 above resolves this to "keep in brainstorm, update ownership pointer" -- but the pointer update's scope inclusion is a captain decision (Q-2).
+
+---
+
+## Honest Boundaries
+
+- **HB-1**: Dashboard client-side rendering for `alignment-gate` is not verifiable in this codebase. Entity 094 is in `status: clarify` (unshipped); its client rendering code may change before ship. Entity 114's AC-7 can only guarantee FO emits the correct event; whether the dashboard graph renders the stage name depends on 094. Plan phase must add a verification step that reads 094's current state at execute time.
+- **HB-2**: CONTRACTS schema compatibility for a new `### skills/build-alignment-gate/SKILL.md` header is unambiguous from reading (file-keyed headers are the consistent pattern). However, this creates a bootstrapping edge case: the file does not exist at CONTRACTS-update time (it gets created by the same entity). Plan phase must sequence the CONTRACTS row addition AFTER the skill file creation task (wave ordering).
+- **HB-3**: Entity 091 (clarify-pre-presentation-evidence-gate) modifies `agents/science-officer.md` Step 3 (~line 99) -- disjoint from Step 3.6 (lines 153-206) by ~54 lines. Merge conflict risk is low but not zero if 091 ships during entity 114's execute window. Plan phase should note entity 091's status and coordinate if it reaches execute while 114 is in-flight.
+- **HB-4**: The Brainstorming Spec claims effective_stages() routing is fully automatic once README is edited. This is confirmed (A-1). However, FO's dashboard dispatch event (A-5) is also confirmed data-driven. The only unconfirmed surface is the dashboard CLIENT rendering -- which is HB-1 above. Both engine-level claims are solid.
+
+---
+
 ## Acceptance Criteria
 
 - Given `docs/build-pipeline/README.md` after 114 ships, when `grep -c "name: alignment-gate" README.md` runs, then it returns ≥1 (how to verify: `grep -c "name: alignment-gate" docs/build-pipeline/README.md`)
@@ -177,3 +270,20 @@ You are asking for the alignment-gate (currently a sub-step inside the science-o
 - Given CONTRACTS.md after 114 ships, when checking entity 113's rows, then all 7 rows are `✅ final` (none remain `🟡 in-flight`) (how to verify: `grep "build-entry-routing-and-alignment-gate" docs/build-pipeline/_index/CONTRACTS.md | grep -c "in-flight"` returns 0)
 - Given dashboard activity stream after 114 ships, when the next entity passes through the alignment-gate stage, then a `dispatch` event with `stage: alignment-gate` appears in `/api/events` (how to verify: POST to `/api/events` during a pipeline run and `grep "alignment-gate"` the event log)
 - Given `references/first-officer-shared-core.md` effective_stages() logic unchanged in code, when the 11-stage README is loaded, then `effective_stages()` returns the full 11-stage ordering including alignment-gate (how to verify: read README stages in order; pipeline should traverse brainstorm → alignment-gate → explore for a fresh entity)
+
+## Stage Report: explore
+
+- [x] Files mapped: 10 across workflow-config, agent, skill, contract, reference, smoke-test
+  workflow-config: 1 (README.md stages.states), agent: 1 (science-officer.md Step 3.6), skill: 2 (build-clarify/SKILL.md precedent, build-brainstorm/SKILL.md alignment_confidence format), contract: 1 (CONTRACTS.md 7 in-flight rows), reference: 2 (first-officer-shared-core.md effective_stages, confidence-gate.md 5 factors), smoke-test: 1 (build-shape-f5-alignment-gate.smoke.yaml), archive: 1 (build-entry-routing-and-alignment-gate.md entity 113), new-file: 1 (skills/build-alignment-gate/SKILL.md -- does not yet exist)
+- [x] Assumptions formed: 6 (Confident: 4, Likely: 2, Unclear: 0)
+  A-1 effective_stages auto-routing (Confident 0.95); A-2 F5 fixture passes unchanged (Confident 0.92); A-3 CONTRACTS file-keyed schema (Confident 0.90); A-4 brainstorm ownership pointer needs update (Likely 0.80); A-5 dashboard dispatch event data-driven (Likely 0.78); A-6 entity 113 CONTRACTS rows confirmed 7 in-flight (Confident 0.95)
+- [x] Options surfaced: 2
+  O-1 where alignment_confidence is reported post-extraction (keep in brainstorm Stage Report ✅ Recommended); O-2 how SO Step 3.6 is replaced (single-sentence delegation ✅ Recommended)
+- [x] Questions generated: 2
+  Q-1 entity 094 dashboard client-side rendering -- is it data-driven or stage-name-enumerated; Q-2 brainstorm ownership pointer scope -- include in entity 114 Scope: In or defer
+- [x] α markers resolved: 0 / 0
+  Brainstorming Spec had 0 α markers -- confirmed by full scan of APPROACH/GUARDRAILS/RATIONALE
+- [x] Scale assessment: Medium confirmed
+  10 files across 6 layers; 2 open questions; consistent with Medium (5-15 files)
+- [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident or Likely on internal patterns; no external library/API claims; ensign Mode B)
+  ⚠ ensign-mode inline fallback -- 4-angle quality not achieved this invocation
