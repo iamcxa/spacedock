@@ -9,6 +9,7 @@ This file captures the shared first-officer semantics. Keep it aligned with `age
    1. **Explicit path** — if the user provided a workflow directory, use it directly.
    2. **Project-local** — search `{project_root}/` for `README.md` files whose YAML frontmatter contains `commissioned-by: spacedock@...`. Ignore `.git`, `.worktrees`, `node_modules`, `vendor`, `dist`, `build`, and `__pycache__`.
    3. **User-scoped** — search `~/.claude/workflows/` for `README.md` files with `commissioned-by: spacedock@...`. This allows cross-project workflows (e.g., a shared build pipeline) to live in a single user-level location.
+   4. **Plugin-manifest** — for each `.spacedock/workflows/*/manifest.yaml` under `{project_root}/`, if the manifest has top-level `source_plugin:` + `workflow_readme_path:` fields, resolve the plugin directory for `source_plugin` (same resolver used in the Status Viewer's `{spacedock_plugin_dir}`) and read the workflow README from `{plugin_dir}/{workflow_readme_path}`. Then apply LOCAL.yaml `readme_operations` in-memory before extracting mission/entity-labels/stage-ordering. If LOCAL.yaml is absent, use the plugin README verbatim. If a `readme_operations` op targets a stage that does not exist in the plugin's current README, fail loud with a clear error identifying the stale op — do not silently skip. This source takes priority for grafted workflows; the project-local README scan (source 2) will not find a README in the workflow dir because runtime overlay intentionally omits it.
    If multiple workflows are found across sources, list them and ask the captain which one to use.
 3. Read `{workflow_dir}/README.md` to extract:
    - mission
@@ -26,7 +27,7 @@ This file captures the shared first-officer semantics. Keep it aligned with `age
 
 ## Status Viewer
 
-The status viewer ships with the plugin at `skills/commission/bin/status`. Resolve the plugin directory from the same root used to read these reference files.
+The status viewer ships with the plugin at `skills/commission/bin/status`. Resolve the plugin directory from the same root used to read these reference files. Note: this same `{spacedock_plugin_dir}` resolver is used in Step 2.4 (Plugin-manifest) to locate the workflow README for grafted workflows.
 
 Invoke it as:
 ```
