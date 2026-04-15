@@ -1,7 +1,7 @@
 ---
 id: 103
 title: "Shape skill -- pre-build alignment for user stories and scope validation"
-status: quality
+status: uat
 context_status: ready
 source: captain architectural discussion (2026-04-14 SO session — split product alignment from technical execution via /shape skill + build integration)
 created: 2026-04-14T21:30:00+08:00
