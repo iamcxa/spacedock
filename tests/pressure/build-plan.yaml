@@ -183,7 +183,7 @@ test_cases:
     expected_answer: B
     correct_because:
       cite_file: skills/build-plan/references/plan-checker-prompt.md
-      cite_section: "9. Stale-Line-Anchor Dimension"
+      cite_section: "9. Stale-Line-Anchor (new)"
       cite_contains: "blocker"
     history: []
 
@@ -212,6 +212,6 @@ test_cases:
     expected_answer: B
     correct_because:
       cite_file: skills/build-plan/references/plan-checker-prompt.md
-      cite_section: "10. Circular-AC Dimension"
+      cite_section: "10. Circular-AC (new)"
       cite_contains: "blocker"
     history: []
