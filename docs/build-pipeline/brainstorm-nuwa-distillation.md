@@ -902,3 +902,29 @@ None (all wave 1 + wave 2 tasks reached terminal DONE).
 
 knowledge capture: skipped -- all findings are entity-104-specific or plan-defect-class observations already captured in this Stage Report; no D1/D2 patterns generalize beyond this entity.
 
+
+## Stage Report: quality
+
+status: passed
+base SHA: f480471
+final SHA: f89b9c0 (execute final)
+scope: project-wide mechanical verification
+
+### Checks
+
+| Check | Command | Result | Notes |
+|---|---|---|---|
+| bun test | `bun test` (from worktree root) | **749 pass, 0 fail, 1855 expect() calls** across 72 files | Required `bun install` in root + tools/dashboard + spacebridge + spacebridge/ui before run (fresh worktree lacked node_modules). Post-install: full green. |
+| tsc --noEmit | `bunx tsc --noEmit` in spacebridge/ | Pre-existing errors in src/ipc/coordination-*.ts and src/ipc/fo-simulator.*.ts (branded-type/UUID literal assignability) | Verified identical errors exist on main (unrelated to entity 104 markdown-only edits). Does not worsen baseline. |
+| tsc --noEmit | spacebridge/ui, tools/dashboard | clean | No errors. |
+| bun lint | `bun lint` at root | N/A | No root package.json / lint script defined at repo root; project doesn't ship a root-level lint config. Not a regression. |
+| bun build | N/A | N/A | No root build script. Sub-package builds not exercised (skill scope was markdown-only). |
+
+### Baseline comparison
+
+Entity 104 changes are 100% markdown (skills/build-brainstorm/SKILL.md + docs/build-pipeline/*.md + docs/build-pipeline/_docs/extraction-framework.md). Zero code delta. Quality result is equivalent-to-baseline: tests green, typecheck pre-existing errors persist unchanged.
+
+### Outcome
+
+Auto-advance to review stage. No feedback-to.
+
