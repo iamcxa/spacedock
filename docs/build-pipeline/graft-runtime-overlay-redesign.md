@@ -937,3 +937,50 @@ workflow-index append: 4 append calls, covering 10 tasks across 4 files (skills/
 ### Summary
 
 Markdown-only changes (870 insertions, 131 deletions across 6 files). Full test suite passes cleanly with no regressions; TypeScript compilation clean. All quality gates pass.
+
+## Stage Report: review
+
+**Verdict**: pass
+**Ran at**: 2026-04-15T20:30:00Z
+**HEAD**: 37e32f4
+**Execute base**: fafdd33
+
+### Pre-scan
+claude-md-compliance: 0 findings
+stale-references: 2 findings
+dependency-chain: 0 findings
+plan-consistency: 0 findings
+goal-backward: 0 findings
+
+### Dispatch summary
+No parallel reviewer agents dispatched -- markdown-only diff, fast-path mode per captain dispatch instructions. Pre-scan only.
+
+### Dispatch Gaps
+Fast-path: captain explicitly scoped to inline review (no multi-reviewer fanout for markdown-only changes). Pre-scan is the entire evidence base for this review.
+
+### Findings
+
+| Severity | Root | File:Line | Description | Source |
+|----------|------|-----------|-------------|--------|
+| MEDIUM | DOC | tests/pressure/graft.yaml:177 | `cite_contains: ".origin/ is immutable between graft operations"` references text eliminated from skills/graft/SKILL.md by task-7. Pressure test `origin-modification-during-localize` now has a broken citation -- the quoted text no longer exists in the cited file. The test's scenario (editing .origin/ directly) is still architecturally relevant as a historical reference, but the citation is stale. | pre-scan:stale-references |
+| MEDIUM | DOC | tests/pressure/graft.yaml:263 | `cite_contains: "If .origin/skills/{name}/references/ exists, copy reference files to .claude/skills/{name}/references/"` references the old .origin/-based copy logic that was eliminated from skills/graft/SKILL.md. Pressure test `reference-files-missing-from-localize-copy` citation is stale; the new SKILL.md uses plugin bytes directly, not .origin/. | pre-scan:stale-references |
+| LOW | DOC | docs/build-pipeline/_index/DECISIONS.md:25 | Entry header is `## D-101-runtime-overlay` but the DECISIONS.md header declares format `## D-{entity-slug}-{sequence}`. The existing entry `D-plan-defect-autopilot-1` follows slug-sequence convention. D-101 uses numeric id + descriptive suffix instead. Diverges from declared format; minor but inconsistent. | pre-scan:claude-md-compliance |
+| LOW | DOC | references/first-officer-shared-core.md:12 | Step 2.4 Plugin-manifest is not labeled "2.4." in the document -- it appears as item `4.` under Step 2. Execute noted this deviation. The Status Viewer cross-reference at line 30 calls it "Step 2.4" retroactively. Functionally correct but creates a label mismatch between the list item and the cross-reference name used in SKILL.md and CONTRACTS.md. | pre-scan:plan-consistency |
+
+### Execute AC Deviation Classification
+
+The execute Stage Report flagged 4 plan AC deviations. Each classified below:
+
+| Deviation | Classification | Disposition |
+|-----------|---------------|-------------|
+| 4 remaining `.origin/` refs in SKILL.md are negations ("No .origin/ directory") -- plan AC expected `grep -c == 0` | ACCEPTED -- negations are architecturally necessary; the grep test was too strict | No action needed |
+| Pressure test format uses `- id:` not `- name:` -- plan AC grep expected `^  - name:` | ACCEPTED -- followed existing file convention; plan AC was wrong about the format | No action needed |
+| Step 2.4 not labeled "2.4." literally in shared-core doc (appears as item 4) | WARNING -- see LOW DOC finding above; cross-reference calls it "Step 2.4" but list item says "4." | Tracked as LOW DOC |
+| task-8 flipped pressure test #4 (upgrade-conflict-blanket-policy) to E in addition to #20/#21/#22 -- plan only listed #20/#21/#22 | ACCEPTED -- 3-way merge conflicts are structurally impossible in new design; flipping #4 is architecturally correct and within the task's intent | No action needed |
+
+### Knowledge Capture
+no findings met D1/D2 threshold -- stale pressure-test citations (MEDIUM DOC) are entity-specific cleanup candidates deferred to 112; label-format inconsistency (LOW DOC) is a one-off; no reusable cross-entity patterns surfaced.
+
+## Pending Knowledge Captures
+
+(none)
