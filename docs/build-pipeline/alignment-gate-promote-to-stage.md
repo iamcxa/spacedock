@@ -234,12 +234,14 @@ After extraction, SO Step 3.6 needs a routing hint. Two viable forms:
 - Why it matters: AC-7 ("dashboard activity stream shows `stage: alignment-gate` event") depends on whether the client renders arbitrary stage names or has a hardcoded list. If hardcoded, `alignment-gate` would be invisible even after FO emits a correctly-formed event.
 - Suggested options: (a) Read entity 094's execute commits or skill files to check client rendering code; (b) Accept that FO event emission is data-driven (confirmed) and flag client rendering as a plan-phase verification task; (c) Treat as out-of-scope for entity 114 (dashboard UI is Scope: Out) and accept that event emission is the deliverable, client rendering is 094's responsibility.
 - SO self-investigation: entity 094 is in `status: clarify` (not yet shipped); its client-side source is not yet finalized; reading draft code would be unreliable. Plan phase should add a verification task to check 094's current state before merging 114. → Not self-resolvable without reading 094's unfinished code.
+→ **Captain resolved** (2026-04-16): **Option (c)** — out-of-scope for entity 114. Shape Scope: Out already declares "Dashboard UI additions beyond what the data-driven stage graph auto-renders" as out-of-scope. AC-7 tightens to "FO emits a `dispatch` event with `stage: alignment-gate`", not "dashboard renders it". Client-side rendering is entity 094's responsibility. Plan phase adds a doc comment noting the client-side dependency on 094.
 
 **Q-2**: Should `skills/build-brainstorm/SKILL.md:505` ownership pointer ("owned by `agents/science-officer.md` Step 3.6") be updated as part of entity 114, or deferred?
 - Domain: skill-contract / documentation
 - Why it matters: If left stale, future skill authors reading brainstorm's Stage Report format spec will believe alignment gate is still owned by SO Step 3.6 -- a CONTRACTS drift that the memory:contract-tests-cover-unconditional-calls pattern warns against.
 - Suggested options: (a) Update the ownership pointer in entity 114's execute tasks (one-line edit to `skills/build-brainstorm/SKILL.md`); (b) Defer to a follow-up annotation task on the brainstorm skill; (c) Add a supersession comment in `skills/build-alignment-gate/SKILL.md` that back-references brainstorm's format spec (avoids touching brainstorm).
 - SO self-investigation: Entity 114 Scope: In lists 6 files but does NOT list `skills/build-brainstorm/SKILL.md`. Adding it would be a minor Scope: In amendment. The stale pointer is a real CONTRACTS risk (Track A A-4 confidence: Likely). → Captain decision: amend Scope: In to include the brainstorm ownership pointer update, or explicitly accept the stale pointer as a known gap.
+→ **Captain resolved** (2026-04-16): **Option (a)** — update the ownership pointer as part of entity 114's execute tasks. P-4 immutable-pitch is preserved by NOT editing the shape Scope: In section; instead, plan phase adds a task that edits `skills/build-brainstorm/SKILL.md:505` (one-line pointer update). This closes the CONTRACTS drift risk at trivial cost. The plan's `files_modified` list includes `skills/build-brainstorm/SKILL.md` as a 7th modified file; CONTRACTS.md gains a row for this file scoped to entity 114.
 
 ---
 
@@ -287,3 +289,24 @@ After extraction, SO Step 3.6 needs a routing hint. Two viable forms:
   10 files across 6 layers; 2 open questions; consistent with Medium (5-15 files)
 - [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident or Likely on internal patterns; no external library/API claims; ensign Mode B)
   ⚠ ensign-mode inline fallback -- 4-angle quality not achieved this invocation
+
+## Stage Report: clarify
+
+status: passed
+mode: lightweight inline (2 questions; no Science Officer dispatch needed)
+
+- [x] Assumptions confirmed: 6/6 (no changes from explore -- Confident and Likely ratings preserved)
+- [x] Options selected: 2/2
+  O-1 → (a) keep alignment_confidence in brainstorm Stage Report, update ownership pointer only
+  O-2 → (a) single-sentence SO Step 3.6 delegation
+- [x] Questions resolved: 2/2
+  Q-1 → Option (c) out-of-scope for 114 (captain resolved); AC-7 tightens to "FO emits event", client rendering is 094's concern
+  Q-2 → Option (a) include pointer update as plan task (captain resolved); preserves P-4 by NOT editing Scope: In; plan phase adds skills/build-brainstorm/SKILL.md as 7th modified file
+- [x] Captain questions asked: 0 (inline resolution based on captain directive in conversation; no AskUserQuestion round)
+- [x] Self-filter: 2 self-resolved inline via captain direction, 0 batch-escalated
+  clarify_self_filter_ratio: 1.00
+
+### Canonical References
+- Entity 094 warroom-pipeline-graph-visualization (status: clarify) — Q-1 out-of-scope boundary
+- memory:contract-tests-cover-unconditional-calls — Q-2 drift risk rationale
+- P-4 immutable-pitch discipline (skills/build-shape/references/output-format.md) — Scope: In amendment avoidance
