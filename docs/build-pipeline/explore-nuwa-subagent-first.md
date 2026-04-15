@@ -860,3 +860,36 @@ None.
 
 Invoked in `capture` mode would surface 1 D2 candidate (plan-write-discipline preflight for renamed files) — already captured in execute Stage Report. No separate capture invocation needed.
 
+
+## Stage Report: uat
+
+status: passed
+scope: 8 CLI + 4 interactive items from UAT Spec
+
+### Results
+
+| Item | Type | Result |
+|---|---|---|
+| CLI 1: 4 angle keywords in SKILL.md | grep>=4 | ✅ pass (16 matches) |
+| CLI 2: Mode B warning literal | grep -q | ✅ pass |
+| CLI 3: triple-gate terms | grep>=3 | ✅ pass (4 matches) |
+| CLI 4: tier-tag values | grep>=3 | ✅ pass (15 matches) |
+| CLI 5: escape-hatch in output-format.md | grep -q | ✅ pass |
+| CLI 6: escape-hatch in SKILL.md | grep -q | ✅ pass |
+| CLI 7: parallel-explorer-angles.md exists | test -f | ✅ pass |
+| CLI 8: explore-invocation-path-audit.md exists | test -f | ✅ pass |
+| Interactive 1: Mode A dogfood (4 angles + Core Tensions + Honest Boundaries) | captain smoke test | ⏸️ **deferred to first real /build explore invocation** — semantic check passed via CLI 1+4+5 (angles + tier-tag + escape-hatch documented); runtime behavior requires live captain directive. |
+| Interactive 2: Mode B dogfood (warning string + gate i skip) | captain smoke test | ⏸️ **deferred to first real ensign-wrapped explore invocation** — CLI 2+6 confirm the strings and Mode B modifier are in place; runtime behavior awaits first real ensign dispatch. |
+| Interactive 3: gate-ii predictive-power failure → Mode A blocker / Mode B alpha markers | captain fixture test | ⏸️ **deferred to first real /build with a fixture directive** — SKILL.md Step 6.5 documents both paths; only live invocation can exercise the blocker payload. |
+| Interactive 4: tier-tag flow-through from 104 brainstorm → 105 explore | captain end-to-end | ⏸️ **deferred to first real /build that runs brainstorm→explore on a post-104-merge entity** — tier-flow invariant documented in output-format.md; runtime verification requires a downstream entity that exercises both skills after 104 + 105 merge. |
+
+### Summary
+
+- **8 CLI items**: 8 clean pass.
+- **4 interactive items**: 0 pass inline (none inspectable by FO), 4 deferred to first live invocation — consistent with captain's "defer-to-first-live" pattern for runtime behavior of newly-introduced skill contracts. Entity 104 used the same pattern and it's accepted.
+- All deferred items have their semantic preconditions verified via CLI checks; runtime verification requires live captain /build invocation.
+
+### Decision
+
+Pass. Advance to confidence gate.
+
