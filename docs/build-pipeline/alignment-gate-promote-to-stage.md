@@ -20,7 +20,7 @@ profile:
 auto_advance:
 parent:
 children:
-shape_status: draft
+shape_status: validated
 ---
 
 ## Captain Context Snapshot
