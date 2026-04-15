@@ -1,7 +1,7 @@
 ---
 id: 107
 title: Plan-Checker Multi-Angle Nuwa-ification -- Port Monolithic Prompt to Per-Dim Haiku Dispatch
-status: quality
+status: review
 context_status: ready
 source: /build
 created: 2026-04-15T00:00:00Z
