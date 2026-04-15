@@ -1,7 +1,7 @@
 ---
 id: 101
 title: "Graft runtime overlay — eliminate build-time merge, read workflow from plugin"
-status: execute
+status: quality
 context_status: ready
 source: /build
 created: 2026-04-14T03:30:00Z
