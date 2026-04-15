@@ -1,7 +1,7 @@
 ---
 id: 097
 title: "Share view UX fixes — duplicate form, comment content display, activity truncation"
-status: execute
+status: quality
 context_status: ready
 source: entity 058 UAT live test (2026-04-14 captain manual)
 created: 2026-04-14T17:00:00+08:00
