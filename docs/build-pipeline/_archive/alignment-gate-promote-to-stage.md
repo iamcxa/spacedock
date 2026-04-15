@@ -2,15 +2,15 @@
 id: 114
 title: Alignment-Gate Promote to Stage -- Pipeline Control Point Visibility + SO Depolicing
 slug: alignment-gate-promote-to-stage
-status: uat
+status: shipped
 context_status: ready
 source: /shape
 created: 2026-04-16T00:30:00+08:00
 started: 2026-04-16T01:00:00+08:00
-completed:
-verdict:
-score: 1.0
-worktree: .worktrees/spacedock-ensign-alignment-gate-promote-to-stage
+completed: 2026-04-16T02:00:00+08:00
+verdict: PASSED
+score: 0.95
+worktree:
 issue:
 pr:
 intent: feature
@@ -18,6 +18,7 @@ scale: Medium
 project: spacedock
 profile:
 auto_advance:
+uat_pending_count: 4
 parent:
 children:
 shape_status: validated
