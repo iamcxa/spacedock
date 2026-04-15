@@ -1,7 +1,7 @@
 ---
 id: 099
 title: "Spacebridge channel bridge — UI ↔ daemon ↔ CC bidirectional communication"
-status: review
+status: uat
 context_status: ready
 source: captain observation (2026-04-14 — new UI has no channel support, blocks cutover)
 created: 2026-04-14T13:00:00+08:00
