@@ -327,6 +327,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add dimension 6d test_first validation sub-rule for test file and TDD skill checks | in-flight | 2026-04-12 |
+| plan-checker-multi-angle-nuwa | plan | prepend DEPRECATED banner (body preserved for O-2-B parallel-run window) | 🔵 planned | 2026-04-15 |
 
 ### skills/build-quality/SKILL.md
 
