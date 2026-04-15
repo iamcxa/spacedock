@@ -318,6 +318,594 @@ Scope flag present but decomposition NOT recommended: 4 primitives are tightly c
 - `_archive/shape-pre-build-alignment-skill.md:56-61` -- entity 103 "no automatic routing in v1" decision (superseded by 113) [secondary]
 - `skills/build-explore/references/output-format.md:21-29` -- per-assumption confidence schema (readiness score precedent) [secondary]
 
+## Research Findings
+
+### Upstream Constraints
+
+- Entity 103 (shape-pre-build-alignment-skill) contracted all 4 target skill files (skills/build/SKILL.md, skills/build-shape/SKILL.md, skills/build-brainstorm/SKILL.md, skills/build-clarify/SKILL.md). All changes must be strictly additive -- append new steps/rules, never overwrite 103's contributions. CONTRACTS.md confirms 15 rows for entity 103. -- CONTRACTS.md [primary]
+- Entity 091 (clarify-pre-presentation-evidence-gate) modifies build-clarify Step 1.5 1a and agents/science-officer.md Step 3. Entity 113 modifies build-clarify Step 2 and agents/science-officer.md Step 3.5 area. Insertion points are disjoint. No depends-on required. -- docs/build-pipeline/clarify-pre-presentation-evidence-gate.md:34-48 [primary]
+- build-brainstorm is contractually non-interactive ("NEVER ask the captain questions", SKILL.md:472). Alignment-gate AskUserQuestion CANNOT live inside brainstorm. Must live in SO agent or a new SO-invoked skill. -- skills/build-brainstorm/SKILL.md:472 [primary]
+- AskUserQuestion only works in --agent mode (SO main session) or via Teammate tool in teams mode. Subagents cannot use it. -- memory:askuserquestion-agent-vs-subagent.md [primary]
+
+### Existing Patterns
+
+- /build Phase III entity creation (SKILL.md:148-219): scans existing entity IDs, generates slug, creates entity file with full frontmatter template. The ID generation logic (`sort -n | tail -1` + increment) and slug generation (`lowercase, spaces -> hyphens, max 50 chars`) are the reusable seed components for shape self-seed. -- skills/build/SKILL.md:148-219 [primary]
+- build-shape Step 0 (SKILL.md:28-44) parses `--from {slug}` vs raw directive. Step 2 (SKILL.md:76-92) creates draft entity with minimal frontmatter (`slug`, `shape_status: draft`, `context_status: pending`). The self-seed path extends Step 0's raw-directive branch to call /build's ID+slug generation before proceeding to Steps 3-7. -- skills/build-shape/SKILL.md:28-44, 76-92 [primary]
+- SO routing table (agents/science-officer.md:60-67) routes by (status, context_status) tuple. Step 3.5 (lines 103-151) is a post-brainstorm research dispatch hook that already runs in SO main session context. The alignment-gate inserts between Step 3.5's synthesis completion and the Step 2 re-apply that routes to explore. -- agents/science-officer.md:60-67, 103-151 [primary]
+- build-clarify Shape-Aware Filter (SKILL.md:152-166): binary section-cite predicate that skips shape-locked assumptions. The self-filter generalizes this pattern -- instead of checking shape section headers, it checks [primary] Lens Evidence `file:line` citations. Same pre-presentation insertion point (before captain question loop). -- skills/build-clarify/SKILL.md:152-166 [primary]
+
+### Library/API Surface
+
+No findings -- all changes are to internal skill spec files (markdown), no library dependencies.
+
+### Known Gotchas
+
+- Alignment-gate retry loop must rewrite `## Brainstorming Spec` but preserve `## Lens Evidence`. Since brainstorm runs as a subagent that returns text (not file writes), the retry path must: (a) re-invoke brainstorm with correction note appended, (b) receive new synthesis output, (c) overwrite only the `## Brainstorming Spec` section in the entity file via Edit, leaving all other sections intact. The brainstorm subagent returns structured text -- SO must parse and write selectively. -- agents/science-officer.md:97 (brainstorm returns text, SO writes to file) [primary]
+- Escalate-to-shape branch (c) writes `context_status: blocked` to entity frontmatter. This is an SO-owned transition per Step 2.5 (lines 77-91). The `supersedes:` hint goes in the Stage Report body, NOT in frontmatter (frontmatter has no `supersedes` field in the current schema). -- agents/science-officer.md:77-91; skills/build-shape/references/output-format.md:47-51 [primary]
+- Self-filter must NOT filter questions that cite [secondary] or [tertiary] evidence only -- those tiers indicate weaker confidence and should still reach captain. Only [primary] tier auto-resolves. -- entity:113 O-2 selected (a) binary [primary]-only [primary]
+
+### Reference Examples
+
+- Shape-Aware Filter code pattern (build-clarify:152-166): `grep -E "^- Evidence:.*## (Problem Statement|User Stories|Scope: (In|Out))"` -- the self-filter adapts this to checking [primary]-tier `file:line` citations that directly address the question's domain. -- skills/build-clarify/SKILL.md:152-166 [primary]
+- build-shape escape-hatch keyword list (SKILL.md:62): `fix`, `typo`, `rename`, `bump`, `patch`, `bugfix`, `hotfix` -- hardcoded, short, bilingual not needed for these English-only terms. The gatekeeper hedge-word list follows the same hardcoded pattern but is bilingual (EN + ZH). -- skills/build-shape/SKILL.md:62 [secondary]
+- FO auto-revision loop cap: max 3 iterations before escalation -- memory:fo-auto-revision-loop.md. Alignment-gate retry applies the same cap. -- memory [secondary]
+
+## PLAN
+
+**Goal**: Add 4 pipeline primitives (Sonnet gatekeeper, shape self-seed, alignment-gate, clarify self-filter) with DAG-consumable readiness scores.
+
+<task id="task-0" model="sonnet" wave="0">
+  <read_first>
+    - skills/build/SKILL.md
+    - skills/build-shape/SKILL.md
+    - agents/science-officer.md
+    - skills/build-clarify/SKILL.md
+    - skills/build-brainstorm/SKILL.md
+    - skills/build-shape/references/output-format.md
+    - skills/build-shape/references/fixture-format.md
+    - docs/build-pipeline/_index/CONTRACTS.md
+  </read_first>
+
+  <action>
+  Environment verification. Confirm all 8 target files exist and are readable. Verify:
+  1. `skills/build/SKILL.md` contains `## Args Extraction` and `## Phase II: Spec Distillation` sections
+  2. `skills/build-shape/SKILL.md` contains `## Step 0: Parse Arguments` and `## Step 2: Assume -- Create Draft Entity`
+  3. `agents/science-officer.md` contains `### Step 3.5: Post-Brainstorm Research Dispatch`
+  4. `skills/build-clarify/SKILL.md` contains `### Shape-Aware Filter`
+  5. `skills/build-brainstorm/SKILL.md` contains `## Rules` section with "NEVER ask the captain questions"
+  6. `skills/build-shape/references/fixture-format.md` exists
+  7. `docs/build-pipeline/_index/CONTRACTS.md` exists and is writable
+  8. No existing `## Step 0: Gatekeeper` section in build/SKILL.md
+  9. No existing `smoke-tests/` directory under `skills/build-shape/`
+  Run: `grep -c "Step 0: Gatekeeper" skills/build/SKILL.md` returns 0; `ls skills/build-shape/smoke-tests/ 2>/dev/null` returns empty or error.
+  </action>
+
+  <acceptance_criteria>
+    - All 8 files exist and contain their expected sections
+    - No pre-existing gatekeeper step in build/SKILL.md
+    - Verification log written to stdout
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1">
+  <read_first>
+    - skills/build/SKILL.md
+  </read_first>
+
+  <action>
+  Add `## Step 0: Gatekeeper` as a new section in `skills/build/SKILL.md`, inserted immediately BEFORE the existing `## Args Extraction` section (line 18). The gatekeeper runs on every /build invocation before any args parsing.
+
+  Content of the new section:
+
+  ```markdown
+  ## Step 0: Gatekeeper (Sonnet Triage)
+
+  Before any args extraction, evaluate the captain's raw directive text on two syntactic axes:
+
+  **Axis 1 -- Hedge-word presence**: Pattern-match against this closed keyword set (whole-word, case-insensitive): `maybe`, `possibly`, `perhaps`, `might`, `could try`, `not sure`, `wondering`, `or perhaps`, `可能`, `某種`, `我在想`, `也許`, `或許`, `不確定`.
+
+  **Axis 2 -- Concrete-target presence**: Regex for any of: file paths (`/` or `.` in token), component/module names (PascalCase or kebab-case tokens >5 chars), entity slugs (matches `[a-z]+-[a-z]+-` pattern), acceptance-criteria-like phrasing ("when X then Y", "given X"), `--from` flag presence.
+
+  **Decision matrix**:
+
+  | Hedge-words | Concrete-target | Action |
+  |---|---|---|
+  | YES | NO | Auto-suggest: emit `Directive appears underspecified. Consider running /shape "{directive}" for product-level alignment first.` and HALT. Do not proceed to Args Extraction. |
+  | YES | YES | Grey-zone: log `gatekeeper-warning: hedge-words detected but concrete target present -- proceeding` in the eventual Stage Report. Proceed to Args Extraction. |
+  | NO | YES | Silent pass-through. Proceed to Args Extraction. |
+  | NO | NO | Grey-zone: log `gatekeeper-warning: no concrete target but no hedge-words -- proceeding` in the eventual Stage Report. Proceed to Args Extraction. |
+
+  **`--from` flag bypass**: If the directive contains `--from {slug}`, skip the gatekeeper entirely -- the directive is already shape-validated.
+
+  **Supersession note**: This gatekeeper supersedes entity 103's v1 decision ("no automatic routing -- captain judgment") based on observed friction from SO front-half overhead across entities 097, 099, 101.
+  ```
+
+  Use `Edit` to insert this section before the `## Args Extraction` heading. The insertion must not modify any existing content.
+  </action>
+
+  <acceptance_criteria>
+    - `grep "Step 0: Gatekeeper" skills/build/SKILL.md` finds the new section
+    - `grep "Auto-suggest" skills/build/SKILL.md` finds the halt action
+    - `grep "gatekeeper-warning" skills/build/SKILL.md` finds the grey-zone log
+    - `grep "\-\-from.*bypass" skills/build/SKILL.md` finds the bypass rule
+    - Existing `## Args Extraction` section is intact and follows the new section
+    - `grep "Phase II" skills/build/SKILL.md` still finds the existing Phase II section unchanged
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="1">
+  <read_first>
+    - skills/build-shape/SKILL.md
+    - skills/build/SKILL.md
+  </read_first>
+
+  <action>
+  Add self-seed logic to `skills/build-shape/SKILL.md`. Two edits:
+
+  **Edit 1**: In Step 0 (after the `--from {slug}` parse block ending at line 44, and BEFORE the `shape_status: validated` refusal block at line 46), insert:
+
+  ```markdown
+  ### Raw-Directive Self-Seed (Entry B)
+
+  When Step 0 parses a raw directive (no `--from` flag), the skill must create the entity file before proceeding to Step 1 (escape hatch) and Steps 3-7. This makes `/shape` a true independent entry point that does not require a pre-existing entity.
+
+  **Self-seed procedure**:
+
+  1. **Run escape hatch first**: Step 1's heuristic fires before entity creation. If the escape hatch fires, EXIT -- no entity is created.
+  2. **Generate entity ID**: use the same logic as /build Phase III Step 2 (skills/build/SKILL.md:150-162):
+     ```bash
+     (ls docs/build-pipeline/*.md docs/build-pipeline/_archive/*.md 2>/dev/null || true) \
+       | xargs grep -l "^id:" 2>/dev/null \
+       | xargs grep "^id:" \
+       | sed 's/.*id: *//' \
+       | sort -n \
+       | tail -1
+     ```
+     Next ID = highest + 1.
+  3. **Generate slug**: from the directive text (lowercase, spaces to hyphens, strip non-alphanumeric except hyphens, max 50 chars).
+  4. **Create entity file** at `docs/build-pipeline/{slug}.md` with frontmatter:
+     ```yaml
+     ---
+     id: {next_id}
+     title: {first 80 chars of directive}
+     slug: {slug}
+     status: draft
+     context_status: pending
+     source: /shape
+     created: {ISO 8601 timestamp}
+     shape_status: draft
+     intent:
+     scale:
+     project: {project from git root basename}
+     ---
+     ```
+  5. **Write Captain Context Snapshot**: add `## Captain Context Snapshot` with the raw directive verbatim plus invocation timestamp.
+  6. **Proceed to Step 1** (escape hatch) then Step 2 (which detects the existing entity and skips its own creation).
+
+  **Ordering clarification**: The self-seed procedure runs the escape hatch check (Step 1) BEFORE creating the entity file. The sequence is: Step 0 detects raw directive -> Step 1 escape hatch check -> if escape fires, EXIT with no entity -> if escape does not fire, run self-seed steps 2-5 above -> proceed to Step 2 (Create Draft Entity, which detects existing file and skips).
+  ```
+
+  **Edit 2**: At the top of Step 2 (`## Step 2: Assume -- Create Draft Entity`, line 76), add:
+
+  ```markdown
+  **Self-seed guard**: If Step 0's self-seed already created `docs/build-pipeline/{slug}.md` (detectable by: file exists AND `shape_status: draft` in frontmatter AND `source: /shape`), skip entity creation in this step and proceed directly to Step 3. The entity file is already populated with frontmatter and Captain Context Snapshot.
+  ```
+  </action>
+
+  <acceptance_criteria>
+    - `grep "Raw-Directive Self-Seed" skills/build-shape/SKILL.md` finds the new subsection
+    - `grep "Entry B" skills/build-shape/SKILL.md` finds the entry label
+    - `grep "source: /shape" skills/build-shape/SKILL.md` finds the frontmatter template
+    - `grep "Self-seed guard" skills/build-shape/SKILL.md` finds the Step 2 guard clause
+    - Existing Step 0 `--from` parse logic is intact
+    - Existing Step 1 escape hatch is unchanged
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-shape/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-3" model="sonnet" wave="1">
+  <read_first>
+    - agents/science-officer.md
+    - skills/build-brainstorm/SKILL.md
+  </read_first>
+
+  <action>
+  Add alignment-gate logic to `agents/science-officer.md` as a new `### Step 3.6: Alignment Gate` section, inserted immediately AFTER the `### Step 3.5: Post-Brainstorm Research Dispatch` section (after the "Commit brainstorm research annotations before proceeding to `build-explore`." line at ~line 151) and BEFORE `### Step 4: Handoff` (line 153).
+
+  Content:
+
+  ```markdown
+  ### Step 3.6: Alignment Gate (Post-Brainstorm Direction Check)
+
+  After Step 3.5 research synthesis completes (or is skipped) and before the Step 2 re-apply routes to `build-explore`, present the captain with a lightweight direction check.
+
+  **Trigger condition**: `build-brainstorm` has completed and written `## Brainstorming Spec` to the entity body. This step runs in SO main session where AskUserQuestion is available.
+
+  **Presentation format**: Extract from the entity's `## Brainstorming Spec`:
+  - APPROACH headline (first sentence of APPROACH paragraph)
+  - ALTERNATIVE headlines (first sentence of each ALTERNATIVE paragraph, if any)
+
+  Present via AskUserQuestion:
+
+  ```
+  AskUserQuestion(
+    question="Direction check after brainstorm synthesis. Recommended approach:\n\n{APPROACH headline}\n\nAlternatives considered:\n{ALTERNATIVE headlines}\n\nHow should we proceed?",
+    options=["Continue to explore", "Retry brainstorm with correction", "Escalate to /shape"]
+  )
+  ```
+
+  **Branch handling**:
+
+  **(a) Continue**: Proceed to Step 2 re-apply (which routes to `build-explore`). Write to entity's `## Stage Report: brainstorm` section:
+  ```
+  - Alignment gate: continue (0 retries)
+  alignment_confidence: 1.0
+  ```
+
+  **(b) Retry brainstorm with correction**: Ask captain for correction note via AskUserQuestion:
+  ```
+  AskUserQuestion(
+    question="What correction should brainstorm incorporate?",
+    options=["(type your correction below)"]
+  )
+  ```
+  Re-invoke `build-brainstorm` with the captain's correction note appended to the directive as `[Captain correction: {note}]`. After brainstorm returns, overwrite ONLY the `## Brainstorming Spec` section in the entity file (preserve `## Lens Evidence`, `## Directive`, `## Captain Context Snapshot`, and all other sections). Re-present the alignment gate.
+
+  **Retry cap**: Max 3 retries. On the 3rd retry, if captain still selects "Retry", auto-escalate to branch (c). Write:
+  ```
+  - Alignment gate: retry-then-escalate ({N} retries)
+  alignment_confidence: 0.4
+  ```
+
+  **Retry confidence formula**: `alignment_confidence = 1.0 - (retry_count * 0.2)`. Values: 1 retry = 0.8, 2 retries = 0.6, 3 retries = 0.4 (then auto-escalate).
+
+  **(c) Escalate to /shape**: Write `context_status: blocked` to entity frontmatter via Edit. Write to entity's `## Stage Report: brainstorm` section:
+  ```
+  - Alignment gate: escalate (captain requested product-layer re-alignment)
+  - supersedes: {current-slug} -- captain should open new entity via /shape
+  alignment_confidence: N/A (entity superseded)
+  ```
+  Inform captain: "Entity blocked. Open a new entity via `/shape` to re-align at the product level. This entity's accumulated brainstorm work is preserved for reference."
+  Do NOT proceed to explore. Return control to captain.
+
+  **Stage Report annotation**: After the gate completes (any branch), ensure the entity's `## Stage Report: brainstorm` section contains the alignment gate line and `alignment_confidence` value. If `## Stage Report: brainstorm` does not yet exist, create it with the gate annotation only.
+  ```
+  </action>
+
+  <acceptance_criteria>
+    - `grep "Step 3.6: Alignment Gate" agents/science-officer.md` finds the new section
+    - `grep "alignment_confidence" agents/science-officer.md` finds the score field
+    - `grep "Retry brainstorm with correction" agents/science-officer.md` finds branch (b)
+    - `grep "Escalate to /shape" agents/science-officer.md` finds branch (c)
+    - `grep "Max 3 retries" agents/science-officer.md` finds the retry cap
+    - `grep "context_status: blocked" agents/science-officer.md` finds the escalate transition
+    - Existing Step 3.5 content is intact
+    - Existing Step 4 Handoff content is intact
+  </acceptance_criteria>
+
+  <files_modified>
+    - agents/science-officer.md
+  </files_modified>
+</task>
+
+<task id="task-4" model="sonnet" wave="1">
+  <read_first>
+    - skills/build-clarify/SKILL.md
+  </read_first>
+
+  <action>
+  Add the code-evidence self-filter rule to `skills/build-clarify/SKILL.md`. Insert a new subsection immediately AFTER the existing `### Shape-Aware Filter (Section-Cite Predicate)` section (after the "If `shape_status` is absent, `n/a`, or `draft`, skip this filter entirely and present all assumptions normally." line at ~line 168) and BEFORE the "Present ALL unconfirmed assumptions in a single formatted block:" line at ~line 170.
+
+  Content:
+
+  ```markdown
+  ### Code-Evidence Self-Filter (Pre-Presentation)
+
+  After the Shape-Aware Filter and before presenting Open Questions to the captain, run a self-filter pass on each Open Question in `## Open Questions`:
+
+  **For each Open Question**:
+
+  1. Extract the question's domain and the specific claim or gap it addresses.
+  2. Search the entity's `## Lens Evidence` section for [primary]-tier citations that directly address the question's domain.
+  3. Check three evidence sources:
+     - (a) `file:line` citation in `## Lens Evidence` with `[primary]` tier that directly answers the question
+     - (b) Parent entity `-> Answer:` annotation that resolves the question
+     - (c) Existing `-> Selected:` option annotation that renders the question moot
+  4. **If any source pins the answer**: write `-> Self-resolved: {evidence source} -- {brief explanation}` inline on the question. Remove the question from the captain presentation queue.
+  5. **If no source pins the answer**: keep the question in the captain queue for AskUserQuestion presentation.
+
+  **Conservative threshold (GUARDRAIL)**: Only [primary]-tier evidence auto-resolves. [secondary] and [tertiary] tiers indicate weaker confidence and MUST still reach captain. When in doubt, escalate -- false negatives (captain sees a question that could have been self-resolved) are acceptable; false positives (captain misses a genuinely ambiguous question) are not.
+
+  **Detection command for verification**: `grep -c "Self-resolved" entity.md` returns the count of self-resolved questions.
+
+  **Stage Report annotation**: After the self-filter pass completes, add to `## Stage Report: clarify`:
+  ```
+  - Self-filter: {N} self-resolved, {M} captain-escalated
+  clarify_self_filter_ratio: {N / (N + M)}
+  ```
+  Where N = questions self-resolved, M = questions presented to captain.
+  ```
+  </action>
+
+  <acceptance_criteria>
+    - `grep "Code-Evidence Self-Filter" skills/build-clarify/SKILL.md` finds the new subsection
+    - `grep "Self-resolved" skills/build-clarify/SKILL.md` finds the annotation format
+    - `grep "clarify_self_filter_ratio" skills/build-clarify/SKILL.md` finds the score field
+    - `grep "\[primary\]-tier evidence auto-resolves" skills/build-clarify/SKILL.md` finds the conservative threshold rule
+    - Existing Shape-Aware Filter section is intact
+    - Existing "Present ALL unconfirmed assumptions" block follows the new section
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-clarify/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-5" model="sonnet" wave="2">
+  <read_first>
+    - skills/build-shape/references/fixture-format.md
+    - agents/science-officer.md
+  </read_first>
+
+  <action>
+  Create the directory `skills/build-shape/smoke-tests/` and the fixture file `skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml`.
+
+  Content:
+
+  ```yaml
+  # F5: Alignment-gate branch coverage
+  # Tests the three branches of the alignment-gate in agents/science-officer.md Step 3.6
+  # Note: This is a structural fixture for forge validation, not a live execution test.
+  # Live testing requires captain-interactive AskUserQuestion (Class 3).
+
+  skill: spacedock:science-officer
+  trigger: "/science build-entry-routing-and-alignment-gate"
+  timeout: 180
+
+  scenarios:
+    - name: "branch-a-continue"
+      description: "Captain selects Continue at alignment gate"
+      assertions:
+        - contains: "alignment_confidence: 1.0"
+        - contains: "Alignment gate: continue"
+        - not_contains: "context_status: blocked"
+
+    - name: "branch-b-retry"
+      description: "Captain selects Retry then Continue"
+      assertions:
+        - contains: "alignment_confidence"
+        - contains: "Alignment gate: retry"
+        - not_contains: "Lens Evidence"
+
+    - name: "branch-c-escalate"
+      description: "Captain selects Escalate to /shape"
+      assertions:
+        - contains: "context_status: blocked"
+        - contains: "supersedes:"
+        - contains: "alignment_confidence: N/A"
+        - not_contains: "build-explore"
+
+    - name: "retry-preserves-lens-evidence"
+      description: "Retry overwrites Brainstorming Spec but preserves Lens Evidence"
+      assertions:
+        - contains: "Brainstorming Spec"
+        - contains: "Lens Evidence"
+  ```
+  </action>
+
+  <acceptance_criteria>
+    - `ls skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml` succeeds
+    - `grep "skill: spacedock:science-officer" skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml` finds the skill reference
+    - `grep "branch-a-continue" skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml` finds scenario 1
+    - `grep "branch-c-escalate" skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml` finds scenario 3
+    - `grep "supersedes:" skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml` finds the escalate assertion
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml
+  </files_modified>
+</task>
+
+<task id="task-6" model="sonnet" wave="2">
+  <read_first>
+    - skills/build-brainstorm/SKILL.md
+    - skills/build-clarify/SKILL.md
+  </read_first>
+
+  <action>
+  Add Stage Report format additions and decision lineage documentation.
+
+  **Edit 1 -- skills/build-brainstorm/SKILL.md**: After the `## Rules` section (line 470+), append:
+
+  ```markdown
+  ## Stage Report: brainstorm (Format Addition)
+
+  When a `## Stage Report: brainstorm` is written (by SO or FO after brainstorm completes), include these fields if the alignment-gate ran:
+
+  ```
+  - Alignment gate: {branch taken} ({retry count} retries)
+  alignment_confidence: {0.0-1.0 or N/A}
+  ```
+
+  The alignment-gate is owned by `agents/science-officer.md` Step 3.6, not by brainstorm itself. This format spec ensures consistency when SO writes the Stage Report on brainstorm's behalf.
+
+  **Decision lineage**: The /build gatekeeper (entity 113) supersedes entity 103's v1 decision ("no automatic routing -- captain judgment") based on observed friction from SO front-half overhead across entities 097, 099, 101.
+  ```
+
+  **Edit 2 -- skills/build-clarify/SKILL.md**: Locate the Stage Report format area (near the end of the file or near existing Stage Report examples). Add:
+
+  ```markdown
+  ## Stage Report: clarify (Format Addition)
+
+  When a `## Stage Report: clarify` is written, include the self-filter reporting fields:
+
+  ```
+  - Self-filter: {N} self-resolved, {M} captain-escalated
+  clarify_self_filter_ratio: {0.0-1.0}
+  ```
+  ```
+  </action>
+
+  <acceptance_criteria>
+    - `grep "Stage Report: brainstorm (Format Addition)" skills/build-brainstorm/SKILL.md` finds the format section
+    - `grep "alignment_confidence" skills/build-brainstorm/SKILL.md` finds the field spec
+    - `grep "Stage Report: clarify (Format Addition)" skills/build-clarify/SKILL.md` finds the format section
+    - `grep "clarify_self_filter_ratio" skills/build-clarify/SKILL.md` finds the field spec in the format section
+    - `grep "entity 103.*v1 decision" skills/build-brainstorm/SKILL.md` finds the supersession note
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-brainstorm/SKILL.md
+    - skills/build-clarify/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-7" model="sonnet" wave="3">
+  <read_first>
+    - skills/build/SKILL.md
+    - skills/build-shape/SKILL.md
+    - agents/science-officer.md
+    - skills/build-clarify/SKILL.md
+    - skills/build-brainstorm/SKILL.md
+    - skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml
+  </read_first>
+
+  <action>
+  Integration verification task. Run mechanical checks across all modified files:
+
+  1. **Gatekeeper-to-shape cross-reference**: `grep "Auto-suggest" skills/build/SKILL.md` present AND `grep "source: /shape" skills/build-shape/SKILL.md` present -- confirms gatekeeper's /shape suggestion leads to a valid self-seed path.
+
+  2. **Alignment-gate-to-brainstorm contract**: `grep "NEVER ask the captain questions" skills/build-brainstorm/SKILL.md` still present AND `grep "AskUserQuestion" skills/build-brainstorm/SKILL.md` returns 0 hits -- confirms alignment-gate AskUserQuestion is NOT in brainstorm skill. `grep "AskUserQuestion" agents/science-officer.md` finds hits -- confirms gate is in SO agent.
+
+  3. **Filter ordering**: In `skills/build-clarify/SKILL.md`, `grep -n "Shape-Aware Filter" | head -1` returns line N, `grep -n "Code-Evidence Self-Filter" | head -1` returns line M, assert M > N -- confirms Shape-Aware runs first.
+
+  4. **Stage Report field consistency**: `grep "alignment_confidence" agents/science-officer.md skills/build-brainstorm/SKILL.md` returns hits in both files. `grep "clarify_self_filter_ratio" skills/build-clarify/SKILL.md` returns at least 2 hits (definition + format).
+
+  5. **Entity 091 disjointness**: `grep -n "Step 1.5" skills/build-clarify/SKILL.md` shows 091's insertion area. `grep -n "Code-Evidence Self-Filter" skills/build-clarify/SKILL.md` shows 113's insertion area. Different step numbers confirm disjoint.
+
+  6. **Fixture schema**: `grep "skill:" skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml` AND `grep "trigger:" ...` AND `grep "assertions:" ...` all present per fixture-format.md schema.
+
+  7. **Readiness score parsability**: `echo "alignment_confidence: 1.0" | grep -E "alignment_confidence: [0-9.]+"` succeeds AND `echo "clarify_self_filter_ratio: 0.75" | grep -E "clarify_self_filter_ratio: [0-9.]+"` succeeds -- confirms grep-parseable format.
+
+  Report each check as PASS/FAIL with evidence.
+  </action>
+
+  <acceptance_criteria>
+    - All 7 cross-reference checks report PASS
+    - No insertion point overlap between entity 113 and entity 091
+    - Fixture file matches fixture-format.md schema
+    - Both readiness score fields are grep-parseable
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+None
+
+### CLI
+- [ ] `/build "maybe we could add something"` triggers gatekeeper halt and suggests /shape
+- [ ] `/build "add Step 0 gatekeeper to build/SKILL.md"` passes gatekeeper silently (concrete target, no hedge-words)
+- [ ] `/build "maybe add gatekeeper to build/SKILL.md"` logs gatekeeper-warning (grey-zone: both axes trigger)
+- [ ] `/build --from validated-entity-slug` bypasses gatekeeper entirely
+- [ ] `/shape "add dark mode toggle"` self-seeds entity file with shape_status: draft before running Steps 3-7
+- [ ] `/shape --from existing-slug` skips self-seed and loads existing entity
+
+### API
+None
+
+### Interactive
+- [ ] After brainstorm synthesis, SO presents alignment-gate with 3 options via AskUserQuestion
+- [ ] Captain selects "Continue" at alignment-gate -- entity proceeds to explore with alignment_confidence: 1.0
+- [ ] Captain selects "Retry" at alignment-gate -- brainstorm re-runs, Brainstorming Spec overwritten, Lens Evidence preserved
+- [ ] Captain selects "Retry" 3 times -- auto-escalates to branch (c) with alignment_confidence: 0.4
+- [ ] Captain selects "Escalate" at alignment-gate -- entity gets context_status: blocked, supersedes: hint in Stage Report
+- [ ] During clarify, Open Questions with [primary] Lens Evidence citations are self-resolved and NOT presented to captain
+- [ ] During clarify, Open Questions with only [secondary] evidence are still presented to captain
+- [ ] Stage Report: brainstorm contains alignment_confidence field; Stage Report: clarify contains clarify_self_filter_ratio field
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1 Gatekeeper halts on hedge-words + no concrete target | task-1 | `grep "Auto-suggest" skills/build/SKILL.md` | pending | -- |
+| AC-2 Grey-zone logs warning but proceeds | task-1 | `grep "gatekeeper-warning" skills/build/SKILL.md` | pending | -- |
+| AC-3 Shape self-seed creates entity with shape_status: draft | task-2 | `grep "source: /shape" skills/build-shape/SKILL.md && grep "shape_status: draft" skills/build-shape/SKILL.md` | pending | -- |
+| AC-4 Alignment-gate presents 3 options via AskUserQuestion | task-3 | `grep "Continue to explore.*Retry brainstorm.*Escalate" agents/science-officer.md` | pending | -- |
+| AC-5 Retry overwrites Brainstorming Spec preserving Lens Evidence | task-3, task-5 | `grep "overwrite ONLY.*Brainstorming Spec" agents/science-officer.md` | pending | -- |
+| AC-6 Escalate writes context_status: blocked + supersedes: hint | task-3 | `grep "context_status: blocked" agents/science-officer.md && grep "supersedes:" agents/science-officer.md` | pending | -- |
+| AC-7 Self-filter auto-resolves [primary]-pinned questions | task-4 | `grep "Self-resolved" skills/build-clarify/SKILL.md` | pending | -- |
+| AC-8 Readiness scores in Stage Reports | task-6 | `grep -E "alignment_confidence:|clarify_self_filter_ratio:" skills/build-brainstorm/SKILL.md skills/build-clarify/SKILL.md` | pending | -- |
+
+## Stage Report: plan
+
+- [x] Load spacedock:build-plan skill and follow its orchestration steps
+  Loaded via Skill tool; followed Steps 0.5 through 9
+- [x] Dispatch parallel research subagents for identified research topics
+  All 3 topics deduped against explore Lens Evidence; 0 researchers dispatched (inline fallback used)
+- [x] Write ## Research Findings with citations
+  5 subsections written with file:line citations from entity body + own reads
+- [x] Write ## PLAN with per-task attributes
+  8 tasks (task-0 through task-7) across 4 waves with model/wave/skills/read_first/action/acceptance_criteria/files_modified
+- [x] Write ## UAT Spec with items classified by type
+  4 headers present: Browser (None), CLI (6 items), API (None), Interactive (8 items)
+- [x] Write ## Validation Map
+  8 rows mapping AC-1 through AC-8 to tasks with grep verification commands
+- [x] Run self-review + plan-checker (up to 3 revision iterations)
+  Self-review inline (Step 5); plan-checker all 9 active dims evaluated inline (no Agent tool); 1 warning (Dim 7), 0 blockers; PASS on iteration 1
+- [x] Call workflow-index append unconditionally
+  7 append calls to CONTRACTS.md covering 6 files across 7 task entries; committed as chore(index)
+
+status: passed
+plan-checker verdict: PASS (after 1 revision iteration)
+iteration count: 1
+knowledge capture: skipped -- no findings met D1/D2 threshold
+workflow-index append: 7 append calls, covering 7 tasks and 6 files, all successful
+
+### Step 0.5 Assumption Re-Validation
+- A-1 (SO Step 3.5 insertion point): evidence holds -- agents/science-officer.md:103-151 confirmed
+- A-2 (Shape-Aware Filter): evidence holds -- skills/build-clarify/SKILL.md:152-166 confirmed
+- A-3 (entity 103 contracts): evidence holds -- CONTRACTS.md shows 15 rows for entity 103
+- A-4 (091 disjoint insertion points): evidence holds -- 091 APPROACH at lines 34-48 confirmed disjoint
+- A-5 (retry cap 3): no file:line citation -- skipped
+- A-6 (hardcoded keywords): evidence holds -- build-shape:62 + build-brainstorm:472 confirmed
+
+### Research
+- Topics extracted: 3 (Existing Patterns: seed logic, SO routing, Shape-Aware Filter)
+- All 3 deduped against explore Lens Evidence -- 0 researchers dispatched
+- Research findings written inline from entity body + own file reads
+
+### Plan-Checker Output (Inline -- no Agent tool available)
+```yaml
+issues:
+  - dimension: cross_entity_coherence
+    task: task-6
+    severity: warning
+    description: "skills/build-brainstorm/SKILL.md has in-flight entry for build-flow-tdd-discipline; task-6 also modifies this file"
+    fix_hint: "Insertion points are disjoint (task-6 appends after Rules, tdd-discipline modifies Step 4). Proceed with awareness."
+```
+
+### Dispatch Gaps
+- Plan-checker dimensions evaluated inline (ensign context has no Agent tool). All 9 active dims checked manually.
+- Parallel-run diff skipped (no Agent tool for monolithic sonnet dispatch). Counter: 1 existing, N=3 threshold not met.
+
+### Commits
+- chore(index): add contracts for entity-build-entry-routing-and-alignment-gate entering plan (6 files)
+- chore(plan): build-entry-routing-and-alignment-gate -- 4 pipeline primitives with DAG-ready scores
+
 ## Stage Report: clarify
 
 - [x] Assumptions confirmed: 6/6 (3 Confident unchanged, 3 Likely upgraded to Confident via self-investigation)
