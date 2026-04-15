@@ -81,7 +81,7 @@ NEW (broken):
 ## Acceptance Criteria
 
 - Given a CC session with FO running, when FO calls the `reply` MCP tool with a message, then the message appears in the spacebridge UI's activity feed within 2 seconds (how to verify: FO sends reply, browser shows message in SSE feed)
-- Given the spacebridge UI with a chat input, when captain types a message and submits, then the connected CC session receives the message via `get_pending_messages` MCP tool (how to verify: submit chat in UI, FO calls get_pending_messages, assert message appears)
+- Given the spacebridge UI with a chat input, when captain types a message and submits, then the connected CC session receives the captain message via daemon notification channel (`notifications/spacebridge/captain_message`). The `get_pending_messages` MCP tool integration is deferred to child entity 099b. (how to verify: submit chat in UI, assert shim stdout emits `notifications/spacebridge/captain_message` within 2s)
 - Given an entity at a gate stage (plan/uat), when the UI shows an approve/reject button and captain clicks approve, then the gate decision is written to DB and the FO's next idle/poll cycle detects the approval (how to verify: click approve in UI, FO event loop picks up approval)
 - Given the MCP shim disconnects and reconnects, when FO calls `get_pending_messages` with the last known sequence, then all messages sent during the disconnect window are returned (how to verify: disconnect shim, send 3 messages from UI, reconnect, assert 3 messages in response)
 - Given the spacebridge UI is open in a browser, when the Next.js dev server starts, then the UI connects to the daemon via Route Handler → socket RPC and displays the connection status (how to verify: start daemon + UI, assert "Connected" indicator in UI header)
@@ -461,7 +461,10 @@ Parent: 099 (099b is child of 099)
   </action>
 
   <acceptance_criteria>
-    - All 10 checks pass (each echoed)
+    - `test -f spacebridge/bin/daemon.ts` exits 0 (daemon entry exists)
+    - `grep -q 'await new Promise<void>(() => {})' spacebridge/bin/cli.ts` exits 0 (mcp stub still present)
+    - `grep -cE 'sessionEvents|leaseEvents|commentEvents' spacebridge/src/schema.ts` returns ≥3 (schema intact)
+    - All 10 action checks pass without error (each echoed to stdout)
     - No source file modified by this task
   </acceptance_criteria>
 
