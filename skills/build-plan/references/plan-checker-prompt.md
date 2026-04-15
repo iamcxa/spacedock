@@ -1,3 +1,11 @@
+# DEPRECATED -- Port 11 Multi-Angle Nuwa (entity 107, 2026-04-15)
+
+This monolithic prompt has been replaced by 6 per-dim haiku dispatches + 1 synthesis-layer Dim 3 pattern in `skills/build-plan/SKILL.md` Step 6. See `docs/build-pipeline/_docs/nuwa-ports.md` Port 11.
+
+Retained temporarily for the O-2-B parallel-run diff window (default 3 plans). Will be removed in a follow-up entity after captain confirms zero schema/severity deviation across the diff window. Do NOT edit to add Dim 11+ -- new dims are new per-dim agents + skills at `agents/plan-checker-dim-{n}-{slug}.md` + `skills/plan-checker-dim-{n}-{slug}/`.
+
+---
+
 # Plan-Checker Prompt Template (Reference -- do NOT register as a skill)
 
 Used by `skills/build-plan/SKILL.md` step 6. `build-plan` reads this file via the `Read` tool, substitutes `{plan_text}` and `{entity_context}`, then dispatches:
