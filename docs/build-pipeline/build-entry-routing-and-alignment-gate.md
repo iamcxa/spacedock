@@ -10,7 +10,7 @@ started:
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-build-entry-routing-and-alignment-gate
 issue:
 pr:
 intent: feature
