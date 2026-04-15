@@ -709,3 +709,56 @@ Seven seeds pre-locked by clarify, one entity per HIGH finding plus the LOW doc-
 - NOT in scope: changes to the dispatch contract content itself; not in scope: similar extraction for other inline contracts in other skills (can be a follow-on)
 
 **Model/profile hint**: Small scale, default profile; sonnet sufficient; fast ship
+
+## Known-Gap Log
+
+Findings accepted as v1 trade-offs. Each entry documents the rationale and an explicit revisit trigger for future audit cycles.
+
+### F-WI-4 — CONTRACTS row schema has no Supersedes column (MEDIUM)
+
+**Accepted as v1 trade-off.** Captain P-4 discipline (supersedes relationships) is captured in two places: DECISIONS.md (typed Supersedes field per decision entry) and CONTRACTS.md Notes cells (free-text, e.g., CONTRACTS.md line ~336). The asymmetry is intentional at v1 — contract rows track live-file ownership and don't need relationship semantics; decisions track architectural choices and do. Adding a Supersedes column to CONTRACTS would require schema migration across hundreds of rows for marginal benefit in the current 10-20 active-entity range.
+
+**Revisit trigger**: if 3 or more entities carry explicit P-4 supersedes relationships on overlapping CONTRACTS file sections within any 60-day window, the free-text Notes cell approach will produce lookup friction that justifies the column addition.
+
+### F-TR-1 — `blocked_reason` stringly-typed (MEDIUM)
+
+**Accepted as v1 trade-off, per entity 106 precedent.** The Benign-Drift Classifier at `skills/build-execute/SKILL.md:216-240` uses substring matching on `blocked_reason` to decide auto-proceed on BLOCKED tasks. The 106 sharp-edges review (`docs/build-pipeline/_archive/plan-defect-autopilot.md:809-854`) explicitly accepted this as a known-gap with the rationale that internal-agent trust is assumed and the cost of enum-constrained `blocked_reason` (loss of troop expressiveness for nuanced failure descriptions) outweighs the risk for the current single-operator context.
+
+**Revisit trigger**: a post-Phase-F threat-model pass that formally defines the adversarial-troop threat; OR a traced incident where a false-auto-proceed is attributed to a crafted or confused `blocked_reason` substring matching a classifier pattern.
+
+### F-TR-2 — `scope_observation` / `drift_class` unsanitized (MEDIUM)
+
+**Accepted as v1 trade-off.** The internal-agent trust model assumes troops are non-adversarial (confused at worst, not malicious). Sanitizing free-text finding fields would require a schema-enforcement layer between the troop's task report and the Stage Report parser — adding complexity for a threat that has not materialized. The `scope_observation` and `drift_class` fields are informational channels, not decision gates; a confused troop authoring a misleading `scope_observation` produces noise in the Stage Report, not an automatic system action.
+
+**Revisit trigger**: if an adversarial-troop scenario (LLM output mimicking classifier field patterns, producing false audit trail entries) materializes in a phase execution, or if `drift_class` is promoted to a decision gate in a future classifier version.
+
+### F-TR-4 — Circular-AC grep-context trust (MEDIUM)
+
+**Accepted as v1 trade-off.** The Circular-AC Rule's same-entity scope-narrow (confirmed during entity 106 review) is a practical mitigation for the confused-troop scenario: the rule explicitly blocks the troop from classifying DONE on a cross-entity zero-count grep. The remaining edge case (working-tree self-match from the plan body) requires the entity file to contain the AC search string in a guard-listed block AND for the troop to fail to distinguish that match from a real artifact — a compound confusion that is practically rare and self-documenting (the troop returns a `scope_observation` finding flagging the circular reference).
+
+**Revisit trigger**: if a DONE task is traced back to a Circular-AC semantic-pass that matched only the plan-body definition rather than a real artifact in the target source files, requiring a plan-author rewrite that was not flagged in review.
+
+### F-TR-5 — Mod-hook logged-not-alarmed (LOW)
+
+**Accepted as v1 trade-off.** The current deployment is single-operator (one captain, one FO instance). Log visibility is sufficient when the operator reads FO output after each session. The alarm channel complexity (dashboard notification, MCP message, or captain interrupt) is disproportionate for the current scale. The error handling block already prevents FO startup and entity dispatch from being blocked by hook failures — graceful degradation is in place.
+
+**Revisit trigger**: when cross-instance drift materializes (two concurrent FO instances producing competing index writes) or when a missed hook failure causes a downstream captain-visible error that would have been prevented by an alarm. At that point, add a dashboard `update_entity` notification or MCP `add_comment` call to the error handling block.
+
+## Stage Report: execute
+
+- [x] Task 1: workflow-index findings table authored (5 rows)
+  `## Audit Findings — workflow-index` appended; F-WI-1 HIGH, F-WI-2 HIGH, F-WI-3 HIGH, F-WI-4 MEDIUM, F-WI-5 HIGH; all Location fields use content anchors per Dim 9 discipline; commit `feat(108): wave 1 task-1`
+- [x] Task 2: troop + task-execution findings table authored (6 rows + F-XP-1 compound + Confirmed Mitigations)
+  `## Audit Findings — troop + task-execution` appended; F-TR-1 MEDIUM, F-TR-2 MEDIUM, F-TR-3 HIGH, F-TR-4 MEDIUM, F-TR-5 LOW, F-TR-6 LOW; F-XP-1 compound with sub-findings (a)+(b); `## Confirmed Mitigations` subsection for footguns #8 and #10; commit `feat(108): wave 1 task-2`
+- [x] Task 3: cross-primitive coherence + Phase F seed slate authored
+  `## Cross-Primitive Coherence` with compound footgun table (3 headline + 1 tertiary); `## Phase F Seed Slate` with 7 `### Seed N:` blocks (Seed 1-7); commit `feat(108): wave 1 task-3`
+- [x] Task 4: known-gap log + CONTRACTS append + Stage Report authored
+  `## Known-Gap Log` with 5 entries (F-WI-4, F-TR-1, F-TR-2, F-TR-4, F-TR-5), each with explicit revisit trigger; CONTRACTS.md row appended for entity 108 execute stage via workflow-index skill (chore(index) commit); Stage Report: execute present
+
+### Summary
+
+Audit artifact written to entity body in 4 sequential tasks. All 11 findings authored (6 HIGH + 3 MEDIUM + 2 LOW), compound finding F-XP-1 with two sub-findings, 7 Phase F seeds with scope/severity/model hints, cross-primitive coherence compound table, 5 known-gap entries with revisit triggers, and 2 confirmed mitigations. No source-code changes per audit-only scope (Directive: "Review-only audit entity"). CONTRACTS.md row appended for this entity entering execute stage.
+
+## Files Modified
+
+- docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md
