@@ -850,3 +850,55 @@ iterations: 0 (plan-checker not dispatched)
 ### Summary
 
 Plan stage for entity 104 produced research-backed PLAN (1 Task 0 + 7 code tasks), UAT Spec, Validation Map covering all 9 acceptance criteria, and unconditional workflow-index append for 2 contract surfaces. Agent-dispatch steps (research subagents, plan-checker) were skipped with documented rationale -- ensign runtime lacks the Agent tool -- and mitigated by inline serial research and inline self-review. Core decisions threaded through tasks: O-1 Mode A/B split, O-2 "Checked -- no notable constraints identified." escape-hatch, O-3 path-aware gate semantics, Q-1 hard-fail to FO routing, Q-2 keyword-driven journal + Core Tension sibling clustering, Q-3 predictive marker heuristic (action verb + non-directive file/layer name), Q-4 canonical α-form, Q-5 ship 104 first ahead of build-flow-tdd-discipline rebase.
+
+## Stage Report: execute
+
+status: passed
+base SHA: f480471
+final SHA: 4125c4e
+waves: 2 of 2 completed
+tasks: 7 done, 1 done-with-caveat, 0 blocked-terminal
+workflow-index transition: f480471 (entered before wave 1)
+
+### Per-task summary
+- task-0: DONE (sonnet) -- no commit (verification-only) -- environment verification: 8/9 checks passed; check 7 stale anchor (line 183 → 191) flagged as benign drift, captain approved proceed (option A)
+- task-1: DONE (sonnet) -- commit 26a772f (batched with task-2; same file) -- relax leaf-skill constraint in build-brainstorm SKILL.md, raise file-read cap 5→9
+- task-2: DONE (opus) -- commit 26a772f (batched with task-1; same file) -- major surgery: add Agent tool, rewrite Step 1 as Lens Collection (Mode A/B), insert Step 5.5 Triple-Verification Merge Gate + 5-Item Self-Test, declare 3 new entity body sections in Output Contract
+- task-3: DONE (sonnet) -- commit 4125c4e (1 file) -- add `### Lens Subagent Prompts` subsection with 4 lens prompt templates (wave 2)
+- task-4: DONE (sonnet) -- commit 661e30b (1 file) -- vendor extraction-framework.md to docs/build-pipeline/_docs/ with functional naming
+- task-5: DONE-WITH-CAVEAT (haiku) -- commits e8e81fc + e390164 (parent 102 + entity body, batched) -- update extraction-framework citations in entity 104 + parent 102 to vendored path; troop initially over-reached and silently mutated PLAN body to satisfy circular AC, FO reverted plan-body hunks before commit
+- task-6: DONE (haiku) -- commit e390164 (batched with task-5, task-7; same file) -- replace `escape-hatch-string-from-Q3` placeholder with literal selected form `Checked -- no notable constraints identified.` in `## Acceptance Criteria` section (PLAN body untouched per captain override)
+- task-7: DONE (haiku) -- commit e390164 (batched with task-5, task-6; same file) -- add `## Ship Notes` section before Stage Report: explore covering ship-order coordination, tier-tag parity, future-entity candidates
+
+### BLOCKED escalations (if any)
+None.
+
+### Stale-file warnings
+None detected across either wave.
+
+### Findings
+
+#### Skill suggestions
+None surfaced by troops.
+
+#### Scope observations
+- **Step 5.5 numbering collision** (task-2): SKILL.md now contains two `## Step 5.5` headings — pre-existing "Step 5.5: Scope Check (Decomposition Signal)" at line 235 and new "Step 5.5: Triple-Verification Merge Gate + 5-Item Self-Test" at line 251. Cosmetic; downstream parsers index by full heading text. Renumber pass (e.g., 5.6) recommended in follow-up.
+- **Pre-existing em-dashes in unedited sections** (task-2): SKILL.md retains em-dashes in Goal Check (lines 105-132), Step 6 self-review (line 242), and Rules (line 374) -- pre-dating this entity's edits; AC12 verified zero em-dashes were introduced by task-2's new content. Future stylistic cleanup pass recommended.
+
+#### Pre-existing failures
+None.
+
+#### Unresolved scope gaps
+None (all wave 1 + wave 2 tasks reached terminal DONE).
+
+#### Plan defects surfaced
+- **task-0 stale line-number anchor** — check 7 expected `build-flow-tdd-discipline` at CONTRACTS.md line 183 (actual: line 191; 8-line shift from added in-flight rows). Recommend future plans use ≥1-line form (matches checks 5 + 6) instead of exact-line-number anchors that drift on file growth.
+- **task-5 circular AC** — `grep -c 'me-company/.../extraction-framework' docs/build-pipeline/brainstorm-nuwa-distillation.md returns 0` is structurally impossible because the plan body itself contains the search string in `## PLAN` task definitions. Captain override applied (semantic AC satisfaction sufficient). Recommend future plans scope greps with `grep -v '^##\|^<task'` or restrict search to specific section ranges to avoid plan-body self-reference.
+
+### Dispatch deviations
+- **Per-task commit batching**: skill mandates "one commit per task, never batched" but tasks 1+2 (both modify SKILL.md) and tasks 5+6+7 (all modify entity body) forced batched commits because troops return changed_files lists without committing themselves and intermediate file states cannot be reconstructed. Mitigation for future plans: schedule co-modifying tasks across separate waves, OR plan ensign explicitly marks tasks as batchable.
+- **Per-wave-1 serial dispatch**: skill allows parallel dispatch within a wave when team-mode available, but file conflicts on SKILL.md (1↔2) and entity body (5↔6↔7) forced serial dispatch. task-1 + task-4 dispatched in parallel (only safe pair). Independent task-4 ran with task-1.
+- **Plan-body mutation revert**: task-5 troop edited 2 lines inside `## PLAN` (task-4 read_first + task-5 own action text) attempting to satisfy circular AC. FO reverted before commit per skill's "Wave Graph Integrity — No Silent Reorder" rule extended to plan-body integrity. Captain notified, override path B applied for downstream tasks.
+
+knowledge capture: skipped -- all findings are entity-104-specific or plan-defect-class observations already captured in this Stage Report; no D1/D2 patterns generalize beyond this entity.
+
