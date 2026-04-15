@@ -2,7 +2,7 @@
 id: 107
 title: Plan-Checker Multi-Angle Nuwa-ification -- Port Monolithic Prompt to Per-Dim Haiku Dispatch
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: /build
 created: 2026-04-15T00:00:00Z
 started:
@@ -93,7 +93,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 
 ## Brainstorming Spec
 
-**APPROACH**: Port the current monolithic plan-checker prompt (10 dims after entity 106) into a per-dim haiku-dispatch architecture. Create 10 thin-wrapper agents at `agents/plan-checker-dim-{id}-{slug}.md` (each ≤25 lines per MEMORY thin-wrapper-agent-pattern), each preloading a single skill `skills/plan-checker-dim-{slug}` containing the extracted per-dim prompt. Rewrite `skills/build-plan/SKILL.md` Step 6 to issue all 10 `Agent(subagent_type="spacedock:plan-checker-dim-{id}-{slug}", model="haiku", ...)` calls in a single tool-call block for true parallelism. Synthesis phase in main session concatenates per-dim `issues[]` lists, preserving contradictions (Port 10) when two dims flag the same task -- both findings survive to the consumer YAML. Dim 3 (wave-graph integrity) is the essential-tension special case (needs clarification -- deferred to explore): candidate options are (a) give Dim 3 agent the full PLAN text as wide-context, (b) move wave-graph correlation out of plan-checker entirely into a main-session synthesis pass that consumes all per-task issues. YAML output schema (`dimension/severity/description/fix_hint/task`) is frozen -- build-plan Step 6 consumer at SKILL.md:307 must work unchanged.
+**APPROACH**: Port the current monolithic plan-checker prompt (10 dims after entity 106) into a per-dim haiku-dispatch architecture. Create 10 thin-wrapper agents at `agents/plan-checker-dim-{id}-{slug}.md` (each ≤25 lines per MEMORY thin-wrapper-agent-pattern) (⚠ contradicted: existing thin-wrapper agents are 19-21 lines -- references/claude-ensign-runtime.md states "15-22 lines" cap; ≤25 is upward drift -- see Q-2), each preloading a single skill `skills/plan-checker-dim-{slug}` containing the extracted per-dim prompt. Rewrite `skills/build-plan/SKILL.md` Step 6 to issue all 10 `Agent(subagent_type="spacedock:plan-checker-dim-{id}-{slug}", model="haiku", ...)` calls in a single tool-call block for true parallelism. Synthesis phase in main session concatenates per-dim `issues[]` lists, preserving contradictions (Port 10) when two dims flag the same task -- both findings survive to the consumer YAML. Dim 3 (wave-graph integrity) is the essential-tension special case (needs clarification -- deferred to explore): candidate options are (a) give Dim 3 agent the full PLAN text as wide-context, (b) move wave-graph correlation out of plan-checker entirely into a main-session synthesis pass that consumes all per-task issues. YAML output schema (`dimension/severity/description/fix_hint/task`) is frozen -- build-plan Step 6 consumer at SKILL.md:307 must work unchanged.
 
 **ALTERNATIVE**: Keep the monolithic single-prompt architecture; downgrade dispatch model from opus to sonnet purely for cost. -- D-01 **rejected**: cross-dim bias pollution (the load-bearing problem) persists because evidence Dim 1 reads leaks into Dim 6's reasoning within the same context window; no parallelism gain; adding Dim 11 in the future still means editing a 150-line prompt, whereas Nuwa-ification gives new dims a clean 25-line file with no risk of touching Dims 1-10. Cost is the weakest argument for Nuwa anyway -- the real win is fresh-context isolation.
 
@@ -117,22 +117,177 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 - Given a synthetic plan with two dims flagging the same task, when post-port synthesis runs, then both findings appear in output preserving Port 10 contradiction (how to verify: pressure-test fixture `tests/pressure/plan-checker-nuwa-dual-dim.yaml` with dual-dim violation seed; assert `yq '.issues | length' post.yaml >= 2`)
 - Given the depends-on chain (061 → 106 → this), when this entity begins execute, then both 061 and 106 are in status `shipped` (how to verify: `grep 'status:' docs/build-pipeline/{phase-e-plan-2-research-and-plan-skills,plan-defect-autopilot}.md` both show shipped OR paths moved to `_archive/`)
 
-## Open Questions
-
-(explore stage will populate)
-
 ## Assumptions
 
-(explore stage will populate)
+### A-1: Thin-wrapper agent format convention is rigid
+- Statement: Per-dim agents follow the exact frontmatter-body shape proven across 4 existing wrappers (code-explorer, researcher, troop, ensign): frontmatter fields `name / description / tools / model: inherit / color / skills: [...]`, body = `## Boot Sequence` + `## Namespace Note` (+ optional Dispatch Boundary).
+- Confidence: Confident (0.95)
+- Evidence:
+  - agents/code-explorer.md:1-21 (21 lines, skills preload, Boot Sequence, Namespace Note) [primary]
+  - agents/researcher.md:1-21 (21 lines, same shape) [primary]
+  - agents/troop.md:1-21 (21 lines, same shape) [primary]
+  - agents/ensign.md:1-19 (19 lines, same shape) [primary]
+
+### A-2: Per-dim skill preload is the extraction unit
+- Statement: Each dim's prompt lives in a standalone skill `skills/plan-checker-dim-{slug}/SKILL.md`, preloaded by the thin-wrapper agent via `skills: ["spacedock:plan-checker-dim-{slug}"]` frontmatter. Matches code-explorer/researcher pattern exactly.
+- Confidence: Confident (0.90)
+- Evidence:
+  - 4 existing wrappers each preload a single skill via frontmatter array [primary]
+  - skills/code-explorer/SKILL.md precedent: wrapper frontmatter + leaf skill pair [primary]
+
+### A-3: Synthesis preserves all per-dim findings (Port 10 literal)
+- Statement: Main-session synthesis concatenates issues[] lists and keeps both findings when two dims flag the same task. No dedupe, no reconciliation -- duplicates are signal, per Port 10 semantics established in build-explore.
+- Confidence: Confident (0.92)
+- Evidence:
+  - skills/build-explore/SKILL.md:233 ("contradictions are first-class outputs, never silently reconciled") [primary]
+  - skills/build-explore/SKILL.md:400 (Step 6 routes inter-explorer conflicts to Core Tensions, typed) [primary]
+
+### A-4: Leaf dispatch rule applies to each dim agent
+- Statement: Per-dim haiku subagents MUST NOT recursively dispatch (no nested Agent() or SendMessage). Each is a leaf, identical to code-explorer and plan-checker's current singleton contract.
+- Confidence: Confident (0.98)
+- Evidence:
+  - skills/build-explore/SKILL.md:229 ("Leaf dispatch rule. spacedock:code-explorer runs as a leaf subagent") [primary]
+  - skills/build-plan/SKILL.md:33 ("researchers and plan-checker you dispatch ... cannot themselves dispatch further Agent calls") [primary]
+
+### A-5: Single-tool-call parallel dispatch block
+- Statement: All 10 per-dim Agent() calls MUST be issued in a single tool-call block for true runtime concurrency. Sequential dispatch defeats the fresh-context parallelism benefit.
+- Confidence: Confident (0.94)
+- Evidence:
+  - skills/build-brainstorm/SKILL.md:20 (4 lens subagents in single block) [primary]
+  - skills/build-explore/SKILL.md:86 (4 code-explorer angles in single block) [primary]
+
+### A-6: YAML output schema is frozen at current field set
+- Statement: Post-port plan-checker emits the same `issues[]` schema with fields `dimension / severity / description / fix_hint / task(optional)`. Build-plan Step 7 revision-loop consumer parses exact field names; any rename breaks downstream silently.
+- Confidence: Confident (0.96)
+- Evidence:
+  - skills/build-plan/SKILL.md:307-308 ("Each issue has dimension, task, severity, description, fix_hint") [primary]
+  - skills/build-plan/references/plan-checker-prompt.md:130-145 (`issues:` output template) [primary]
 
 ## Option Comparisons
 
-(explore stage will populate)
+### O-1: Dim 3 (wave-graph integrity) hosting strategy -- resolves Core Tension α marker
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| **A: Wide-context Dim 3 agent receives full PLAN text** | Preserves "10 dims = 10 agents" symmetry; dim 3 haiku prompt owns the cross-task correlation logic in one place; synthesis stays thin | Violates fresh-context-per-dim principle for this one dim; haiku context budget may strain on large PLANs; single agent with 2x context cost vs others | M | Viable |
+| **B: Move Dim 3 out of per-dim dispatch; cross-correlation runs in main-session synthesis** | Per-dim agents stay symmetric (all narrow-context); main session already has the full PLAN in context (it dispatched the others); cheapest | Synthesis layer expands from "merge results" to "also do wave-graph correlation" -- load grows; breaks the "10 agents" mental model (only 9 haikus + 1 inline step) | S | ✅ Recommended |
+| C: Hybrid -- Dim 3 agent receives task-list summary only, not full PLAN | Middle ground on context budget | All downsides of (A) diluted; still violates isolation; synthesis still needs glue | M | Rejected -- worst of both |
+
+- Evidence:
+  - Angle (iv) seed 3 confirmed absent: no wide-context mode exists [primary]
+  - Angle (i) unknown unknown: Dim 4 Context Compliance also reads CLAUDE.md + DECISIONS.md -- has analogous wide-context need -- see Q-3 [primary]
+  - Core Tension "essential" in this entity body [primary]
+
+### O-2: Rollout strategy -- monolithic coexistence during migration
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| A: Hard cutover (delete plan-checker-prompt.md monolithic, replace Step 6 dispatch in one commit) | Single mental model post-ship; no drift | Rollback hard; breaks if even one dim port has a bug | M | Viable |
+| **B: Parallel run -- both dispatches live behind a feature flag; compare outputs for N plans before cutover** | Safe migration; pressure-test each dim vs monolithic; automatic diff catches schema drift | Temporary 2x compute cost; feature-flag machinery adds files | M | ✅ Recommended |
+| C: Incremental per-dim port (Dim 1 first, Dim 2 next...) | Small PRs, easy review | Every intermediate state has "half ported" synthesis logic; mixing monolithic + per-dim output schema is awkward | L | Rejected -- intermediate states worse than either endpoint |
+
+- Evidence:
+  - tests/pressure/build-plan.yaml precedent: 106 Dim 9+10 pressure-tested before merge [secondary]
+  - Angle (iv) seed 4 confirmed absent: no per-dim fixtures exist -- parallel run provides baseline for generating them [primary]
+
+### O-3: Per-dim pressure fixture file structure
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| **A: Dedicated per-dim files `tests/pressure/plan-checker-dim-{slug}.yaml` (10 files)** | Each dim fixture evolves independently; grep-friendly; matches skill isolation | 10 new files; overhead in registry | S | ✅ Recommended |
+| B: Single `tests/pressure/plan-checker-nuwa.yaml` with `dimension:` field tagging | One file; easy to scan all fixtures together | Large file; hard to evolve one dim's fixtures without touching others | S | Viable |
+| C: Extend existing `build-plan.yaml` with new dim sections | Zero new files | Conflates plan-checker architecture tests with build-plan orchestration tests; 106 already extended this file | S | Rejected -- wrong scope |
+
+- Evidence:
+  - Angle (iv) seed 4 confirmed absent: no per-dim fixtures exist (clean greenfield) [primary]
+  - MEMORY thin-wrapper-agent-pattern: per-skill artifacts live under per-skill paths (skill:agent:fixture alignment) [secondary]
+
+## Open Questions
+
+### Q-1: Dim 3 hosting -- confirm O-1 recommendation?
+- Domain: Runnable (architecture of dispatch unit)
+- Why it matters: The α-marker from brainstorm. O-1 proposes moving Dim 3 to synthesis layer, not porting as a per-dim haiku. This is an asymmetry in the "10 dims = 10 agents" narrative. If captain prefers the symmetric story, pick O-1-A despite context-budget risk.
+- Suggested options: see O-1 above -- recommendation B (synthesis-layer correlation) [primary]
+
+### Q-2: Thin-wrapper line cap -- 22 or 25?
+- Domain: Organizational (convention consistency)
+- Why it matters: 107 APPROACH claims ≤25 lines; existing 4 wrappers are 19-21 lines; references/claude-ensign-runtime.md states "15-22 lines" cap. 107 is upward drift. Either (a) enforce 22 and accept tighter per-dim prompt (dim prompt lives in preloaded skill anyway, wrapper is still just `skills: [...]` + Boot Sequence), or (b) formally relax cap to 25 and update the reference doc.
+- Suggested options:
+  - Enforce 22-line cap (prompt body lives in skill, not wrapper) [primary]
+  - Relax to 25 lines + update references/claude-ensign-runtime.md in same commit [secondary]
+  - Open-ended -- captain decides
+
+### Q-3: Dim 4 (Context Compliance) has parallel wide-context need -- included in scope?
+- Domain: Runnable (scope boundary)
+- Why it matters: Angle (i) unknown unknown surfaced that Dim 4 reads CLAUDE.md + DECISIONS.md -- cross-entity wide context, structurally identical to Dim 3's issue. Either (a) expand O-1's solution to cover Dim 4 as well (both run in synthesis layer), (b) only special-case Dim 3 and let Dim 4 stay as a normal haiku dim accepting the context cost, (c) defer Dim 4 to a follow-up entity.
+- Suggested options:
+  - Expand O-1-B to cover both Dim 3 and Dim 4 in synthesis (symmetrical treatment) [primary]
+  - Only Dim 3 special-cased; Dim 4 accepts wide-context haiku dispatch
+  - Defer Dim 4 -- new entity post-ship
+
+### Q-4: CONTRACTS.md currently has NO row for skills/build-plan/ or plan-checker-prompt.md -- does 107 add the row?
+- Domain: Organizational (workflow-index hygiene)
+- Why it matters: Angle (iii) + Lens (d) both note concurrent writes to these files are unguarded by CONTRACTS. 106 just shipped without adding a row. 107 rewrites Step 6 dispatch logic -- adding a contract row now formalizes future coordination or keeps the omission consistent.
+- Suggested options:
+  - Add row(s) during plan stage (touches workflow-index-maintainer mod) [primary]
+  - Leave CONTRACTS unchanged; rely on depends-on frontmatter alone (061 precedent) [secondary]
+
+### Q-5: Port 10 label -- ratify or rename?
+- Domain: Readable (naming consistency)
+- Why it matters: Angle (ii) traced "Port 10" — it appears first in entity 107 body; entities 104/105 described the contradiction-preservation behavior but never used this label. Either formalize "Port 10" (add to references/huashu-nuwa docs) or rename to the phrase 104/105 already use ("contradictions first-class outputs, never silently reconciled").
+- Suggested options:
+  - Formalize "Port 10" in docs/build-pipeline/_docs/ [primary]
+  - Rename to "contradiction-preservation synthesis" (match 104/105 phrasing)
+  - Defer naming -- leave inline per-entity descriptions
+
+## Core Tensions
+
+- **essential**: Fresh-context-per-dim (load-bearing rationale for Nuwa) vs Dim 3 wave-graph integrity (needs cross-task context to detect cycles/overlap). Same tension named in brainstorm body; O-1 presents resolution options but the tension itself is irreducible -- picking any option surfaces its cost. Dim 4 duplicates the structural issue (Q-3).
+- **time-based**: depends-on chain 061 ✅ shipped (retro-ship 2026-04-15) + 106 ⏳ execute-in-progress. 106 quality/review/ship likely within hours; 107 explore complete now, clarify can proceed in parallel. Plan/execute for 107 gated on 106 `shipped`.
+- **domain-based**: 107 APPROACH leads with cost + parallelism (haiku×10 < opus×1), but Angle (ii) decisions + Lens (c) codebase evidence show the load-bearing benefit is fresh-context isolation (MEMORY subagent-first-for-all-stages-except-clarify). Clarify should confirm ranking so plan task prioritization matches real value.
+
+## Honest Boundaries
+
+- Angle (iii) sibling-entity subagent returned only a stub ("Good -- Dim 9 and 10 are already in plan-checker-prompt.md..."); sibling analysis was completed using brainstorm Lens (d) data instead. CONTRACTS.md + INDEX.md full scan for this file surface was covered in Lens (d), so no coverage gap, but Angle (iii) itself did not produce a structured return.
+- Port 10 origin was traced only through git log + archive bodies, not through formal docs/ references. If "Port 10" has been formally ratified somewhere this sweep missed, Q-5 is moot.
+- Thin-wrapper size-cap drift (22 → 25) was detected by code comparison, not by reading references/claude-ensign-runtime.md directly during this explore. Verify reference doc before plan commits to 22 or 25.
+- Angle (i) unknown unknown about Dim 4 wide-context need is based on one observation; full Dim 4 prompt body was not read. Scope expansion in Q-3 is speculative until confirmed.
+- CONTRACTS.md size (16K+) was too large for Angle (i) full read; plan-stage MUST scan it fully if Q-4 selects "add row".
 
 ## Decomposition Recommendation
 
-(explore stage will populate if scope warrants it)
+Not warranted. Scale confirmed Medium (12 files: 10 new per-dim wrappers + 10 new per-dim skills + 1 build-plan/SKILL.md Step 6 rewrite + 1 plan-checker-prompt.md deprecation = ~22 files; pressure fixtures add more but per-entity count still Medium band). The three-part structure (agents + skills + synthesis rewrite) is tightly coupled -- splitting would require intermediate "half-ported" states which O-2 Option C rejected.
 
 ## Canonical References
 
-(clarify stage will populate)
+- `skills/build-explore/SKILL.md:86-136, 229, 233, 400` -- Mode A 4-angle fanout structural template + Port 10 contradiction preservation reference implementation
+- `skills/build-brainstorm/SKILL.md:20` -- 4-lens single-tool-call dispatch pattern
+- `skills/build-plan/SKILL.md:295-325` -- current plan-checker dispatch site (Step 6); YAML consumer at Step 7; depends-on chain target
+- `skills/build-plan/references/plan-checker-prompt.md:130-145` -- YAML output contract (frozen); dim definitions source (10 dims after 106 ships)
+- `agents/code-explorer.md, agents/researcher.md, agents/troop.md, agents/ensign.md` -- thin-wrapper format template (4 consistent usages)
+- `docs/build-pipeline/_archive/brainstorm-nuwa-distillation.md` (entity 104) -- Nuwa pattern adoption rationale, Mode A/B split decision (O-1)
+- `docs/build-pipeline/_archive/explore-nuwa-subagent-first.md` (entity 105) -- subagent-first extension, Port 7-11 framework
+- `docs/build-pipeline/_archive/flatten-dispatch-troops-architecture.md` (entity 065) -- thin-wrapper agent precedent, ensign-boundary decision
+- `docs/build-pipeline/_archive/phase-e-plan-2-research-and-plan-skills.md` (entity 061) -- build-plan/SKILL.md authoring; retro-shipped 2026-04-15
+- `docs/build-pipeline/plan-defect-autopilot.md` (entity 106) -- depends-on parent; Dim 9+10 source; D-plan-defect-autopilot-1 first DECISIONS.md entry
+
+## Stage Report: explore
+
+- [x] Files mapped: 9 across domain, contract, config
+  domain: 4 (build-brainstorm, build-explore, build-plan, build-execute skills); contract: 2 (plan-checker-prompt, parallel-explorer-angles); config: 4 (code-explorer, researcher, troop, ensign agent wrappers; DECISIONS.md)
+- [x] Assumptions formed: 6 (Confident: 6, Likely: 0, Unclear: 0)
+  A-1 through A-6 all Confident -- clean codebase precedent across 4 wrappers + 3 Nuwa-skill dispatch sites; strong pattern-consistency signal
+- [x] Options surfaced: 3
+  O-1 Dim 3 hosting (recommend B: synthesis-layer correlation); O-2 rollout strategy (recommend B: parallel run behind flag); O-3 fixture file structure (recommend A: per-dim files)
+- [x] Questions generated: 5
+  Q-1 Dim 3 hosting confirm; Q-2 thin-wrapper line cap (22 vs 25); Q-3 Dim 4 wide-context scope; Q-4 CONTRACTS.md row; Q-5 Port 10 label ratify/rename
+- [x] α markers resolved: 1 / 1
+  α (Dim 3 hosting strategy) from brainstorm converted to Q-1 + O-1 (2 concrete options + recommendation)
+- [x] Scale assessment: Medium confirmed
+  ~22 files (10 agents + 10 skills + build-plan Step 6 rewrite + plan-checker-prompt.md deprecation + pressure fixtures); fits Medium band; decomposition rejected (tightly coupled three-part structure)
+- [x] Research dispatched: 0 researchers (skipped -- all assumptions internal codebase patterns, no external tech claims)
+- [x] Brainstorm contradictions: 1
+  APPROACH "≤25 lines per MEMORY" contradicted by observed 15-22 line pattern in 4 existing wrappers -- annotated inline; raised as Q-2
+- [x] Inter-explorer contradictions: 0
+  3 of 4 angles returned structured data; Angle (iii) stub-returned and was covered by brainstorm Lens (d); no findings conflict
+- [x] Angle (iii) coverage gap: flagged in Honest Boundaries -- stub return replaced with brainstorm Lens (d) sibling analysis
