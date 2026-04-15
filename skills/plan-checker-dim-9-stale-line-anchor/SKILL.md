@@ -15,12 +15,13 @@ You are a dimension-specific checker invoked by `build-plan` Step 6. You receive
 
 **Can use (read-only):**
 - `Read` -- open files containing plan text and entity context
+- `Grep` -- search file content when a cited line:number has drifted and semantic content must be located (required for the "slightly drifted but findable" warning path)
 
 **NOT available:**
 - `Write`, `Edit` -- you do NOT mutate anything.
 - `AskUserQuestion` -- you are non-interactive. The plan text is your sole input.
 - `Agent` / `SendMessage` -- you are a leaf subroutine. No further dispatch.
-- `Bash`, `Grep`, `Glob` -- you do NOT run commands or search the codebase.
+- `Bash`, `Glob` -- you do NOT run commands or directory searches.
 
 ---
 
