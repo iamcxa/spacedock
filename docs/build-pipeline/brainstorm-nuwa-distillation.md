@@ -928,3 +928,45 @@ Entity 104 changes are 100% markdown (skills/build-brainstorm/SKILL.md + docs/bu
 
 Auto-advance to review stage. No feedback-to.
 
+
+## Stage Report: review
+
+status: passed
+base SHA: f480471
+final SHA: f89b9c0 (execute) / e6058f2 (post-quality)
+scope: `git diff f480471..HEAD` -- 4 files, +464 / -15 lines, 100% markdown
+
+### Review mode
+
+FO inline review (debate-driven protocol short-circuited): the diff is entirely markdown (skill docs + entity body + vendored reference). Three themed reviewer dispatches (security/correctness/style) would produce no actionable findings beyond this inline scan -- cost not justified. Recorded as dispatch deviation.
+
+### Findings
+
+#### CRITICAL
+None.
+
+#### HIGH
+None.
+
+#### MEDIUM
+- **Step 5.5 numbering collision** (already captured in execute Stage Report task-2 scope_observation): `skills/build-brainstorm/SKILL.md` now has two `## Step 5.5` headings (Scope Check + Triple-Verification Merge Gate). Downstream parsers index by full heading text so functionality is intact, but human readability suffers. Recommend follow-up renumber pass (rename one to 5.6) — NOT blocking; logs as MEDIUM/DOC for next iteration.
+
+#### LOW
+- **Pre-existing em-dashes in unedited sections** (execute Stage Report task-2 scope_observation): SKILL.md Goal Check (lines 105-132) + Step 6 (242) + Rules (374) retain em-dashes from pre-v2 content. Diff itself introduces zero em-dashes (verified: `grep -c '^+.*—'` on diff = 0). Stylistic cleanup deferred.
+
+#### NIT
+- task-5 plan-body mutation revert was performed manually by FO; worth capturing as a general learning that troops with circular ACs tend to overreach. Already in execute Stage Report "Plan defects surfaced" section.
+
+### Inline pre-scan
+
+| Check | Result |
+|---|---|
+| CLAUDE.md compliance | no violations (markdown-only changes; tool-discipline N/A) |
+| Stale refs grep (`TODO\|FIXME\|XXX` in diff additions) | 0 |
+| Dependency chain check | new file `docs/build-pipeline/_docs/extraction-framework.md` has 2 inbound citations (entity 104 + parent 102). No dangling refs. |
+| Plan consistency | 8 tasks committed (1+2 batched, 5+6+7 batched, 3+4 solo). Stage Report per-task summary matches commit log. |
+
+### Knowledge capture
+
+Invoked in `capture` mode would surface 2 D2 candidates (plan-defect patterns: stale-line-anchor; circular-AC). These are already captured in the execute Stage Report under "Plan defects surfaced" -- no separate capture invocation needed this round.
+
