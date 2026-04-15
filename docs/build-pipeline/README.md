@@ -30,6 +30,23 @@ stages:
       #   A) Interactive brainstorm (superpowers:brainstorming)
       #   B) Ensign analysis (dispatch to worktree, posts to dashboard)
       #   C) Captain provides approach directly
+    - name: alignment-gate
+      model: opus
+      worktree: false
+      gate: true
+      skill: spacedock:build-alignment-gate
+      # First-class extraction of science-officer Step 3.6 (entity 114).
+      # Runs after brainstorm; evaluates problem framing against captain
+      # intent and Lens Evidence; returns one of three branch outcomes:
+      #   continue -> proceed to explore
+      #   retry    -> re-run brainstorm (retry cap 3)
+      #   escalate-to-shape -> return to shape stage
+      # alignment_confidence = 1.0 - (retry_count * 0.2)
+      #
+      # NAMESPACE NOTE: Migration to `spacebridge:build-alignment-gate` happens when spacebridge plugin skeleton is created (entity 050).
+      #
+      # FALLBACK (skill not found):
+      # FO defers to science-officer agent (legacy Step 3.6 routing).
     - name: explore
       model: sonnet
       skill: spacedock:build-explore
