@@ -3,7 +3,7 @@ id: 116
 title: Blocked-Entity Dashboard Rendering -- context_status Visibility for Escape-Hatch Branches
 slug: blocked-entity-dashboard-rendering
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: captain observation
 created: 2026-04-16T02:30:00+08:00
 started:
@@ -95,7 +95,7 @@ You are asking for the dashboard to visually flag entities whose `context_status
 
 ## Brainstorming Spec
 
-**APPROACH**: Extend the existing entity-card renderer in `tools/dashboard/static/app.js` (around line 224, where `csValues` and the `context_status` chip render live) and the detail-page header in `tools/dashboard/static/detail.js` (currently zero `context_status` handling) to check for `frontmatter.context_status === "blocked"`. When true, apply a grey-out CSS class to the card/header and render a small "awaiting captain action" label distinct in colour from the existing red dependency-blocked badge at `app.js:369-371`. Surface the `supersedes:` hint as an actionable text line `Open new entity: /shape "{slug}"` beneath the label. Optionally extend `tools/dashboard/src/types.ts:78-81` with a `blocked` `AgentEventType` and update `/api/events` POST schema (`tools/dashboard/src/server.ts:613`) so the activity stream reflects the transition when FO writes `context_status: blocked`; core deliverable ships without this emission path (read-side only).
+**APPROACH**: Extend the existing entity-card renderer in `tools/dashboard/static/app.js` (around line 224, where `csValues` and the `context_status` chip render live) and the detail-page header in `tools/dashboard/static/detail.js` (currently zero `context_status` handling) to check for `frontmatter.context_status === "blocked"`. When true, apply a grey-out CSS class to the card/header and render a small "awaiting captain action" label distinct in colour from the existing red dependency-blocked badge at `app.js:369-371`. Surface the `supersedes:` hint as an actionable text line `Open new entity: /shape "{slug}"` beneath the label. (⚠ gap surfaced by explore: `supersedes` field is NOT currently parsed by frontmatter-io.ts — blocks this claim until O-2 resolves the parse path; see A-5) Optionally extend `tools/dashboard/src/types.ts:78-82` (✓ confirmed by explore: extension pattern unchanged, actual line span is 78-82) with a `blocked` `AgentEventType` and update `/api/events` POST schema (`tools/dashboard/src/server.ts:613`) so the activity stream reflects the transition when FO writes `context_status: blocked`; core deliverable ships without this emission path (read-side only).
 
 **ALTERNATIVE**: Reuse the existing dependency-blocked red badge pattern at `app.js:369-371` (driven by `ds.status === "blocked"`) by extending it to also fire on `context_status === "blocked"` -- D-01 Rejected: conflates two semantically distinct blocked states (dependency-unmet vs captain-action-required). Captain explicitly wants "grey + awaiting captain action", not "red + blocked dep". Reusing red would train captain attention in the wrong direction and defeat the diagnostic purpose stated in the directive.
 
@@ -103,7 +103,7 @@ You are asking for the dashboard to visually flag entities whose `context_status
 - No pipeline schema changes — `context_status` field + `supersedes:` hint format are frozen by entity 114's contract (MEMORY.md multi-branch-gate-pattern)
 - No alignment-gate skill edits — skill-internal blocked-write path is upstream contract boundary
 - No FO routing additions — if blocked-event emission ships, it's a single call added to FO's existing blocked-write path, not new routing
-- Coordinate with entity 046 at plan-phase time — both touch `app.js:223-258` render block; verify 046's shipped state and merge order
+- Coordinate with entity 046 at plan-phase time — both touch `app.js:223-258` render block; verify 046's shipped state and merge order (⚠ contradicted by explore: 046 is shipped/archived — downgrade to "respect shipped contract at app.js:223-258", no concurrent conflict — see A-4)
 - Coordinate with entity 064 (draft) — also touches `app.js` card rendering; plan phase must confirm 064 is not concurrently in-flight
 - `blocked` grey-out must be visually distinct from dependency-blocked red badge (colour + label both) to preserve the two-semantics separation
 
@@ -132,6 +132,138 @@ You are asking for the dashboard to visually flag entities whose `context_status
 - Intent: feature
 - Scale: Small (3 core files: app.js, detail.js, CSS; +2 optional: types.ts, server.ts — worst case 5)
 - Scope flag: none (0 decomposition signals)
+
+## Assumptions
+
+### A-1 -- `context_status` field already read in the entity-card render scope
+
+- Confidence: Confident (0.98)
+- Evidence: `tools/dashboard/static/app.js:227` reads `e.context_status` to build csCounts; rendering a grey-out class just adds a conditional at the card-build site, same scope. [primary]
+- Implication: no frontmatter-io plumbing needed for the grey-out half of APPROACH; renderer already has access.
+
+### A-2 -- Dependency-blocked (`ds.status === "blocked"`) and context-status-blocked are visually and semantically distinct and must stay distinct
+
+- Confidence: Confident (0.97)
+- Evidence: `tools/dashboard/static/app.js:369-371` dep-badge uses red `#f85149` + `🚫 →` emoji prefix, driven by `ds.status` (dependency resolution state). `context_status` is frontmatter, driven by skill writes. Two different data paths, two different meanings. [primary]
+- Implication: APPROACH must pick a colour and vocabulary clearly distinct from red + 🚫.
+
+### A-3 -- `detail.js` has zero `context_status` handling today
+
+- Confidence: Confident (0.95)
+- Evidence: `grep -n context_status tools/dashboard/static/detail.js` returns zero matches (re-verified this session). No existing branch to extend — detail-page grey-out is greenfield. [primary]
+- Implication: detail.js change is an additive feature, not a modification of an existing render branch.
+
+### A-4 -- Entity 046 (`dashboard-context-status-filter`) is shipped and its chip-render contract at `app.js:223-258` is frozen
+
+- Confidence: Confident (0.96)
+- Evidence: `docs/build-pipeline/_archive/dashboard-context-status-filter.md` — `status: shipped, verdict: PASSED, context_status: ready`. INDEX.md shows 046 in clarify but INDEX is stale (last rebuilt 2026-04-12, misses 114/115/116). [primary]
+- Implication: 046 is not a concurrent-flight conflict risk; it is a contract to respect. 116's grey-out class attaches to the card element, not to 046's chip pipeline. Downgrades the brainstorm GUARDRAIL "coordinate with in-flight 046" to "respect shipped 046 contract at app.js:223-258".
+
+### A-5 -- `supersedes` frontmatter field is NOT currently parsed or exposed by the dashboard
+
+- Confidence: Confident (0.94)
+- Evidence: `grep -c supersedes tools/dashboard/static/*.js tools/dashboard/src/*.ts` returns 0 matches across the render tree. Field exists in entity YAML (written by alignment-gate per entity 114 contract) but nothing reads it. [primary]
+- Implication: Rendering the actionable `Open new entity: /shape "{new-slug}"` line requires first parsing `supersedes` — blocks APPROACH's supersedes-surfacing claim unless O-2 resolves the parse path. This was silent in brainstorm Lens (c).
+
+### A-6 -- `AgentEventType` at `types.ts:78-82` is a string-union extensible by adding a literal
+
+- Confidence: Confident (0.92)
+- Evidence: Current union is `"dispatch" | "completion" | "gate" | "feedback" | "merge" | "idle" | "channel_message" | "channel_response" | "permission_request" | "permission_response" | "comment" | "suggestion" | "gate_decision" | "share_created" | "rollback" | "pr_ready" | "pipeline_error" | "entity_shipped"` at `tools/dashboard/src/types.ts:78-82`. Standard TS discriminated-union extension pattern. [secondary]
+- Implication: Optional `/api/events blocked` emission is a 1-token addition + a server-side validator update; no schema migration. Lens (c) under-counted (6 vs 18 variants) but the extension pattern is unchanged.
+
+## Option Comparisons
+
+### O-1 -- Where to render the "awaiting captain action" label on the entity card
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|--------|------|------|------------|----------------|
+| (a) Inline badge next to the entity title in card header | Maximum visual prominence; captain sees it at same scan point as title | Competes with existing title + status pill area for horizontal space | Low | ✅ Recommended |
+| (b) Separate banner row beneath card header | Higher visibility than (a), dedicated real estate | Increases card height; inconsistent with compact card design for non-blocked entities | Low | Viable |
+| (c) Badge appended to the existing `context_status` chip pipeline | Reuses 046's chip rendering contract; minimal new surface | Bucket-filter chip semantics (click-to-filter) don't fit "awaiting captain action" call-to-action; mixes two UX affordances | Medium | Rejected -- UX conflict with 046 chip's filter semantics |
+
+Recommendation (a) places the label at the highest-attention scan point (next to entity title), preserves card height compactness for the 99% non-blocked case, and keeps the two semantics (blocked chip as filter vs blocked label as call-to-action) in separate UI affordances.
+
+### O-2 -- How to source `supersedes` for rendering the actionable next-step line
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|--------|------|------|------------|----------------|
+| (a) Extend `tools/dashboard/src/frontmatter-io.ts` to parse `supersedes` field; expose on Entity shape | Canonical path; all renderers get access; future-proof for other consumers | Touches shared domain module — requires TS type update + test | Medium | ✅ Recommended |
+| (b) Parse `supersedes` inline in `app.js` via direct YAML scan of entity body | No shared-module change; self-contained in 116's scope | Duplicates YAML parsing; fragile if frontmatter format shifts; violates existing frontmatter-io abstraction | Low | Rejected -- violates abstraction boundary |
+| (c) FO writes `supersedes` into a synthetic `/api/events blocked` event payload; renderer reads event, not frontmatter | Decouples renderer from entity YAML shape; natural fit if events path ships | Requires the optional events path to be non-optional; blocks card rendering on event arrival timing | Medium | Viable — only if O-3 selects "include events" |
+
+Recommendation (a) keeps YAML parsing centralized in frontmatter-io.ts (A-5 confirmed nothing parses it today), aligns with how other fields are plumbed, and unblocks the supersedes-surfacing half of APPROACH without depending on the optional events path.
+
+### O-3 -- Scope boundary for `/api/events blocked` emission
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|--------|------|------|------------|----------------|
+| (a) Include events emission in this entity's scope (extend `AgentEventType` + FO emit call) | Full activity-stream coverage at ship; richer blocked-state UX | Adds ~2 files (types.ts, FO caller) + test surface; may blow Small scale budget if FO emit wiring is non-trivial | Medium | Viable |
+| (b) Defer events emission to a follow-up entity; ship card grey-out + label only | Keeps 116 Small and self-contained; matches captain's "optional 可選" framing | Activity feed misses the blocked transition signal until follow-up ships | Low | ✅ Recommended |
+
+Recommendation (b) matches captain's explicit "可選" framing and the empirical baseline: no blocked entity exists yet, so activity-stream miss is zero-impact at ship time. Defer to a Phase E+1 candidate (already noted in MEMORY.md phase-e-plus-1-candidates.md).
+
+## Open Questions
+
+### Q-1 -- Label microcopy: "awaiting captain action" vs alternatives
+
+- Domain: User-facing Visual
+- Why it matters: The label is a call-to-action. "Awaiting captain action" is directive verbatim but may read stiff; shorter alternatives may communicate faster. This is cosmetic but load-bearing for diagnostic speed.
+- Suggested options:
+  - (a) "awaiting captain action" (directive verbatim) -- preserves captain's own phrasing
+  - (b) "needs new entity" -- shorter, more action-focused
+  - (c) "blocked — open new entity" -- explicit verb
+- [secondary]
+
+### Q-2 -- CSS token for grey-out: reuse existing muted/disabled tokens or introduce a new `.blocked` class?
+
+- Domain: User-facing Visual
+- Why it matters: Existing muted/disabled tokens may conflict semantically (disabled = system unavailable; blocked = captain-action-required). A dedicated class keeps semantics clean but adds CSS surface.
+- Suggested options:
+  - (a) Reuse existing `.muted` / `.disabled` token if one exists -- minimum CSS surface
+  - (b) Introduce `.context-blocked` class with custom grey + label styling -- clean semantics, small new surface
+  - (c) Defer to whichever pattern 094's spacebridge/ui graph ends up using -- forward-compat with future stage-graph work
+- [secondary]
+
+## Core Tensions
+
+- **domain-based**: Dashboard rendering in `tools/dashboard/static/` (legacy Bun + vanilla JS) vs pipeline graph rendering in `spacebridge/ui/` (Next.js + React). Directive names both but they live in separate codebases — this entity must scope to the Bun dashboard.
+- **essential**: Two orthogonal "blocked" semantics must coexist visually without confusing captain — dependency-blocked (`ds.status === "blocked"`, red 🚫 badge at `app.js:369-371`) vs captain-action-blocked (`context_status === "blocked"`, new grey-out). Colour and vocabulary differentiation is load-bearing for the diagnostic purpose.
+
+## Honest Boundaries
+
+- Stage-graph node rendering excluded — lives in spacebridge/ui codebase with its own entity (094).
+- Retroactive rendering of already-shipped blocked entities excluded — forward-looking only.
+- `/api/events` `blocked` emission deferred (O-3 recommendation (b)) — follow-up Phase E+1 candidate.
+- Test harness is synthetic because no real blocked entity exists yet — escape-hatch has never fired in practice.
+- Recommendation validation for O-1/O-2/O-3 was performed inline against Honest Boundary of "respect shipped 046 contract" (no return-value trace applicable — this is pure view layer).
+
+## Stage Report: explore
+
+- [x] Mode: B (inline single-pass fallback -- Small entity, target files pre-mapped by brainstorm Lens (c))
+- [x] Files mapped: 5 across frontend, contract
+  frontend: 2 (app.js, detail.js), contract: 1 (types.ts), config: 1 (server.ts), domain-like: 1 (frontmatter-io.ts). Scale confirmed Small (≤5 files).
+- [x] Assumptions formed: 6 (Confident: 6, Likely: 0, Unclear: 0)
+  A-1 through A-6 all Confident (0.92-0.98) via direct file:line evidence.
+- [x] Options surfaced: 3
+  O-1 label placement; O-2 supersedes parse path; O-3 events emission scope boundary.
+- [x] Questions generated: 2
+  Q-1 label microcopy; Q-2 grey-out CSS token.
+- [x] α markers resolved: 0 / 0
+  Brainstorm emitted 0 α markers; none to consume.
+- [x] Brainstorm claim verification: 4 confirmed, 1 contradicted, 1 clarified
+  ✓ app.js:224 csValues; ✓ app.js:369-371 dep badge; ✓ detail.js zero handling; ✓ types.ts AgentEventType (actual line range 78-82, superset of Lens (c) claim but same pattern); ⚠ GUARDRAIL "coordinate with in-flight 046" contradicted — 046 is shipped/archived, downgraded to "respect shipped contract"; clarification: `supersedes` field not currently parsed (new A-5 + O-2 surface).
+- [x] Scale assessment: confirmed Small (≤5 files; 3 core + 2 optional)
+- [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident ≥0.92, no external tech claims; pure codebase view-layer)
+- [x] Mode A 4-angle fallback note: inline Mode B chosen per heuristic "Small entity with well-known target files pre-mapped in brainstorm Lens (c)". Stage Report transparency warning:
+  ⚠ Mode B fallback -- 4-angle quality not achieved this invocation (acceptable for this Small/pre-mapped case; plan-phase may treat as known coverage gap)
+- [x] Self-test gate (Port 11): all gates pass
+  Gate (i) cross-layer recurrence: N/A in Mode B per Port 11 Mode B modifier
+  Gate (ii) Track A evidence depth: PASS (all 6 assumptions ≥2 evidence via file:line + cross-module grep)
+  Gate (iii) Track B alternative completeness: PASS (O-1/O-2/O-3 each have 2-3 options + 1 Recommended)
+  Gate (iv) Track C option surfacing: PASS (Q-1/Q-2 each have 3 suggested options)
+  Gate (v) Evidence tier tagging: PASS (all Evidence lines end [primary] or [secondary])
+  Gate (vi) Core Tensions typing: PASS (2 entries, both typed domain-based + essential)
+- [x] Follow-up: INDEX.md is stale (last rebuilt 2026-04-12 per file footer; missing entities 114/115/116). Workflow-index rebuild hook appears not fired. Not blocking 116 but noting for a separate maintenance pass.
 
 ## Pre-Brainstorm Scope Sketch (informal)
 
