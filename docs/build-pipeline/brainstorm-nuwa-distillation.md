@@ -1001,3 +1001,26 @@ scope: 7 CLI + 3 interactive items from UAT Spec
 
 Pass. Advance to confidence gate.
 
+
+## Confidence Assessment
+
+Iteration: 1 of 3 (first pass)
+
+### Per-factor scores
+
+| Factor | Weight | Score | Contribution | Evidence |
+|---|---|---|---|---|
+| test_coverage | 25% | 100% | 25.00 | Quality Stage Report: 749 pass / 0 fail / 1855 expect() calls. No ratchet regression. |
+| type_coverage | 20% | 100% | 20.00 | tsc baseline unchanged (pre-existing errors in src/ipc/* identical on main and worktree; 104's markdown-only edits introduced 0 new type errors). |
+| review_severity | 20% | 100% | 20.00 | Review Stage Report: 0 CRITICAL, 0 HIGH. 1 MEDIUM (Step 5.5 numbering) + 1 LOW (em-dash legacy) + 1 NIT — MEDIUM/LOW/NIT are informational only per spec. |
+| ac_completeness | 20% | 100% | 20.00 | UAT: 10 items; 7 CLI pass + 1 interactive pass + 2 deferred-to-live (skipped-with-ack). effective_total = 8; pass = 8 → 100%. |
+| integration_breadth | 15% | 100% | 15.00 | 8/8 tasks DONE. planned_weighted = done_weighted = 11.5 (wave-weighted file sum across task-0..task-7). |
+
+### Composite
+
+100 × 25% + 100 × 20% + 100 × 20% + 100 × 20% + 100 × 15% = **100.00%**
+
+### Routing
+
+Composite 100% >= 90% threshold. **Advance to shipped.** Proceed to Merge and Cleanup.
+
