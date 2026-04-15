@@ -1,24 +1,24 @@
 ---
 id: 101
 title: "Graft runtime overlay — eliminate build-time merge, read workflow from plugin"
-status: draft
+status: plan
 context_status: ready
 source: /build
 created: 2026-04-14T03:30:00Z
-started:
+started: 2026-04-15T18:55:00+08:00
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-graft-runtime-overlay-redesign
 issue:
 pr:
 intent: feature
-scale: Large
+scale: Medium
 project: spacedock
 auto_advance:
 uat_pending_count:
 parent:
-children:
+children: [112]
 ---
 
 ## Directive
