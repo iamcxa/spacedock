@@ -2,15 +2,15 @@
 id: 113
 title: Build Entry Routing + Alignment Gate -- SO Pipeline Dual-Entry, Mid-Flow Direction Check, Clarify Self-Filter
 slug: build-entry-routing-and-alignment-gate
-status: uat
+status: shipped
 context_status: ready
 source: /build --from build-entry-routing-and-alignment-gate
 created: 2026-04-15T20:30:00+08:00
 started: 2026-04-15T21:00:00+08:00
-completed:
-verdict:
-score:
-worktree: .worktrees/spacedock-ensign-build-entry-routing-and-alignment-gate
+completed: 2026-04-16T00:00:00+08:00
+verdict: PASSED
+score: 0.95
+worktree:
 issue:
 pr:
 intent: feature
@@ -18,6 +18,7 @@ scale: Medium
 project: spacedock
 profile:
 auto_advance:
+uat_pending_count: 14
 parent:
 children:
 shape_status: validated
