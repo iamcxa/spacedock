@@ -117,6 +117,16 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 - Given a synthetic plan with two dims flagging the same task, when post-port synthesis runs, then both findings appear in output preserving Port 10 contradiction (how to verify: pressure-test fixture `tests/pressure/plan-checker-nuwa-dual-dim.yaml` with dual-dim violation seed; assert `yq '.issues | length' post.yaml >= 2`)
 - Given the depends-on chain (061 → 106 → this), when this entity begins execute, then both 061 and 106 are in status `shipped` (how to verify: `grep 'status:' docs/build-pipeline/{phase-e-plan-2-research-and-plan-skills,plan-defect-autopilot}.md` both show shipped OR paths moved to `_archive/`)
 
+## Clarify Parked (2026-04-15)
+
+**Park reason**: mid-clarify captain challenge surfaced a more fundamental question than the Dim 3 hosting α-marker: **do we actually need all 10 dimensions?** Several dims show overlap risk (Dim 4 Context Compliance / Dim 5 Research Coverage / Dim 7 Cross-Entity Coherence all read cross-entity state), and Dim 3 wave-graph logic duplicates a check that build-execute Step 1 also performs. Dim 9+10 just shipped with entity 106 and have zero production firing history. Nuwa-ifying 10 dims without empirical utility data risks optimizing bad structure.
+
+**Blocker**: new entity `plan-checker-dim-utility-audit` (109) must ship first. That entity sweeps the last N entities' plan-checker YAML outputs to produce per-dim blocker/warning fire counts, identifies merge candidates (Dim 4+5+7), and flags dead-weight dims. Output feeds 107 scope: Nuwa-ify the survivors only, not the current 10.
+
+**Status preserved**: A-1 through A-6 confirmed (batch, captain 2026-04-15); O-1 in-progress (captain started answering but redirected to scope challenge -- annotation deferred); Q-1 through Q-5 unresolved; pre-audit clarify state frozen. Resume protocol: after 109 ships, re-read audit findings, update 107 APPROACH to target only the surviving dims, then re-enter clarify from Step 3 (O-1).
+
+**Depends-on updated**: frontmatter `depends-on: [061, 106]` extends to `depends-on: [061, 106, 109]` when 109 seed exists.
+
 ## Assumptions
 
 ### A-1: Thin-wrapper agent format convention is rigid
@@ -127,6 +137,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
   - agents/researcher.md:1-21 (21 lines, same shape) [primary]
   - agents/troop.md:1-21 (21 lines, same shape) [primary]
   - agents/ensign.md:1-19 (19 lines, same shape) [primary]
+- → Confirmed: captain, 2026-04-15 (batch)
 
 ### A-2: Per-dim skill preload is the extraction unit
 - Statement: Each dim's prompt lives in a standalone skill `skills/plan-checker-dim-{slug}/SKILL.md`, preloaded by the thin-wrapper agent via `skills: ["spacedock:plan-checker-dim-{slug}"]` frontmatter. Matches code-explorer/researcher pattern exactly.
@@ -134,6 +145,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 - Evidence:
   - 4 existing wrappers each preload a single skill via frontmatter array [primary]
   - skills/code-explorer/SKILL.md precedent: wrapper frontmatter + leaf skill pair [primary]
+- → Confirmed: captain, 2026-04-15 (batch)
 
 ### A-3: Synthesis preserves all per-dim findings (Port 10 literal)
 - Statement: Main-session synthesis concatenates issues[] lists and keeps both findings when two dims flag the same task. No dedupe, no reconciliation -- duplicates are signal, per Port 10 semantics established in build-explore.
@@ -141,6 +153,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 - Evidence:
   - skills/build-explore/SKILL.md:233 ("contradictions are first-class outputs, never silently reconciled") [primary]
   - skills/build-explore/SKILL.md:400 (Step 6 routes inter-explorer conflicts to Core Tensions, typed) [primary]
+- → Confirmed: captain, 2026-04-15 (batch)
 
 ### A-4: Leaf dispatch rule applies to each dim agent
 - Statement: Per-dim haiku subagents MUST NOT recursively dispatch (no nested Agent() or SendMessage). Each is a leaf, identical to code-explorer and plan-checker's current singleton contract.
@@ -148,6 +161,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 - Evidence:
   - skills/build-explore/SKILL.md:229 ("Leaf dispatch rule. spacedock:code-explorer runs as a leaf subagent") [primary]
   - skills/build-plan/SKILL.md:33 ("researchers and plan-checker you dispatch ... cannot themselves dispatch further Agent calls") [primary]
+- → Confirmed: captain, 2026-04-15 (batch)
 
 ### A-5: Single-tool-call parallel dispatch block
 - Statement: All 10 per-dim Agent() calls MUST be issued in a single tool-call block for true runtime concurrency. Sequential dispatch defeats the fresh-context parallelism benefit.
@@ -155,6 +169,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 - Evidence:
   - skills/build-brainstorm/SKILL.md:20 (4 lens subagents in single block) [primary]
   - skills/build-explore/SKILL.md:86 (4 code-explorer angles in single block) [primary]
+- → Confirmed: captain, 2026-04-15 (batch)
 
 ### A-6: YAML output schema is frozen at current field set
 - Statement: Post-port plan-checker emits the same `issues[]` schema with fields `dimension / severity / description / fix_hint / task(optional)`. Build-plan Step 7 revision-loop consumer parses exact field names; any rename breaks downstream silently.
@@ -162,6 +177,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 - Evidence:
   - skills/build-plan/SKILL.md:307-308 ("Each issue has dimension, task, severity, description, fix_hint") [primary]
   - skills/build-plan/references/plan-checker-prompt.md:130-145 (`issues:` output template) [primary]
+- → Confirmed: captain, 2026-04-15 (batch)
 
 ## Option Comparisons
 
