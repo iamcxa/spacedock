@@ -8,6 +8,8 @@
 import { useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { TextSelectionPopover } from "@/components/text-selection-popover";
+import { ChatInput } from "@/components/chat-input";
+import { GateButtons } from "@/components/gate-buttons";
 
 interface CommentRow {
   commentId: string;
@@ -27,6 +29,10 @@ interface EntityBodyProps {
   allComments: CommentRow[];
   entitySlug: string;
   onCommentAdded?: (comment: CommentRow) => void;
+  /** Frontmatter status — used to conditionally show gate buttons */
+  status?: string;
+  /** Frontmatter auto_advance — when true, gate buttons are hidden (FO auto-advances) */
+  autoAdvance?: boolean;
 }
 
 function wrapTextRange(
@@ -75,7 +81,11 @@ export function EntityBody({
   allComments,
   entitySlug,
   onCommentAdded,
+  status,
+  autoAdvance,
 }: EntityBodyProps) {
+  const showGateButtons =
+    !autoAdvance && (status === "plan" || status === "uat");
   const articleRef = useRef<HTMLElement>(null);
 
   // Inject yellow highlight marks for comments with selectedText
@@ -204,6 +214,12 @@ export function EntityBody({
           onCommentAdded={onCommentAdded}
         />
       </div>
+
+      {showGateButtons && (
+        <GateButtons entitySlug={entitySlug} stage={status!} />
+      )}
+
+      <ChatInput entitySlug={entitySlug} />
     </div>
   );
 }
