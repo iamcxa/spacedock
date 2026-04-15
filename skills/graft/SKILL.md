@@ -77,20 +77,19 @@ After `graft init`, the target repo contains:
 ```
 {target-repo}/
 ├── .spacedock/workflows/{workflow-name}/
-│   ├── README.md                    # Merged workflow (engine reads this)
-│   ├── .origin/
-│   │   ├── manifest.yaml            # Source tracking + tier classification
-│   │   ├── README.md                # Upstream original (read-only reference)
-│   │   ├── skills/                  # Upstream skill originals (localize tier only)
-│   │   │   ├── build-quality/SKILL.md
-│   │   │   ├── build-quality/references/  # Skill's reference files (if any)
-│   │   │   └── ...
-│   │   └── agents/                  # Upstream agent originals (if referenced by localize skills)
-│   │       └── code-explorer.md
+│   ├── manifest.yaml                # Source tracking + tier classification + plugin pointer
 │   ├── LOCAL.yaml                   # Overlay definition (persistent)
-│   └── _index/                      # Infrastructure (if Tier 3 skills ported)
-│       ├── CONTRACTS.md
-│       └── DECISIONS.md
+│   ├── _archive/                    # Completed/shipped entities
+│   ├── _mods/                       # Project-specific mods
+│   ├── _docs/                       # Reference documentation (copied from source)
+│   ├── _index/                      # Workflow state
+│   │   ├── CONTRACTS.md
+│   │   ├── DECISIONS.md
+│   │   └── INDEX.md
+│   └── *.md                         # Entity files (project work items)
+│
+│   NOTE: No README.md in the workflow dir. No .origin/ directory.
+│         FO reads workflow README from the plugin at startup via manifest.yaml.
 │
 ├── .claude/skills/                  # Target repo's skill directory
 │   ├── {existing-skills}/           # Pre-existing project skills
@@ -106,9 +105,12 @@ After `graft init`, the target repo contains:
 ## Manifest Schema
 
 ```yaml
-# .spacedock/workflows/{name}/.origin/manifest.yaml
+# .spacedock/workflows/{name}/manifest.yaml
+source_plugin: spacedock                         # Plugin name; FO resolves plugin_dir from this
+workflow_readme_path: docs/build-pipeline/README.md  # Relative path inside plugin to workflow README
+
 source:
-  plugin: spacedock                    # Source plugin name
+  plugin: spacedock                    # Source plugin name (redundant with source_plugin; kept for compatibility)
   workflow_path: docs/build-pipeline   # Relative path within source plugin
   version: "0.9.0"                     # Source plugin version at graft time
   commit_sha: abc1234                  # Source commit (if git repo)
@@ -126,6 +128,7 @@ skills:
     source_path: skills/build-quality/SKILL.md
     target_path: .claude/skills/build-quality/SKILL.md
     version: "0.9.0"
+    source_hash: "e3b0c44298fc1c149afb..."    # SHA256 of plugin SKILL.md bytes at init/upgrade time
     override_count: 4
     portability_signals:                       # Why this was classified as localize
       - "hardcoded CLI: bun test, bun lint, bunx tsc, bun build"
@@ -135,6 +138,7 @@ skills:
     source_path: skills/build-explore/SKILL.md
     target_path: .claude/skills/build-explore/SKILL.md
     version: "0.9.0"
+    source_hash: "a665a45920422f9d417e..."    # SHA256 of plugin SKILL.md bytes at init/upgrade time
     override_count: 1
     references:                                  # Reference files copied with this skill
       - gray-area-templates.md
@@ -147,6 +151,7 @@ skills:
     source_path: skills/build-plan/SKILL.md
     target_path: .claude/skills/build-plan/SKILL.md
     version: "0.9.0"
+    source_hash: "2c624232cdd221771294..."    # SHA256 of plugin SKILL.md bytes at init/upgrade time
     override_count: 2
     references:
       - plan-checker-prompt.md
@@ -177,6 +182,16 @@ prerequisites:
     - pr-review-toolkit
     - e2e-pipeline
 ```
+
+### source_hash canonicalization
+
+Every `localize`-tier skill entry in manifest.yaml carries a `source_hash` field computed at `graft init` time and updated at `graft upgrade` time. Canonicalization rules:
+
+- **Read as binary bytes**: `open(plugin_skill_path, "rb").read()` — no text decoding.
+- **No normalization**: do not strip trailing newlines, swap LF↔CRLF, or apply any transform. Byte-exact match is the simplest correctness rule; any hidden transform is a contract violation waiting to happen.
+- **Algorithm**: SHA256 hex digest. Python: `hashlib.sha256(bytes).hexdigest()`.
+- **Storage**: store the full 64-character hex string as the `source_hash` string value.
+- **Upgrade comparison**: `sha256(current_plugin_bytes) == manifest_source_hash` → Unchanged (no-op). Any difference → Changed (reapply LOCAL.yaml overrides).
 
 ---
 
