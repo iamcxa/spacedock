@@ -503,3 +503,12 @@ correctly.
   append in the order captain cited them.
 - **Decomposition gate EXITS the skill** on accept. Do not continue to Step 1. The epic is
   frozen and child entities take over.
+
+## Stage Report: clarify (Format Addition)
+
+When a `## Stage Report: clarify` is written, include the self-filter reporting fields:
+
+```
+- Self-filter: {N} self-resolved, {M} captain-escalated
+clarify_self_filter_ratio: {0.0-1.0}
+```
