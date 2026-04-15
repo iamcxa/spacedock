@@ -81,12 +81,14 @@ In the normal FO-driven flow, the ensign wrapper between skills writes the `cont
 After each skill returns control to you:
 
 1. Read the skill's output (Stage Report + any text response).
-2. If the skill succeeded, write the target `context_status` value to the entity frontmatter using `Edit`:
-   - After `build-brainstorm`: set `context_status: pending` (unless already set by `/build` at creation).
-   - After `build-explore`: set `context_status: awaiting-clarify`.
-   - After `build-clarify`: verify `context_status: ready` is already set by the skill's Step 5; do not overwrite.
+2. If the skill succeeded, write BOTH `context_status` AND `status` to the entity frontmatter using `Edit`:
+   - After `build-brainstorm`: set `context_status: pending` (unless already set by `/build` at creation) + `status: brainstorm`.
+   - After `build-explore`: set `context_status: awaiting-clarify` + `status: explore`.
+   - After `build-clarify`: verify `context_status: ready` is already set by the skill's Step 5; do not overwrite. Set `status: clarify`.
 3. Commit the frontmatter change as part of the same commit the skill already created (if the skill already committed) OR amend your own follow-up commit -- your choice depends on whether the skill committed first.
 4. Re-read the entity frontmatter and re-apply the routing table from Step 2.
+
+**Why SO writes `status` in SO-direct mode**: In FO-driven flow, FO advances `status` as it dispatches each stage ensign. In SO-direct mode there is no FO — if SO only writes `context_status`, FO inherits a stale `status: draft` at handoff and cannot determine which stages already completed. Proven by entity 113: FO asked captain to advance from draft→brainstorm despite clarify being complete.
 
 Without this step, the routing table cannot advance -- `build-explore` leaves `context_status` at `pending`, and the next routing pass would invoke `build-explore` again, spinning forever.
 
