@@ -763,3 +763,44 @@ All topics are covered by explore-stage assumptions (A-1..A-6 with file:line cit
 ### Summary
 
 Plan produced for a pure docs/scaffolding extraction refactor: lift SO Step 3.6 body into a new first-class `skills/build-alignment-gate/SKILL.md`, add the stage to README, replace SO body with a routing hint, annotate the entity-113 archive, add/finalize CONTRACTS rows, and update the brainstorm ownership pointer + confidence-gate sourcing reference. 8 tasks across 4 waves touching exactly the 7 files anticipated by clarify (6 shape Scope: In + 1 Q-2 resolution addition). Research findings written inline from explore evidence (all 6 assumptions Confident/Likely, zero external-tech topics, full dedup against inline `(✓ confirmed by explore)` annotations). Plan-checker parallel dispatch skipped due to ensign tool constraints; FO should route plan-checker separately or captain auto-advance per confidence policy. workflow-index append is staged for FO as an explicit 7-file list.
+
+## Stage Report: execute
+
+status: passed
+base SHA: a4b2084 (plan commit)
+final SHA: 561da76
+waves: 4 completed out of 4 declared
+tasks: 8 done, 0 blocked, 0 needs_context-rounds
+workflow-index transition: 4d7efbd (pre-execute, entity 114 rows added + 2 new sections)
+
+### Dispatch Mode
+Mixed: Wave 1 (3 troops parallel, sonnet), Wave 2 (3 troops parallel haiku — all 3 returned DONE but disk-writes were lost for tasks 4/6/7, FO re-applied inline; task 5 inline from start), Waves 0 and 3 inline.
+
+### Per-task summary
+- task-0: DONE (sonnet) -- inline -- environment verification 11/11 checks (0 files)
+- task-1: DONE (sonnet) -- commit db7dca6 (1 files) -- create skills/build-alignment-gate/SKILL.md from Step 3.6 extraction
+- task-2: DONE (sonnet) -- commit f655662 (1 files) -- add alignment-gate as 11th stage in README stages.states
+- task-3: DONE (sonnet) -- commit af2546f (1 files) -- replace SO Step 3.6 body with 5-line delegation hint
+- task-4: DONE (haiku → inline redo) -- commit 7b3d5d4 (1 files) -- supersession annotation on entity 113 archive
+- task-5: DONE (inline) -- commit 0029900 (1 files) -- finalize 7 entity-113 rows to final in CONTRACTS
+- task-6: DONE (haiku → inline redo) -- commit 7bb38e6 (1 files) -- update brainstorm ownership pointer
+- task-7: DONE (haiku → inline redo) -- commit 561da76 (1 files) -- add alignment_confidence sourcing note
+
+### AC verification
+| AC | Verify command | Result |
+|----|---------------|--------|
+| AC-1 alignment-gate in README | `grep -c "name: alignment-gate" docs/build-pipeline/README.md` = 1 | PASS |
+| AC-2 new skill file | `test -s skills/build-alignment-gate/SKILL.md` | PASS |
+| AC-3 Step 3.6 ≤15 lines | `awk '/Step 3.6/,.../Step 3.7|Step 4|^##/' \| wc -l` = 7 | PASS |
+| AC-4 F5 fixture unchanged | `git diff a4b2084..HEAD -- F5.yaml \| wc -l` = 0 | PASS |
+| AC-5 archive supersession | `grep -c "alignment-gate-promote-to-stage\|skills/build-alignment-gate" archive` = 2 | PASS |
+| AC-6 entity 113 rows all final | `grep -c "build-entry-routing.*in-flight" CONTRACTS` = 0 | PASS |
+| AC-7 FO dispatch event data-driven | `grep "NEXT_STAGE\|stage:" references/first-officer-shared-core.md` confirms template uses `${NEXT_STAGE}` variable | PASS (static precondition; runtime verification deferred to UAT) |
+| AC-8 11-stage ordering | `grep -c "^    - name:" README.md` = 11; ordering brainstorm→alignment-gate→explore confirmed | PASS |
+
+### Findings
+#### Scope observations
+- Wave 2 troop execution anomaly: tasks 4, 6, 7 troops returned DONE with successful acceptance criteria grep output, but their file modifications did NOT persist to the worktree filesystem. Task 5 (inline) and all Wave 1 troops persisted normally. FO re-applied tasks 4/6/7 inline via Edit/Bash. Likely cause: haiku-model troop dispatched in parallel writes may have sandbox-isolated filesystem view. Worth investigating as a signal_harvester finding for troop dispatch infrastructure.
+- CONTRACTS task-5's "add new header" 5a sub-item was already completed during pre-execute workflow-index append by FO (required for plan-checker Dim 7 visibility). Task-5's actual work was only 5b (finalize 113 rows) plus noting that entity 114's rows were already present. Zero duplication.
+
+knowledge capture: staged — Wave 2 haiku troop persistence anomaly (D2 candidate for `mods/` or troop agent reference doc review).
