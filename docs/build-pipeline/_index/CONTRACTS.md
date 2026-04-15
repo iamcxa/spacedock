@@ -31,6 +31,24 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | flatten-dispatch-troops-architecture | plan | Add explicit no-sub-dispatch boundary documentation | 🔵 planned | 2026-04-14 |
 
+### agents/build-shape-framer.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| shape-pre-build-alignment-skill | plan | Task 2 -- thin-wrapper framer agent (opus) for /shape problem-statement dispatch | 🔵 planned | 2026-04-15 |
+
+### agents/build-shape-scope-drafter.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| shape-pre-build-alignment-skill | plan | Task 2 -- thin-wrapper scope-drafter agent (sonnet) for /shape in/out boundary dispatch | 🔵 planned | 2026-04-15 |
+
+### agents/build-shape-story-gen.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| shape-pre-build-alignment-skill | plan | Task 2 -- thin-wrapper story-gen agent (sonnet) for /shape user-story dispatch | 🔵 planned | 2026-04-15 |
+
 ### agents/code-explorer.md
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -84,7 +102,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| brainstorm-nuwa-distillation | plan | Task 4 -- vendor huashu-nuwa extraction-framework.md to local _docs with functional header per A-7 | in-flight | 2026-04-14 |
+| brainstorm-nuwa-distillation | plan | Task 4 -- vendor huashu-nuwa extraction-framework.md to local _docs with functional header per A-7 | final | 2026-04-14 |
 
 ### docs/build-pipeline/_mods/pr-merge.md
 
@@ -112,6 +130,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | review-stage-parallel-skill-dispatch | execute | Add dispatch: debate-driven to review stage YAML + update prose | 🟡 in-flight | 2026-04-12 |
 | pre-ship-confidence-gate | execute | Document confidence gate in uat and shipped stage definitions | 🟡 in-flight | 2026-04-13 |
 | flatten-dispatch-troops-architecture | plan | Update execute stage description: troop -> troop agent | 🔵 planned | 2026-04-14 |
+| shape-pre-build-alignment-skill | plan | Task 7 -- add shape_status schema row and /shape + --from CLI paths paragraph | 🔵 planned | 2026-04-15 |
 
 ### docs/overhaul/recipes/phase-e-plan-3-build-pipeline.yaml
 
@@ -189,15 +208,17 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add given/when/then AC guidance to step 4 for TDD-friendly spec generation | in-flight | 2026-04-12 |
-| brainstorm-nuwa-distillation | plan | Task 1 -- relax leaf constraint and preamble, raise file-read cap 5 to 9 | in-flight | 2026-04-14 |
-| brainstorm-nuwa-distillation | plan | Task 2 -- add Agent tool, Mode A/B Step 1 Lens Collection, Step 5.5 merge gate + 5-item self-test, output-spec for 3 new body sections | in-flight | 2026-04-14 |
-| brainstorm-nuwa-distillation | plan | Task 3 -- add Lens Subagent Prompts subsection with 4 lens dispatch templates | in-flight | 2026-04-14 |
+| brainstorm-nuwa-distillation | plan | Task 1 -- relax leaf constraint and preamble, raise file-read cap 5 to 9 | final | 2026-04-14 |
+| brainstorm-nuwa-distillation | plan | Task 2 -- add Agent tool, Mode A/B Step 1 Lens Collection, Step 5.5 merge gate + 5-item self-test, output-spec for 3 new body sections | final | 2026-04-14 |
+| brainstorm-nuwa-distillation | plan | Task 3 -- add Lens Subagent Prompts subsection with 4 lens dispatch templates | final | 2026-04-14 |
+| shape-pre-build-alignment-skill | plan | Task 6 -- extend Lens (a) prompt template to accept shape sections as [primary] input | 🔵 planned | 2026-04-15 |
 
 ### skills/build-clarify/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | clarify-open-exploration-loop | execute | Insert Step 4.5 Open Exploration Loop + update resume case and stage report metric | ✅ final | 2026-04-13 |
+| shape-pre-build-alignment-skill | plan | Task 5 -- add shape-aware assumption filter to Step 2 (shape_status: validated gate) | 🔵 planned | 2026-04-15 |
 
 ### skills/build-clarify/references/output-format.md
 
@@ -278,11 +299,41 @@ Each section lists a file path with entities that have modified it, their stage,
 | review-stage-parallel-skill-dispatch | execute | Add FO Guidance section for debate-driven reviewer dispatch; restructure for two-phase model | 🟡 in-flight | 2026-04-12 |
 | quality-goal-backward-regression | plan | Insert Step 1e goal-backward verification in pre-scan | 🔵 planned | 2026-04-13 |
 
+### skills/build-shape/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| shape-pre-build-alignment-skill | plan | Task 3 -- new captain-interactive skill with 4-step assume/imagine/align/ship flow, 3 subagent dispatches, escape-hatch, immutable-pitch enforcement | 🔵 planned | 2026-04-15 |
+
+### skills/build-shape/references/output-format.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| shape-pre-build-alignment-skill | plan | Task 4 -- section ordering contract (Q-4), grammar per section, O-2 section-cite integration predicate | 🔵 planned | 2026-04-15 |
+
+### skills/build-shape/references/fixture-format.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| shape-pre-build-alignment-skill | plan | Task 4 -- kc-plugin-forge smoke-test schema reference for build-shape fixtures | 🔵 planned | 2026-04-15 |
+
+### skills/build-shape/references/dispatch-guide.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| shape-pre-build-alignment-skill | plan | Task 4 -- 3-wrapper dispatch shape guide (framer/story-gen/scope-drafter per step) | 🔵 planned | 2026-04-15 |
+
 ### skills/build-uat/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | pre-ship-confidence-gate | execute | Add skip_interactive_passed input and auto-fix iteration re-entry docs | 🟡 in-flight | 2026-04-13 |
+
+### skills/build/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| shape-pre-build-alignment-skill | plan | Task 6 -- accept --from {slug} flag, load validated shape sections, P-4 enforcement | 🔵 planned | 2026-04-15 |
 
 ### skills/code-explorer/SKILL.md
 
@@ -309,6 +360,30 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add TDD Mode RED-GREEN-REFACTOR sub-cycle activated by test_first flag | in-flight | 2026-04-12 |
 | flatten-dispatch-troops-architecture | plan | Update agent references from troop to troop | 🔵 planned | 2026-04-14 |
+
+### smoke-tests/build-shape-f1-large-ui.smoke.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| shape-pre-build-alignment-skill | plan | Task 1 -- forge fixture F-1 Large UI (entity 100 directive) for build-shape TDD | 🔵 planned | 2026-04-15 |
+
+### smoke-tests/build-shape-f2-large-runtime.smoke.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| shape-pre-build-alignment-skill | plan | Task 1 -- forge fixture F-2 Large runtime (entity 101 directive) for build-shape TDD | 🔵 planned | 2026-04-15 |
+
+### smoke-tests/build-shape-f3-medium-workflow.smoke.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| shape-pre-build-alignment-skill | plan | Task 1 -- forge fixture F-3 Medium workflow (entity 095 directive, narrative-continuity Q-3) for build-shape TDD | 🔵 planned | 2026-04-15 |
+
+### smoke-tests/build-shape-f4-small-escape-hatch.smoke.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| shape-pre-build-alignment-skill | plan | Task 1 -- forge fixture F-4 Small synthetic directive for escape-hatch regression (AC-3) | 🔵 planned | 2026-04-15 |
 
 ### spacebridge/.claude-plugin/plugin.json
 

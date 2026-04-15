@@ -1,0 +1,12 @@
+skill: build-shape
+trigger: "Redesign graft from build-time merge (copy + overlay -> merged README) to runtime overlay (FO reads workflow README from plugin, applies LOCAL.yaml at startup). Eliminates _origin/, merged README, and the entire 3-way merge upgrade path. Motivated by 9 real-world bugs discovered during the first-ever graft init into carlove (2026-04-13/14)."
+timeout: 120
+assertions:
+  - contains: "## Problem Statement"
+  - contains: "## User Stories"
+  - contains: "## Scope: In"
+  - contains: "## Scope: Out"
+  - contains: "As a"
+  - contains: "so that"
+  - not_contains: "TBD"
+  - not_contains: "shape unnecessary"

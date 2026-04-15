@@ -1,0 +1,12 @@
+skill: build-shape
+trigger: "Host the spacebridge UI on a cloud platform (e.g., Vercel) as a multi-tenant collaborative war room. Two operating modes: Solo mode (zero-config, no auth required) and Cloud mode (Google OAuth + multi-tenant). Solo mode is the out-of-the-box default -- same logic, same UI, but single-user with no auth setup required. Cloud mode layers auth, persistence, and sharing on top."
+timeout: 120
+assertions:
+  - contains: "## Problem Statement"
+  - contains: "## User Stories"
+  - contains: "## Scope: In"
+  - contains: "## Scope: Out"
+  - contains: "As a"
+  - contains: "so that"
+  - not_contains: "TBD"
+  - not_contains: "shape unnecessary"

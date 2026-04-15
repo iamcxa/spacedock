@@ -44,7 +44,7 @@ Exact prompt templates for each Mode A lens dispatch. Copy-paste contract for im
 
 - **Dispatched agent**: `spacedock:researcher`
 - **Model**: `sonnet`
-- **Input materials**: directive text (verbatim), acceptance criteria from entity file (if present), CLAUDE.md path reference
+- **Input materials**: directive text (verbatim), acceptance criteria from entity file (if present), shape sections from entity body (if present -- ## Problem Statement / ## User Stories / ## Scope: In / ## Scope: Out / ## References), CLAUDE.md path reference
 - **Prompt template**:
   ```
   You are Lens (a): captain-stated-intent.
@@ -52,6 +52,8 @@ Exact prompt templates for each Mode A lens dispatch. Copy-paste contract for im
   Directive: {verbatim directive text}
 
   Acceptance Criteria (if present): {entity AC block, or "none"}
+
+  Shape sections (if present, all [primary] tier): {shape block or "none"}
 
   Task: Surface all explicit statements, constraints, and goals the captain stated in the directive.
   Do NOT infer or extrapolate -- report only what is literally present.
@@ -61,6 +63,8 @@ Exact prompt templates for each Mode A lens dispatch. Copy-paste contract for im
   ```
 - **Return format**: 3-6 bullet lines, each ending with a `[primary|secondary|tertiary]` tag
 - **Non-interactivity assertion**: this prompt contains zero `AskUserQuestion` / `Teammate(` references
+
+<!-- Shape-aware dispatch: when the entity frontmatter carries shape_status: validated, the dispatch site injects the entity's ## Problem Statement / ## User Stories / ## Scope: * / ## References sections verbatim into the {shape block} placeholder. Per A-7 and Q-5 (P-4 enforcement), /build --from {slug} accepts only the slug -- no supplemental directive text is passed alongside. -->
 
 #### Lens (b) -- captain-unstated-intent
 

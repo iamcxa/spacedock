@@ -1,0 +1,12 @@
+skill: build-shape
+trigger: "Add a UI review/audit stage to the build pipeline that catches visual and interaction parity gaps before shipping. Entity 054 shipped with a UX gap: the old dashboard had Notion-like text-selection commenting (highlight text -> comment popover -> anchored thread), but 054's SO pipeline (explore/clarify) only captured the data model and API patterns, missing the interaction pattern entirely. This entity adds a ui-review stage (or integrates UI audit into an existing stage) that verifies: (1) visual parity with existing UI when doing replacement work, (2) UI spec compliance (component hierarchy, layout, interactions match the ## UI Spec produced in clarify), (3) interaction pattern coverage (hover, selection, keyboard, responsive)."
+timeout: 120
+assertions:
+  - contains: "## Problem Statement"
+  - contains: "## User Stories"
+  - contains: "## Scope: In"
+  - contains: "## Scope: Out"
+  - contains: "As a"
+  - contains: "so that"
+  - not_contains: "TBD"
+  - not_contains: "shape unnecessary"

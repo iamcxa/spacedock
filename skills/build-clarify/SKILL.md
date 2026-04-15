@@ -149,6 +149,24 @@ Step 2 uses plain text, not AskUserQuestion).
 
 Read `references/output-format.md` for the exact annotation format.
 
+### Shape-Aware Filter (Section-Cite Predicate)
+
+When the entity frontmatter contains `shape_status: validated`, apply this filter **before** presenting assumptions to the captain:
+
+- Inspect each assumption's `- Evidence:` line.
+- If the Evidence line literally cites any of the following section headers (case-sensitive match):
+  - `## Problem Statement`
+  - `## User Stories`
+  - `## Scope: In`
+  - `## Scope: Out`
+- Then **skip** that assumption -- it is product-level locked by the shape stage.
+- Detection command: `grep -E "^- Evidence:.*## (Problem Statement|User Stories|Scope: (In|Out))"`
+- Mark skipped assumptions `status: shape-locked` in the Assumption Batch summary.
+- Do NOT include shape-locked assumptions in the AskUserQuestion batch or the plain-text confirmation block.
+- Rationale: these sections are immutable-pitch locks from `/shape` align stage. Re-challenging them during clarify violates P-4 immutable-pitch discipline -- the captain who wants to revise a shape-locked section must open a new entity with `supersedes: {old-slug}` (see entity 103 directive).
+
+If `shape_status` is absent, `n/a`, or `draft`, skip this filter entirely and present all assumptions normally.
+
 Present ALL unconfirmed assumptions in a single formatted block:
 
     Based on build-explore's codebase analysis, here are the assumptions:

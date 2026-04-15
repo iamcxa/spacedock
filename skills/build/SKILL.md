@@ -22,6 +22,33 @@ If the user's invocation includes text beyond the command:
 - **Free text** (e.g., `/build add coverage delta to quality stage`) → treat as feature description, use in Phase II.
 - **Linear issue ID** (e.g., `/build SC-123`) → fetch issue details via Linear MCP, use title + description as brainstorming input.
 - **Both** (e.g., `/build SC-123 focus on the API layer`) → fetch issue, overlay user's focus.
+- **`--from {slug}`** (e.g., `/build --from add-dark-mode-toggle`) → load shape sections from a validated shape entity and pass them to build-brainstorm Lens (a) as [primary] tier input. See `--from` flag rules below.
+
+### `--from {slug}` flag
+
+When `--from {slug}` is present:
+
+1. **Resolve slug**: locate `docs/build-pipeline/{slug}.md`. If the file does not exist, emit:
+   ```
+   Entity not found: docs/build-pipeline/{slug}.md
+   ```
+   and stop.
+
+2. **Validate shape_status**: read the entity frontmatter. Proceed only if `shape_status: validated`. Otherwise emit:
+   ```
+   run /shape {slug} to completion first
+   ```
+   and stop.
+
+3. **P-4 enforcement -- no supplemental directive text allowed**: `--from {slug}` MUST be the ONLY argument. If any extra text follows (e.g., `/build --from {slug} "extra directive"`), emit:
+   ```
+   no supplemental directive text allowed (P-4 immutable-pitch discipline)
+   ```
+   and stop.
+
+4. **Load shape sections**: extract `## Problem Statement`, `## User Stories`, `## Scope: In`, `## Scope: Out`, and `## References` from the entity body verbatim. Pass them as the `{shape block}` in the build-brainstorm Lens (a) prompt template (Input materials: shape sections field).
+
+5. **Proceed to Phase II**: invoke `Skill: "spacedock:build-brainstorm"` with the shape sections injected. The directive is derived from the entity's `## Captain Context Snapshot` (the raw directive verbatim). No free-text directive is accepted alongside `--from`.
 
 ---
 
