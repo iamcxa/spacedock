@@ -43,6 +43,45 @@ open a new entity with supersedes: {slug} in frontmatter and run /shape there.
 
 EXIT.
 
+### Raw-Directive Self-Seed (Entry B)
+
+When Step 0 parses a raw directive (no `--from` flag), the skill must create the entity file before proceeding to Step 1 (escape hatch) and Steps 3-7. This makes `/shape` a true independent entry point that does not require a pre-existing entity.
+
+**Self-seed procedure**:
+
+1. **Run escape hatch first**: Step 1's heuristic fires before entity creation. If the escape hatch fires, EXIT -- no entity is created.
+2. **Generate entity ID**: use the same logic as /build Phase III Step 2 (skills/build/SKILL.md:150-162):
+   ```bash
+   (ls docs/build-pipeline/*.md docs/build-pipeline/_archive/*.md 2>/dev/null || true) \
+     | xargs grep -l "^id:" 2>/dev/null \
+     | xargs grep "^id:" \
+     | sed 's/.*id: *//' \
+     | sort -n \
+     | tail -1
+   ```
+   Next ID = highest + 1.
+3. **Generate slug**: from the directive text (lowercase, spaces to hyphens, strip non-alphanumeric except hyphens, max 50 chars).
+4. **Create entity file** at `docs/build-pipeline/{slug}.md` with frontmatter:
+   ```yaml
+   ---
+   id: {next_id}
+   title: {first 80 chars of directive}
+   slug: {slug}
+   status: draft
+   context_status: pending
+   source: /shape
+   created: {ISO 8601 timestamp}
+   shape_status: draft
+   intent:
+   scale:
+   project: {project from git root basename}
+   ---
+   ```
+5. **Write Captain Context Snapshot**: add `## Captain Context Snapshot` with the raw directive verbatim plus invocation timestamp.
+6. **Proceed to Step 1** (escape hatch) then Step 2 (which detects the existing entity and skips its own creation).
+
+**Ordering clarification**: The self-seed procedure runs the escape hatch check (Step 1) BEFORE creating the entity file. The sequence is: Step 0 detects raw directive -> Step 1 escape hatch check -> if escape fires, EXIT with no entity -> if escape does not fire, run self-seed steps 2-5 above -> proceed to Step 2 (Create Draft Entity, which detects existing file and skips).
+
 If the target entity (resolved from `--from {slug}` or, after Step 2, the freshly created slug) has frontmatter `shape_status: validated`, REFUSE with:
 
 ```
@@ -74,6 +113,8 @@ EXIT with exit code 0. Do NOT create an entity. Do NOT emit any body sections.
 ---
 
 ## Step 2: Assume -- Create Draft Entity
+
+**Self-seed guard**: If Step 0's self-seed already created `docs/build-pipeline/{slug}.md` (detectable by: file exists AND `shape_status: draft` in frontmatter AND `source: /shape`), skip entity creation in this step and proceed directly to Step 3. The entity file is already populated with frontmatter and Captain Context Snapshot.
 
 If Step 0 parsed `--from {slug}`, skip entity creation and load the existing draft entity. Otherwise:
 
