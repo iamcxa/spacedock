@@ -150,6 +150,61 @@ After researchers return, run a synthesis step before annotating the entity body
 
 Commit brainstorm research annotations before proceeding to `build-explore`.
 
+### Step 3.6: Alignment Gate (Post-Brainstorm Direction Check)
+
+After Step 3.5 research synthesis completes (or is skipped) and before the Step 2 re-apply routes to `build-explore`, present the captain with a lightweight direction check.
+
+**Trigger condition**: `build-brainstorm` has completed and written `## Brainstorming Spec` to the entity body. This step runs in SO main session where AskUserQuestion is available.
+
+**Presentation format**: Extract from the entity's `## Brainstorming Spec`:
+- APPROACH headline (first sentence of APPROACH paragraph)
+- ALTERNATIVE headlines (first sentence of each ALTERNATIVE paragraph, if any)
+
+Present via AskUserQuestion:
+
+```
+AskUserQuestion(
+  question="Direction check after brainstorm synthesis. Recommended approach:\n\n{APPROACH headline}\n\nAlternatives considered:\n{ALTERNATIVE headlines}\n\nHow should we proceed?",
+  options=["Continue to explore", "Retry brainstorm with correction", "Escalate to /shape"]
+)
+```
+
+**Branch handling**:
+
+**(a) Continue**: Proceed to Step 2 re-apply (which routes to `build-explore`). Write to entity's `## Stage Report: brainstorm` section:
+```
+- Alignment gate: continue (0 retries)
+alignment_confidence: 1.0
+```
+
+**(b) Retry brainstorm with correction**: Ask captain for correction note via AskUserQuestion:
+```
+AskUserQuestion(
+  question="What correction should brainstorm incorporate?",
+  options=["(type your correction below)"]
+)
+```
+Re-invoke `build-brainstorm` with the captain's correction note appended to the directive as `[Captain correction: {note}]`. After brainstorm returns, overwrite ONLY the `## Brainstorming Spec` section in the entity file (preserve `## Lens Evidence`, `## Directive`, `## Captain Context Snapshot`, and all other sections). Re-present the alignment gate.
+
+**Retry cap**: Max 3 retries. On the 3rd retry, if captain still selects "Retry", auto-escalate to branch (c). Write:
+```
+- Alignment gate: retry-then-escalate ({N} retries)
+alignment_confidence: 0.4
+```
+
+**Retry confidence formula**: `alignment_confidence = 1.0 - (retry_count * 0.2)`. Values: 1 retry = 0.8, 2 retries = 0.6, 3 retries = 0.4 (then auto-escalate).
+
+**(c) Escalate to /shape**: Write `context_status: blocked` to entity frontmatter via Edit. Write to entity's `## Stage Report: brainstorm` section:
+```
+- Alignment gate: escalate (captain requested product-layer re-alignment)
+- supersedes: {current-slug} -- captain should open new entity via /shape
+alignment_confidence: N/A (entity superseded)
+```
+Inform captain: "Entity blocked. Open a new entity via `/shape` to re-align at the product level. This entity's accumulated brainstorm work is preserved for reference."
+Do NOT proceed to explore. Return control to captain.
+
+**Stage Report annotation**: After the gate completes (any branch), ensure the entity's `## Stage Report: brainstorm` section contains the alignment gate line and `alignment_confidence` value. If `## Stage Report: brainstorm` does not yet exist, create it with the gate annotation only.
+
 ### Step 4: Handoff
 
 After routing lands on `context_status: ready`:

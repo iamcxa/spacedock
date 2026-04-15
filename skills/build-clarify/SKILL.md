@@ -167,6 +167,32 @@ When the entity frontmatter contains `shape_status: validated`, apply this filte
 
 If `shape_status` is absent, `n/a`, or `draft`, skip this filter entirely and present all assumptions normally.
 
+### Code-Evidence Self-Filter (Pre-Presentation)
+
+After the Shape-Aware Filter and before presenting Open Questions to the captain, run a self-filter pass on each Open Question in `## Open Questions`:
+
+**For each Open Question**:
+
+1. Extract the question's domain and the specific claim or gap it addresses.
+2. Search the entity's `## Lens Evidence` section for [primary]-tier citations that directly address the question's domain.
+3. Check three evidence sources:
+   - (a) `file:line` citation in `## Lens Evidence` with `[primary]` tier that directly answers the question
+   - (b) Parent entity `-> Answer:` annotation that resolves the question
+   - (c) Existing `-> Selected:` option annotation that renders the question moot
+4. **If any source pins the answer**: write `-> Self-resolved: {evidence source} -- {brief explanation}` inline on the question. Remove the question from the captain presentation queue.
+5. **If no source pins the answer**: keep the question in the captain queue for AskUserQuestion presentation.
+
+**Conservative threshold (GUARDRAIL)**: Only [primary]-tier evidence auto-resolves. [secondary] and [tertiary] tiers indicate weaker confidence and MUST still reach captain. When in doubt, escalate -- false negatives (captain sees a question that could have been self-resolved) are acceptable; false positives (captain misses a genuinely ambiguous question) are not.
+
+**Detection command for verification**: `grep -c "Self-resolved" entity.md` returns the count of self-resolved questions.
+
+**Stage Report annotation**: After the self-filter pass completes, add to `## Stage Report: clarify`:
+```
+- Self-filter: {N} self-resolved, {M} captain-escalated
+clarify_self_filter_ratio: {N / (N + M)}
+```
+Where N = questions self-resolved, M = questions presented to captain.
+
 Present ALL unconfirmed assumptions in a single formatted block:
 
     Based on build-explore's codebase analysis, here are the assumptions:
@@ -477,3 +503,12 @@ correctly.
   append in the order captain cited them.
 - **Decomposition gate EXITS the skill** on accept. Do not continue to Step 1. The epic is
   frozen and child entities take over.
+
+## Stage Report: clarify (Format Addition)
+
+When a `## Stage Report: clarify` is written, include the self-filter reporting fields:
+
+```
+- Self-filter: {N} self-resolved, {M} captain-escalated
+clarify_self_filter_ratio: {0.0-1.0}
+```
