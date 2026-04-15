@@ -1346,3 +1346,26 @@ Auto-advance eligibility: **NOT ELIGIBLE** (92% < 95% threshold). Captain gate r
 ### Summary
 
 All 13 tasks executed across 5 waves. Chat and gate aggregates follow fmodel CQRS pattern (daemon-side per clarify lock), session routing uses project-root + most-recent-heartbeat (O-2a), UI push remains 500ms SSE polling (O-3a). The MCP stdio bridge replaces the cli.ts stub and forwards action-push frames as MCP server notifications. The route handlers open per-request socket clients to the daemon and return synchronous ack. Format check passes; 3 pre-existing lint errors remain in coordination bridge code (not introduced by 099).
+
+## Stage Report: quality-feedback-round-1
+
+- [x] tsc errors resolved (8 → 7 remaining, all 099-scoped fixed)
+  registry.ts `this.disconnect`/`this.getActiveProjectRoots` → `registry.*` (object self-ref via named var); coordination-client-bridge.ts aggregateId `as const` for LeaseKey compatibility; watcher.test.ts mock extended with `getActiveSessionByProjectRoot: () => null`
+- [x] lint noNonNullAssertion resolved in entity-body.tsx (6 violations)
+  `textContent!` → `?? ""`, `parentNode!` → guarded `if (!parent) continue/break`, `status!` → `?? ""`
+- [x] lint noUnusedFunctionParameters resolved in entity-body.tsx
+  `sectionHeadings` → `_sectionHeadings`
+- [x] lint noAssignInExpressions resolved in entity-body.tsx
+  `while ((node = walker.nextNode()))` → `for(;;) { const next = walker.nextNode(); if (!next) break; }`
+- [x] lint useTemplate resolved in entity-body.tsx, chat-input.test.tsx, gate-buttons.test.tsx
+  string concatenation → template literals in all 5 locations
+- [x] lint noTemplateCurlyInString resolved in chat-input.test.tsx, gate-buttons.test.tsx
+  biome-ignore suppression with rationale (intentionally checking literal template syntax in source text)
+- [x] lint a11y/useKeyWithClickEvents + noStaticElementInteractions resolved in entity-body.tsx
+  biome-ignore suppression with rationale (progressive enhancement, keyboard users navigate via comment cards)
+- [ ] SKIP: daemon.ts L360 noExplicitAny, L561 noNonNullAssertion
+  Pre-existing (commit 19277054, 2026-04-13 before 099); out of scope per assignment rules
+
+### Summary
+
+Round 1 eliminated all 099-scoped tsc errors (registry.ts self-reference pattern via named variable, coordination-client-bridge.ts LeaseKey type narrowing via `as const`, watcher.test.ts mock completeness) and all 099-scoped lint violations (entity-body.tsx non-null assertions, assignment-in-expression, a11y; test file string concatenation and literal template-curly). Remaining tsc errors (7) and lint warnings are pre-existing. Commit: 291bd91.
