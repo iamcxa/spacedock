@@ -1,8 +1,8 @@
 ---
 id: 107
 title: Plan-Checker Multi-Angle Nuwa-ification -- Port Monolithic Prompt to Per-Dim Haiku Dispatch
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: /build
 created: 2026-04-15T00:00:00Z
 started:
@@ -93,7 +93,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 
 ## Brainstorming Spec
 
-**APPROACH**: Port the current monolithic plan-checker prompt (10 dims after entity 106) into a per-dim haiku-dispatch architecture. Create 10 thin-wrapper agents at `agents/plan-checker-dim-{id}-{slug}.md` (each ≤25 lines per MEMORY thin-wrapper-agent-pattern) (⚠ contradicted: existing thin-wrapper agents are 19-21 lines -- references/claude-ensign-runtime.md states "15-22 lines" cap; ≤25 is upward drift -- see Q-2), each preloading a single skill `skills/plan-checker-dim-{slug}` containing the extracted per-dim prompt. Rewrite `skills/build-plan/SKILL.md` Step 6 to issue all 10 `Agent(subagent_type="spacedock:plan-checker-dim-{id}-{slug}", model="haiku", ...)` calls in a single tool-call block for true parallelism. Synthesis phase in main session concatenates per-dim `issues[]` lists, preserving contradictions (Port 10) when two dims flag the same task -- both findings survive to the consumer YAML. Dim 3 (wave-graph integrity) is the essential-tension special case (needs clarification -- deferred to explore): candidate options are (a) give Dim 3 agent the full PLAN text as wide-context, (b) move wave-graph correlation out of plan-checker entirely into a main-session synthesis pass that consumes all per-task issues. YAML output schema (`dimension/severity/description/fix_hint/task`) is frozen -- build-plan Step 6 consumer at SKILL.md:307 must work unchanged.
+**APPROACH** (amended 2026-04-15 post-109 audit + Q-2/Q-5 resolution): Port the current monolithic plan-checker prompt (10 dims after entity 106) into a **7-unit per-dim haiku-dispatch architecture**: 6 per-dim haiku agents (Dim 1, 2, 6, 7, 9, + merged Dim 4+5 "Context & Research Traceability") + 1 synthesis-layer Dim 3 wave-graph correlation check in main session. Dim 8 deferred (re-audit at N=10 entities); Dim 10 retired (task-execution Circular-AC Rule is authoritative catch per entity 106 Part A). Create 6 thin-wrapper agents at `agents/plan-checker-dim-{id}-{slug}.md` (each ≤22 lines matching existing wrapper convention per Q-2 resolution), each preloading a single skill `skills/plan-checker-dim-{slug}` containing the extracted per-dim prompt. Rewrite `skills/build-plan/SKILL.md` Step 6 to issue all 10 `Agent(subagent_type="spacedock:plan-checker-dim-{id}-{slug}", model="haiku", ...)` calls in a single tool-call block for true parallelism. Synthesis phase in main session concatenates per-dim `issues[]` lists, preserving contradictions (Port 10) when two dims flag the same task -- both findings survive to the consumer YAML. Dim 3 (wave-graph integrity) is the essential-tension special case (needs clarification -- deferred to explore): candidate options are (a) give Dim 3 agent the full PLAN text as wide-context, (b) move wave-graph correlation out of plan-checker entirely into a main-session synthesis pass that consumes all per-task issues. YAML output schema (`dimension/severity/description/fix_hint/task`) is frozen -- build-plan Step 6 consumer at SKILL.md:307 must work unchanged.
 
 **ALTERNATIVE**: Keep the monolithic single-prompt architecture; downgrade dispatch model from opus to sonnet purely for cost. -- D-01 **rejected**: cross-dim bias pollution (the load-bearing problem) persists because evidence Dim 1 reads leaks into Dim 6's reasoning within the same context window; no parallelism gain; adding Dim 11 in the future still means editing a 150-line prompt, whereas Nuwa-ification gives new dims a clean 25-line file with no risk of touching Dims 1-10. Cost is the weakest argument for Nuwa anyway -- the real win is fresh-context isolation.
 
@@ -117,15 +117,26 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 - Given a synthetic plan with two dims flagging the same task, when post-port synthesis runs, then both findings appear in output preserving Port 10 contradiction (how to verify: pressure-test fixture `tests/pressure/plan-checker-nuwa-dual-dim.yaml` with dual-dim violation seed; assert `yq '.issues | length' post.yaml >= 2`)
 - Given the depends-on chain (061 → 106 → this), when this entity begins execute, then both 061 and 106 are in status `shipped` (how to verify: `grep 'status:' docs/build-pipeline/{phase-e-plan-2-research-and-plan-skills,plan-defect-autopilot}.md` both show shipped OR paths moved to `_archive/`)
 
-## Clarify Parked (2026-04-15)
+## Clarify Resumed (2026-04-15, post-109)
 
-**Park reason**: mid-clarify captain challenge surfaced a more fundamental question than the Dim 3 hosting α-marker: **do we actually need all 10 dimensions?** Several dims show overlap risk (Dim 4 Context Compliance / Dim 5 Research Coverage / Dim 7 Cross-Entity Coherence all read cross-entity state), and Dim 3 wave-graph logic duplicates a check that build-execute Step 1 also performs. Dim 9+10 just shipped with entity 106 and have zero production firing history. Nuwa-ifying 10 dims without empirical utility data risks optimizing bad structure.
+**Audit delivered**: `docs/build-pipeline/_docs/plan-checker-dim-audit.md` (entity 109, shipped via direct-sweep retro-ship 2026-04-15). Resolves original 10-dim assumption with 7-unit recommendation.
 
-**Blocker**: new entity `plan-checker-dim-utility-audit` (109) must ship first. That entity sweeps the last N entities' plan-checker YAML outputs to produce per-dim blocker/warning fire counts, identifies merge candidates (Dim 4+5+7), and flags dead-weight dims. Output feeds 107 scope: Nuwa-ify the survivors only, not the current 10.
+**Updated scope**:
+- 6 per-dim haiku agents: Dim 1 (Requirement Coverage), Dim 2 (Task Completeness), Dim 6 (Validation Sampling), Dim 7 (Cross-Entity Coherence), Dim 9 (Stale-Line-Anchor, provisional), and MERGED Dim 4+5 as "Context & Research Traceability"
+- 1 synthesis-layer check: Dim 3 (wave-graph integrity) per O-1 below
+- Deferred: Dim 8 (warning-only; re-audit at N=10 more entities)
+- Retired: Dim 10 (task-execution Circular-AC Rule is authoritative catch per entity 106 Part A)
+- **Total: 7 runtime units** (vs originally-planned 10)
 
-**Status preserved**: A-1 through A-6 confirmed (batch, captain 2026-04-15); O-1 in-progress (captain started answering but redirected to scope challenge -- annotation deferred); Q-1 through Q-5 unresolved; pre-audit clarify state frozen. Resume protocol: after 109 ships, re-read audit findings, update 107 APPROACH to target only the surviving dims, then re-enter clarify from Step 3 (O-1).
+**APPROACH amended**: the original 10-dim port now becomes a 7-unit port. All other APPROACH terms unchanged (per-dim haiku dispatch, thin-wrapper agents, single-tool-call block, main-session synthesis with Port 10 contradiction preservation, YAML schema frozen).
 
-**Depends-on updated**: frontmatter `depends-on: [061, 106]` extends to `depends-on: [061, 106, 109]` when 109 seed exists.
+**Q-3 resolved by audit**: Dim 4 Context Compliance merges with Dim 5 Research Coverage into one "Context & Research Traceability" agent. No captain input needed -- audit citation sufficient.
+
+**New Canonical References**:
+- `docs/build-pipeline/_docs/plan-checker-dim-audit.md` -- 7-unit recommendation source
+- `docs/build-pipeline/_archive/plan-checker-dim-utility-audit.md` -- entity 109 record
+
+**Status preserved from park**: A-1 through A-6 confirmed (batch, captain 2026-04-15). O-1 through O-3 + Q-1, Q-2, Q-4, Q-5 still pending interactive resolution; Q-3 auto-resolved via audit (above).
 
 ## Assumptions
 
@@ -193,6 +204,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
   - Angle (iv) seed 3 confirmed absent: no wide-context mode exists [primary]
   - Angle (i) unknown unknown: Dim 4 Context Compliance also reads CLAUDE.md + DECISIONS.md -- has analogous wide-context need -- see Q-3 [primary]
   - Core Tension "essential" in this entity body [primary]
+- → Selected: B -- synthesis-layer correlation (captain, 2026-04-15, interactive)
 
 ### O-2: Rollout strategy -- monolithic coexistence during migration
 
@@ -205,6 +217,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 - Evidence:
   - tests/pressure/build-plan.yaml precedent: 106 Dim 9+10 pressure-tested before merge [secondary]
   - Angle (iv) seed 4 confirmed absent: no per-dim fixtures exist -- parallel run provides baseline for generating them [primary]
+- → Selected: B -- parallel run behind feature flag; diff output N plans before cutover (captain, 2026-04-15, interactive)
 
 ### O-3: Per-dim pressure fixture file structure
 
@@ -217,6 +230,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 - Evidence:
   - Angle (iv) seed 4 confirmed absent: no per-dim fixtures exist (clean greenfield) [primary]
   - MEMORY thin-wrapper-agent-pattern: per-skill artifacts live under per-skill paths (skill:agent:fixture alignment) [secondary]
+- → Selected: A -- dedicated per-dim files (6 per-dim haiku fixtures + 1 plan-checker-dim-3-synthesis fixture = 7 total, matching audit 7-unit architecture) (captain, 2026-04-15, interactive)
 
 ## Open Questions
 
@@ -224,6 +238,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 - Domain: Runnable (architecture of dispatch unit)
 - Why it matters: The α-marker from brainstorm. O-1 proposes moving Dim 3 to synthesis layer, not porting as a per-dim haiku. This is an asymmetry in the "10 dims = 10 agents" narrative. If captain prefers the symmetric story, pick O-1-A despite context-budget risk.
 - Suggested options: see O-1 above -- recommendation B (synthesis-layer correlation) [primary]
+- → Answer: resolved via O-1 selection (captain, 2026-04-15, interactive)
 
 ### Q-2: Thin-wrapper line cap -- 22 or 25?
 - Domain: Organizational (convention consistency)
@@ -232,14 +247,14 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
   - Enforce 22-line cap (prompt body lives in skill, not wrapper) [primary]
   - Relax to 25 lines + update references/claude-ensign-runtime.md in same commit [secondary]
   - Open-ended -- captain decides
-
-### Q-3: Dim 4 (Context Compliance) has parallel wide-context need -- included in scope?
+- → Answer: enforce 22-line cap; per-dim prompt body lives in preloaded skill (skills/plan-checker-dim-{slug}/SKILL.md), NOT inlined in wrapper. Wrapper stays minimal `skills:[...]` + Boot Sequence. APPROACH "≤25 lines" claim corrected (captain, 2026-04-15, interactive) Dim 4 (Context Compliance) has parallel wide-context need -- included in scope?
 - Domain: Runnable (scope boundary)
 - Why it matters: Angle (i) unknown unknown surfaced that Dim 4 reads CLAUDE.md + DECISIONS.md -- cross-entity wide context, structurally identical to Dim 3's issue. Either (a) expand O-1's solution to cover Dim 4 as well (both run in synthesis layer), (b) only special-case Dim 3 and let Dim 4 stay as a normal haiku dim accepting the context cost, (c) defer Dim 4 to a follow-up entity.
 - Suggested options:
   - Expand O-1-B to cover both Dim 3 and Dim 4 in synthesis (symmetrical treatment) [primary]
   - Only Dim 3 special-cased; Dim 4 accepts wide-context haiku dispatch
   - Defer Dim 4 -- new entity post-ship
+- → Answer: Dim 4 + Dim 5 merge into one "Context & Research Traceability" per-dim agent (entity 109 audit finding; audit cites 2+ shared data sources `## Clarify Output` + entity-body-context-read). Dim 8 also resolved by audit: defer. Dim 10 retired: task-execution Circular-AC Rule is authoritative catch per entity 106 Part A. (auto-resolved by audit, 2026-04-15)
 
 ### Q-4: CONTRACTS.md currently has NO row for skills/build-plan/ or plan-checker-prompt.md -- does 107 add the row?
 - Domain: Organizational (workflow-index hygiene)
@@ -247,6 +262,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
 - Suggested options:
   - Add row(s) during plan stage (touches workflow-index-maintainer mod) [primary]
   - Leave CONTRACTS unchanged; rely on depends-on frontmatter alone (061 precedent) [secondary]
+- → Answer: plan ensign adds CONTRACTS.md row(s) for skills/build-plan/SKILL.md + plan-checker-prompt.md + new agents/plan-checker-dim-*.md + new skills/plan-checker-dim-*/ files during plan stage; status lifecycle in-flight → final tracked via workflow-index-maintainer mod (captain, 2026-04-15, interactive)
 
 ### Q-5: Port 10 label -- ratify or rename?
 - Domain: Readable (naming consistency)
@@ -255,6 +271,7 @@ You are asking for plan-checker to work like Nüwa -- instead of one big opus pr
   - Formalize "Port 10" in docs/build-pipeline/_docs/ [primary]
   - Rename to "contradiction-preservation synthesis" (match 104/105 phrasing)
   - Defer naming -- leave inline per-entity descriptions
+- → Answer: formalize in new `docs/build-pipeline/_docs/nuwa-ports.md` defining Port 7-11; 107 plan stage includes a task to author this doc. Future Nuwa-ify entities cite by Port number (captain, 2026-04-15, interactive)
 
 ## Core Tensions
 
@@ -286,6 +303,8 @@ Not warranted. Scale confirmed Medium (12 files: 10 new per-dim wrappers + 10 ne
 - `docs/build-pipeline/_archive/flatten-dispatch-troops-architecture.md` (entity 065) -- thin-wrapper agent precedent, ensign-boundary decision
 - `docs/build-pipeline/_archive/phase-e-plan-2-research-and-plan-skills.md` (entity 061) -- build-plan/SKILL.md authoring; retro-shipped 2026-04-15
 - `docs/build-pipeline/plan-defect-autopilot.md` (entity 106) -- depends-on parent; Dim 9+10 source; D-plan-defect-autopilot-1 first DECISIONS.md entry
+- `docs/build-pipeline/_docs/plan-checker-dim-audit.md` (entity 109 deliverable) -- 7-unit recommendation source; Dim 4+5 merge rationale; Dim 10 retire rationale
+- `docs/build-pipeline/_archive/plan-checker-dim-utility-audit.md` (entity 109) -- retro-shipped audit entity record
 
 ## Stage Report: explore
 
@@ -307,3 +326,26 @@ Not warranted. Scale confirmed Medium (12 files: 10 new per-dim wrappers + 10 ne
 - [x] Inter-explorer contradictions: 0
   3 of 4 angles returned structured data; Angle (iii) stub-returned and was covered by brainstorm Lens (d); no findings conflict
 - [x] Angle (iii) coverage gap: flagged in Honest Boundaries -- stub return replaced with brainstorm Lens (d) sibling analysis
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- Medium scale, tightly coupled 3-part structure
+- [x] Re-validation: 6 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  explore ran earlier same session; entity 109 audit delivered fresh context via direct-sweep
+- [x] Assumptions confirmed: 6 / 6 (0 corrected)
+  A-1 through A-6 confirmed via batch 2026-04-15 pre-park; preserved post-resume
+- [x] Options selected: 3 / 3
+  O-1 Dim 3 hosting → B synthesis-layer correlation; O-2 rollout → B parallel run behind flag; O-3 fixtures → A dedicated per-dim files (7 total matching audit)
+- [x] Questions answered: 5 / 5
+  Q-1 via O-1; Q-2 22-line cap (prompt in skill); Q-3 auto-resolved via 109 audit (Dim 4+5 merge); Q-4 CONTRACTS row added in plan; Q-5 formalize in new docs/build-pipeline/_docs/nuwa-ports.md
+- [x] Open exploration: 0 gray areas surfaced (captain selected Complete immediately)
+- [x] Canonical refs added: 2
+  docs/build-pipeline/_docs/plan-checker-dim-audit.md (entity 109); docs/build-pipeline/_archive/plan-checker-dim-utility-audit.md
+- [x] Context status: ready
+  gate passed: 6 A / 3 O / 5 Q all annotated; 7-unit architecture locked; APPROACH amended
+- [x] Handoff mode: loose
+  auto_advance unset -- captain must say "execute 107" in separate FO session
+- [x] Clarify duration: 6 AskUserQuestion calls + 1 scope redirect (mid-session park + resume post-109)
+  Session arc: pre-park batch A + 1 attempted O-1 (interrupted) → park → seed 109 → direct-sweep audit → retro-ship 109 → resume with amended APPROACH → clean O-1/O-2/O-3/Q-2/Q-4/Q-5 → Complete
+- [x] Scope change during session: 10-unit → 7-unit architecture (109 audit finding)
+  Dim 10 retired, Dim 8 deferred, Dim 4+5 merged; APPROACH amended; 3 Canonical Refs added
