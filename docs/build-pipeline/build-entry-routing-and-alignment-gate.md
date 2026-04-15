@@ -118,7 +118,7 @@ You are asking for the SO pipeline to gain entry-point routing, a mid-flow align
 
 - **Problem being solved**: Captain currently waits through full brainstorm + explore before any alignment opportunity; clarify surfaces unanswerable skill-internal questions; multiple work streams cannot advance concurrently.
 - **Expected outcome**: `/build` auto-suggests `/shape` for unclear directives; `/shape` can independently seed entities; captain gets a 1-minute direction-check after brainstorm synthesis; clarify only escalates genuine gaps; Stage Reports carry DAG-consumable readiness scores.
-- **Explicit non-goals**: Full DAG scheduler (owned by entity 070), entity-DAG visualization UI (owned by 094 or future entity), changes to brainstorm/explore skill internals (104/105 locked) (needs clarification -- deferred to explore).
+- **Explicit non-goals**: Full DAG scheduler (owned by entity 070), entity-DAG visualization UI (owned by 094 or future entity), changes to brainstorm/explore skill internals (104/105 locked), FO dispatch mechanics, dashboard rendering changes, gatekeeper in non-/build entry points (✓ resolved by explore: Scope Out 9 items confirm all non-goals).
 
 ## Lens Evidence
 
@@ -168,7 +168,7 @@ You are asking for the SO pipeline to gain entry-point routing, a mid-flow align
 
 ## Brainstorming Spec
 
-**APPROACH**: Add four pipeline primitives that restructure SO's entry and mid-flow captain interaction points. (1) A Sonnet gatekeeper as new Step 0 in `skills/build/SKILL.md` that evaluates each directive on two syntactic axes -- hedge-word presence (pattern-match against a closed keyword set: "maybe", "possibly", "可能", "某種", "我在想", "or perhaps") and concrete-target presence (regex for file paths, component names, entity slugs, acceptance-criteria-like phrasing) -- and auto-suggests `/shape` when both axes trigger, while silently passing grey-zone directives. (2) A self-seed branch in `skills/build-shape/SKILL.md` Step 0 that detects raw directives (no `--from` flag) and calls `/build`'s entity-creation logic before running Steps 3-7, making `/shape` a true independent entry point. (3) An alignment-gate as a new post-synthesis step in the SO dispatcher layer (`agents/science-officer.md` Step 2→Step 3 boundary) that presents captain with a 2-3 line APPROACH/ALTERNATIVE summary via AskUserQuestion, supporting three branches: continue, retry-with-correction (capped at 3 iterations), or escalate-to-shape (writes `context_status: blocked` + `supersedes:` hint). (4) A code-evidence self-filter pass prepended to `skills/build-clarify/SKILL.md` Step 2 that checks each Open Question against existing Lens Evidence citations, parent entity annotations, and selected option annotations -- auto-resolving questions whose answer is already pinned and reporting the self-filter ratio in Stage Report. All four primitives emit machine-parseable fields (alignment_confidence, clarify_self_filter_ratio) consumable by entity 070's future DAG ordering.
+**APPROACH**: Add four pipeline primitives that restructure SO's entry and mid-flow captain interaction points. (✓ confirmed by explore: all 4 gaps verified -- skills/build/SKILL.md:20-51 zero gating, skills/build-shape/SKILL.md:28-44 no self-seed, agents/science-officer.md:100-149 Step 3.5 insertion point exists, skills/build-clarify/SKILL.md:152-166 only Shape-Aware Filter) (1) A Sonnet gatekeeper as new Step 0 in `skills/build/SKILL.md` that evaluates each directive on two syntactic axes -- hedge-word presence (pattern-match against a closed keyword set: "maybe", "possibly", "可能", "某種", "我在想", "or perhaps") and concrete-target presence (regex for file paths, component names, entity slugs, acceptance-criteria-like phrasing) -- and auto-suggests `/shape` when both axes trigger, while silently passing grey-zone directives. (2) A self-seed branch in `skills/build-shape/SKILL.md` Step 0 that detects raw directives (no `--from` flag) and calls `/build`'s entity-creation logic before running Steps 3-7, making `/shape` a true independent entry point. (3) An alignment-gate as a new post-synthesis step in the SO dispatcher layer (`agents/science-officer.md` Step 2→Step 3 boundary) that presents captain with a 2-3 line APPROACH/ALTERNATIVE summary via AskUserQuestion, supporting three branches: continue, retry-with-correction (capped at 3 iterations), or escalate-to-shape (writes `context_status: blocked` + `supersedes:` hint). (4) A code-evidence self-filter pass prepended to `skills/build-clarify/SKILL.md` Step 2 that checks each Open Question against existing Lens Evidence citations, parent entity annotations, and selected option annotations -- auto-resolving questions whose answer is already pinned and reporting the self-filter ratio in Stage Report. All four primitives emit machine-parseable fields (alignment_confidence, clarify_self_filter_ratio) consumable by entity 070's future DAG ordering.
 
 **ALTERNATIVE**: Instead of four separate primitives, consolidate into a single "SO quality gate" skill that runs between every stage pair (not just brainstorm→explore) and subsumes both the alignment-gate and clarify self-filter as instances of a general "stage-transition quality check". -- D-01 Rejected: over-generalizing before validating the specific brainstorm→explore gap would delay shipping the proven-needed alignment checkpoint and risk scope creep into stage pairs (explore→clarify, clarify→plan) where the captain interaction contract is different. Ship the targeted primitives first; generalize into a "stage-transition quality gate" pattern in a follow-up entity if the pattern proves reusable.
 
@@ -193,22 +193,121 @@ You are asking for the SO pipeline to gain entry-point routing, a mid-flow align
 - Given an Open Question in build-clarify whose answer is pinned by a file:line citation in Lens Evidence, when clarify Step 2 self-filter runs, then the question receives Self-resolved annotation and is NOT presented to captain (how to verify: grep 'Self-resolved' entity.md present for the question; AskUserQuestion call count excludes it)
 - Given alignment-gate completes and clarify completes, when Stage Reports are inspected, then alignment_confidence: {0.0-1.0} appears in brainstorm report and clarify_self_filter_ratio: {0.0-1.0} appears in clarify report (how to verify: grep -E 'alignment_confidence:|clarify_self_filter_ratio:' entity.md returns 2 lines with numeric values)
 
-## Open Questions
-
-(explore stage will populate)
-
 ## Assumptions
 
-(explore stage will populate)
+**A-1**: SO Step 3.5 (post-brainstorm research dispatch, agents/science-officer.md:100-149) is the correct insertion point for the alignment-gate -- it is an existing optional hook between brainstorm and explore that already runs in SO main session with AskUserQuestion access.
+- **Confidence**: Confident (0.90)
+- **Evidence**: Angle (i) confirmed Step 3.5 as a secondary mid-pipeline gate between brainstorm and explore; it currently dispatches researchers but the hook runs in SO main session context where AskUserQuestion is available -- agents/science-officer.md:100-149 [primary]. Step 2.5 (context_status transitions, :77-91) runs immediately after each skill return -- alignment-gate would insert between Step 2.5's brainstorm transition and the Step 2 re-apply that routes to explore -- agents/science-officer.md:75 [primary]
+
+**A-2**: build-clarify's Shape-Aware Filter (skills/build-clarify/SKILL.md:152-166) is the precedent for the self-filter rule -- the new code-evidence self-filter generalizes the same pre-presentation pattern from shape-specific to evidence-general.
+- **Confidence**: Confident (0.95)
+- **Evidence**: Angle (i) identified the Shape-Aware Filter as the only systematic pre-presentation filter in build-clarify; its predicate (`shape_status: validated` + Evidence section-cite) is structurally identical to the proposed self-filter (check Evidence `file:line` citations for code-pinned answers) -- skills/build-clarify/SKILL.md:152-166 [primary]. Entity 103 O-2 selected this filter design (→ Selected: Step 2 Evidence-filter) -- entity:103 [primary]
+
+**A-3**: All 4 target skill files are contracted by shipped entity 103; changes must be strictly additive (append new steps/rules, never overwrite 103's contributions).
+- **Confidence**: Confident (0.95)
+- **Evidence**: Angle (iii) CONTRACTS.md scan confirmed all 4 files (build/SKILL.md, build-shape/SKILL.md, build-brainstorm/SKILL.md, build-clarify/SKILL.md) are contracted by entity 103 (shipped) -- CONTRACTS.md [primary]. Lens (d) brainstorm confirmed same -- entity:103 [primary]
+
+**A-4**: Entity 091 (clarify-pre-presentation-evidence-gate, clarify/ready) must ship before entity 113 to avoid merge conflicts on build-clarify/SKILL.md Step 1.5 and agents/science-officer.md.
+- **Confidence**: Likely (0.70)
+- **Evidence**: Angle (iii) found entity 091 writes to both build-clarify/SKILL.md (Step 1.5 provenance rule) and agents/science-officer.md (pre-Step-2 checkpoint) -- clarify-pre-presentation-evidence-gate.md:36-38 [primary]. 091 is in clarify/ready (closer to ship than 113 in draft/pending), so natural ordering has 091 first -- but no formal depends-on is declared and FO could dispatch 113 to execute first if 091 stalls -- INDEX.md [secondary]
+
+**A-5**: Alignment-gate retry cap of 3 is appropriate, matching FO auto-revision loop precedent.
+- **Confidence**: Likely (0.75)
+- **Evidence**: FO auto-revision loop caps at 3 iterations before escalation (MEMORY.md fo-auto-revision-loop.md, proven entity 103 iter 1→2) -- memory:fo-auto-revision-loop.md [secondary]. Captain has not formally locked this number for alignment-gate specifically -- entity:113 shape Stage Report locks 6 decisions but retry cap is not among them -- entity:113 [secondary]
+
+**A-6**: The Sonnet gatekeeper's hedge-word keyword list can be hardcoded in the skill spec (not a configurable external file) because the list is short (~10 keywords) and changes infrequently.
+- **Confidence**: Likely (0.70)
+- **Evidence**: build-brainstorm's α-marker keyword list is hardcoded at SKILL.md:472 ("needs clarification -- deferred to explore") and has never needed external configuration -- skills/build-brainstorm/SKILL.md:472 [secondary]. build-shape's escape-hatch keywords are hardcoded at SKILL.md:62 (fix, typo, rename, bump, patch, bugfix, hotfix) -- skills/build-shape/SKILL.md:62 [secondary]
 
 ## Option Comparisons
 
-(explore stage will populate)
+### O-1: Where alignment-gate code lives
+
+The alignment-gate needs a home -- either in the SO agent file, in the brainstorm skill, or as a new standalone skill. This affects maintenance, testing, and how the gate interacts with context_status transitions.
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| **(a) New step in agents/science-officer.md** (between Step 3.5 research dispatch and Step 2 re-apply) | SO already owns the brainstorm→explore boundary; AskUserQuestion is natively available; context_status transition is co-located; no new skill file | SO agent file grows larger; gate logic mixes with routing logic; harder to test in isolation | Low | ✅ Recommended |
+| **(b) New post-synthesis step in skills/build-brainstorm/SKILL.md** | Co-locates with brainstorm output; could leverage the self-test gate pattern (Step 5.5) | Brainstorm is non-interactive by design (SKILL.md:472 "NEVER ask captain questions"); adding AskUserQuestion violates this contract; would need Mode A/B branching for gate | Medium | Viable but contract-breaking |
+| **(c) New standalone skill (e.g., skills/build-alignment-gate/SKILL.md)** | Clean separation; independently testable; can be loaded by SO via Skill() call | New file overhead; SO must call Skill() between brainstorm and explore, adding a dispatch hop; context_status transition ownership becomes ambiguous | Medium | Viable |
+
+### O-2: Self-filter threshold mechanism
+
+The clarify self-filter needs a rule for "when is code-evidence sufficient to auto-resolve a question?" Two approaches:
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| **(a) Binary file:line existence** -- if ANY Lens Evidence citation with [primary] tier directly addresses the question, self-resolve | Simple; grep-verifiable; matches the Shape-Aware Filter precedent (binary section-cite check); errs toward escalation (only [primary] tier auto-resolves) | May miss cases where [secondary] evidence is actually sufficient; "directly addresses" is LLM judgment, not mechanical | Low | ✅ Recommended |
+| **(b) Confidence-based** -- self-resolve only if evidence confidence aggregates to ≥ Likely (0.70) across multiple sources | More nuanced; handles cases where 3 weak signals collectively pin the answer | Requires confidence computation before presentation; adds latency; confidence aggregation formula is a new primitive with no precedent in this pipeline | Medium | Viable |
+
+## Open Questions
+
+### Q-1: Merge ordering with entity 091 (clarify-pre-presentation-evidence-gate)
+
+**Domain**: Organizational (cross-entity sequencing)
+
+**Why it matters**: Entity 091 (clarify/ready) and entity 113 both write to `skills/build-clarify/SKILL.md` and `agents/science-officer.md`. If 113 ships first, its edits to build-clarify Step 2 and SO agent may conflict with 091's Step 1.5 provenance rule and pre-Step-2 checkpoint. If 091 ships first, 113 can rebase on 091's changes and treat them as the new baseline.
+
+**Suggested options**:
+1. Declare `depends-on: [091]` in entity 113 frontmatter -- ensures 091 ships first; 113 plans against 091's shipped state
+2. Plan 113 to be additive at different insertion points (Step 2 self-filter vs Step 1.5 provenance) and let either order work
+3. Merge the two entities' build-clarify changes into a single entity (scope creep risk)
+
+### Q-2: build-brainstorm --from shape provenance gap
+
+**Domain**: Readable/Textual (output contract)
+
+**Why it matters**: When build-brainstorm runs via `/build --from {slug}`, it replaces the Captain Context Snapshot's original shape-origin lines with the enriched brainstorm format (Repo/Session/Domain/Related entities). The "Invoked via /spacedock:build-shape" provenance is lost unless manually restored (as happened in this session with the fix commit). The APPROACH claims the `/build --from` path is additive on entity 103 -- but this provenance gap is a missing contract detail.
+
+**Suggested options**:
+1. Add a `**Shape origin**` bullet to the enriched Captain Context Snapshot template in build-brainstorm's Step 7 output contract (detect `shape_status: validated` → emit origin line)
+2. Preserve original Captain Context Snapshot bullets and append enriched fields below them (no replacement)
+3. Accept as-is and rely on `source:` frontmatter field (already records `/build --from {slug}`)
+
+### Q-3: Entity 103 "no automatic routing in v1" decision — explicit supersession
+
+**Domain**: Readable/Textual (decision traceability)
+
+**Why it matters**: Angle (ii) found entity 103 explicitly decided: "No automatic 'build detects shape needed' logic in v1 -- captain's judgment, 3-second decision. Add auto-routing later only if the manual path shows friction." Entity 113 now adds exactly that auto-routing (Sonnet gatekeeper). This is a legitimate evolution, but the supersession should be explicitly documented for decision traceability.
+
+**Suggested options**:
+1. Add `supersedes: entity-103 decision "no automatic routing in v1"` annotation in entity 113 body
+2. Note in entity 113's RATIONALE that this supersedes 103's v1 decision based on observed friction
+3. No action needed — the shape conversation already captures the evolution context
+
+## Core Tensions
+
+- **(domain-based)**: Entity 091 and entity 113 both modify `skills/build-clarify/SKILL.md` and `agents/science-officer.md` at different semantic levels (091: evidence provenance at Step 1.5; 113: question self-filter at Step 2). Both changes are structurally additive at different insertion points, but if either changes the Step numbering or section ordering, the other's plan becomes stale. Merge ordering is the primary sequencing risk.
+- **(essential)**: The alignment-gate's AskUserQuestion requirement means it CANNOT live inside build-brainstorm (which is contractually non-interactive). It MUST live in the SO agent or a new SO-invoked skill. This is a hard architectural constraint, not a preference.
+- **(time-based)**: Entity 113 supersedes entity 103's "no automatic routing in v1" decision. The supersession is evidence-based (observed friction from SO front-half overhead) but must be explicitly documented to prevent future confusion about why 103's decision was reversed.
+
+## Honest Boundaries
+
+- The 4-angle code-explorer sweep covered 8 files across 3 layers (domain/router/config). Angle (iv) negative-space returned `seed: none-dispatched` -- no §5 keywords matched APPROACH. Absence verification was not performed.
+- Entity 091's exact file-level changes to build-clarify Step 1.5 and science-officer.md were not deeply read during this explore -- only the entity's APPROACH summary was scanned. Plan-phase must read 091's full spec to identify exact line-level conflict zones.
+- The gatekeeper hedge-word list is proposed as bilingual (EN + ZH) based on directive text examples. Whether other languages need coverage is unknown -- captain's working languages are English and Traditional Chinese.
+- The `alignment_confidence` and `clarify_self_filter_ratio` scoring formulas are novel -- no prior entity has emitted entity-level composite scores. First-ship iteration may need post-ship tuning.
 
 ## Decomposition Recommendation
 
-(explore stage will populate if scope warrants it)
+Scope flag present but decomposition NOT recommended: 4 primitives are tightly coupled (alignment-gate branch (c) depends on shape self-seed existing; readiness scores depend on both gate + self-filter outputs; gatekeeper routing decision feeds into alignment-gate's branch probability). Shipping as a single entity preserves these integration points. 8 files across 3 layers is within Medium scale (5-15 files).
 
 ## Canonical References
 
 (clarify stage will populate)
+
+## Stage Report: explore
+
+- [x] Files mapped: 8 across domain (5), router (2), config (1)
+  domain: skills/build/SKILL.md, skills/build-shape/SKILL.md, skills/build-brainstorm/SKILL.md, skills/build-clarify/SKILL.md, agents/science-officer.md; router: science-officer.md routing table + Step 3.5; config: science-officer.md frontmatter
+- [x] Assumptions formed: 6 (Confident: 3, Likely: 3)
+  A-1 through A-3 Confident; A-4 Likely (091 merge ordering); A-5 Likely (retry cap); A-6 Likely (hardcoded keyword list)
+- [x] Options surfaced: 2
+  O-1 alignment-gate code location (3 options, SO agent recommended); O-2 self-filter threshold (2 options, binary recommended)
+- [x] Questions generated: 3
+  Q-1 merge ordering with entity 091; Q-2 build-brainstorm --from provenance gap; Q-3 entity 103 decision supersession
+- [x] α markers resolved: 1 / 1
+  Goal Check non-goals α marker resolved via Scope: Out sections
+- [x] Scale assessment: Medium confirmed
+  8 files across 3 layers, within Medium range (5-15); no revision from brainstorm estimate
+- [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident or Likely on internal codebase patterns, no external tech claims)
