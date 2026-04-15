@@ -1,15 +1,15 @@
 ---
 id: 103
 title: "Shape skill -- pre-build alignment for user stories and scope validation"
-status: clarify
+status: plan
 context_status: ready
 source: captain architectural discussion (2026-04-14 SO session — split product alignment from technical execution via /shape skill + build integration)
 created: 2026-04-14T21:30:00+08:00
-started:
+started: 2026-04-15T11:30:00+08:00
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-shape-pre-build-alignment-skill
 issue:
 pr:
 intent: feature
