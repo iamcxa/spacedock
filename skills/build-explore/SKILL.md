@@ -411,6 +411,44 @@ Preserve all existing content. Only modify sections this skill owns. Never modif
 
 ---
 
+## Step 6.5: Self-Test Gate (Port 11)
+
+Before emitting the Stage Report, run a mandatory path-aware self-test gate against the sections written in Step 6. The gate has 5 checks:
+
+1. **Track A evidence depth** -- every Track A assumption has `>=2` evidence sources across `>=2` layers (domain/contract/router/view/seed/frontend/test/config).
+2. **Track B alternative completeness** -- every Track B option comparison has `>=2` viable alternatives AND `>=1` marked `✅ Recommended`.
+3. **Track C option surfacing** -- every Track C open question has `Suggested options:` with `>=2` options OR an explicit `Open-ended -- captain decides` literal.
+4. **Evidence tier tagging** -- every `Evidence:` line carries a bracketed `[primary|secondary|tertiary]` tier tag (Port 9 compliance check).
+5. **Core Tensions typing** -- if `## Core Tensions` is populated (not the `Checked -- no notable constraints identified.` literal), every entry is typed (`time-based` / `domain-based` / `essential`).
+
+### Path-aware semantics (sibling entity 104 O-3 propagated)
+
+The gate's failure response depends on Step 2's execution mode:
+
+**Mode A (SO-direct / 4-angle parallel fanout) -- gate failure BLOCKS Stage Report emission.** Do NOT write the Stage Report. Instead, return the structured blocker payload below. The FO ensign routing hook reads `feedback-to: captain` and halts the explore-to-clarify advance until the gate passes:
+
+```yaml
+status: blocked
+feedback-to: captain
+gate_failure:
+  gate_id: {"i"|"ii"|"iii"|"iv"|"v"}
+  failure_reason: {human-readable}
+  offending_items:
+    - {entity-body line reference}
+```
+
+**Mode B (ensign-mode inline fallback) -- gate failure is ADVISORY.** Emit alpha markers `(α: gate-{n} advisory-only in Mode B -- {reason})` inline on each offending item AND include a Stage Report warning `gate-{n} advisory-only in Mode B`. Stage Report still emits; explore-to-clarify advance proceeds. Plan-phase reviewers treat advisory alphas as known coverage gaps.
+
+### Mode B modifier for triple-gate
+
+In Mode B, gate (i) cross-layer recurrence is structurally unavailable because angle (iv) negative-space verification was skipped (see Step 2 Mode B contract). Gate (i) counts as **not applicable** in Mode B, not "failed" -- do NOT emit an advisory alpha for gate (i) in Mode B. Gates (ii)-(v) apply normally.
+
+### FO dispatch-hook audit note
+
+The downstream plan MUST cite the audit scope from parent entity 102 Honest Boundary 9 when declaring FO dispatch-hook coverage for the Mode A blocker payload. Plan ensign: do not assert hook implementation without this citation.
+
+---
+
 ## Step 7: Stage Report
 
 File counts and layer breakdowns come from the Step 2 code-explorer dispatch return; the caller does NOT independently re-grep.
