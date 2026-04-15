@@ -27,6 +27,10 @@ interface EntityDetailClientProps {
   commentRows: CommentRow[];
   repliesByParent: Record<string, CommentRow[]>;
   entitySlug: string;
+  /** Frontmatter status -- used to conditionally show gate buttons */
+  status?: string;
+  /** Frontmatter auto_advance -- when true, gate buttons are hidden (FO auto-advances) */
+  autoAdvance?: boolean;
 }
 
 function buildCommentsBySection(rows: CommentRow[]): Record<string, CommentRow[]> {
@@ -45,6 +49,8 @@ export function EntityDetailClient({
   commentRows,
   repliesByParent,
   entitySlug,
+  status,
+  autoAdvance,
 }: EntityDetailClientProps) {
   const router = useRouter();
   const [commentsBySection, setCommentsBySection] = useState(() =>
@@ -93,6 +99,8 @@ export function EntityDetailClient({
           allComments={allHighlightComments}
           entitySlug={entitySlug}
           onCommentAdded={handleCommentAdded}
+          status={status}
+          autoAdvance={autoAdvance}
         />
       </div>
       <div>
