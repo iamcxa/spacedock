@@ -889,3 +889,21 @@ Neither gap is a structural plan defect; both are "verifiable only at execute ti
 
 - `chore(plan): 107 -- AC-4 rewrite (7-unit) + wave-1 serialization note; workflow-index append deferred to FO` (this commit)
 - `chore(index): add contracts for entity-plan-checker-multi-angle-nuwa entering plan` -- DEFERRED to FO per captain directive; 2 append calls enumerated above
+
+## Stage Report: execute
+
+### Task 0 Verification
+
+Wave 0 environment verification -- 2026-04-15.
+
+| Check | Command Summary | Result |
+|-------|----------------|--------|
+| 1 | 061 shipped (_archive + status: shipped) | PASS |
+| 2 | 106 status captured (shipped or status line present) | PASS |
+| 3 | Greenfield guarantee (no agents/skills/tests/docs pre-existing) | PASS |
+| 4 | 10-dim monolith present (plan-checker-prompt.md >= 160 lines) | PASS |
+| 5 | Q-2 cap source (15-22 lines in claude-ensign-runtime.md) | PASS |
+| 6 | CONTRACTS section headers for build-plan/SKILL.md + plan-checker-prompt.md | PASS |
+| 7 | Monolithic dispatch at lines 297-306 (general-purpose agent dispatch) | PASS |
+
+All 7 checks PASS. Proceed to wave 1.
