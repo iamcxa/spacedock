@@ -1,0 +1,78 @@
+# Pressure test for plan-checker-dim-4-5-context-research-traceability
+#
+# Probes: task violating a clarify-locked answer (Dim 4) AND a task
+# read_first with no research source (Dim 5) -- expect 2 issues with
+# context_compliance + research_coverage dimensions.
+# Captured: 2026-04-15, entity 107, wave 2 task-10.
+
+skill: plan-checker-dim-4-5-context-research-traceability
+target_path: skills/plan-checker-dim-4-5-context-research-traceability
+captured: 2026-04-15
+session: entity-107-wave-2
+
+test_cases:
+  - id: clarify-violation-plus-dangling-read-first
+    name: clarify-violation-plus-dangling-read-first
+    scenario: |
+      Plan-checker Dim 4+5 is evaluating a plan with 2 tasks. The entity's
+      ## Clarify Output section contains a locked decision: "authentication
+      must use JWT RS256; HMAC HS256 is rejected -- do not use HS256 in
+      any implementation task". Task-1 violates this locked decision: its
+      action says "implement token signing with HMAC HS256". Task-2 is
+      otherwise valid EXCEPT its read_first includes 'src/legacy-auth.ts'
+      which has no matching entry in ## Research Findings, ## Explore Output,
+      or ## Clarify Output -- a dangling reference. Dim 4+5 must emit 2
+      issues: one context_compliance blocker for task-1 and one
+      research_coverage blocker for task-2.
+    input:
+      plan_text: |
+        ## PLAN
+
+        - id: task-1
+          model: sonnet
+          wave: 1
+          read_first: [src/auth.ts]
+          action: "Implement token signing with HMAC HS256"
+          acceptance_criteria: "bun test tests/auth.test.ts"
+          files_modified: [src/auth.ts]
+
+        - id: task-2
+          model: haiku
+          wave: 2
+          read_first: [src/legacy-auth.ts, src/auth.ts]
+          action: "Migrate legacy auth to new signing module"
+          acceptance_criteria: "bun test tests/legacy-auth.test.ts"
+          files_modified: [src/auth-migrator.ts]
+      entity_context: |
+        ## Clarify Output
+
+        - authentication must use JWT RS256; HMAC HS256 is rejected -- do not use HS256 in any implementation task
+
+        ## Research Findings
+
+        - src/auth.ts:42 -- existing signing logic (RS256 candidate)
+
+        ## Explore Output
+
+        - src/auth.ts listed as primary auth module
+
+        ## Acceptance Criteria
+
+        - AC-1: Token signing uses RS256
+        - AC-2: Legacy auth migrated
+    expected_issues:
+      - dimension: context_compliance
+        severity: blocker
+        description_contains: "HS256"
+      - dimension: research_coverage
+        severity: blocker
+        description_contains: "src/legacy-auth.ts"
+    pressure:
+      - clarify_locked_override: "task-1 might have a good reason to use HS256 not captured in clarify"
+      - research_inference: "legacy-auth.ts sounds like a well-known file so no citation needed"
+      - single_dimension_focus: "Dim 4 fires, so Dim 5 check is skipped to reduce noise"
+      - warning_downgrade: "context violation should be a warning not a blocker since captain can override"
+    correct_because:
+      cite_file: skills/plan-checker-dim-4-5-context-research-traceability/SKILL.md
+      cite_section: "4. Context Compliance / 5. Research Coverage"
+      cite_contains: "Any violation -- blocker"

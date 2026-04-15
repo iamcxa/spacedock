@@ -294,34 +294,166 @@ Self-review is separate from the plan-checker revision loop. Do not conflate the
 
 ## Step 6: Plan-Checker Dispatch
 
-Read `skills/build-plan/references/plan-checker-prompt.md` via the `Read` tool. Substitute `{plan_text}` (the full `## Research Findings` + `## PLAN` + `## UAT Spec` + `## Validation Map` text) and `{entity_context}` (the entity's `## Brainstorming Spec`, `## Explore Output`, `## Clarify Output`, `## Acceptance Criteria` sections). Dispatch:
+**Reference:** `docs/build-pipeline/_docs/nuwa-ports.md` Port 11 -- Per-Dim Haiku Dispatch (build-plan plan-checker).
+
+This step is a 4-sub-step sequence: (6a) 6-way parallel per-dim haiku dispatch, (6b) inline Dim 3 synthesis-layer wave-graph correlation, (6c) Port 10 contradiction-preserving synthesis, (6d) feature-flag parallel run for first N plans post-cutover.
+
+### 6a: Parallel Per-Dim Dispatch
+
+Read `skills/build-plan/references/plan-checker-prompt.md` via the `Read` tool. Prepare two substitution strings:
+
+- `{plan_text}` -- the full `## Research Findings` + `## PLAN` + `## UAT Spec` + `## Validation Map` text
+- `{entity_context}` -- the entity's `## Brainstorming Spec`, `## Explore Output`, `## Clarify Output`, `## Acceptance Criteria` sections
+
+**Pre-dispatch guard (MUST check before issuing any Agent calls):** Assert both substitution strings are valid:
+1. `{plan_text}` is non-empty and does not contain a literal `{` character (unsubstituted placeholder).
+2. `{entity_context}` is non-empty and does not contain a literal `{` character.
+
+If either assertion fails, STOP. Do not dispatch any dim agents. Emit a single blocker issue inline:
+```yaml
+issues:
+  - dimension: dispatch_guard
+    severity: blocker
+    description: "plan_text or entity_context substitution failed -- one or both fields are empty or contain unsubstituted placeholders"
+    fix_hint: "Check that the entity body has a ## PLAN section and ## Acceptance Criteria section before running plan-checker"
+```
+Then skip to Step 7 revision loop with this single issue.
+
+Issue all 6 dispatch calls in **one tool-call block** (parallel subagent fanout):
+
+```
+Agent(
+  subagent_type="spacedock:plan-checker-dim-1-requirement-coverage",
+  model="haiku",
+  prompt=<plan-checker-prompt.md Dim 1 section with {plan_text} and {entity_context} substituted>
+)
+
+Agent(
+  subagent_type="spacedock:plan-checker-dim-2-task-completeness",
+  model="haiku",
+  prompt=<plan-checker-prompt.md Dim 2 section with {plan_text} and {entity_context} substituted>
+)
+
+Agent(
+  subagent_type="spacedock:plan-checker-dim-4-5-context-research-traceability",
+  model="haiku",
+  prompt=<plan-checker-prompt.md Dim 4-5 section with {plan_text} and {entity_context} substituted>
+)
+
+Agent(
+  subagent_type="spacedock:plan-checker-dim-6-validation-sampling",
+  model="haiku",
+  prompt=<plan-checker-prompt.md Dim 6 section with {plan_text} and {entity_context} substituted>
+)
+
+Agent(
+  subagent_type="spacedock:plan-checker-dim-7-cross-entity-coherence",
+  model="haiku",
+  prompt=<plan-checker-prompt.md Dim 7 section with {plan_text} and {entity_context} substituted>
+)
+
+Agent(
+  subagent_type="spacedock:plan-checker-dim-9-stale-line-anchor",
+  model="haiku",
+  prompt=<plan-checker-prompt.md Dim 9 section with {plan_text} and {entity_context} substituted>
+)
+```
+
+Wait for all 6 to return before proceeding to 6b. Each agent returns a structured YAML `issues[]` list with fields: `dimension`, `task` (optional), `severity` (`blocker` | `warning`), `description`, `fix_hint`.
+
+**Plan-checker is stateless.** Each dispatch gets a fresh context. The checker does not remember previous iterations, and you do not tell it what iteration you are on. This is deliberate -- each check is an independent judgment.
+
+**Known architectural unknown -- Skill tool in Dim 7 subagent context.** The Dim 7 agent (`spacedock:plan-checker-dim-7-cross-entity-coherence`) assumes the `Skill` tool is available to call `spacedock:workflow-index` read mode. Per `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md`, subagents have restricted tool surfaces and we have no positive evidence that `Skill` is available there. If the assumption proves false in practice, the graceful-degradation stub in `references/plan-checker-prompt.md` (Dim 7 section) emits a Dim 7 warning instead of silently skipping -- captain resolves out-of-band or restructures build-plan to pre-compute CONTRACTS conflict data and inject it into the prompt.
+
+---
+
+### 6b: Dim 3 Synthesis-Layer Wave-Graph Correlation (Inline)
+
+Dim 3 (Dependency Correctness) runs **inline in the main session** -- NOT as a dispatched subagent. This is the synthesis-layer wave-graph correlation step.
+
+Build the wave graph from `wave` attributes in the `## PLAN` section, then apply the checks from `references/dim-3-dependency-rules.md` (section: Wave-Graph Integrity Rules):
+
+- Wave N tasks' `read_first` entries can only reference outputs produced by wave < N tasks (or pre-existing files). A wave 2 task reading a wave 2 task's output is a cycle hint -- **blocker**.
+- `files_modified` overlap between tasks in the same wave -- **warning** (parallelism concern, execute will force serial).
+- `files_modified` overlap AND cross-wave with dependency ordering reversed -- **blocker**.
+- Cycles in the wave graph -- **blocker**.
+
+Emit issues with `dimension: dependency_correctness` for each violation found. These inline issues feed directly into the 6c synthesis step alongside the 6 haiku returns.
+
+---
+
+### 6c: Port 10 Contradiction-Preserving Synthesis
+
+Concatenate all `issues[]` lists: the 6 per-dim haiku returns (from 6a) plus the inline Dim 3 findings (from 6b). Per Port 10 (`docs/build-pipeline/_docs/nuwa-ports.md`):
+
+- **No silent deduplication.** When two dims flag the same task or `file:line`, both entries are preserved verbatim.
+- **No tiebreaker by dispatch order.** Both findings stand.
+- **No majority-vote resolution.** A contradiction between dim findings is a first-class output.
+
+Reconstruct a flat `issues: [...]` YAML preserving all entries from all 7 sources (6 haiku agents + inline Dim 3). This is the authoritative issue list that drives the Step 7 revision loop.
+
+---
+
+### 6d: Feature Flag Parallel Run (O-2-B)
+
+For the first N plans post-cutover (default N=3), **also** dispatch the monolithic plan-checker prompt as an additional parallel subagent:
 
 ```
 Agent(
   subagent_type="general-purpose",
   model="sonnet",
-  prompt={rendered plan-checker template}
+  prompt=<full rendered plan-checker-prompt.md with {plan_text} and {entity_context} substituted>
 )
 ```
 
-Wait for the dispatched subagent to return. Parse its YAML output into a list of issues. Each issue has `dimension`, `task` (optional), `severity` (`blocker` | `warning`), `description`, `fix_hint`.
+N is configurable via:
+- Environment variable `SPACEDOCK_PLAN_CHECKER_NUWA_DIFF_N` (integer), or
+- Entity frontmatter field `plan_checker_diff: N`
 
-**Plan-checker is stateless.** Each dispatch gets a fresh context. The checker does not remember previous iterations, and you do not tell it what iteration you are on. This is deliberate -- each check is an independent judgment.
+Default N=3 when neither is set. When N=0 or the cutover counter has exceeded N clean diffs, skip this sub-step entirely.
 
-**Known architectural unknown -- Skill tool in dispatched subagent context.** The plan-checker prompt assumes the `Skill` tool is available in the dispatched `general-purpose` subagent so Dim 7 can call `spacedock:workflow-index` read mode. Per `~/.claude/projects/-Users-kent-Project-spacedock/memory/subagent-cannot-nest-agent-dispatch.md`, subagents have restricted tool surfaces and we have no positive evidence that `Skill` is available there. If the assumption proves false in practice, the graceful-degradation stub in `references/plan-checker-prompt.md` (Dim 7 section) emits a Dim 7 warning instead of silently skipping -- captain resolves out-of-band or restructures build-plan to pre-compute CONTRACTS conflict data and inject it into the prompt. Flagged during Wave 2 CQR.
+**Durable cutover counter (F-02 fix):** The counter must survive LLM session restarts. Do NOT rely on in-session memory. Instead, compute the running count by grepping entity Stage Reports:
 
-**Plan-checker dimensions** (for reference; full detail lives in `references/plan-checker-prompt.md`):
+```
+Grep pattern: "### Parallel-Run Diff" in docs/build-pipeline/*.md
+```
 
-1. Requirement Coverage -- every AC has at least one task
-2. Task Completeness -- every task has all required fields
-3. Dependency Correctness -- wave graph has no cycles
-4. Context Compliance -- no violations of clarify-locked / CLAUDE.md / DECISIONS.md
-5. Research Coverage -- every `read_first` traces to a research source
-6. Validation Sampling (Full Nyquist) -- 6a presence / 6b latency / 6c continuity / 6d wave-0 completeness
-7. Cross-Entity Coherence -- `files_modified` cross-checked against `CONTRACTS.md`
-8. Type/Test Coverage -- source files have test pairing and type-check config coverage
-9. Stale-Line-Anchor -- every `file:line` citation resolves to asserted content; auto-rewrite to content anchor when unambiguous
-10. Circular-AC -- grep-count ACs are not self-referential against the entity's own PLAN/UAT blocks
+Count the number of existing `### Parallel-Run Diff` subsections found. If count >= N, skip this sub-step. This grep-based approach is durable across session boundaries because it reads from committed entity files, not from session state.
+
+Record both outputs (6-way haiku synthesis from 6c AND monolithic sonnet output) in `## Stage Report: plan` under a `### Parallel-Run Diff` subsection:
+
+```markdown
+### Parallel-Run Diff
+
+nuwa_issues_count: {count from 6c}
+monolithic_issues_count: {count from monolithic run}
+agreement: {list of issues present in both}
+nuwa_only: {list of issues flagged only by nuwa dispatch}
+monolithic_only: {list of issues flagged only by monolithic dispatch}
+diff_run: {N -- this run's index in the parallel-run window}
+```
+
+After N clean diffs (no `monolithic_only` blockers that nuwa missed), the captain cuts the monolithic branch in a follow-up entity. Until then, the **6c synthesis issues list is authoritative** -- the monolithic run is observational only and does not modify the revision loop inputs.
+
+---
+
+### Plan-Checker Dimensions (Post-Entity-109 Taxonomy)
+
+Per the entity 109 dim-utility-audit:
+
+| Dim | Name | Execution | Status |
+|-----|------|-----------|--------|
+| 1 | Requirement Coverage | `spacedock:plan-checker-dim-1-requirement-coverage` (haiku) | Active |
+| 2 | Task Completeness | `spacedock:plan-checker-dim-2-task-completeness` (haiku) | Active |
+| 3 | Dependency Correctness | Inline main-session wave-graph (6b) | Active |
+| 4-5 | Context + Research Traceability | `spacedock:plan-checker-dim-4-5-context-research-traceability` (haiku) | Active |
+| 6 | Validation Sampling | `spacedock:plan-checker-dim-6-validation-sampling` (haiku) | Active |
+| 7 | Cross-Entity Coherence | `spacedock:plan-checker-dim-7-cross-entity-coherence` (haiku) | Active |
+| 8 | Type/Test Coverage | -- | Deferred (no agent shipped) |
+| 9 | Stale-Line-Anchor | `spacedock:plan-checker-dim-9-stale-line-anchor` (haiku) | Active |
+| 10 | Circular-AC | -- | Retired (entity 109 audit) |
+
+Full detail lives in `skills/build-plan/references/plan-checker-prompt.md`.
 
 ---
 

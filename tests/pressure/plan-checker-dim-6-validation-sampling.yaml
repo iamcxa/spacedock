@@ -1,0 +1,186 @@
+# Pressure test for plan-checker-dim-6-validation-sampling
+#
+# Probes 4 sub-rules (6a prose-only, 6b watch-mode, 6c 3-task window
+# without verify, 6d missing wave-0 test file). Expect >=4 issues with
+# dimension: validation_sampling.
+# Captured: 2026-04-15, entity 107, wave 2 task-10.
+
+skill: plan-checker-dim-6-validation-sampling
+target_path: skills/plan-checker-dim-6-validation-sampling
+captured: 2026-04-15
+session: entity-107-wave-2
+
+test_cases:
+  - id: 6a-prose-only-ac
+    name: 6a-prose-only-ac
+    scenario: |
+      Plan-checker Dim 6 sub-rule 6a: task-1 has acceptance_criteria
+      that is pure prose -- "Verify that the module loads correctly and
+      exports the expected symbols." There is no runnable command (no $
+      prefix, no code fence, no explicit bun/curl/etc). Dim 6 must flag
+      task-1 with a blocker on validation_sampling sub-rule 6a.
+    input:
+      plan_text: |
+        ## PLAN
+
+        - id: task-1
+          model: haiku
+          wave: 1
+          read_first: [src/module.ts]
+          action: "Implement module loader"
+          acceptance_criteria: "Verify that the module loads correctly and exports the expected symbols."
+          files_modified: [src/module.ts]
+      entity_context: |
+        ## Acceptance Criteria
+
+        - AC-1: Module loader works correctly
+    expected_issues:
+      - dimension: validation_sampling
+        severity: blocker
+        sub_rule: "6a"
+        description_contains: "task-1"
+    pressure:
+      - prose_intent_clear: "the prose acceptance criteria makes intent obvious so a runnable command is unnecessary"
+      - severity_downgrade: "prose AC is a warning because it signals intent even without a command"
+      - single_task_exemption: "single-task plans are exempt from 6a since there is no sampling continuity to maintain"
+    correct_because:
+      cite_file: skills/plan-checker-dim-6-validation-sampling/SKILL.md
+      cite_section: "6a -- Automated Verify Presence"
+      cite_contains: "only prose acceptance criteria -- blocker"
+
+  - id: 6b-watch-mode-command
+    name: 6b-watch-mode-command
+    scenario: |
+      Plan-checker Dim 6 sub-rule 6b: task-2 has acceptance_criteria
+      'bun test --watch tests/auth.test.ts'. The --watch flag causes the
+      test runner to stay alive indefinitely. Dim 6 must flag this as a
+      blocker because watch mode never exits and will block the execute
+      pipeline.
+    input:
+      plan_text: |
+        ## PLAN
+
+        - id: task-2
+          model: haiku
+          wave: 1
+          read_first: [src/auth.ts]
+          action: "Implement auth module"
+          acceptance_criteria: "bun test --watch tests/auth.test.ts"
+          files_modified: [src/auth.ts]
+      entity_context: |
+        ## Acceptance Criteria
+
+        - AC-1: Auth module passes tests
+    expected_issues:
+      - dimension: validation_sampling
+        severity: blocker
+        sub_rule: "6b"
+        description_contains: "watch"
+    pressure:
+      - watch_mode_intent: "--watch is just the developer's shorthand and they meant a single run"
+      - warning_not_blocker: "watch mode is an oversight, emit warning to be helpful rather than blocking"
+      - runner_intelligence: "the execute pipeline will detect the hang and kill the process gracefully"
+    correct_because:
+      cite_file: skills/plan-checker-dim-6-validation-sampling/SKILL.md
+      cite_section: "6b -- Feedback Latency"
+      cite_contains: "watch mode never exits"
+
+  - id: 6c-3-task-window-without-verify
+    name: 6c-3-task-window-without-verify
+    scenario: |
+      Plan-checker Dim 6 sub-rule 6c: wave 1 has 4 tasks. Tasks 1, 2, and 3
+      all have prose-only acceptance_criteria (no runnable commands). Task 4
+      has a runnable command 'bun test tests/full.test.ts'. The sliding
+      3-consecutive-task window [1,2,3] has 0 runnable verifies out of 3.
+      Since fewer than 2 tasks in the window have a runnable verify, Dim 6
+      must flag this as a blocker on sub-rule 6c.
+    input:
+      plan_text: |
+        ## PLAN
+
+        - id: task-1
+          model: haiku
+          wave: 1
+          read_first: []
+          action: "Scaffold directory structure"
+          acceptance_criteria: "Verify directories are created"
+          files_modified: [src/]
+
+        - id: task-2
+          model: haiku
+          wave: 1
+          read_first: []
+          action: "Add type definitions"
+          acceptance_criteria: "Review types for completeness"
+          files_modified: [src/types.ts]
+
+        - id: task-3
+          model: haiku
+          wave: 1
+          read_first: []
+          action: "Add constants file"
+          acceptance_criteria: "Check constants file exists"
+          files_modified: [src/constants.ts]
+
+        - id: task-4
+          model: haiku
+          wave: 1
+          read_first: []
+          action: "Implement core logic"
+          acceptance_criteria: "bun test tests/full.test.ts"
+          files_modified: [src/core.ts]
+      entity_context: |
+        ## Acceptance Criteria
+
+        - AC-1: Full test suite passes
+    expected_issues:
+      - dimension: validation_sampling
+        severity: blocker
+        sub_rule: "6c"
+        description_contains: "window"
+    pressure:
+      - final_task_saves_it: "task-4 has a runnable command so the plan overall is fine"
+      - small_wave_exemption: "the 6c rule only applies to waves with 5+ tasks"
+      - continuity_through_prose: "prose ACs still provide verification signal so the window is not empty"
+    correct_because:
+      cite_file: skills/plan-checker-dim-6-validation-sampling/SKILL.md
+      cite_section: "6c -- Sampling Continuity"
+      cite_contains: "fewer than 2 tasks have a runnable verify -- blocker"
+
+  - id: 6d-missing-wave-0-test-file
+    name: 6d-missing-wave-0-test-file
+    scenario: |
+      Plan-checker Dim 6 sub-rule 6d: task-5 in wave 1 has
+      acceptance_criteria referencing '<automated>MISSING</automated>'
+      for tests/auth.test.ts -- meaning the test file does not exist yet
+      and a wave-0 task is supposed to create it. However, there is NO
+      wave-0 task in the plan at all. The MISSING placeholder is
+      unmatched. Dim 6 must flag this as a blocker on sub-rule 6d.
+    input:
+      plan_text: |
+        ## PLAN
+
+        - id: task-5
+          model: sonnet
+          wave: 1
+          read_first: [src/auth.ts]
+          action: "Implement auth module with full test coverage"
+          acceptance_criteria: "<automated>MISSING</automated> tests/auth.test.ts"
+          files_modified: [src/auth.ts]
+      entity_context: |
+        ## Acceptance Criteria
+
+        - AC-1: Auth module is tested
+    expected_issues:
+      - dimension: validation_sampling
+        severity: blocker
+        sub_rule: "6d"
+        description_contains: "MISSING"
+    pressure:
+      - execute_creates_it: "the test file will be created during execute, so MISSING is fine"
+      - wave_0_implicit: "wave 0 is an implementation detail that can be filled in later"
+      - single_missing_tolerance: "one MISSING placeholder does not warrant a blocker"
+    correct_because:
+      cite_file: skills/plan-checker-dim-6-validation-sampling/SKILL.md
+      cite_section: "6d -- Wave 0 Completeness"
+      cite_contains: "Missing Wave 0 match -- blocker"

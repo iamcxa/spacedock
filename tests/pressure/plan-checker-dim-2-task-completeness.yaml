@@ -1,0 +1,55 @@
+# Pressure test for plan-checker-dim-2-task-completeness
+#
+# Probes: task missing acceptance_criteria field emits a blocker.
+# Captured: 2026-04-15, entity 107, wave 2 task-10.
+
+skill: plan-checker-dim-2-task-completeness
+target_path: skills/plan-checker-dim-2-task-completeness
+captured: 2026-04-15
+session: entity-107-wave-2
+
+test_cases:
+  - id: missing-acceptance-criteria-field-emits-blocker
+    name: missing-acceptance-criteria-field-emits-blocker
+    scenario: |
+      Plan-checker Dim 2 is evaluating a plan with 2 tasks. Task-1 is
+      complete: it has id, model, wave, read_first, action,
+      acceptance_criteria, and files_modified. Task-2 is missing
+      'acceptance_criteria' entirely -- the field does not appear in
+      the task definition at all. Dim 2 must flag task-2 as a blocker
+      for missing a required field.
+    input:
+      plan_text: |
+        ## PLAN
+
+        - id: task-1
+          model: haiku
+          wave: 1
+          read_first: [src/schema.ts]
+          action: "Validate id field presence in task schema"
+          acceptance_criteria: "grep -q 'id' src/schema.ts"
+          files_modified: [src/schema.ts]
+
+        - id: task-2
+          model: haiku
+          wave: 1
+          read_first: [src/runner.ts]
+          action: "Add wave field to task runner"
+          files_modified: [src/runner.ts]
+      entity_context: |
+        ## Acceptance Criteria
+
+        - AC-1: All tasks must have an id field
+        - AC-2: Runner must process wave field
+    expected_issues:
+      - dimension: task_completeness
+        severity: blocker
+        description_contains: "task-2"
+    pressure:
+      - action_present_temptation: "task-2 has an action so it feels almost complete"
+      - partial_completeness_downgrade: "missing one field is a warning not a blocker"
+      - infer_from_context: "acceptance_criteria can be inferred from the action description"
+    correct_because:
+      cite_file: skills/plan-checker-dim-2-task-completeness/SKILL.md
+      cite_section: "Dimension Check: Task Completeness"
+      cite_contains: "Missing any field -- blocker"

@@ -1,0 +1,48 @@
+# Pressure test for plan-checker-dim-1-requirement-coverage
+#
+# Probes: AC with no covering task emits a blocker.
+# Captured: 2026-04-15, entity 107, wave 2 task-10.
+
+skill: plan-checker-dim-1-requirement-coverage
+target_path: skills/plan-checker-dim-1-requirement-coverage
+captured: 2026-04-15
+session: entity-107-wave-2
+
+test_cases:
+  - id: uncovered-ac-emits-blocker
+    name: uncovered-ac-emits-blocker
+    scenario: |
+      Plan-checker Dim 1 is evaluating a plan whose entity body has 2
+      acceptance criteria. AC-1 ('all tasks must have an id field') is
+      covered by task-1 whose acceptance_criteria checks for the id field.
+      AC-2 ('all tasks must have a wave field') has NO covering task --
+      no task in the PLAN section has acceptance_criteria that references
+      the wave field. Dim 1 must flag AC-2 as a blocker.
+    input:
+      plan_text: |
+        ## PLAN
+
+        - id: task-1
+          model: haiku
+          wave: 1
+          read_first: []
+          action: "Add id field validation to task schema"
+          acceptance_criteria: "grep -q 'id' src/task-schema.ts"
+          files_modified: [src/task-schema.ts]
+      entity_context: |
+        ## Acceptance Criteria
+
+        - AC-1: All tasks must have an id field (covered by task-1)
+        - AC-2: All tasks must have a wave field
+    expected_issues:
+      - dimension: requirement_coverage
+        severity: blocker
+        description_contains: "AC-2"
+    pressure:
+      - coverage_assumption: "AC-2 feels similar to AC-1 so maybe Dim 1 skips it"
+      - implicit_coverage: "wave is mentioned in the plan body so it feels covered"
+      - single_ac_focus: "checker only flags the first uncovered AC and stops"
+    correct_because:
+      cite_file: skills/plan-checker-dim-1-requirement-coverage/SKILL.md
+      cite_section: "Dimension Check: Requirement Coverage"
+      cite_contains: "no covering task -- blocker"
