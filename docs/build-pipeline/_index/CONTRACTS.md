@@ -59,7 +59,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| flatten-dispatch-troops-architecture | execute | Create troop agent (renamed from task-executor, multiple default skills) | ✅ final | 2026-04-14 |
+| flatten-dispatch-troops-architecture | execute | Create troop agent (renamed from troop, multiple default skills) | ✅ final | 2026-04-14 |
 
 ### agents/variant-analysis-reviewer.md
 
@@ -78,7 +78,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| flatten-dispatch-troops-architecture | execute | Update execute stage details: task-executor -> troop in dispatch descriptions | ✅ final | 2026-04-14 |
+| flatten-dispatch-troops-architecture | execute | Update execute stage details: troop -> troop in dispatch descriptions | ✅ final | 2026-04-14 |
 
 ### docs/build-pipeline/_docs/extraction-framework.md
 
@@ -111,7 +111,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Correct pr-review-toolkit bundling claim at line 183 | ✅ final | 2026-04-12 |
 | review-stage-parallel-skill-dispatch | execute | Add dispatch: debate-driven to review stage YAML + update prose | 🟡 in-flight | 2026-04-12 |
 | pre-ship-confidence-gate | execute | Document confidence gate in uat and shipped stage definitions | 🟡 in-flight | 2026-04-13 |
-| flatten-dispatch-troops-architecture | plan | Update execute stage description: task-executor -> troop agent | 🔵 planned | 2026-04-14 |
+| flatten-dispatch-troops-architecture | plan | Update execute stage description: troop -> troop agent | 🔵 planned | 2026-04-14 |
 
 ### docs/overhaul/recipes/phase-e-plan-3-build-pipeline.yaml
 
@@ -142,13 +142,13 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| flatten-dispatch-troops-architecture | plan | Update orchestrator skills section: task-executor -> troop, FO-direct dispatch | 🔵 planned | 2026-04-14 |
+| flatten-dispatch-troops-architecture | plan | Update orchestrator skills section: troop -> troop, FO-direct dispatch | 🔵 planned | 2026-04-14 |
 
 ### references/claude-ensign-runtime.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| flatten-dispatch-troops-architecture | plan | Update thin wrapper canonical refs: task-executor.md -> troop.md | 🔵 planned | 2026-04-14 |
+| flatten-dispatch-troops-architecture | plan | Update thin wrapper canonical refs: troop.md -> troop.md | 🔵 planned | 2026-04-14 |
 
 ### references/claude-first-officer-runtime.md
 
@@ -161,13 +161,13 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| flatten-dispatch-troops-architecture | plan | Update any task-executor references to troop for Codex parity | 🔵 planned | 2026-04-14 |
+| flatten-dispatch-troops-architecture | plan | Update any troop references to troop for Codex parity | 🔵 planned | 2026-04-14 |
 
 ### references/codex-first-officer-runtime.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| flatten-dispatch-troops-architecture | plan | Update any task-executor references to troop for Codex parity | 🔵 planned | 2026-04-14 |
+| flatten-dispatch-troops-architecture | plan | Update any troop references to troop for Codex parity | 🔵 planned | 2026-04-14 |
 
 ### references/confidence-gate.md
 
@@ -256,7 +256,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add test_first attribute to task schema and TDD plan intelligence in step 4a | in-flight | 2026-04-12 |
-| flatten-dispatch-troops-architecture | plan | Update task-executor references to troop in dispatch constraint notes | 🔵 planned | 2026-04-14 |
+| flatten-dispatch-troops-architecture | plan | Update troop references to troop in dispatch constraint notes | 🔵 planned | 2026-04-14 |
 
 ### skills/build-plan/references/plan-checker-prompt.md
 
@@ -301,14 +301,14 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | overhaul-skill-implementation | plan | Add 3 new recipe primitives (replace-table-block, update-yaml-block, update-section) | planned | 2026-04-12 |
-| flatten-dispatch-troops-architecture | plan | Update task-executor example references to troop | 🔵 planned | 2026-04-14 |
+| flatten-dispatch-troops-architecture | plan | Update troop example references to troop | 🔵 planned | 2026-04-14 |
 
 ### skills/task-execution/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add TDD Mode RED-GREEN-REFACTOR sub-cycle activated by test_first flag | in-flight | 2026-04-12 |
-| flatten-dispatch-troops-architecture | plan | Update agent references from task-executor to troop | 🔵 planned | 2026-04-14 |
+| flatten-dispatch-troops-architecture | plan | Update agent references from troop to troop | 🔵 planned | 2026-04-14 |
 
 ### spacebridge/.claude-plugin/plugin.json
 
@@ -936,7 +936,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-flow-tdd-discipline | execute | Pressure test: task-executor detects vacuous test passing before implementation | in-flight | 2026-04-12 |
+| build-flow-tdd-discipline | execute | Pressure test: troop detects vacuous test passing before implementation | in-flight | 2026-04-12 |
 
 ### tests/pressure/overhaul.yaml
 

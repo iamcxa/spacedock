@@ -1,8 +1,8 @@
 # Pressure tests for task-execution TDD Mode -- vacuous test detection
 #
 # Captured entity 067 (Build Flow TDD Discipline) execute stage (2026-04-12).
-# Skill is task-execution subroutine loaded by spacedock:task-executor agent.
-# TDD Mode: when test_first=true, task-executor follows RED->GREEN->REFACTOR.
+# Skill is task-execution subroutine loaded by spacedock:troop agent.
+# TDD Mode: when test_first=true, troop follows RED->GREEN->REFACTOR.
 # Vacuous test detection: if test passes before implementation (exit 0 in RED
 # phase), return NEEDS_CONTEXT with vacuous_test finding.
 

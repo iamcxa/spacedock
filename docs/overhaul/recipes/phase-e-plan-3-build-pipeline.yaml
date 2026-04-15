@@ -52,7 +52,7 @@ operations:
     value: spacedock:build-execute
     reason: |
       Wire in the Phase E Plan 2 Wave 3 skill. Execute orchestrator builds
-      wave graph from PLAN and dispatches task-executor agents per task.
+      wave graph from PLAN and dispatches troop agents per task.
 
   - op: set-stage-field
     stage: quality
@@ -244,7 +244,7 @@ operations:
     new_content: |
       ### `execute`
 
-      Implement the plan via wave-based parallel task dispatch. The execute orchestrator (sonnet) builds a wave graph from `## PLAN`, dispatches task subagents through `spacedock:task-executor` agent with per-task model hints, collects changes, and commits serially per task.
+      Implement the plan via wave-based parallel task dispatch. The execute orchestrator (sonnet) builds a wave graph from `## PLAN`, dispatches task subagents through `spacedock:troop` agent with per-task model hints, collects changes, and commits serially per task.
 
       (Full content in README -- this recipe records intent only)
     reason: Spec §Stage Definitions / Execute (lines 217-292) -- wave-parallel redesign

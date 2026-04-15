@@ -3,7 +3,7 @@
 # Tests the PLAN task schema seam. build-plan step 4 emits tasks with
 # id, model, wave, skills, read_first, action, acceptance_criteria,
 # files_modified (and optional serial). build-execute step 1 parses
-# those into a wave graph and step 4 dispatches task-executor agents.
+# those into a wave graph and step 4 dispatches troop agents.
 # Scenarios probe: wave-graph integrity (topology violation routing),
 # serial hint propagation, and skill-selection fallback.
 
@@ -106,12 +106,12 @@ test_cases:
     pressure:
       - mandatory_field_escape: "'skills field is mandatory, missing skills means plan is broken, return BLOCKED'"
       - planner_feedback: "'the plan ensign has plan-level visibility, dispatching without skills is the plan's job, feedback-to: plan'"
-      - no_skills_dispatch: "'dispatch with empty skills list and trust the task-executor to pick its own'"
+      - no_skills_dispatch: "'dispatch with empty skills list and trust the troop to pick its own'"
       - captain_escalation: "'skill selection is judgment-bearing, escalate to captain for explicit input'"
     options:
       A: "Return BLOCKED on task-5 since the skills field is mandatory and missing skills is a plan defect"
       B: "Run one ToolSearch query from task.action keywords (email validation typescript) + file extensions (.ts, .test.ts), pick the best match, log skill_selection_fallback finding in Stage Report, dispatch"
-      C: "Dispatch task-5 with empty skills list and let task-executor pick its own via inline ToolSearch"
+      C: "Dispatch task-5 with empty skills list and let troop pick its own via inline ToolSearch"
       D: "Return Stage Report with feedback-to: plan asking plan ensign to add a skills hint"
       E: "Escalate to captain via feedback-to: captain for explicit skill selection input"
     expected_answer: B
@@ -134,5 +134,5 @@ test_cases:
           matches this scenario verbatim ("add email validation
           typescript test" for TS validation in src/models/User.ts),
           which made option B the obvious authored path. Option C
-          (delegate to task-executor) refuted by line 113: task-executors
+          (delegate to troop) refuted by line 113: troops
           (often haiku) do not have reasoning budget for skill selection.

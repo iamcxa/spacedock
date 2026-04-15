@@ -1,7 +1,7 @@
 # Pressure tests for task-execution TDD Mode -- backward compatibility
 #
 # Captured entity 067 (Build Flow TDD Discipline) execute stage (2026-04-12).
-# Skill is task-execution subroutine loaded by spacedock:task-executor agent.
+# Skill is task-execution subroutine loaded by spacedock:troop agent.
 # Backward compatibility: when test_first is absent or false, Step 2 executes
 # as a single phase with no TDD overlay -- even if the task touches test files.
 

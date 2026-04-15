@@ -4,7 +4,7 @@
 # Skill is the execute stage orchestrator dispatched by FO as an ensign.
 # sonnet orchestrator + haiku/sonnet/opus task subagents per task model
 # hint. Reads PLAN, builds wave graph, transitions CONTRACTS rows to
-# in-flight, dispatches spacedock:task-executor agents wave-by-wave,
+# in-flight, dispatches spacedock:troop agents wave-by-wave,
 # commits serially, writes Stage Report. Does NOT mutate wave topology.
 
 skill: build-execute
@@ -107,10 +107,10 @@ test_cases:
       - replan_shortcut: "'if haiku couldn't find the pattern, plan is obviously under-specified, jump to replan'"
     options:
       A: "Mark task-2 failed immediately; write Stage Report fail with task-2's blocked_reason; feedback-to: execute. Ship task-1 + task-3"
-      B: "Re-dispatch task-2 to the same haiku task-executor with additional context from task-1's changed_files"
+      B: "Re-dispatch task-2 to the same haiku troop with additional context from task-1's changed_files"
       C: "Escalate task-2's model tier: re-dispatch as sonnet. If still BLOCKED, re-dispatch as opus. If still BLOCKED on opus, Stage Report fail + feedback-to: execute with a replan flag raised"
       D: "Abort the entity outright; captain picks up"
-      E: "Dispatch an additional haiku task-executor in parallel to the original, hoping one of the two converges"
+      E: "Dispatch an additional haiku troop in parallel to the original, hoping one of the two converges"
     expected_answer: C
     correct_because:
       cite_file: skills/build-execute/SKILL.md
