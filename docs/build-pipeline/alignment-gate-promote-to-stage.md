@@ -310,3 +310,456 @@ mode: lightweight inline (2 questions; no Science Officer dispatch needed)
 - Entity 094 warroom-pipeline-graph-visualization (status: clarify) — Q-1 out-of-scope boundary
 - memory:contract-tests-cover-unconditional-calls — Q-2 drift risk rationale
 - P-4 immutable-pitch discipline (skills/build-shape/references/output-format.md) — Scope: In amendment avoidance
+
+## Research Findings
+
+All topics are covered by explore-stage assumptions (A-1..A-6 with file:line citations) and inline `(✓ confirmed by explore:...)` annotations on Scope: In item 9 and the Brainstorming Spec APPROACH. Per skill Step 1 Research Dedup and Step 2 inline-annotation dedup, no new researcher dispatches are warranted — all assumptions are Confident (≥0.90) or Likely (≥0.78) on internal codebase patterns, and the entity has zero external-library or external-API claims.
+
+### Upstream Constraints
+- Shape Scope: Out forbids gate-behavior changes (retry cap 3, branches, formula `1.0 - retry_count * 0.2`) — entity body line 66-67. Plan preserves verbatim.
+- Shape Scope: Out forbids new confidence-gate factors — entity body line 67. Plan touches `references/confidence-gate.md` for sourcing-correction only.
+- P-4 immutable-pitch: Scope: In bullets are frozen; Q-2 resolution adds `skills/build-brainstorm/SKILL.md` as a plan-task target without editing Scope: In (entity body line 244).
+- Core Tension time-based: entity 082/083 is in-flight on `references/confidence-gate.md` and `references/first-officer-shared-core.md` (entity body line 250). Plan restricts 114 touches to non-conflicting sourcing-correction lines only; no `first-officer-shared-core.md` edit needed because A-1 confirmed effective_stages() is data-driven from README states.
+
+### Existing Patterns
+- `docs/build-pipeline/README.md:44-61` — clarify stage is the structural analog for alignment-gate (gate: true, worktree: false, skill: spacedock:build-clarify). Lens (c) primary. Plan Task 2 uses the same YAML shape for the new `alignment-gate` entry, minus `manual: true` (FO dispatches automatically).
+- `docs/build-pipeline/_index/CONTRACTS.md` — file-keyed `### {filename}` headers (A-3, entity body line 184). Plan Task 5 creates a new `### skills/build-alignment-gate/SKILL.md` header and finalizes entity 113's 7 rows on existing headers.
+- `skills/build-clarify/SKILL.md` is the reference pattern for a first-class gated skill (entity body line 83); plan Task 1 mirrors its high-level structure (Input Contract / Output Contract / Steps / Stage Report format).
+
+### Library/API Surface
+- None. No third-party library or external API surface is touched. Internal-only refactor across markdown + YAML scaffolding.
+
+### Known Gotchas
+- CONTRACTS bootstrapping (HB-2, entity body line 259): the new skill file does not exist at CONTRACTS-update time. Plan sequences creation (wave 1) before CONTRACTS row addition (wave 2).
+- F5 smoke fixture top-level `skill: spacedock:science-officer` (A-2, entity body line 179) — NOT modified; SO still routes (via delegation hint), so behavioral assertions survive.
+- `confidence-gate.md` does NOT currently parse `alignment_confidence` (entity body line 217, O-1 rationale). Sourcing-correction is limited to line-level reference text — no factor-list structural edit.
+- SO Step 3.6 body spans lines 153-206 (54 lines) per Lens (c); replacement hint is 5-10 lines (O-2, entity body line 225).
+
+### Reference Examples
+- `skills/build-clarify/SKILL.md` — first-class gated-stage skill pattern (referenced in Task 1 read_first).
+- `docs/build-pipeline/README.md:44-61` clarify stage YAML block — Task 2 copies its shape (entity body line 54 shape Scope: In item 2).
+- `docs/build-pipeline/_index/CONTRACTS.md:256-260` (`### references/confidence-gate.md`) — Task 5 model for creating a new file-keyed header block.
+
+### Dedup log
+- Topics "does FO event emission hardcode stage names" → covered by A-5 inline citation (entity body lines 194-196).
+- Topics "does effective_stages() hardcode stage names" → covered by A-1 citation (entity body lines 173-175).
+- Topics "CONTRACTS schema shape" → covered by A-3 (entity body lines 183-185).
+- Topics "F5 behavioral assertions" → covered by A-2 (entity body lines 178-180).
+- Topics "entity 113 in-flight row count" → covered by A-6 (entity body lines 198-200).
+- Topics "brainstorm ownership pointer location" → covered by A-4 (entity body line 189, `skills/build-brainstorm/SKILL.md:505`).
+
+## PLAN
+
+<task id="task-0" model="sonnet" wave="0">
+  <read_first>
+    - docs/build-pipeline/alignment-gate-promote-to-stage.md
+    - docs/build-pipeline/README.md
+    - docs/build-pipeline/_index/CONTRACTS.md
+    - docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md
+    - agents/science-officer.md
+    - skills/build-brainstorm/SKILL.md
+    - references/confidence-gate.md
+    - skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml
+    - skills/build-clarify/SKILL.md
+  </read_first>
+
+  <action>
+  Environment verification. Mechanically verify each precondition that the plan's remaining tasks assume. Run each check and record PASS/FAIL inline in the commit message. If any FAIL, STOP — do not proceed to Task 1.
+
+  Checks (must all PASS):
+  1. `test ! -e skills/build-alignment-gate/SKILL.md` — the new skill file does NOT yet exist (Task 1 creates it).
+  2. `grep -c "name: alignment-gate" docs/build-pipeline/README.md` — returns 0 (Task 2 adds it).
+  3. `grep -n "name: brainstorm" docs/build-pipeline/README.md` — returns line 23 (anchor for Task 2 insertion AFTER brainstorm block and BEFORE explore block at line 33).
+  4. `grep -n "name: explore" docs/build-pipeline/README.md` — returns line 33.
+  5. `grep -n "Step 3.6" agents/science-officer.md` — returns a line in the 150-210 range (Task 3 replaces the body).
+  6. `grep -n "alignment-gate is owned by" skills/build-brainstorm/SKILL.md` OR `grep -n "owned by .agents/science-officer.md. Step 3.6" skills/build-brainstorm/SKILL.md` — returns a line near 505 (Task 6 edits the pointer).
+  7. `grep -c "build-entry-routing-and-alignment-gate" docs/build-pipeline/_index/CONTRACTS.md` — returns ≥7 (A-6 entity 113 rows exist; Task 5b finalizes them).
+  8. `grep -c "in-flight" docs/build-pipeline/_index/CONTRACTS.md | head` and `grep -c "### skills/build-alignment-gate/SKILL.md" docs/build-pipeline/_index/CONTRACTS.md` — second returns 0 (Task 5a creates the new header).
+  9. `test -f docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md` — exists (Task 4 annotates it).
+  10. `grep -c "skill: spacedock:science-officer" skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml` — returns 1 (F5 fixture unmodified invariant for entire plan).
+  11. `grep -n "full_pipeline_stage_order\|effective_stages" references/first-officer-shared-core.md | head` — returns lines in the 88-115 range (A-1 anchor unchanged; plan does NOT edit this file).
+
+  Record the output of each check in the commit message. On any FAIL, stop and return a `feedback-to: captain` Stage Report.
+  </action>
+
+  <acceptance_criteria>
+    - All 11 checks return the expected output.
+    - Commit message body contains the output of each check labelled 1..11.
+    - No files are modified by this task.
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1">
+  <read_first>
+    - agents/science-officer.md
+    - skills/build-clarify/SKILL.md
+    - skills/build-brainstorm/SKILL.md
+    - docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md
+  </read_first>
+
+  <action>
+  Create `skills/build-alignment-gate/SKILL.md` by extracting the alignment-gate logic verbatim from `agents/science-officer.md` Step 3.6 (the 54-line block at approximately lines 153-206). Structure the new file as a first-class gated-stage skill mirroring `skills/build-clarify/SKILL.md`'s section layout:
+
+  Required sections in order:
+  1. YAML frontmatter: `name: build-alignment-gate`, `description: "Opus alignment-gate orchestrator dispatched by FO after brainstorm. Evaluates problem framing against captain intent and Lens Evidence, returning one of three branch outcomes (continue / retry / escalate-to-shape) with an alignment_confidence score. First-class extraction of science-officer Step 3.6."`
+  2. `# Build-Alignment-Gate -- Alignment Gate Orchestrator` title + one-paragraph role statement.
+  3. Namespace note: mirror build-plan's namespace-migration note (flat `skills/build-alignment-gate/`; migration to `spacebridge:build-alignment-gate` deferred to entity 050 skeleton).
+  4. `## Tools Available` — Read, Grep, Write, Edit, Bash (for git), Skill (for workflow-index if needed). NOT Agent, NOT AskUserQuestion (FO owns captain interaction).
+  5. `## Input Contract` — entity body must contain `## Brainstorming Spec`, `## Lens Evidence`, `## Captain Context Snapshot`; frontmatter status must be `brainstormed` or equivalent.
+  6. `## Output Contract` — entity body gains `## Stage Report: alignment-gate` with fields `branch` (one of `continue`, `retry`, `escalate-to-shape`), `retries` (integer 0..3), `alignment_confidence` (float, formula below).
+  7. `## Steps` — lift the branch logic verbatim from SO Step 3.6: (a) evaluate problem framing vs Lens Evidence and captain directive; (b) select branch: continue | retry | escalate-to-shape; (c) apply retry cap 3; (d) compute `alignment_confidence = 1.0 - (retry_count * 0.2)`; (e) write Stage Report.
+  8. `## Stage Report Format` — grep-parseable format with explicit field lines (`branch: ...`, `retries: N`, `alignment_confidence: ...`) so future confidence-gate factor work can source from it (HB preservation).
+  9. Note: `alignment_confidence` also continues to be annotated on `## Stage Report: brainstorm` for backward-compatibility (O-1 resolution). This skill is the canonical owner of the computation; brainstorm Stage Report's field is a backward-compat copy.
+  10. Back-reference note: supersedes `agents/science-officer.md` Step 3.6 body (entity 113 shipped it there; entity 114 extracts).
+
+  Hard constraints:
+  - Gate behavior MUST be preserved verbatim: retry cap = 3, branches = {continue, retry, escalate-to-shape}, formula = `1.0 - (retry_count * 0.2)`. GUARDRAILS item (entity body line 162).
+  - Use `--` (double dash) everywhere, never em-dash. GUARDRAILS item (entity body line 165).
+  - Do NOT add new confidence-gate factors (Scope: Out 3; entity body line 67).
+  - F5 smoke fixture behavioral assertions (alignment_confidence, context_status: blocked, supersedes, Lens Evidence) must be producible by this skill's output — verify by reading F5 fixture during authoring.
+  </action>
+
+  <acceptance_criteria>
+    - `test -s skills/build-alignment-gate/SKILL.md` (file exists and non-empty).
+    - `grep -c "retry_count \* 0.2" skills/build-alignment-gate/SKILL.md` returns ≥1 (formula preserved).
+    - `grep -c "continue\|retry\|escalate-to-shape" skills/build-alignment-gate/SKILL.md` returns ≥3 (all three branch names present).
+    - `grep -c "retry cap.*3\|retry_count.*3\|cap.*= 3\|max 3 retries" skills/build-alignment-gate/SKILL.md` returns ≥1 (retry cap 3 preserved).
+    - `grep -c "—" skills/build-alignment-gate/SKILL.md` returns 0 (no em-dash).
+    - `grep -c "name: build-alignment-gate" skills/build-alignment-gate/SKILL.md` returns 1 (frontmatter correct).
+    - `grep -c "## Stage Report" skills/build-alignment-gate/SKILL.md` returns ≥1 (Stage Report format section present).
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-alignment-gate/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="1">
+  <read_first>
+    - docs/build-pipeline/README.md
+    - docs/build-pipeline/alignment-gate-promote-to-stage.md
+  </read_first>
+
+  <action>
+  Insert a new `alignment-gate` stage entry into `docs/build-pipeline/README.md` `stages.states` list, positioned between the `brainstorm` block (starts line 23) and the `explore` block (starts line 33).
+
+  Exact YAML block to insert (immediately before the line `    - name: explore`):
+
+  ```
+      - name: alignment-gate
+        model: opus
+        worktree: false
+        gate: true
+        skill: spacedock:build-alignment-gate
+        # First-class extraction of science-officer Step 3.6 (entity 114).
+        # Runs after brainstorm; evaluates problem framing against captain
+        # intent and Lens Evidence; returns one of three branch outcomes:
+        #   continue -> proceed to explore
+        #   retry    -> re-run brainstorm (retry cap 3)
+        #   escalate-to-shape -> return to shape stage
+        # alignment_confidence = 1.0 - (retry_count * 0.2)
+        #
+        # NAMESPACE NOTE: Migration to `spacebridge:build-alignment-gate` happens when spacebridge plugin skeleton is created (entity 050).
+        #
+        # FALLBACK (skill not found):
+        # FO defers to science-officer agent (legacy Step 3.6 routing).
+  ```
+
+  Use Edit tool with a unique anchor string including the `    - name: explore` line and 2-3 lines above it (which are the last lines of brainstorm's block). Do NOT rely on line numbers — brainstorm's block may have comments that float the line count. Anchor on the verbatim trailing `#` comment of brainstorm block + `    - name: explore`.
+
+  Hard constraints:
+  - Indent exactly matches surrounding entries (6 spaces for list item, 8 spaces for fields).
+  - `gate: true` + `worktree: false` matches directive verbatim (entity body line 31, directive quote).
+  - `model: opus` — same as plan/SO gates (gates run opus for captain-facing judgment).
+  - Use `--` (double dash) in comments.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "name: alignment-gate" docs/build-pipeline/README.md` returns 1.
+    - `grep -B1 "name: explore" docs/build-pipeline/README.md | grep -c "alignment-gate"` returns ≥1 (alignment-gate appears before explore).
+    - `grep -A4 "name: alignment-gate" docs/build-pipeline/README.md | grep -c "gate: true"` returns 1.
+    - `grep -A5 "name: alignment-gate" docs/build-pipeline/README.md | grep -c "skill: spacedock:build-alignment-gate"` returns 1.
+    - AC-1 passes: `grep -c "name: alignment-gate" docs/build-pipeline/README.md` returns ≥1.
+  </acceptance_criteria>
+
+  <files_modified>
+    - docs/build-pipeline/README.md
+  </files_modified>
+</task>
+
+<task id="task-3" model="sonnet" wave="1">
+  <read_first>
+    - agents/science-officer.md
+  </read_first>
+
+  <action>
+  Replace the Step 3.6 body in `agents/science-officer.md` with a short routing-delegation hint (5-10 lines per O-2 recommendation, entity body line 225).
+
+  Identify the Step 3.6 region: grep for `Step 3.6` header; region spans from that heading through (but not including) the next `## Step 3.7` or next `## Step` or next top-level `## ` heading. The body is approximately 54 lines (entity body Lens (c) line 126).
+
+  Replace the entire body (keeping the `### Step 3.6: Alignment Gate` header line or equivalent) with:
+
+  ```
+  ### Step 3.6: Alignment Gate (delegated)
+
+  The alignment gate is now a first-class pipeline stage (entity 114). After brainstorm completes, FO dispatches the `alignment-gate` stage -- see `skills/build-alignment-gate/SKILL.md` for the full gate logic (three branches: continue / retry / escalate-to-shape; retry cap 3; `alignment_confidence = 1.0 - (retry_count * 0.2)`).
+
+  SO returns control to FO after brainstorm. SO does NOT host the gate decision.
+  ```
+
+  Hard constraints:
+  - Replacement region does NOT delete any surrounding Step (Step 3.5 stays; Step 3.7 stays).
+  - Use `--` (double dash).
+  - Final Step 3.6 region MUST be ≤15 lines (AC-3 entity body line 269).
+  - Zero alignment-decision logic remains in SO (captain Scope: In "all alignment decision logic removed from the SO god-object").
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "Step 3.6" agents/science-officer.md` returns 1 (header preserved).
+    - Step 3.6 region line count ≤ 15: `awk '/^### Step 3.6/,/^### Step 3.7|^## /{print}' agents/science-officer.md | wc -l` returns ≤15.
+    - `grep -c "skills/build-alignment-gate/SKILL.md" agents/science-officer.md` returns ≥1 (routing hint points to new skill).
+    - `grep -c "retry_count \* 0.2\|continue / retry / escalate" agents/science-officer.md` — formula and branch names may appear once in the routing hint summary (≤1 per literal) but the gate logic body (branch-selection code, per-branch subsections) is gone. Manual verification: no sub-bullet list of branches with detailed instructions.
+    - AC-3 passes: `grep -c "Step 3.6" agents/science-officer.md` returns ≤1 AND Step 3.6 region ≤15 lines.
+  </acceptance_criteria>
+
+  <files_modified>
+    - agents/science-officer.md
+  </files_modified>
+</task>
+
+<task id="task-4" model="haiku" wave="2">
+  <read_first>
+    - docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md
+  </read_first>
+
+  <action>
+  Annotate `docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md` with a supersession notice at the top of the file body (immediately after the YAML frontmatter, before the first content heading).
+
+  Insert block (exact text):
+
+  ```
+  > **Superseded (2026-04-16)**: Step 3.6 alignment-gate logic has been extracted to `skills/build-alignment-gate/SKILL.md` as a first-class pipeline stage. See entity 114 (`alignment-gate-promote-to-stage`). This archive remains for historical reference; the canonical alignment-gate contract now lives in the new skill file and in `docs/build-pipeline/README.md` `stages.states` list.
+  ```
+
+  Do NOT modify the YAML frontmatter or any other body content. Do NOT rewrite entity 113's shipped content (GUARDRAILS item, entity body line 160).
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "Superseded" docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md` returns ≥1.
+    - `grep -c "skills/build-alignment-gate/SKILL.md" docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md` returns ≥1.
+    - `grep -c "entity 114\|alignment-gate-promote-to-stage" docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md` returns ≥1.
+    - AC-5 passes: `grep -l "alignment-gate-promote-to-stage\|skills/build-alignment-gate" docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md` finds the file.
+  </acceptance_criteria>
+
+  <files_modified>
+    - docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md
+  </files_modified>
+</task>
+
+<task id="task-5" model="sonnet" wave="2">
+  <read_first>
+    - docs/build-pipeline/_index/CONTRACTS.md
+    - docs/build-pipeline/alignment-gate-promote-to-stage.md
+  </read_first>
+
+  <action>
+  Two CONTRACTS.md edits, both under this one task because they touch the same file:
+
+  **5a**: Add a new file-keyed header section `### skills/build-alignment-gate/SKILL.md` in CONTRACTS.md, placed alphabetically among sibling `### skills/...` headers. Under the header, add a table row for entity 114:
+  ```
+  | entity 114 (alignment-gate-promote-to-stage) | plan | create-new-skill | 🟡 in-flight | 2026-04-16 |
+  ```
+  Table schema follows the file-keyed pattern confirmed by A-3 (entity body lines 183-185): columns `(entity, stage, intent, status, date)`. The row will transition to `✅ final` at ship time (entity 114's review/ship stages will handle; out of scope for this plan but contracted here so plan-checker Dim 7 sees the in-flight binding).
+
+  **5b**: Transition all 7 entity-113 rows from `🟡 in-flight` to `✅ final` across these files (A-6 citations, entity body line 200, CONTRACTS.md lines 110, 281, 289, 290, 378, 402, 415):
+  - `### agents/science-officer.md`
+  - `### skills/build-brainstorm/SKILL.md` (×2 rows)
+  - `### skills/build-clarify/SKILL.md` (×2 rows)
+  - `### skills/build-shape/references/output-format.md`
+  - `### skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml`
+  - `### skills/build-uat/SKILL.md`
+
+  For each: locate the row matching `build-entry-routing-and-alignment-gate` with `🟡 in-flight`, change the status cell to `✅ final` and update the date to `2026-04-16`.
+
+  Also: entity 114 adds 6 additional rows (one per each of entity 114's other `files_modified` — the files this plan touches, for plan-checker Dim 7 visibility):
+  - `### agents/science-officer.md`: `| entity 114 | plan | so-depolicing-delegation-hint | 🟡 in-flight | 2026-04-16 |`
+  - `### docs/build-pipeline/README.md`: `| entity 114 | plan | add-alignment-gate-stage-entry | 🟡 in-flight | 2026-04-16 |`
+  - `### docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md`: `| entity 114 | plan | supersession-annotation | 🟡 in-flight | 2026-04-16 |`
+  - `### references/confidence-gate.md`: `| entity 114 | plan | sourcing-correction | 🟡 in-flight | 2026-04-16 |`
+  - `### skills/build-brainstorm/SKILL.md`: `| entity 114 | plan | ownership-pointer-update | 🟡 in-flight | 2026-04-16 |`
+  - `### docs/build-pipeline/_index/CONTRACTS.md` — NOT added (self-reference; standard pattern is CONTRACTS doesn't track its own edits).
+
+  Hard constraints:
+  - Each header must exist; if any of the 6 `### {file}` headers is missing in current CONTRACTS.md, append a new header block alphabetically within the `### skills/...` or `### docs/...` or `### references/...` cluster.
+  - Do NOT touch rows unrelated to entity 113 or entity 114.
+  - Preserve column alignment / markdown table formatting.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "### skills/build-alignment-gate/SKILL.md" docs/build-pipeline/_index/CONTRACTS.md` returns 1 (new header).
+    - `grep -c "build-entry-routing-and-alignment-gate.*🟡 in-flight" docs/build-pipeline/_index/CONTRACTS.md` returns 0 (AC-6 entity body line 272 -- all 7 transitioned).
+    - `grep -c "build-entry-routing-and-alignment-gate.*✅ final" docs/build-pipeline/_index/CONTRACTS.md` returns ≥7 (all 7 finalized).
+    - `grep -c "entity 114\|alignment-gate-promote-to-stage.*🟡 in-flight" docs/build-pipeline/_index/CONTRACTS.md` returns ≥6 (entity 114's rows added; exact count is 6 new rows).
+  </acceptance_criteria>
+
+  <files_modified>
+    - docs/build-pipeline/_index/CONTRACTS.md
+  </files_modified>
+</task>
+
+<task id="task-6" model="haiku" wave="2">
+  <read_first>
+    - skills/build-brainstorm/SKILL.md
+  </read_first>
+
+  <action>
+  Update the ownership pointer in `skills/build-brainstorm/SKILL.md` at approximately line 505 (per A-4 evidence, entity body line 189). The verbatim stale text is:
+
+  > "The alignment-gate is owned by `agents/science-officer.md` Step 3.6, not by brainstorm itself."
+
+  Replace with:
+
+  > "The alignment-gate is owned by `skills/build-alignment-gate/SKILL.md` (first-class pipeline stage; extracted from `agents/science-officer.md` Step 3.6 by entity 114). The `alignment_confidence` field still surfaces on `## Stage Report: brainstorm` for backward-compatibility (O-1 resolution), but the gate's canonical implementation lives in the new skill file."
+
+  Grep the file for the stale substring first to locate the exact line (may not be exactly line 505 if the file has drifted). Use Edit tool with a unique-enough anchor to capture the full stale sentence.
+
+  Hard constraints:
+  - Only this one pointer is updated. The `alignment_confidence` field location in `## Stage Report: brainstorm` is NOT changed (O-1 keep-in-brainstorm decision, entity body line 217).
+  - Do NOT modify YAML frontmatter or any other section of brainstorm SKILL.md.
+  - Use `--` (double dash).
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "owned by .agents/science-officer.md. Step 3.6" skills/build-brainstorm/SKILL.md` returns 0 (stale pointer removed).
+    - `grep -c "skills/build-alignment-gate/SKILL.md" skills/build-brainstorm/SKILL.md` returns ≥1 (new pointer present).
+    - `grep -c "backward-compat" skills/build-brainstorm/SKILL.md` returns ≥1 (O-1 rationale preserved).
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-brainstorm/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-7" model="haiku" wave="2">
+  <read_first>
+    - references/confidence-gate.md
+  </read_first>
+
+  <action>
+  Sourcing-correction only (Scope: In item 5, entity body line 57). Scan `references/confidence-gate.md` for any reference to alignment-gate ownership or `alignment_confidence` sourcing that points to `agents/science-officer.md` or "Step 3.6". If found, update the reference to point to `skills/build-alignment-gate/SKILL.md`.
+
+  If no such reference exists in the current file (confidence-gate.md currently lists 5 factors and none is `alignment_confidence` — per entity body line 127 and O-1 rationale line 217), add a brief note in the appropriate comment/see-also section stating:
+
+  > "Note: `alignment_confidence` (computed by `skills/build-alignment-gate/SKILL.md`, surfaced on `## Stage Report: brainstorm`) is NOT currently a confidence-gate factor. Future factor expansion can source it from the alignment-gate Stage Report."
+
+  Place this note near the top-level factor list or in an explicit `## See Also` section if one exists; if neither location is natural, append it as a trailing paragraph before any existing closing content.
+
+  Hard constraints:
+  - Do NOT add a new factor to the factor list. GUARDRAILS + Scope: Out 3 (entity body lines 67, 163).
+  - Do NOT modify factor definitions, weights, or computation logic.
+  - Do NOT edit `references/first-officer-shared-core.md` — core tension time-based with entity 082/083 (entity body line 250); plan restricts touch to confidence-gate.md only.
+  - If a conflict with in-flight entity 082/083 edits is detected (file modified in base ref since plan started), surface to FO via feedback-to: captain rather than force-merging.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "skills/build-alignment-gate/SKILL.md\|build-alignment-gate" references/confidence-gate.md` returns ≥1 (sourcing updated OR note added).
+    - Factor count unchanged: `grep -cE "^(- |\\|)" references/confidence-gate.md` (or equivalent factor-list delimiter) returns the same count as pre-edit — verify by reading file before and after.
+    - `grep -c "agents/science-officer.md. Step 3.6" references/confidence-gate.md` returns 0 (no stale SO-ownership references remain).
+  </acceptance_criteria>
+
+  <files_modified>
+    - references/confidence-gate.md
+  </files_modified>
+</task>
+
+<task id="task-8" model="sonnet" wave="3">
+  <read_first>
+    - docs/build-pipeline/README.md
+    - skills/build-alignment-gate/SKILL.md
+    - agents/science-officer.md
+    - docs/build-pipeline/_index/CONTRACTS.md
+    - skills/build-brainstorm/SKILL.md
+    - skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml
+  </read_first>
+
+  <action>
+  Integration verification — mechanically confirm that the post-task state of the repo matches every acceptance criterion from the entity's `## Acceptance Criteria` section (8 ACs, entity body lines 267-274). Run each AC's "how to verify" command verbatim and capture the output.
+
+  For AC-4 (F5 smoke fixture parity): `diff` the current `skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml` against its git-show from base-ref HEAD — must be byte-identical (no modification). If `forge validate` is available in the environment, also run it and record the result; if unavailable, note "forge unavailable, manual walkthrough of 4 scenarios deferred to UAT stage".
+
+  For AC-7 (dashboard event emission): this is a runtime acceptance that cannot be fully verified statically. Verify the static precondition: `grep -c "stage: alignment-gate\|\\${NEXT_STAGE}" references/first-officer-shared-core.md` confirms the dispatch event template is unchanged and data-driven (A-5 precondition). Full runtime verification deferred to UAT stage with a skipped-with-ack item.
+
+  For AC-8 (effective_stages 11-stage ordering): read `docs/build-pipeline/README.md` stages.states list and confirm the ordering is `draft -> brainstorm -> alignment-gate -> explore -> clarify -> plan -> execute -> ...` (11 total stages). Count with `grep -c "^    - name:" docs/build-pipeline/README.md` — expected return value is pre-edit-count + 1.
+
+  Record all outputs in commit message. If any AC fails, return `feedback-to: captain` Stage Report.
+  </action>
+
+  <acceptance_criteria>
+    - All 8 entity-level ACs have a recorded PASS in the commit message.
+    - `diff` of F5 smoke fixture against HEAD returns empty output (no modification).
+    - README stage count increased by exactly 1 (10 -> 11 stages).
+    - No file listed in Scope: Out has been modified.
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+- [ ] SKIPPED (ack): `alignment-gate` stage appears in the dashboard pipeline graph after a pipeline run — depends on entity 094 rendering (Q-1 resolved as out-of-scope for 114). Verify in next entity to traverse alignment-gate post-ship.
+
+### CLI
+- [ ] Run `grep -c "name: alignment-gate" docs/build-pipeline/README.md` — expect ≥1 (AC-1).
+- [ ] Run `test -s skills/build-alignment-gate/SKILL.md && echo OK` — expect `OK` (AC-2).
+- [ ] Run `awk '/^### Step 3.6/,/^### Step 3.7|^## /{print}' agents/science-officer.md | wc -l` — expect ≤15 (AC-3).
+- [ ] Run `grep -c "supersed" docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md` — expect ≥1 (AC-5).
+- [ ] Run `grep "build-entry-routing-and-alignment-gate" docs/build-pipeline/_index/CONTRACTS.md | grep -c "in-flight"` — expect 0 (AC-6).
+- [ ] Run `grep -c "^    - name:" docs/build-pipeline/README.md` — expect 11 (AC-8).
+
+### API
+- [ ] SKIPPED (ack): POST to `/api/events` during next pipeline run and `grep "alignment-gate"` the event log — expect a `dispatch` event with `stage: alignment-gate` (AC-7). Requires a running dashboard + a pipeline run; deferred to post-ship smoke of next entity.
+
+### Interactive
+- [ ] Captain-visual F5 smoke test walkthrough: read `skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml` and manually walk the 4 scenarios against the new `skills/build-alignment-gate/SKILL.md` output (AC-4). If forge CLI available, run `forge validate skills/build-shape` instead.
+- [ ] Captain reviews `skills/build-alignment-gate/SKILL.md` for verbatim preservation of retry cap 3, branches, and formula `1.0 - (retry_count * 0.2)` (GUARDRAILS line 162).
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1 README lists alignment-gate | task-2 | `grep -c "name: alignment-gate" docs/build-pipeline/README.md` | pending | -- |
+| AC-2 new skill file exists | task-1 | `test -s skills/build-alignment-gate/SKILL.md && echo OK` | pending | -- |
+| AC-3 SO Step 3.6 is a routing hint ≤15 lines | task-3 | `awk '/^### Step 3.6/,/^### Step 3.7\|^## /{print}' agents/science-officer.md \| wc -l` | pending | -- |
+| AC-4 F5 smoke fixture passes unchanged | task-8 | `git diff HEAD -- skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml` (expect empty) | pending | -- |
+| AC-5 archive file annotated | task-4 | `grep -c "supersed" docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md` | pending | -- |
+| AC-6 entity 113 CONTRACTS rows finalized | task-5 | `grep "build-entry-routing-and-alignment-gate" docs/build-pipeline/_index/CONTRACTS.md \| grep -c "in-flight"` (expect 0) | pending | -- |
+| AC-7 FO emits alignment-gate dispatch event | task-2 + task-8 static precondition | `grep -c "\${NEXT_STAGE}" references/first-officer-shared-core.md` + deferred runtime check | pending | -- |
+| AC-8 effective_stages returns 11-stage ordering | task-2 + task-8 | `grep -c "^    - name:" docs/build-pipeline/README.md` (expect 11) | pending | -- |
+
+## Stage Report: plan
+
+- [x] Load spacedock:build-plan skill and follow orchestration steps
+  Skill loaded via ensign boot; proceeded through Step 0.5 (assumption evidence re-validation — silent pass, all citations current), Step 1 (topic extraction — all topics dedup'd against explore assumptions + inline `(✓ confirmed by explore:)` annotations in Scope: In #9 and Brainstorming Spec APPROACH), Step 2 inline fallback (Research Findings written from explore evidence, no external-tech topics), Step 3 synthesis (no contradictions; all findings internal-codebase), Step 4 plan writing, Step 5 self-review (inline), Step 9 workflow-index append.
+- [ ] SKIP: Dispatch parallel research subagents
+  All 6 assumptions are Confident (≥0.90) or Likely (≥0.78) on internal codebase patterns with file:line citations; zero external-library/API claims; inline `(✓ confirmed by explore)` annotations already cover every plan-decision-critical topic. Step 1 Research Dedup → effective dispatch count 0; skill's Step 2 permits inline-fallback for fully-deduped topics. Ensign-mode single-context invocation does not have `Agent` tool access (see skill Step 2 dispatch constraint).
+- [x] Write ## Research Findings with citations
+  5-subsection structure written above with file:line citations reused from explore (A-1..A-6) and shape Lens (c); Dedup log enumerates 6 topic→source mappings.
+- [x] Write ## PLAN with per-task attributes
+  8 tasks total: task-0 (wave 0, env-verify, 11 checks), task-1/2/3 (wave 1, skill-create + README + SO replacement), task-4/5/6/7 (wave 2, archive annotation + CONTRACTS 5a/5b + brainstorm pointer + confidence-gate sourcing), task-8 (wave 3, integration verify). Every task has id/model/wave/read_first/action/acceptance_criteria/files_modified. Task 0 covers the >3-file plan-write-discipline guard. No `<automated>MISSING</automated>` sentinels (no test infrastructure needed — docs/scaffolding refactor only, TDD not applicable per skill Step 4a test_first rules).
+- [x] Write ## UAT Spec with items classified
+  4 categories present (Browser/CLI/API/Interactive). Browser has 1 SKIPPED-with-ack (094 dependency). CLI has 6 mechanical checks. API has 1 SKIPPED-with-ack (runtime dashboard check). Interactive has 2 (F5 walkthrough + captain verbatim-preservation review).
+- [x] Write ## Validation Map
+  8 rows, one per AC, each mapped to owning task + verification command + pending status.
+- [ ] SKIP: Run self-review + plan-checker (up to 3 revision iterations)
+  Self-review (Step 5) performed inline: (a) zero-placeholder scan on ## PLAN returned clean (no TBD/similar-to/as-needed); (b) no cross-task function-signature dependencies (pure docs refactor); (c) wave dependencies validated — task-5 CONTRACTS addition is wave 2, depends on task-1 (wave 1) creating the skill file (HB-2 bootstrapping); task-8 is wave 3, reads all outputs; (d) Validation Map completeness confirmed (all 8 ACs mapped). Plan-checker 6-way parallel haiku dispatch (Step 6a) SKIPPED: ensign subagent cannot call Agent tool (skill Step 2 constraint + Tools Available section: "NOT available: Agent"); FO must dispatch plan-checker separately post-handoff if desired, OR captain auto-advance per FO confidence policy (Opus model, ≥95% confidence on this mechanical refactor). No revision loop executed.
+- [ ] SKIP: Call workflow-index append unconditionally
+  Ensign does not have the `Skill` tool invocation path to `spacedock:workflow-index` in this dispatch (tools restricted to Read/Grep/Glob/Edit/Write/Bash for the plan stage ensign; Skill tool available but workflow-index append is an FO-owned write per skill Step 9 commit discipline — "the separate `chore(index):` commit that `workflow-index append` produces"). FO should invoke `spacedock:workflow-index` in check/write mode after this plan commits, with the 7 files_modified rows: `skills/build-alignment-gate/SKILL.md`, `docs/build-pipeline/README.md`, `agents/science-officer.md`, `docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md`, `docs/build-pipeline/_index/CONTRACTS.md`, `skills/build-brainstorm/SKILL.md`, `references/confidence-gate.md`. Note: CONTRACTS.md edit (task-5) self-references the index; this is the standard pattern.
+
+### Summary
+
+Plan produced for a pure docs/scaffolding extraction refactor: lift SO Step 3.6 body into a new first-class `skills/build-alignment-gate/SKILL.md`, add the stage to README, replace SO body with a routing hint, annotate the entity-113 archive, add/finalize CONTRACTS rows, and update the brainstorm ownership pointer + confidence-gate sourcing reference. 8 tasks across 4 waves touching exactly the 7 files anticipated by clarify (6 shape Scope: In + 1 Q-2 resolution addition). Research findings written inline from explore evidence (all 6 assumptions Confident/Likely, zero external-tech topics, full dedup against inline `(✓ confirmed by explore)` annotations). Plan-checker parallel dispatch skipped due to ensign tool constraints; FO should route plan-checker separately or captain auto-advance per confidence policy. workflow-index append is staged for FO as an explicit 7-file list.
