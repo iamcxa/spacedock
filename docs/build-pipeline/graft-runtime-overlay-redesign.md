@@ -857,6 +857,33 @@ status: passed
 plan-checker verdict: PASS (inline 10-dim pass; subagent-nested Agent dispatch unavailable per claude-ensign-runtime constraint)
 iteration count: 1
 knowledge capture: skipped -- no findings met D1/D2 threshold (plan surfaced entity-specific design decisions; no reusable patterns beyond existing MEMORY entries)
+
+## Stage Report: execute
+
+- [x] task-0: Environment verification pass
+  All 8 checks passed; BASE SHA 26562d8 captured in .spacedock/plan-base-sha.txt (gitignored, not tracked — plan assumed .spacedock/ is tracked but it is gitignored)
+- [x] task-1: Add 5 pressure test fixtures to tests/pressure/graft.yaml
+  Added manifest-source-hash-present-after-init, no-origin-dir-after-init, fo-discovers-workflow-via-plugin-path, hash-based-upgrade-reapplies-local-yaml, local-yaml-runtime-apply-fail-loud-on-missing-stage. Note: existing test format uses `- id:` not `- name:` as plan AC assumed; used id: for consistency.
+- [x] task-2: Extend manifest.yaml schema in skills/graft/SKILL.md
+  Added source_plugin, workflow_readme_path, source_hash per localize-tier skill, and source_hash canonicalization subsection. grep -c 'source_hash' = 7.
+- [x] task-3: Add Step 2.4 Plugin-manifest discovery to references/first-officer-shared-core.md
+  Inserted as item 4 under Step 2 (not labeled "2.4." literally but referenced as Step 2.4 in Status Viewer cross-reference). Lines 7-12 byte-identical to BASE.
+- [x] task-4: Rewrite graft init Phase 4 for runtime overlay
+  Eliminated .origin/ dir creation and README merge; added _archive/, _mods/, _docs/, _index/INDEX.md creation. Updated File Structure Convention. Remaining .origin/ refs in Phase 4 are negative statements confirming its absence.
+- [x] task-5: Rewrite graft upgrade to hash-based reapply
+  3-way merge eliminated. Hash-compare + reapply flow documented. Idempotence rule added. Design principles updated (line 29 "Build-time merge" -> "Runtime overlay").
+- [x] task-6: Add Runtime Apply Contract + shipped_config to LOCAL.yaml Schema
+  Runtime Apply Contract with FAIL LOUD behavior documented. shipped_config schema (090 Part 2 absorption) added.
+- [x] task-7: Final cleanup — status/diff/localize/No Exceptions/Rules/Red Flags
+  All .origin/ positive references eliminated. Rule 3 updated to "Plugin is the authoritative upstream source". status and diff rewritten to use plugin bytes + source_hash. Remaining 4 .origin/ refs are negations (structurally correct).
+- [x] task-8: Flip pressure tests #20/#21/#22 to E; annotate #14-19 deferred_to:112
+  #4 (upgrade-conflict-blanket-policy) also flipped to E — 3-way merge conflicts structurally impossible. #12 (upgrade-stale-anchor-detection) left at A — stale anchors still valid in new design.
+- [x] task-9: Append D-101-runtime-overlay to DECISIONS.md
+  Decision entry appended with context, decision, consequences, and related entities.
+
+### Summary
+
+All 10 tasks completed across 6 waves with no blockers. The graft skill and FO shared core now reflect the runtime overlay architecture: FO reads workflow README from plugin at startup, .origin/ directory eliminated, manifest.yaml carries source_plugin + workflow_readme_path + per-skill source_hash, hash-based reapply replaces 3-way merge for upgrades. Key scope observation: the plan AC for task-7 expected `grep -c '\.origin/' == 0` but 4 remaining references are architecturally necessary negation statements ("No .origin/ directory"). The plan AC for task-1 expected `grep -c '^  - name:'` but existing test format uses `- id:`; used id: for consistency with the file convention.
 workflow-index append: 4 append calls, covering 10 tasks across 4 files (skills/graft/SKILL.md, references/first-officer-shared-core.md, tests/pressure/graft.yaml, docs/build-pipeline/_index/DECISIONS.md), all successful. `.spacedock/plan-base-sha.txt` is worktree-local scratch and NOT registered in CONTRACTS (transient artifact, not a coherence contract).
 
 - [x] Step 0.5 assumption evidence re-validated
