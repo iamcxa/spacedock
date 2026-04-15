@@ -113,6 +113,28 @@ export const sessionEvents = sqliteTable("session_events", {
   timestamp: integer("timestamp").notNull(), // epoch-ms
 });
 
+// ─── chat_events — [full CQRS] daemon-side chat aggregate ────────────────────
+
+export const chatEvents = sqliteTable("chat_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  aggregateId: text("aggregate_id").notNull(), // targetSessionId
+  sequenceNumber: integer("sequence_number").notNull(),
+  eventType: text("event_type").notNull(), // captain_message_sent | captain_message_delivered
+  payload: text("payload").notNull(),
+  timestamp: integer("timestamp").notNull(), // epoch-ms
+});
+
+// ─── gate_events — [full CQRS] daemon-side gate aggregate ────────────────────
+
+export const gateEvents = sqliteTable("gate_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  aggregateId: text("aggregate_id").notNull(), // "${entitySlug}::${stage}"
+  sequenceNumber: integer("sequence_number").notNull(),
+  eventType: text("event_type").notNull(), // gate_approved | gate_rejected
+  payload: text("payload").notNull(),
+  timestamp: integer("timestamp").notNull(), // epoch-ms
+});
+
 // ─── share_tokens — [plain drizzle] bearer-token model (O-1: clean recreate) ──
 
 export const shareTokens = sqliteTable("share_tokens", {

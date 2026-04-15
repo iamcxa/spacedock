@@ -3,15 +3,15 @@
 // queries events + comments from DB, renders header/timeline/body/comments.
 // Dynamic route: /entity/[slug] — slug maps to docs/build-pipeline/<slug>.md
 
-import { notFound } from "next/navigation";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { and, eq, asc } from "drizzle-orm";
-import { parseEntity } from "@/lib/entity-parse";
+import { and, asc, eq } from "drizzle-orm";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { EntityDetailClient } from "@/components/entity-detail-client";
 import { EntityHeader } from "@/components/entity-header";
 import { StageTimeline } from "@/components/stage-timeline";
-import { EntityDetailClient } from "@/components/entity-detail-client";
-import Link from "next/link";
+import { parseEntity } from "@/lib/entity-parse";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,13 @@ export default async function EntityDetailPage({ params }: PageProps) {
   // Resolve entity file path from connected session's projectRoot
   let entityText: string | null = null;
   let projectRoot: string | null = null;
-  let stageTransitions: Array<{ id: number; stage: string; agent: string; timestamp: number; detail: string | null }> = [];
+  let stageTransitions: Array<{
+    id: number;
+    stage: string;
+    agent: string;
+    timestamp: number;
+    detail: string | null;
+  }> = [];
   let commentRows: Array<{
     commentId: string;
     selectedText: string;
@@ -156,7 +162,7 @@ export default async function EntityDetailPage({ params }: PageProps) {
             const key = r.parentId!;
             acc.set(key, [...(acc.get(key) ?? []), r]);
             return acc;
-          }, new Map<string, typeof replies>())
+          }, new Map<string, typeof replies>()),
         )}
         entitySlug={slug}
       />

@@ -42,6 +42,7 @@ function makeRegistry(workflowDirs: string[]): SessionRegistry {
     getActiveProjectRoots: () => [],
     discoverActiveWorkflows: () =>
       workflowDirs.map((dir) => ({ dir, commissioned_by: "spacedock@test" })),
+    getActiveSessionByProjectRoot: () => null,
   };
 }
 
