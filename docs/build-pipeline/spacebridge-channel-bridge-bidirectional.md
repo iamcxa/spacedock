@@ -1,14 +1,14 @@
 ---
 id: 099
 title: "Spacebridge channel bridge — UI ↔ daemon ↔ CC bidirectional communication"
-status: plan
+status: execute
 context_status: ready
 source: captain observation (2026-04-14 — new UI has no channel support, blocks cutover)
 created: 2026-04-14T13:00:00+08:00
 started: 2026-04-15T18:55:00+08:00
 completed:
 verdict:
-score:
+score: 0.92
 worktree: .worktrees/spacedock-ensign-spacebridge-channel-bridge-bidirectional
 issue:
 pr:
