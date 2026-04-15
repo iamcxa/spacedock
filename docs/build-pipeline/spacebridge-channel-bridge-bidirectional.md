@@ -1265,3 +1265,45 @@ Blocker resolution guidance:
 **Updated confidence**: 88% baseline − (2 × 3%) − (4 × 0.5%) = 88% − 6% − 2% = **80%**
 
 Auto-advance eligibility: **NOT ELIGIBLE** (80% < 95% threshold, and blockers present).
+
+## Plan-Checker Run (iter-1)
+
+*Revision iter-1 — 2026-04-15. 2 blockers from iter-0 resolved. Re-evaluated all 10 dims against updated plan.*
+
+### Changes Applied
+
+1. **Dim 1 / AC-2 rewrite**: `## Acceptance Criteria` AC-2 now reads: "CC session receives the captain message via daemon notification channel (`notifications/spacebridge/captain_message`). The `get_pending_messages` MCP tool integration is deferred to child entity 099b." — aligns with task-7 notification dispatch and task-11 integration test assertion.
+
+2. **Dim 6a / task-0 runnable ACs**: `task-0 acceptance_criteria` now includes 3 runnable commands:
+   - `test -f spacebridge/bin/daemon.ts` (daemon entry exists)
+   - `grep -q 'await new Promise<void>(() => {})' spacebridge/bin/cli.ts` (mcp stub present)
+   - `grep -cE 'sessionEvents|leaseEvents|commentEvents' spacebridge/src/schema.ts` returns ≥3 (schema intact)
+
+### Per-Dim Verdicts (iter-1)
+
+| Dim | Result | Issues |
+|-----|--------|--------|
+| 1 — Requirement Coverage | AC-2 now matches task-7/11 notification path ✓; AC-5 warning remains (no header indicator task) | W:1 |
+| 2 — Task Completeness | PASS | — |
+| 3 — Dependency Correctness | PASS | — |
+| 4 — Context Compliance | PASS | — |
+| 5 — Research Coverage | PASS | — |
+| 6a — Automated Verify Presence | task-0 now has 3 runnable commands ✓; all other tasks unchanged ✓ | — |
+| 6b — Feedback Latency | PASS | — |
+| 6c — Sampling Continuity | Wave 0 window: task-0 (now runnable ✓), task-1 (✓), task-2 (✓) → 3/3 ✓ | — |
+| 6d — Wave 0 Completeness | PASS | — |
+| 7 — Cross-Entity Coherence | Warning retained (stale CONTRACTS for 057 files — hygiene gap, not execute blocker) | W:1 |
+| 8 — Test/Type Coverage | Warning retained (entity-body.tsx missing test pairing in task-10) | W:1 |
+| 9 — Stale-Line-Anchor | Warning retained (daemon.ts line range in context sections: :96-223 vs actual :107-177) | W:1 |
+| 10 — Circular-AC | PASS | — |
+
+**Total: 0 blockers / 4 warnings / 0 nits**
+
+### Confidence
+
+- Baseline: 88%
+- Resolved blockers: +2 × 3% = +6%
+- Warnings remaining (4): −4 × 0.5% = −2%
+- **Updated confidence: 92%**
+
+Auto-advance eligibility: **NOT ELIGIBLE** (92% < 95% threshold). Captain gate recommended.
