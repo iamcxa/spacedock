@@ -640,3 +640,135 @@ test_cases:
       - run: 2026-04-14
         actual: A
         note: "_origin/README.md had active commissioned-by, FO would discover two workflows. Fixed by commenting out the field."
+
+  - id: manifest-source-hash-present-after-init
+    summary: |
+      Captain runs `graft init` to transplant a workflow from spacedock into a
+      target repo. The init completes and reports success. Captain inspects
+      the generated manifest.yaml for the localize-tier skill build-quality.
+      The manifest has source_plugin, workflow_readme_path, and per-skill entries
+      under skills: but none of the localize-tier entries has a source_hash field.
+      The SHA256 of the plugin's SKILL.md at init time was never recorded.
+    pressure:
+      - schema_bloat: "manifest.yaml is already complex — adding source_hash per skill increases noise"
+      - deferred_need: "source_hash is only needed at upgrade time, not at init time"
+      - implicit_trust: "we know when we grafted; the plugin source is trusted"
+    options:
+      A: "Skip source_hash at init — compute it lazily at first upgrade invocation"
+      B: "Record source_hash only for skills where LOCAL.yaml defines overrides (anchor/replace)"
+      C: "Record source_hash for ALL localize-tier skills as binary SHA256 of plugin SKILL.md bytes (no normalization) at init time; store in manifest.yaml per skill entry"
+      D: "Record the plugin commit SHA instead of file-level content hash"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Manifest Schema / source_hash canonicalization"
+      cite_contains: "source_hash: <sha256 of plugin SKILL.md at init/upgrade time>"
+    expected_actual: A
+    fix_entity: 101
+    history: []
+
+  - id: no-origin-dir-after-init
+    summary: |
+      Captain runs `graft init` with the new runtime overlay design. After
+      init completes, captain lists `.spacedock/workflows/build-pipeline/` and
+      finds a `.origin/` directory containing a copy of the plugin's README.md
+      and skill files. The graft skill has not been updated to eliminate the
+      build-time copy-and-merge step.
+    pressure:
+      - backward_compat: "old graft code creates .origin/ — the tests assume it"
+      - safety_net: ".origin/ provides a rollback point if something goes wrong"
+      - reference_copy: "having the upstream as a file is convenient for diffing"
+    options:
+      A: "Keep .origin/ for safety — it doesn't hurt anything to have the extra copy"
+      B: "Keep .origin/ but strip commissioned-by from the README copy to prevent dual discovery"
+      C: "Eliminate .origin/ entirely; FO reads workflow README from plugin at startup via manifest.yaml plugin-path fields; no local README copy needed"
+      D: "Replace .origin/ with a single manifest.yaml that records commit SHA of the grafted revision"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "File Structure Convention"
+      cite_contains: "No .origin/ directory"
+    expected_actual: A
+    fix_entity: 101
+    history: []
+
+  - id: fo-discovers-workflow-via-plugin-path
+    summary: |
+      Captain launches FO in a target repo that has a grafted workflow under
+      `.spacedock/workflows/build-pipeline/`. The workflow dir contains
+      manifest.yaml with source_plugin: spacedock and
+      workflow_readme_path: docs/build-pipeline/README.md, plus LOCAL.yaml and
+      entity files. There is NO README.md in the workflow dir itself. FO's
+      project-local discovery (Step 2.2) scans for README.md files and finds
+      none under .spacedock/workflows/build-pipeline/. FO concludes no workflow
+      is present and reports "No active workflow found."
+    pressure:
+      - existing_discovery: "FO Step 2.2 explicitly looks for README.md files"
+      - no_readme_no_workflow: "without a README.md, how does FO know what to load?"
+      - conservative: "failing loudly is better than loading the wrong workflow"
+    options:
+      A: "Keep FO discovery unchanged — require a local README.md for all workflows"
+      B: "Generate a merged README.md at init time and keep it in the workflow dir"
+      C: "Add FO Step 2.4 Plugin-manifest: for each manifest.yaml with source_plugin + workflow_readme_path, resolve the plugin dir and read the README from {plugin_dir}/{workflow_readme_path}, applying LOCAL.yaml readme_operations in-memory"
+      D: "Require captain to symlink the plugin README into the workflow dir"
+    expected_answer: C
+    correct_because:
+      cite_file: references/first-officer-shared-core.md
+      cite_section: "Step 2 / 2.4 Plugin-manifest"
+      cite_contains: "workflow_readme_path"
+    expected_actual: A
+    fix_entity: 101
+    history: []
+
+  - id: hash-based-upgrade-reapplies-local-yaml
+    summary: |
+      Captain modifies one line in spacedock's skills/build-quality/SKILL.md
+      (the plugin source). Captain then runs `graft upgrade` in the target repo.
+      The old graft upgrade flow fetches the current plugin source, attempts a
+      3-way merge between .origin/build-quality/SKILL.md (original), the current
+      plugin bytes, and the localized .claude/skills/build-quality/SKILL.md.
+      The merge produces CONFLICT markers because a LOCAL.yaml anchor region was
+      independently modified upstream.
+    pressure:
+      - merge_familiarity: "3-way merge is a well-understood git primitive"
+      - conflict_visibility: "CONFLICT markers force captain to review changes"
+      - tooling: "graft already implements the 3-way merge flow"
+    options:
+      A: "Keep 3-way merge — conflicts are a feature, not a bug"
+      B: "Skip upgrade if there are any LOCAL.yaml overrides in the changed skill"
+      C: "Compute SHA256 of current plugin SKILL.md bytes; if it differs from manifest source_hash, reapply LOCAL.yaml anchor overrides to the new plugin bytes; write result to .claude/skills/{name}/SKILL.md; update manifest source_hash; report Reapplied"
+      D: "Always overwrite localized skill with the new plugin bytes, discarding LOCAL.yaml overrides"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "Sub-command: graft upgrade / Phase 1 Step 3"
+      cite_contains: "source_hash"
+    expected_actual: A
+    fix_entity: 101
+    history: []
+
+  - id: local-yaml-runtime-apply-fail-loud-on-missing-stage
+    summary: |
+      A grafted workflow's LOCAL.yaml has a readme_operations entry that uses
+      set-stage-field targeting stage: pr-review, field: auto_ship. The plugin's
+      workflow README was updated upstream and the pr-review stage was renamed to
+      pr-review-loop. FO starts up, reads the plugin README via the plugin-path
+      discovery (Step 2.4), and attempts to apply LOCAL.yaml readme_operations.
+      The set-stage-field op cannot find stage: pr-review in the README.
+    pressure:
+      - graceful_degradation: "silently skipping a missing stage keeps FO functional"
+      - captain_burden: "failing at startup blocks all FO work until captain fixes LOCAL.yaml"
+      - rare_case: "stage renames are uncommon; treating this as a warning is reasonable"
+    options:
+      A: "Silently skip ops whose target stage is missing — log a debug note but proceed"
+      B: "Skip and emit a WARNING in FO startup output but continue initialization"
+      C: "FAIL LOUD at FO startup with error: 'LOCAL.yaml op targets stage/field {stage}/{field} which does not exist in plugin README {workflow_readme_path}. Update LOCAL.yaml or escalate.'"
+      D: "Auto-remove the stale op from LOCAL.yaml and continue"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/graft/SKILL.md
+      cite_section: "LOCAL.yaml Schema / Runtime Apply Contract (FO startup)"
+      cite_contains: "FAIL LOUD"
+    expected_actual: A
+    fix_entity: 101
+    history: []
