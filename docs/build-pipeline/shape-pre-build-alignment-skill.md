@@ -817,9 +817,16 @@ None
 - [x] Commit plan artifacts on the worktree branch
   Commit: `chore(plan): shape-pre-build-alignment-skill -- plan bundle (9 tasks, 4 waves, forge TDD)`.
 
-### Task 0 evidence (reserved — Task 0 will populate during execute)
+### Task 0 evidence
 
-Task 0 will capture current file:line anchors for Lens (a), build-clarify Step 2, and README schema table before downstream tasks edit.
+**Preflight results (2026-04-15):**
+
+1. `ls skills/ | grep -x build-shape` -- PASS (empty, directory does not exist)
+2. `ls agents/ | grep -E 'build-shape-(framer|story-gen|scope-drafter).md'` -- PASS (empty, no files exist)
+3. `test -d smoke-tests` -- FAIL (directory MISSING -- Task 1 must create it)
+4. Lens (a) anchor: `skills/build-brainstorm/SKILL.md:43` -- `#### Lens (a) -- captain-stated-intent`
+5. build-clarify Step 2: `skills/build-clarify/SKILL.md:145` -- `## Step 2: Assumption Batch Confirmation`
+6. README context_status row: `docs/build-pipeline/README.md:270` -- `| \`context_status\` | enum | \`pending\`, \`exploring\`, \`awaiting-clarify\`, \`ready\`. ...`
 
 ### Dispatch Gaps
 
