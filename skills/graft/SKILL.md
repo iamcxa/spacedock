@@ -26,11 +26,11 @@ This skill lives at `skills/graft/`; namespace migration to `spacebridge:graft` 
 
 ## Design Principles
 
-1. **Build-time merge, not runtime merge.** The engine reads a single merged README. Overlays are applied at graft/upgrade time, not at workflow execution time. The engine does not know about graft.
+1. **Runtime overlay, not build-time merge.** The FO reads the workflow README directly from the plugin at startup and applies LOCAL.yaml `readme_operations` in-memory. No merged README is written to disk. The workflow dir contains only state files (manifest.yaml, LOCAL.yaml, entities, _index/, _archive/, _mods/, _docs/).
 
 2. **Tier-based skill handling.** Skills are classified into tiers that determine how they are managed:
    - **verbatim** -- no local changes needed. Reference the upstream plugin's skill directly. Zero maintenance on upgrade.
-   - **localize** -- project-specific content (CLI commands, paths, infra dependencies). Copied to target repo's `.claude/skills/` with overrides applied. 3-way merge on upgrade.
+   - **localize** -- project-specific content (CLI commands, paths, infra dependencies). Copied to target repo's `.claude/skills/` with overrides applied. Hash-based reapply on upgrade (no 3-way merge).
 
 3. **Overlay format reuses overhaul recipe ops.** LOCAL.yaml operations use the same op language as `overhaul` recipes. One op vocabulary, two triggers (overhaul: one-shot transformation, graft: persistent overlay re-applied on each upgrade).
 
@@ -507,61 +507,61 @@ Captain invokes `graft upgrade` from the target repo. Optionally specifies workf
 
 ### Step 1 -- Load current graft state
 
-1. Read `.spacedock/workflows/{name}/.origin/manifest.yaml`
-2. Extract current source version, commit SHA, tier classifications
+1. Read `.spacedock/workflows/{name}/manifest.yaml`
+2. Extract `source_plugin`, `workflow_readme_path`, tier classifications, and per-skill `source_hash` values
 3. Read current LOCAL.yaml
 
 ### Step 2 -- Locate upstream source
 
-1. Resolve source plugin path from manifest `source.plugin`
-2. Read upstream README.md and plugin.json for current version
-3. If upstream version == manifest version, report "Already up to date." and stop
-4. Read upstream skill files for all localize tier skills
+1. Resolve `source_plugin` to `{plugin_dir}` (same resolver as FO startup and Status Viewer)
+2. Read `{plugin_dir}/plugin.json` for current version
+3. Read plugin SKILL.md bytes for all localize-tier skills from `{plugin_dir}/skills/{name}/SKILL.md`
+4. Note: workflow README is managed by FO runtime (reads from plugin at startup). No upgrade action needed for README. Report: "README: managed by FO runtime; no upgrade action."
 
-### Step 3 -- Compute upstream diff
+### Step 3 -- Compute hash diff
 
-For the README and each localize tier skill:
-```bash
-git diff --no-index .origin/README.md {upstream_readme} || true
-git diff --no-index .origin/skills/{name}/SKILL.md {upstream_skill} || true
+For each localize-tier skill:
+
+```python
+current_hash = sha256(open(f"{plugin_dir}/skills/{name}/SKILL.md", "rb").read()).hexdigest()
+if current_hash == manifest_source_hash[name]:
+    status = "Unchanged"
+else:
+    status = "Changed"  # mark for reapply
 ```
 
-Categorize changes per file:
-- **Unchanged** -- no diff
-- **Changed** -- upstream has modifications
+### Rules
 
-## Phase 2: Tier-Aware Merge
+- Running `graft upgrade` twice when all hashes match is a no-op: print "All skills up to date." and exit 0. **Idempotent by design.**
+- Never invoke 3-way merge. The entire point of hash-based upgrade is to eliminate per-line conflict detection.
+- If a plugin skill file cannot be read (plugin uninstalled), stop and escalate: "Plugin {source_plugin} not found. Cannot upgrade."
 
-### Step 4 -- Process each component
+## Phase 2: Hash-Based Reapply
 
-**Verbatim skills:** No action needed. They reference the upstream plugin, which the captain updates independently (plugin update = skill update).
+### Step 4 -- Process each Changed skill
 
-**Localize skills with upstream changes:**
+**Verbatim skills:** No action needed. They reference the upstream plugin directly.
 
-For each changed localize skill:
-1. Load three versions:
-   - `old_origin`: `.origin/skills/{name}/SKILL.md` (upstream at graft/last-upgrade time)
-   - `new_origin`: current upstream `skills/{name}/SKILL.md`
-   - `local_overrides`: `LOCAL.yaml` `skill_overrides[{name}]`
-2. Compute upstream delta: diff `old_origin` vs `new_origin`
-3. Check for conflicts:
-   - For each override anchor in `local_overrides`:
-     - Does the upstream delta touch the same region?
-     - YES -> CONFLICT (captain must decide)
-     - NO -> auto-merge (apply upstream delta, then re-apply override)
-4. Also check: do all override anchors still exist in `new_origin`?
-   - Missing anchor -> STALE OVERRIDE (captain must update LOCAL.yaml)
+**Workflow README:** No action needed. FO reads from plugin at startup. No file to update.
 
-**Localize skills without upstream changes:**
-- Re-apply overrides (idempotent). No merge needed.
+**Localize skills marked Changed:**
 
-**Workflow README with upstream changes:**
-- Same 3-way logic as skills, using `readme_operations` from LOCAL.yaml.
+For each Changed skill:
+1. Read plugin SKILL.md bytes from `{plugin_dir}/skills/{name}/SKILL.md`
+2. Apply `skill_overrides[{name}]` from LOCAL.yaml (anchor-based find-replace):
+   - For each anchor: search for the exact anchor string in the plugin bytes
+   - **Found**: replace with the LOCAL.yaml `replace` value
+   - **Not found**: STALE OVERRIDE — escalate to captain: "Anchor '{anchor}' no longer exists in {plugin_dir}/skills/{name}/SKILL.md. Update LOCAL.yaml or remove the override." Do NOT write partial output.
+3. Write result to `.claude/skills/{name}/SKILL.md`
+4. Copy any new reference files from `{plugin_dir}/skills/{name}/references/` -> `.claude/skills/{name}/references/` (additive only)
+5. Update `manifest.yaml` `source_hash` for this skill: write `current_hash`
+
+**Localize skills marked Unchanged:**
+- No reapply needed. Log "Unchanged" in upgrade report.
 
 **Infrastructure changes:**
-- Check if upstream workflow-index skill changed
+- Check if upstream workflow-index skill changed (hash compare)
 - If changed: present diff, ask captain whether to update local copy
-- Check if upstream added new infra dependencies not present in manifest
 
 ### Step 5 -- Present upgrade report
 
@@ -571,38 +571,29 @@ Load `AskUserQuestion` via ToolSearch.
 ## Upgrade Report: {old_version} -> {new_version}
 
 Verbatim skills: {N} (auto-follow upstream, no action needed)
+README: managed by FO runtime (no upgrade action)
 
 Localize skills:
-  Auto-merged: {list} (upstream changes + local overrides, no conflicts)
-  Unchanged: {list}
-  CONFLICT: {list with details}
-    - build-quality: upstream changed "bun test" region
-      but LOCAL overrides "bun test" -> "pnpm test"
-      -> Keep local override? Or adopt upstream change + re-localize?
-  STALE OVERRIDE: {list}
+  Reapplied: {list} (plugin changed; LOCAL.yaml overrides reapplied cleanly)
+  Unchanged: {list} (hash match; no action taken)
+  STALE OVERRIDE: {list with details}
     - {skill}: anchor "{anchor}" no longer exists in upstream
-      -> Remove override? Or update anchor?
+      -> Remove override from LOCAL.yaml? Or update anchor text?
 
 Infrastructure:
   workflow-index: {changed|unchanged}
   New dependencies: {list or "none"}
 
-README:
-  {auto-merged | conflict details}
-
-Apply this upgrade? [y / n / review-conflicts]
+Apply this upgrade? [y / n]
 ```
 
 ### Step 6 -- Apply
 
 On captain approval:
 
-1. Update `.origin/README.md` with new upstream version
-2. Update `.origin/skills/` with new upstream skill versions
-3. Update `manifest.yaml`: version, commit_sha, grafted_at
-4. Re-apply LOCAL.yaml to produce merged README and localized skills
-5. Write all merged outputs
-6. Run post-apply validation (same as init Step 10)
+1. Write updated `.claude/skills/{name}/SKILL.md` for all Reapplied skills (already computed in Step 4)
+2. Update `manifest.yaml`: `source_hash` per skill, `source.version`, `source.commit_sha`, `local.last_applied`
+3. Run post-apply validation (same as init Step 10, excluding FO runtime dir check)
 
 ---
 
@@ -610,11 +601,11 @@ On captain approval:
 
 Modify LOCAL.yaml overrides and re-apply.
 
-1. Read current LOCAL.yaml
+1. Read current manifest.yaml and LOCAL.yaml
 2. Present current overrides to captain
 3. Captain specifies changes (add/remove/modify overrides)
 4. Update LOCAL.yaml
-5. Re-apply: regenerate merged README and localized skills from `.origin/` + updated LOCAL.yaml
+5. Re-apply: for each localize-tier skill, read plugin bytes from `{plugin_dir}/skills/{name}/SKILL.md`, apply updated LOCAL.yaml overrides (same reapply logic as upgrade Step 4), write to `.claude/skills/{name}/SKILL.md`
 6. Show diff of what changed
 7. Run post-apply validation
 
