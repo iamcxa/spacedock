@@ -792,3 +792,28 @@ None.
 
 knowledge capture: skipped -- findings overlap entity 104 observations (agent-dispatch-guide rename, plan-write-discipline stale paths); already in captain-facing record. No new D1/D2 patterns distinct from 104's capture.
 
+
+## Stage Report: quality
+
+status: passed
+base SHA: f95f0ef
+final SHA: a50fb56 (execute Stage Report commit)
+scope: project-wide mechanical verification
+
+### Checks
+
+| Check | Command | Result | Notes |
+|---|---|---|---|
+| bun test | `bun test` (worktree root) | **748 pass, 1 fail, 1850 expect() calls** across 72 files | Matches main baseline exactly. 1 failing test is `Event Pipeline Integration > POST /api/events -> WebSocket broadcast -> multiple clients receive in order` — pre-existing flake on main, unrelated to 105's markdown edits. |
+| tsc --noEmit | sub-packages | Pre-existing errors in spacebridge/src/ipc/* (same as on main) | 105 touched 0 TypeScript files. No new type errors. |
+| bun lint | N/A | No root lint script defined | Not a regression. |
+| bun build | N/A | No root build script | Sub-package builds not exercised; 105's scope is markdown-only. |
+
+### Baseline comparison
+
+Entity 105 changes: 4 markdown files (skills/build-explore/SKILL.md, 3 references/*.md) + 1 new doc (docs/build-pipeline/_docs/explore-invocation-path-audit.md) + entity body. Zero code delta. Quality result is equivalent-to-baseline: tests identical to main (748/1/1850), typecheck unchanged.
+
+### Outcome
+
+Auto-advance to review. No feedback-to.
+
