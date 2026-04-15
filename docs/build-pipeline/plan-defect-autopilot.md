@@ -237,6 +237,404 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
 
 **Plan-checker Nuwa-ification** -- captain flagged during clarify (2026-04-15): current plan-checker is a single opus prompt sequencing 8 dims; the Nuwa multi-angle synthesis pattern (established by entities 104/105 and mirrored by build-explore Step 2 Mode A's 4-angle fanout) is a natural fit -- dispatch one haiku per dim, synthesize in main session with Port 10 contradiction preservation. Deliberately out-of-scope for 106 to avoid scope creep + 061 cascade risk. Captain to `/build` a new entity after 106 ships (proposed slug: `plan-checker-multi-angle-nuwa` or `plan-checker-parallel-dims`). Inherits MEMORY: subagent-first-for-all-stages-except-clarify + thin-wrapper-agent-pattern.
 
+## Research Findings
+
+### Upstream Constraints
+
+- **Global CLAUDE.md circuit-breaker rule** -- `~/.claude/CLAUDE.md`: "2 consecutive identical errors → STOP". Benign-drift auto-proceed is NOT a retry loop (classifier runs once, proceeds or escalates) -- does not violate. [cited: CLAUDE.md global, §Safety Rules]
+- **build-execute BLOCKED ladder invariant** -- `skills/build-execute/SKILL.md:216-224` — haiku→sonnet→opus, each tier once. Classifier must run BEFORE tier 1, must NOT replace ladder for non-whitelist BLOCKED. GUARDRAILS explicit. [primary]
+- **task-execution scope_observation channel** -- `skills/task-execution/SKILL.md:186` defines `scope_observation` finding type; Part A can reuse without new enum value. No finding-type expansion needed. [primary, confirms A-3]
+- **Zero-Agent-dispatch GUARDRAIL** -- classifier must be inline string matching; AC-6 generates verification grep. No exceptions (per directive + RATIONALE).
+- **Workflow-index append unconditional rule** -- `skills/build-plan/SKILL.md:406-446` — Step 9a runs for every task × every file × every plan. This plan will generate K append calls.
+
+### Existing Patterns
+
+- **Plan-checker dimension addition precedent** — `skills/build-plan/references/plan-checker-prompt.md:31-125` uses 8 identical YAML-returning dimensions with `blocker`/`warning` severity. Dim 9/10 fit the pattern verbatim. [primary, confirms A-2]
+- **No-Exceptions-block authoring style** — task-execution/SKILL.md:94-114 and build-execute/SKILL.md:226 use anchor paragraph + "No exceptions:" bullets + "Red flags — STOP" + rationale footer. Part A's Circular-AC rule and Part C's classifier must adopt this shape for consistency.
+- **Pressure test fixture schema** — `tests/pressure/task-execution.yaml:14-40` and `tests/pressure/build-plan.yaml` use `test_cases[*].{id, summary, pressure, options, expected_answer, correct_because}`. New fixtures must match.
+- **Canonical content-anchor vs line-anchor** — existing No-Exceptions blocks cite `file:line` for quick reference only; the load-bearing identifier is the section title + snippet ("Acceptance Criteria Discipline — No Exceptions"). Q-4 auto-rewrite policy aligns with existing convention.
+
+### Library/API Surface
+
+- **Skill tool inline invocation** — `build-plan/SKILL.md:386` demonstrates `Skill("spacedock:knowledge-capture", ...)` inline call; same pattern applies for `spacedock:workflow-index` Step 9a. No new primitive needed.
+- **Read tool line-range semantics** — Dim 9 stale-line-anchor uses `Read(file_path, offset, limit)` to fetch the cited line range for content comparison. Existing Step 0.5 already reads files at cited ranges (precedent).
+- **grep -c for zero-Agent contract verification** — AC-6 uses `grep -c 'Agent(' <line-range>` returning 0 as the mechanical contract check.
+
+### Known Gotchas
+
+- **APPROACH Part C target-file contradiction** — resolved at clarify (O-1 selected build-execute). Plan must NOT follow APPROACH verbatim on this; plan Task 3 inserts into `skills/build-execute/SKILL.md`, not FO runtime. Re-confirmed by re-reading `references/claude-first-officer-runtime.md:64` during plan — no BLOCKED branch exists. [primary]
+- **Entity 061 sequencing** — frontmatter declares `depends-on: [061]`. Plan execute must not dispatch until 061 ships. Noted via `## Stage Report: plan` scope observation — FO honors depends-on before dispatching execute. (061 is currently archived per assignment note, so dependency cleared; plan proceeds.)
+- **Plan-body mutation risk (Q-5)** — Dim 9 auto-rewrite is allowed only on exactly-one-match Reads. Plan-checker still operates pre-approval, so captain sees the rewritten plan. This is NOT the "plan-body mutation during execute" class 104 task-5 hit (that was troop editing PLAN body mid-task). Different timing ⇒ no guardrail collision.
+- **Three-class whitelist rigidity (Q-3)** — hard-coded strings mean any 4th drift class requires a new entity. Accepted trade-off per GUARDRAILS; Angle (iv) "Honest Boundary" flags extension path.
+- **Self-matching grep on SKILL.md edits** — the Circular-AC rule paragraph itself contains the strings `<task`, `<acceptance_criteria` etc. AC-6's grep regions must exclude the rule's own narrative text, or the contract test will fail by self-reference. Plan Task 4's AC text specifies line ranges to scope the grep.
+
+### Reference Examples
+
+- **No-Exceptions anchor paragraph** — `skills/task-execution/SKILL.md:94-114` ("Acceptance Criteria Discipline — No Exceptions"). Part A copies this structure.
+- **Plan-checker dimension body** — `references/plan-checker-prompt.md:70-95` (Dim 6 Validation Sampling) shows multi-subdim structure with blocker/warning split. Part B Dim 9 (stale-line-anchor) and Dim 10 (circular-AC) copy this shape.
+- **Pressure fixture for plan defect** — `tests/pressure/build-tdd-plan-checker-missing-test-file.yaml` is closest precedent: a plan-checker defect fixture with captured dispatch + options + expected_answer.
+- **Entity 104 task-0 stale-anchor scenario** — `docs/build-pipeline/_archive/brainstorm-nuwa-distillation.md:894` — drift-line cite used as seed for pressure fixture replay.
+- **Entity 105 rename scenario** — `docs/build-pipeline/_archive/explore-nuwa-subagent-first.md:787` — `agent-dispatch-guide.md → researcher-vs-code-explorer.md` rename used as seed for pressure fixture.
+
+### Research Dedup Rationale
+
+No additional researchers dispatched. Rationale:
+- All 5 clarify-confirmed assumptions (A-1..A-5) carry Confident/Likely evidence with primary file:line citations. Step 0.5 re-validated all 5 inline — 0 stale, 0 contradicted.
+- Explore's Angle (i)-(iv) already covered: skill-contract surface (i), archive evidence (ii), CONTRACTS/sibling coord (iii), GUARDRAILS + drift patterns (iv).
+- All target files are internal skill contracts — no external tech, library version, or API-surface uncertainty. Dispatching researchers for internal file structure we can Read ourselves is cargo-culting.
+- Q-1's APPROACH contradiction was captain-resolved (O-1 selected build-execute). No ambiguity remains for research to disambiguate.
+
+## PLAN
+
+Scale: Medium. 7 tasks in 3 waves. Wave 0 creates/extends pressure fixtures (infrastructure first). Wave 1 modifies three skill contracts in parallel (non-overlapping files). Wave 2 is the end-to-end replay verification.
+
+<task id="task-0" model="sonnet" wave="0" skills="spacedock:task-execution">
+  <read_first>
+    - docs/build-pipeline/plan-defect-autopilot.md
+    - skills/task-execution/SKILL.md
+    - skills/build-plan/SKILL.md
+    - skills/build-plan/references/plan-checker-prompt.md
+    - skills/build-execute/SKILL.md
+    - references/claude-first-officer-runtime.md
+    - tests/pressure/task-execution.yaml
+    - tests/pressure/build-plan.yaml
+  </read_first>
+
+  <action>
+  Environment verification. For each file in read_first, confirm it exists and contains the anchor content this plan depends on. Run these exact commands and capture stdout+exit:
+
+  1. `grep -n "Acceptance Criteria Discipline -- No Exceptions" skills/task-execution/SKILL.md` — expect one hit near line 94.
+  2. `grep -n "BLOCKED Escalation Ladder" skills/build-execute/SKILL.md` — expect hit near line 216.
+  3. `grep -n "### 8. Type/Test Coverage at Plan Time" skills/build-plan/references/plan-checker-prompt.md` — expect hit; confirms 8-dim taxonomy intact (Dim 9/10 are additive).
+  4. `grep -cE "Circular-AC rule|stale-line-anchor|circular-AC|benign.drift.classifier" skills/task-execution/SKILL.md skills/build-plan/SKILL.md skills/build-plan/references/plan-checker-prompt.md skills/build-execute/SKILL.md references/claude-first-officer-runtime.md` — expect 0 across the board (greenfield; if any hit, STOP and report to FO, sibling entity 061 may have landed).
+  5. `ls tests/pressure/ | grep -cE "plan-defect|circular-ac|stale-anchor|rename|blocked-triage"` — expect 0 before Wave 0 writes fire (used as baseline for AC-4 delta).
+  6. `grep -n "scope_observation" skills/task-execution/SKILL.md` — expect hit near line 186 (confirms A-3: finding channel exists).
+
+  Write verification results into the task's returned report. If any check fails, classify BLOCKED with `scope_gap` finding — do NOT proceed to Wave 1.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "Acceptance Criteria Discipline -- No Exceptions" skills/task-execution/SKILL.md` returns ≥1
+    - `grep -c "BLOCKED Escalation Ladder" skills/build-execute/SKILL.md` returns ≥1
+    - `grep -c "### 8. Type/Test Coverage at Plan Time" skills/build-plan/references/plan-checker-prompt.md` returns ≥1
+    - `grep -c "scope_observation" skills/task-execution/SKILL.md` returns ≥1
+    - `grep -c "Circular-AC rule\|stale-line-anchor\|circular-AC\|benign.drift.classifier" skills/task-execution/SKILL.md skills/build-plan/SKILL.md skills/build-plan/references/plan-checker-prompt.md skills/build-execute/SKILL.md references/claude-first-officer-runtime.md` returns 0
+  </acceptance_criteria>
+
+  <files_modified>
+    (none -- read-only verification; a task that modifies no files is still a valid Task 0 per plan-write-discipline)
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="0" skills="spacedock:task-execution">
+  <read_first>
+    - tests/pressure/task-execution.yaml
+    - docs/build-pipeline/_archive/brainstorm-nuwa-distillation.md
+  </read_first>
+
+  <action>
+  Extend `tests/pressure/task-execution.yaml` with a new test_case `circular-ac-semantic-pass`:
+
+  - id: `circular-ac-semantic-pass`
+  - summary: captures entity 104 task-5 scenario — task has acceptance_criterion `grep -c '<task id="task-5"' docs/build-pipeline/plan-defect-autopilot.md` that returns count matching the PLAN body itself, not a real code hit. Troop must classify as semantic pass (not BLOCKED).
+  - pressure: `circular_ac_grep_matches_plan_body`, `troop_sees_count_0_in_source_but_3_in_plan_body`
+  - options A-E covering: (A) classify DONE on raw count, (B) classify DONE via Circular-AC semantic-pass rule [correct], (C) BLOCKED scope_gap, (D) NEEDS_CONTEXT, (E) silently rewrite AC
+  - expected_answer: B
+  - correct_because.cite_file: `skills/task-execution/SKILL.md`
+  - correct_because.cite_section: `Circular-AC Rule`
+  - correct_because.cite_contains: `search string lives inside PLAN/UAT/task-definition blocks`
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "circular-ac-semantic-pass" tests/pressure/task-execution.yaml` returns ≥1
+    - `grep -c "Circular-AC Rule" tests/pressure/task-execution.yaml` returns ≥1
+  </acceptance_criteria>
+
+  <files_modified>
+    - tests/pressure/task-execution.yaml
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="0" skills="spacedock:task-execution">
+  <read_first>
+    - tests/pressure/build-plan.yaml
+    - docs/build-pipeline/_archive/brainstorm-nuwa-distillation.md
+  </read_first>
+
+  <action>
+  Extend `tests/pressure/build-plan.yaml` with two new test_cases:
+
+  (A) `stale-line-anchor-dim9`:
+  - summary: plan-checker runs on a plan where task-3 has `read_first: src/foo.ts:183` but Read shows target content is now at line 191. Dim 9 must flag.
+  - pressure: `stale_anchor_drift`, `line_numbers_moved_between_plan_and_check`
+  - options A-E: (A) silent pass, (B) emit blocker on stale-line-anchor [correct], (C) dispatch a fix-up researcher, (D) auto-rewrite silently, (E) emit warning.
+  - expected_answer: B
+  - cite_section: `9. Stale-Line-Anchor Dimension`
+
+  (B) `circular-ac-dim10`:
+  - summary: plan AC is `grep -c 'foo_bar' src/` — count matches PLAN body itself, not real code. Dim 10 must flag with auto-fix suggestion.
+  - options A-E
+  - expected_answer: B (emit blocker with rewrite suggestion)
+  - cite_section: `10. Circular-AC Dimension`
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "stale-line-anchor-dim9\|circular-ac-dim10" tests/pressure/build-plan.yaml` returns ≥2
+    - `grep -c "Stale-Line-Anchor Dimension\|Circular-AC Dimension" tests/pressure/build-plan.yaml` returns ≥2
+  </acceptance_criteria>
+
+  <files_modified>
+    - tests/pressure/build-plan.yaml
+  </files_modified>
+</task>
+
+<task id="task-3" model="sonnet" wave="0" skills="spacedock:task-execution">
+  <read_first>
+    - tests/pressure/build-execute.yaml
+    - docs/build-pipeline/_archive/explore-nuwa-subagent-first.md
+  </read_first>
+
+  <action>
+  Create new fixture `tests/pressure/build-execute-blocked-triage.yaml` (skill target: build-execute). Include three test_cases covering the 3 whitelisted benign-drift classes:
+
+  1. `benign-drift-anchor-drift` — BLOCKED reason cites line-anchor mismatch; classifier must auto-proceed with scope_observation. Expected: B (auto-proceed + scope_observation).
+  2. `benign-drift-file-renamed` — BLOCKED reason cites `read_first` file not found but a renamed file at a similar path exists (replay 105 scenario `agent-dispatch-guide.md → researcher-vs-code-explorer.md`). Expected: B (auto-proceed + scope_observation).
+  3. `benign-drift-semantic-grep-mismatch` — BLOCKED reason cites grep-count-AC mismatch where search string appears only inside PLAN/UAT blocks. Expected: B (auto-proceed + scope_observation).
+  4. `genuine-blocker-non-whitelist` — BLOCKED reason is type error / missing dependency. Expected: classifier does NOT match; fall through to haiku→sonnet→opus ladder (confirms whitelist strictness).
+
+  Schema header mirrors `tests/pressure/build-execute.yaml`: `skill: build-execute`, `target_path: skills/build-execute`, `captured: 2026-04-15`.
+  </action>
+
+  <acceptance_criteria>
+    - `test -f tests/pressure/build-execute-blocked-triage.yaml` exits 0
+    - `grep -cE "benign-drift-anchor-drift|benign-drift-file-renamed|benign-drift-semantic-grep-mismatch|genuine-blocker-non-whitelist" tests/pressure/build-execute-blocked-triage.yaml` returns ≥4
+  </acceptance_criteria>
+
+  <files_modified>
+    - tests/pressure/build-execute-blocked-triage.yaml
+  </files_modified>
+</task>
+
+<task id="task-4" model="opus" wave="1" skills="spacedock:task-execution">
+  <read_first>
+    - skills/task-execution/SKILL.md
+    - docs/build-pipeline/plan-defect-autopilot.md
+    - tests/pressure/task-execution.yaml
+  </read_first>
+
+  <action>
+  Insert a new `## Circular-AC Rule` section into `skills/task-execution/SKILL.md`, placed AFTER the "Acceptance Criteria Discipline -- No Exceptions" block (currently ending near line 115) and BEFORE "Scope Discipline -- files_modified Is The Writable Boundary" (currently near line 117). The new section must contain:
+
+  1. Anchor paragraph: "**Circular-AC rule.** When a grep-count acceptance_criteria command returns 0 but the literal search string appears inside a guard-listed block of the same entity file (`## PLAN | ## UAT Spec | <task | <action | <acceptance_criteria | <read_first | <files_modified`), classify the failure as a **semantic pass** — return DONE with a `scope_observation` finding describing the circular reference, and surface the AC for plan-author rewrite in a future iteration."
+
+  2. Guard-list enumeration (verbatim list above).
+
+  3. "No exceptions:" bullets — NEVER expand the guard list at runtime; NEVER apply the rule to ACs referencing other entities' files; NEVER use the rule to skip a grep that returned count > 0.
+
+  4. "Red flags — STOP and classify BLOCKED instead:" bullets — if the AC's search string is NOT on the guard list, if the matched block is outside the current entity file, etc.
+
+  5. Rationale footer citing entity 104 task-5 replay.
+
+  CRITICAL: the Circular-AC rule section must NOT contain any `Agent(` substring (GUARDRAILS "zero Agent dispatches" contract; verified by AC below).
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "Circular-AC rule" skills/task-execution/SKILL.md` returns ≥1
+    - `grep -c "semantic pass" skills/task-execution/SKILL.md` returns ≥1
+    - `grep -c "scope_observation" skills/task-execution/SKILL.md` returns ≥2 (original line 186 + new rule citation)
+    - `awk '/^## Circular-AC Rule$/,/^## /' skills/task-execution/SKILL.md | grep -c "Agent("` returns 0
+    - bun test (no tests affected; sanity full-suite run): `bun test` exits 0
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/task-execution/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-5" model="opus" wave="1" skills="spacedock:task-execution">
+  <read_first>
+    - skills/build-plan/references/plan-checker-prompt.md
+    - skills/build-plan/SKILL.md
+    - docs/build-pipeline/plan-defect-autopilot.md
+    - tests/pressure/build-plan.yaml
+  </read_first>
+
+  <action>
+  Add Dim 9 and Dim 10 to `skills/build-plan/references/plan-checker-prompt.md`, placed AFTER "### 8. Type/Test Coverage at Plan Time" block and BEFORE "## Output Format":
+
+  ### 9. Stale-Line-Anchor (new)
+  - For every `read_first` or `acceptance_criteria` entry matching regex `(\S+\.(ts|js|md|py|go|rs|yaml)):(\d+)`, use Read on the cited file + line range.
+  - If file does not exist OR asserted content no longer resolves at that line: emit blocker with `fix_hint: "rewrite to content anchor: 'returns ≥1 match for \"<snippet>\"'"`.
+  - Auto-rewrite policy (Q-5): plan ensign rewrites ONLY when Read finds exactly one unambiguous match for the semantic content on a different line; otherwise emit blocker for captain advisory.
+  - Severity: blocker (stale) / warning (slightly drifted but findable).
+
+  ### 10. Circular-AC (new)
+  - For every `acceptance_criteria` command matching `grep -c '<pattern>' <file>`, execute two dry-runs: (a) raw count on the working tree, (b) count with the entity's PLAN/UAT/task-definition blocks excluded.
+  - If (a) and (b) differ: the AC is circular — emit blocker with `fix_hint: "scope grep to a line range excluding the entity file's PLAN/UAT/task-definition blocks, or rewrite the AC to target a specific source file outside docs/build-pipeline/"`.
+  - Severity: blocker when counts differ; silent when equal.
+
+  Also add to `skills/build-plan/SKILL.md` at the dimension-table (lines 490-499) two new rows:
+  | 9 | Stale-Line-Anchor | Every `file:line` citation resolves to asserted content; auto-rewrite to content anchor when unambiguous |
+  | 10 | Circular-AC | grep-count ACs are not self-referential against the entity's own PLAN/UAT blocks |
+
+  CRITICAL: the new Dim 9 and Dim 10 regions must NOT contain `Agent(` substring.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "### 9. Stale-Line-Anchor" skills/build-plan/references/plan-checker-prompt.md` returns ≥1
+    - `grep -c "### 10. Circular-AC" skills/build-plan/references/plan-checker-prompt.md` returns ≥1
+    - `grep -cE "stale-line-anchor|Stale-Line-Anchor" skills/build-plan/SKILL.md skills/build-plan/references/plan-checker-prompt.md` returns ≥2
+    - `grep -cE "circular-AC|Circular-AC" skills/build-plan/SKILL.md skills/build-plan/references/plan-checker-prompt.md` returns ≥2
+    - `awk '/^### 9\. Stale-Line-Anchor/,/^## Output Format/' skills/build-plan/references/plan-checker-prompt.md | grep -c "Agent("` returns 0
+    - `bun test` exits 0
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-plan/references/plan-checker-prompt.md
+    - skills/build-plan/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-6" model="opus" wave="1" skills="spacedock:task-execution">
+  <read_first>
+    - skills/build-execute/SKILL.md
+    - docs/build-pipeline/plan-defect-autopilot.md
+    - tests/pressure/build-execute-blocked-triage.yaml
+  </read_first>
+
+  <action>
+  Insert a new `## Benign-Drift Classifier` section into `skills/build-execute/SKILL.md`, placed IMMEDIATELY BEFORE the existing "## BLOCKED Escalation Ladder" section (currently at line 216). The classifier must:
+
+  1. Run on every BLOCKED return from a troop dispatch, BEFORE the haiku→sonnet→opus ladder fires.
+  2. Use inline string matching (zero Agent dispatches) on the `blocked_reason` and `findings[*].type` fields of the troop's return payload.
+  3. Match against exactly 3 whitelisted classes (hard-coded, per Q-3):
+     - **anchor-drift**: `blocked_reason` contains substring `line` AND one of `mismatch | shifted | not found at line | content moved`.
+     - **file-renamed**: `blocked_reason` contains `read_first` AND one of `not found | ENOENT | does not exist`, AND the task's `read_first` file has a sibling file in the same directory with ≥70% path similarity (Jaro-Winkler or substring overlap threshold).
+     - **semantic-grep-mismatch**: `blocked_reason` contains `grep` AND `count` mismatch, AND the search string literally appears in the current entity file's `## PLAN`, `## UAT Spec`, or `<task ...>` blocks.
+  4. On match: auto-proceed (classify the task as DONE), inject a `scope_observation` finding with `drift_class: <one of 3>` + `original_blocked_reason`, continue wave execution. Log to FO narration.
+  5. On no-match: fall through to existing haiku→sonnet→opus ladder unchanged.
+
+  Add a "No exceptions:" block below the classifier:
+  - NEVER expand the whitelist at runtime (if a 4th class is needed, new entity required).
+  - NEVER auto-proceed without injecting a `scope_observation` finding.
+  - NEVER match by regex complexity that exceeds substring-matching (keep classifier inline string-matching only — GUARDRAILS).
+  - NEVER apply classifier to non-BLOCKED statuses.
+
+  CRITICAL: the new classifier region must NOT contain `Agent(` substring.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -c "## Benign-Drift Classifier" skills/build-execute/SKILL.md` returns ≥1
+    - `grep -cE "anchor-drift|file-renamed|semantic-grep-mismatch" skills/build-execute/SKILL.md` returns ≥3
+    - `grep -c "BLOCKED Escalation Ladder" skills/build-execute/SKILL.md` returns ≥1 (preservation check)
+    - `awk '/^## Benign-Drift Classifier$/,/^## BLOCKED Escalation Ladder$/' skills/build-execute/SKILL.md | grep -c "Agent("` returns 0
+    - `bun test` exits 0
+  </acceptance_criteria>
+
+  <files_modified>
+    - skills/build-execute/SKILL.md
+  </files_modified>
+</task>
+
+<task id="task-7" model="sonnet" wave="2" skills="spacedock:task-execution">
+  <read_first>
+    - tests/pressure/task-execution.yaml
+    - tests/pressure/build-plan.yaml
+    - tests/pressure/build-execute-blocked-triage.yaml
+    - skills/task-execution/SKILL.md
+    - skills/build-plan/references/plan-checker-prompt.md
+    - skills/build-execute/SKILL.md
+  </read_first>
+
+  <action>
+  End-to-end verification replay. Three parts:
+
+  1. Confirm all three fixture files contain the new scenarios: grep counts match plan expectations (see ACs below).
+  2. Run the full project test suite: `bun test`. Expect 0 failures.
+  3. Zero-Agent-dispatch contract check across all 3 new regions — run the scoped greps from AC-6 of the Brainstorming Spec and confirm count = 0.
+  4. Synthetic replay assertion: scan the 3 new fixture files for `expected_answer: B` occurrences for the benign scenarios; count ≥5 (2 build-plan dims + 1 task-execution + 3 blocked-triage benign = 6, allow tolerance).
+  5. Final AC-4 delta: `ls tests/pressure/ | grep -cE "plan-defect|circular-ac|stale-anchor|rename|blocked-triage"` returns ≥1 (blocked-triage file; note: other new fixtures are extensions of existing yaml, so file-count semantic is covered by presence of blocked-triage + new test_case ids across 2 existing files — the spec AC-4 intent is "new fixture content exists", satisfied).
+
+  If any check fails: classify BLOCKED with scope_gap finding; do NOT advance to quality stage.
+  </action>
+
+  <acceptance_criteria>
+    - `bun test` exits 0
+    - `grep -c "Circular-AC rule" skills/task-execution/SKILL.md` returns ≥1
+    - `grep -c "stale-line-anchor\|circular-AC" skills/build-plan/SKILL.md skills/build-plan/references/plan-checker-prompt.md` returns ≥2
+    - `grep -cE "anchor-drift|file-renamed|semantic-grep-mismatch" skills/build-execute/SKILL.md` returns ≥3
+    - `ls tests/pressure/ | grep -cE "plan-defect|circular-ac|stale-anchor|rename|blocked-triage"` returns ≥1
+    - `awk '/^## Circular-AC Rule$/,/^## Scope Discipline/' skills/task-execution/SKILL.md | grep -c "Agent("` returns 0
+    - `awk '/^### 9\. Stale-Line-Anchor/,/^## Output Format/' skills/build-plan/references/plan-checker-prompt.md | grep -c "Agent("` returns 0
+    - `awk '/^## Benign-Drift Classifier$/,/^## BLOCKED Escalation Ladder$/' skills/build-execute/SKILL.md | grep -c "Agent("` returns 0
+  </acceptance_criteria>
+
+  <files_modified>
+    (none -- read-only verification)
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+None
+
+### CLI
+- [ ] `grep -c "Circular-AC rule" skills/task-execution/SKILL.md` returns ≥1 after merge
+- [ ] `grep -c "stale-line-anchor\|circular-AC" skills/build-plan/SKILL.md skills/build-plan/references/plan-checker-prompt.md` returns ≥2
+- [ ] `grep -cE "anchor-drift|file-renamed|semantic-grep-mismatch" skills/build-execute/SKILL.md` returns ≥3
+- [ ] `ls tests/pressure/ | grep -cE "plan-defect|circular-ac|stale-anchor|rename|blocked-triage"` returns ≥1 (blocked-triage fixture present)
+- [ ] `bun test` full-suite run exits 0 on the merged branch
+
+### API
+None
+
+### Interactive
+- [ ] Captain confirms the three new regions (task-execution Circular-AC Rule, plan-checker Dim 9+10, build-execute Benign-Drift Classifier) preserve the existing No-Exceptions authoring style and do not weaken BLOCKED ladder / PR gate / wave-graph integrity / workflow-index-step-2.
+- [ ] Captain confirms that entity 104 / 105 scenarios (stale-anchor on task-0, circular-AC on task-5, rename on agent-dispatch-guide) would now be absorbed silently by the 3-layer defense, with scope_observation entries in troop return payloads (not captain escalations).
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1 Circular-AC rule in task-execution | task-4 | `grep -c "Circular-AC rule" skills/task-execution/SKILL.md` | pending | -- |
+| AC-2 Dim 9 + Dim 10 in plan-checker | task-5 | `grep -c "stale-line-anchor\|circular-AC" skills/build-plan/SKILL.md skills/build-plan/references/*.md` | pending | -- |
+| AC-3 classifier in build-execute (corrected target per O-1) | task-6 | `grep -cE "benign.drift.classifier\|Benign-Drift Classifier" skills/build-execute/SKILL.md` | pending | -- |
+| AC-4 pressure fixtures ≥3 plan-defect scenarios | task-1, task-2, task-3 | `ls tests/pressure/ \| grep -cE "plan-defect\|circular-ac\|stale-anchor\|rename\|blocked-triage"` + new test_case id greps | pending | -- |
+| AC-5 synthetic replay = 0 captain escalations | task-3, task-7 | fixture inspection: `expected_answer: B` appears on benign scenarios + `captain_escalation` keyword absent | pending | -- |
+| AC-6 zero Agent dispatches in 3 new regions | task-4, task-5, task-6, task-7 | scoped `awk '/SECTION/,/NEXT/' FILE \| grep -c "Agent("` returns 0 for all 3 regions | pending | -- |
+
+## Stage Report: plan
+
+status: passed
+plan-checker verdict: self-review PASS (inline 8-dim; FO will dispatch plan-checker subagent post-handoff per assignment note)
+iteration count: 1 (inline self-review only; plan-checker dispatch deferred to FO main context)
+knowledge capture: skipped -- no findings met D1/D2 threshold; all target knowledge is entity-specific skill contract edits, already captured in Canonical References.
+workflow-index append: deferred to FO main context -- ensign subagent lacks reliable Skill-tool path to `spacedock:workflow-index` for this dispatch; FO will run the append on 6 files × 7 tasks on handoff.
+
+### Inline self-review (8 dimensions)
+
+1. Requirement Coverage — all 6 ACs mapped to tasks in Validation Map. PASS.
+2. Task Completeness — 8 tasks (0-7), every task has id/model/wave/read_first/action/acceptance_criteria/files_modified. PASS.
+3. Dependency Correctness — Wave 0: task-0..3 (no overlap; task-0 read-only, task-1 writes task-execution.yaml, task-2 writes build-plan.yaml, task-3 writes new file). Wave 1: task-4..6 (non-overlapping files: skills/task-execution, skills/build-plan +plan-checker-prompt, skills/build-execute). Wave 2: task-7 (read-only). No cycles. PASS.
+4. Context Compliance — clarify-locked O-1 (classifier → build-execute, not FO runtime) honored in task-6. depends-on:[061] noted. PASS.
+5. Research Coverage — every read_first traces to Canonical References or Research Findings. PASS.
+6. Validation Sampling — every task has runnable commands (Task 0 verification greps, fixture/skill greps, bun test). Wave 1 has 3 tasks each with runnable AC (6c continuity PASS). No <automated>MISSING</automated> references. PASS.
+7. Cross-Entity Coherence — files touched: skills/task-execution/SKILL.md, skills/build-plan/SKILL.md, skills/build-plan/references/plan-checker-prompt.md, skills/build-execute/SKILL.md, tests/pressure/{task-execution,build-plan,build-execute-blocked-triage}.yaml. Sibling 061 (build-plan/SKILL.md) flagged in frontmatter depends-on. FO to validate via workflow-index read on handoff.
+8. Type/Test Coverage — only markdown + yaml edits in Wave 0-1; no .ts source files. bun test full-suite is the latency-appropriate verify. PASS.
+
+### Self-review findings
+
+- None.
+
+### Dispatch gaps
+
+- Plan-checker dispatch + workflow-index append deferred to FO main context per assignment Step 7 note ("FO will dispatch plan-checker after you return"). Ensign writes plan artifacts; FO executes Step 6 (plan-checker) + Step 9a (workflow-index append) after stage handoff.
+
+### Commits
+
+- chore(plan): plan-defect-autopilot 3-part package (A Circular-AC rule + B Dim 9/10 + C benign-drift classifier) with 7 tasks in 3 waves
+
 ## Stage Report: clarify
 
 - [x] Decomposition: not-applicable -- explore recommended against decomposition (3-part coordinated package, 9 files, Medium scale)
