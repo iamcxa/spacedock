@@ -59,7 +59,7 @@ EXIT. Do NOT mutate any of the five locked body sections on a validated entity.
 Apply the heuristic from `references/output-format.md` (Escape Hatch section) to the raw directive. The heuristic fires when ALL of:
 
 - Directive is a single sentence under ~80 characters AND
-- Directive matches a small-directive pattern: `fix {noun} in {file}` / `bump {dep} to {version}` / `rename {X} to {Y}` / starts with bugfix keywords (`fix typo`, `fix bug`, `bump`, `rename`).
+- Directive matches a small-directive pattern using escape-hatch keywords (whole word, case-insensitive): `fix`, `typo`, `rename`, `bump`, `patch`, `bugfix`, `hotfix`. Usage rule: directive length < 80 chars AND contains any keyword as a whole word (e.g. `fix {noun} in {file}` / `bump {dep} to {version}` / `rename {X} to {Y}` / starts with `bugfix`, `hotfix`, `patch`).
 
 Captain may also pass an explicit `--force-shape` override flag to bypass the escape hatch (rare; useful for small directives that nonetheless deserve product alignment).
 
@@ -97,7 +97,7 @@ Do NOT pre-populate any of the five locked body sections in this step.
 Dispatch the framer wrapper subagent:
 
 ```
-Agent(subagent_type="build-shape-framer", prompt="Directive: {raw directive}\n\nProduce 2-3 candidate problem statements per output-format.md section ## Problem Statement. Each candidate is a 3-6 sentence cohesive paragraph describing the gap, who experiences it, and why it matters now. Do NOT include solution language.")
+Agent(subagent_type="spacedock:build-shape-framer", prompt="Directive: {raw directive}\n\nProduce 2-3 candidate problem statements per output-format.md section ## Problem Statement. Each candidate is a 3-6 sentence cohesive paragraph describing the gap, who experiences it, and why it matters now. Do NOT include solution language.")
 ```
 
 Receive 2-3 candidates. Present to captain via AskUserQuestion:
@@ -114,7 +114,7 @@ If captain selects "revise inline", loop with framer using captain's edit notes 
 Dispatch the story-gen wrapper subagent:
 
 ```
-Agent(subagent_type="build-shape-story-gen", prompt="Accepted problem statement:\n{accepted statement}\n\nProduce 3-5 user stories in the literal 'As a {role}, I want {action}, so that {value}' format, numbered US-1 through US-n. No paragraph rewrites. No 'The system should' format. Reference output-format.md for the contract.")
+Agent(subagent_type="spacedock:build-shape-story-gen", prompt="Accepted problem statement:\n{accepted statement}\n\nProduce 3-5 user stories in the literal 'As a {role}, I want {action}, so that {value}' format, numbered US-1 through US-n. No paragraph rewrites. No 'The system should' format. Reference output-format.md for the contract.")
 ```
 
 Receive 3-5 stories. For each story, present via AskUserQuestion:
@@ -131,7 +131,7 @@ Loop until captain has confirmed/edited/dropped each candidate. Final accepted s
 Dispatch the scope-drafter wrapper subagent:
 
 ```
-Agent(subagent_type="build-shape-scope-drafter", prompt="Accepted frame:\n{problem statement}\n\nAccepted user stories:\n{user stories}\n\nProduce two bulleted lists: ## Scope: In (concrete deliverables / behavioral guarantees, each bullet specific enough to verify) and ## Scope: Out (explicit exclusions, optional WHY in parenthetical). Reference output-format.md sections.")
+Agent(subagent_type="spacedock:build-shape-scope-drafter", prompt="Accepted frame:\n{problem statement}\n\nAccepted user stories:\n{user stories}\n\nProduce two bulleted lists: ## Scope: In (concrete deliverables / behavioral guarantees, each bullet specific enough to verify) and ## Scope: Out (explicit exclusions, optional WHY in parenthetical). Reference output-format.md sections.")
 ```
 
 Receive proposed In/Out lists. Present each list via AskUserQuestion:

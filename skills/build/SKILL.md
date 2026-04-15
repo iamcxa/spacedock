@@ -48,7 +48,7 @@ When `--from {slug}` is present:
 
 4. **Load shape sections**: extract `## Problem Statement`, `## User Stories`, `## Scope: In`, `## Scope: Out`, and `## References` from the entity body verbatim. Pass them as the `{shape block}` in the build-brainstorm Lens (a) prompt template (Input materials: shape sections field).
 
-5. **Proceed to Phase II**: invoke `Skill: "spacedock:build-brainstorm"` with the shape sections injected. The directive is derived from the entity's `## Problem Statement` (the captain's original pitch). No free-text directive is accepted alongside `--from`.
+5. **Proceed to Phase II**: invoke `Skill: "spacedock:build-brainstorm"` with the shape sections injected. The directive is derived from the entity's `## Captain Context Snapshot` (the raw directive verbatim). No free-text directive is accepted alongside `--from`.
 
 ---
 

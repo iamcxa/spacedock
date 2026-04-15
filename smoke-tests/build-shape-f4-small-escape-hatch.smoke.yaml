@@ -6,3 +6,13 @@ assertions:
   - contains: "/build"
   - not_contains: "## Problem Statement"
   - not_contains: "## User Stories"
+
+---
+# P-4 mutex: --from with extra directive text must be refused
+skill: build-shape
+trigger: "--from add-dark-mode-toggle extra directive text here"
+timeout: 60
+assertions:
+  - contains: "no supplemental directive text allowed"
+  - not_contains: "## Problem Statement"
+  - not_contains: "shape unnecessary"
