@@ -12,17 +12,40 @@ Three-track system for classifying gray areas discovered during codebase explora
 
 **When to use:** The codebase already has precedent for this pattern. Build-explore found existing code that answers the gray area.
 
-### Heuristic
+### Heuristic -- Triple-Gate Promotion
 
-| Signal | Confidence Level | Numeric Range |
+A candidate assumption is promoted to Track A only by passing one or more of three gates. The number of gates passed determines the confidence band. Soft "2+ consistent usages" is NOT sufficient on its own -- a claim supported by 2 files in the same layer with generic wording fails all three gates and must demote to Track C.
+
+**Gate (i) -- cross-layer recurrence.** Evidence appears across >=2 distinct layers chosen from: domain, contract, router, view, seed, frontend, test, config. Two files inside the same layer do NOT pass this gate -- the recurrence must cross a layer boundary to demonstrate that the pattern is a codebase-wide convention rather than a local idiom.
+
+**Gate (ii) -- predictive power.** The assumption predicts a plan/execute output rather than describing current state. Operational definition (inherited from sibling 104 Q-3): the claim contains a concrete action verb (add, extend, wire, register, serialize, migrate, etc.) AND a file-or-layer name that is NOT already mentioned in the entity's `## Directive`. A claim that only restates the directive's existing nouns has zero predictive power and fails this gate.
+
+**Gate (iii) -- exclusivity.** The assumption is NOT a generic template match that would apply equally to an arbitrary sibling entity. Replace the subject of the claim with a sibling entity slug; if the claim remains plausibly true, it is template boilerplate and fails this gate. Exclusivity means the claim carries information specific to THIS entity's directive + codebase pairing.
+
+### Promotion Mapping
+
+| Gates passed | Classification | Numeric Range |
 |---|---|---|
-| 2+ consistent usages of the same pattern | Confident | 0.80 - 1.0 |
-| 1 usage, clear fit for the current context | Likely | 0.50 - 0.79 |
-| 1 usage, unclear whether it applies here | Unclear | 0.20 - 0.49 |
+| 3-pass (i + ii + iii) | Track A -- Confident | 0.80 - 1.0 |
+| 2-pass (any two of i/ii/iii) | Track A -- Likely | 0.50 - 0.79 |
+| 1-pass (any one of i/ii/iii) | Track A -- Unclear | 0.20 - 0.49 |
+| 0-pass (none) | demote to Track C Open Question |
 
-The numeric score (0-1) is written alongside the label in the entity body: `Confidence: Confident (0.95)`. This gives the captain a quantitative signal for how much risk each assumption carries. Explore assigns the score based on: number of supporting usages, recency of evidence, and fit between the precedent's context and the current entity's context.
+The numeric score (0-1) is written alongside the label in the entity body: `Confidence: Confident (0.95)`. Explore assigns the score within the band using: recency of evidence, strength of the layer crossing in Gate (i), and specificity of the action verb in Gate (ii).
 
-If confidence is "Unclear," consider whether this is actually a Track B (competing patterns) or Track C (needs captain judgment).
+A 0-pass candidate is NOT an assumption at any confidence -- it must **demote to Track C** as an Open Question for the captain, because the codebase evidence does not distinguish this entity from any other.
+
+### Mode B skip rule (ensign fallback)
+
+When build-explore runs in **Mode B** (ensign fallback, no pre-dispatched code-explorer; see SKILL.md Step 2), the 4-way cross-layer evidence required by Gate (i) is not reliably available -- the inline mapping pass typically covers one or two layers at most. In **Mode B**, Gate (i) is SKIPPED; gates (ii) and (iii) still run inline against the files read. Consequently the maximum achievable in **Mode B** is 2-pass = Likely. A Mode B explore cannot produce a Confident Track A assumption -- Confident requires Mode A (code-explorer dispatched, multi-layer evidence). Record `(mode: B)` on the Confidence line when this cap applies.
+
+### Gate operational tests -- worked examples
+
+**Gate (i) example.** Claim: "Serialize new mutations through the existing dispatch envelope." Evidence cites `src/domain/snapshot.ts:112` AND `src/contract/channel.ts:44`. Two distinct layers (domain + contract) -- **passes Gate (i)**. Counter-example: evidence cites `src/domain/snapshot.ts:112` and `src/domain/comment.ts:30` -- both in domain layer, same-layer recurrence -- **fails Gate (i)**.
+
+**Gate (ii) example.** Directive: "Add idle-timeout to the tunnel server." Claim: "Extend `tunnel-server.ts` handshake handler to emit an `idleDeadline` field." Action verb `extend` + file `tunnel-server.ts` NOT in directive's noun set (directive names "tunnel server" as a concept, not the specific file) + concrete new field `idleDeadline` -- **passes Gate (ii)**. Counter-example: "The tunnel server will have idle-timeout behavior." No action verb, no file name beyond the directive's nouns, describes state not output -- **fails Gate (ii)**.
+
+**Gate (iii) example.** Claim: "Wire `SnapshotVersion` through `autoResolveComments` before the WS push to avoid stub-consumer regression." Replacing the subject with a sibling entity (e.g. entity 104's "idle-timeout") produces gibberish -- the claim is load-bearing on this entity's specific autoResolveComments coupling -- **passes Gate (iii)**. Counter-example: "Keep the existing middleware chain for new endpoints." Swap to any sibling entity that adds an endpoint and the claim remains plausibly true -- **fails Gate (iii)** as generic template match.
 
 ### Format
 
@@ -153,9 +176,9 @@ One-at-a-time AskUserQuestion or freeform input. Each open question is presented
 
 When assessing a gray area:
 
-1. **Search the codebase** for existing patterns related to the gray area.
-2. **Found 2+ consistent usages?** --> Track A (Confident).
-3. **Found 1 usage?** --> Track A (Likely or Unclear depending on fit).
+1. **Search the codebase** for existing patterns related to the gray area, then phrase the candidate as a declarative claim suitable for the triple-gate test.
+2. **Run all 3 gates** against the candidate: (i) cross-layer recurrence, (ii) predictive power, (iii) exclusivity. In **Mode B** (ensign fallback), Gate (i) is SKIPPED per the Mode B skip rule; run only (ii) and (iii).
+3. **Count passes and apply the Promotion Mapping**: 3-pass = Track A Confident (0.80-1.0); 2-pass = Track A Likely (0.50-0.79); 1-pass = Track A Unclear (0.20-0.49); 0-pass = **demote to Track C** Open Question. Mode B caps at 2-pass = Likely.
 4. **Found competing patterns?** --> Track B.
 5. **Found nothing, but standard domain options exist?** --> Track B.
 6. **Found nothing, no standard options?** --> Track C.

@@ -79,37 +79,39 @@ Failure to load invariants causes explore to recommend options that conflict wit
 
 Based on APPROACH, identify the mapping topic (keywords, scope anchors, layer hints from the Domain line in Captain Context Snapshot).
 
-See `docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md` for dispatch ownership and `references/agent-dispatch-guide.md` for tool surface constraints.
+See `docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md` for dispatch ownership and `references/researcher-vs-code-explorer.md` for tool surface constraints. Angle definitions and the §5 seed-pattern table live in `references/parallel-explorer-angles.md` -- Step 2's dispatch contract cites that file directly.
 
 ### Two execution modes
 
-**Mode A -- SO-direct or FO-pre-dispatched (has code-explorer results):**
-When SO runs explore (the default owner per SO/FO split), SO has Agent tool and dispatches `spacedock:code-explorer` directly. When FO runs explore for Large entities, FO dispatches code-explorer before invoking the ensign. In both cases, the code-explorer results are either:
-- Already in your context (SO-direct mode: you dispatched and received the return), or
-- Written to the entity file by FO-dispatched explorer teammates
+**Mode A -- SO-direct / main-session 4-angle parallel fanout (has Agent tool):**
+When SO runs explore (the default owner per SO/FO split) or any main-session invocation with Agent tool available, Step 2 fans out to **4 parallel fresh-context `spacedock:code-explorer` subagents**, one per angle defined in `references/parallel-explorer-angles.md`:
 
-Read the code-explorer output and consume it in Step 3 onward.
+- Angle (i) **prevailing-patterns** -- dominant existing pattern within target scope
+- Angle (ii) **recent-decisions** -- ADRs / DECISIONS.md / recent commit-log design rationale
+- Angle (iii) **sibling-entity** -- active-state entities overlapping the file surface (CONTRACTS.md + INDEX.md)
+- Angle (iv) **negative-space** -- seed-driven absence verification (see §5 of the reference)
 
-**Mode B -- Inline fallback (no code-explorer dispatch):**
-When running as an ensign without pre-dispatched results (FO simple subagent mode for Small/Medium entities), do inline codebase mapping:
-- Use Read/Grep/Glob on the entity context paths
-- Write findings directly into the mapping output format (same structure as code-explorer step 6)
-- This is the original pre-entity-062 behavior and remains the default for Small/Medium entities
+**Mode B -- Ensign-mode inline fallback (no Agent tool):**
+When running as an ensign without Agent dispatch (FO simple subagent mode, nested-Agent context), run angles (i)+(ii)+(iii) inline single-pass using Grep/Glob/Read within the current session. **Skip angle (iv) entirely** -- seed-list verification requires subagent isolation to avoid freeform absence claims (Q-2 constraint). Emit the following warning line verbatim in the Stage Report (Step 7):
+
+```
+⚠ ensign-mode inline fallback -- 4-angle quality not achieved this invocation
+```
+
+No silent degradation: the warning MUST appear whenever Mode B runs. Plan-phase and execute-phase reviewers treat this as a known coverage gap.
 
 ### Mode selection heuristic
 
-When you have the Agent tool (SO-direct mode), choose between Mode A and Mode B:
+- **Ensign mode (no Agent tool)** -- always Mode B regardless of entity scale. Mode A requires Agent dispatch which is unavailable.
+- **SO-direct / main-session (has Agent tool)** -- Mode A by default for Medium+ entities. For Small entities with well-known target files (or when the caller has already read >50% of the relevant files in this session), Mode B may be preferred to avoid redundant subagent dispatch.
 
-- **Use Mode A** (dispatch code-explorer) when: this is a fresh session with no prior reads of the entity's target files, OR the entity touches >10 files across multiple layers, OR you need a clean context boundary to avoid polluting your remaining context budget.
-- **Use Mode B** (inline mapping) when: you already read >50% of the relevant files in this session (e.g., during a multi-entity SO pipeline run), OR the entity is Small/Medium with well-known target files, OR the parent entity's clarify decisions already narrowed the file scope significantly.
+When in doubt, prefer Mode A -- fresh-context isolation is load-bearing for the 4-angle quality signal.
 
-In ensign mode (no Agent tool), always use Mode B regardless of entity scale -- Mode A requires Agent dispatch which is unavailable.
+### Dispatching 4 parallel code-explorers (Mode A, one per angle)
 
-The heuristic optimizes for: Mode A = fresh context isolation, Mode B = avoid redundant subagent dispatch. When in doubt, prefer Mode A for Large entities and Mode B for Small/Medium.
+All 4 dispatches MUST be issued in a **single Agent tool-call block** so the runtime executes them concurrently. Sequential dispatch defeats the fresh-context parallelism goal and violates the Mode A contract.
 
-### Dispatching code-explorer (Mode A, when you have Agent tool)
-
-If running in SO-direct mode (you ARE the main session and have Agent tool), dispatch:
+**Angle (i) -- prevailing-patterns:**
 
 ```
 Agent(
@@ -117,26 +119,120 @@ Agent(
   model="sonnet",
   prompt="""
   ## Topic
-  {1-line topic title from APPROACH keywords}
+  prevailing-patterns -- dominant existing pattern for {1-line topic title from APPROACH keywords}
 
   ## Entity Context
   {paths the explorer should focus on, drawn from APPROACH + Domain line}
 
   ## Scope Constraint
-  {20-file cap; what NOT to touch; layers out of scope for this entity}
+  Angle (i) per references/parallel-explorer-angles.md. 20-file cap.
+  Rank patterns by usage count; return primary/secondary/tertiary tier tags.
 
   ## Layer Hint
   {domain|contract|router|view|seed|frontend|test|config or "unknown -- sweep all"}
 
   Load skill: skills/code-explorer (flat path).
-  Return structured output per code-explorer step 6 format.
+  Return per Angle (i) format in references/parallel-explorer-angles.md.
   """
 )
 ```
 
-**Fresh-context dispatch rationale (Phase E Guiding Principle #5).** Inline grep/Read/store pollutes the caller's context with raw file content. Delegating to `spacedock:code-explorer` isolates the mapping pass in a fresh context; the caller only consumes the structured summary. See `agents/code-explorer.md` for the thin-wrapper agent definition.
+**Angle (ii) -- recent-decisions:**
 
-**Leaf dispatch rule.** `spacedock:code-explorer` runs as a leaf subagent. It does NOT further dispatch other agents. For multiple mapping passes, dispatch multiple `spacedock:code-explorer` calls in parallel from this step.
+```
+Agent(
+  subagent_type="spacedock:code-explorer",
+  model="sonnet",
+  prompt="""
+  ## Topic
+  recent-decisions -- ADRs / DECISIONS.md / commit rationale for {topic}
+
+  ## Entity Context
+  {target paths}; also scan docs/adr, docs/decisions, DECISIONS.md at repo + project root.
+
+  ## Scope Constraint
+  Angle (ii) per references/parallel-explorer-angles.md. git log --since="30 days" window.
+  Include parent entity clarify annotations when Captain Context Snapshot names Related entities.
+
+  ## Layer Hint
+  decisions -- scan docs/ and git log, not source tree.
+
+  Load skill: skills/code-explorer (flat path).
+  Return per Angle (ii) format in references/parallel-explorer-angles.md.
+  """
+)
+```
+
+**Angle (iii) -- sibling-entity:**
+
+```
+Agent(
+  subagent_type="spacedock:code-explorer",
+  model="sonnet",
+  prompt="""
+  ## Topic
+  sibling-entity -- active entities overlapping {topic} file surface
+
+  ## Entity Context
+  docs/build-pipeline/_index/CONTRACTS.md, docs/build-pipeline/_index/INDEX.md,
+  plus the target scope file paths for overlap detection.
+
+  ## Scope Constraint
+  Angle (iii) per references/parallel-explorer-angles.md.
+  Filter INDEX.md to status in {in-flight, planned, clarified, execute, pr-draft}.
+  Cross-reference file surface against current entity's APPROACH scope.
+
+  ## Layer Hint
+  workflow-index -- index docs, not source tree.
+
+  Load skill: skills/code-explorer (flat path).
+  Return per Angle (iii) format in references/parallel-explorer-angles.md.
+  """
+)
+```
+
+**Angle (iv) -- negative-space (seed-driven):**
+
+Before dispatch, apply the **seed-injection rule**: extract APPROACH keywords from the entity's Brainstorming Spec, then scan the `references/parallel-explorer-angles.md` §5 seed-pattern table for case-insensitive substring matches. For each matched row, include its (Keyword / Absence Pattern / Search Method) tuple in the `## Scope Constraint` block of the Angle (iv) dispatch prompt below. If zero keywords match, still dispatch Angle (iv) with an explicit `no seeds matched -- return seed: none-dispatched` instruction (documented return-path in §5).
+
+```
+Agent(
+  subagent_type="spacedock:code-explorer",
+  model="sonnet",
+  prompt="""
+  ## Topic
+  negative-space -- seed-driven absence verification for {topic}
+
+  ## Entity Context
+  {target scope paths from APPROACH + Domain line}
+
+  ## Scope Constraint
+  Angle (iv) per references/parallel-explorer-angles.md §5.
+  Seeds to verify (extracted from APPROACH keywords via seed-pattern table):
+  {injected seed rows: keyword / absence pattern / search method}
+
+  Return one structured verdict per seed: {seed, verdict, evidence_or_reason, tier}
+  verdict enum: confirmed | refuted | not-applicable.
+  Do NOT add seeds beyond those listed above; do NOT make freeform absence claims.
+
+  ## Layer Hint
+  {same as Angle (i) layer hint}
+
+  Load skill: skills/code-explorer (flat path).
+  Return per Angle (iv) format in references/parallel-explorer-angles.md.
+  """
+)
+```
+
+**Fresh-context dispatch rationale (Phase E Guiding Principle #5).** Inline grep/Read pollutes the caller's context with raw file content. Delegating to 4 parallel `spacedock:code-explorer` subagents isolates each angle's mapping pass in a fresh context, preventing framing bias across angles; the caller only consumes the 4 structured summaries. See `agents/code-explorer.md` for the thin-wrapper agent definition.
+
+**Leaf dispatch rule.** `spacedock:code-explorer` runs as a leaf subagent. It does NOT further dispatch other agents. The 4-way fanout here is the maximum parallelism for Step 2; do not nest.
+
+### Inter-explorer contradiction handling
+
+When 2+ of the 4 explorers return findings that conflict on the same `file:line` (e.g., Angle (i) reports pattern X is primary at src/foo.ts:42 while Angle (iii) reports sibling entity claims the same line implements pattern Y), do NOT flatten by synthesis. Write the inter-explorer contradiction into Step 6's `## Core Tensions` section, typed as either `essential` (the contradiction reflects a genuine design tension the captain must resolve) or `domain-based` (the two explorers viewed the same evidence through different domain lenses).
+
+Follow Port 10 semantics: contradictions are first-class outputs, never silently reconciled. The preservation of conflicting evidence is load-bearing for clarify-stage Q&A quality.
 
 ### Scale assessment (both modes)
 
@@ -301,13 +397,55 @@ Emit the following sections (order matters for downstream parsing):
 1. `## Assumptions` -- every Track A item, numbered A-1, A-2, A-3... Include statement, Confidence, and Evidence (`file:line -- description`).
 2. `## Option Comparisons` -- every Track B item as a `###` subsection with the 5-column table (Option / Pros / Cons / Complexity / Recommendation). At least one option per comparison must be marked Recommended.
 3. `## Open Questions` -- every Track C item, numbered Q-1, Q-2, Q-3... α-marker questions take the lowest numbers. Include Domain, Why it matters, and Suggested options (or `None -- captain input needed`).
-4. `## Decomposition Recommendation` -- only if Step 3 determined it was warranted. Use the `⚠️` emoji prefix and list child entity slugs with domain tags.
+4. `## Core Tensions` -- 1-5 typed entries (`time-based` / `domain-based` / `essential`) emitted AFTER `## Open Questions`. Route inter-explorer contradictions here per Step 2. When empty, emit EXACTLY: `Checked -- no notable constraints identified.` See `references/output-format.md` § "Core Tensions + Honest Boundaries (Port 10)" for format details.
+5. `## Honest Boundaries` -- 1-5 declared limits emitted AFTER `## Core Tensions`. Same cardinality discipline and escape-hatch literal: `Checked -- no notable constraints identified.` Downstream stages annotate but never delete entries in either section.
+6. `## Decomposition Recommendation` -- only if Step 3 determined it was warranted. Use the `⚠️` emoji prefix and list child entity slugs with domain tags.
+
+**Tier tag rule (Port 9):** every `Evidence:` line in `## Assumptions`, `## Option Comparisons`, and `## Open Questions` MUST end with a bracketed tier tag -- `[primary]`, `[secondary]`, or `[tertiary]`. Primary = captain directive / Canonical References / ADRs / design-doc invariants; secondary = codebase pattern with >=2 consistent usages; tertiary = single usage, template match, or "standard practice" claim. On conflict, primary wins over secondary wins over tertiary unless captain clarify override. Tier tags already set by brainstorm flow through unchanged (no re-tagging, no syntax conversion). See `references/output-format.md` § "Tier Tag (Port 9)" for full semantics.
 
 Annotate the `## Brainstorming Spec` inline:
 - **Confirmed**: append `(✓ confirmed by explore: {evidence})` to claims the codebase supports.
 - **Contradicted**: append `(⚠ contradicted: {evidence} -- see Q-{n})` to claims the codebase refutes, and ensure the linked Q exists in the Open Questions section.
 
 Preserve all existing content. Only modify sections this skill owns. Never modify the `## Directive` or `## Captain Context Snapshot` sections.
+
+---
+
+## Step 6.5: Self-Test Gate (Port 11)
+
+Before emitting the Stage Report, run a mandatory path-aware self-test gate against the sections written in Step 6. The gate has 5 checks:
+
+1. **Track A evidence depth** -- every Track A assumption has `>=2` evidence sources across `>=2` layers (domain/contract/router/view/seed/frontend/test/config).
+2. **Track B alternative completeness** -- every Track B option comparison has `>=2` viable alternatives AND `>=1` marked `✅ Recommended`.
+3. **Track C option surfacing** -- every Track C open question has `Suggested options:` with `>=2` options OR an explicit `Open-ended -- captain decides` literal.
+4. **Evidence tier tagging** -- every `Evidence:` line carries a bracketed `[primary|secondary|tertiary]` tier tag (Port 9 compliance check).
+5. **Core Tensions typing** -- if `## Core Tensions` is populated (not the `Checked -- no notable constraints identified.` literal), every entry is typed (`time-based` / `domain-based` / `essential`).
+
+### Path-aware semantics (sibling entity 104 O-3 propagated)
+
+The gate's failure response depends on Step 2's execution mode:
+
+**Mode A (SO-direct / 4-angle parallel fanout) -- gate failure BLOCKS Stage Report emission.** Do NOT write the Stage Report. Instead, return the structured blocker payload below. The FO ensign routing hook reads `feedback-to: captain` and halts the explore-to-clarify advance until the gate passes:
+
+```yaml
+status: blocked
+feedback-to: captain
+gate_failure:
+  gate_id: {"i"|"ii"|"iii"|"iv"|"v"}
+  failure_reason: {human-readable}
+  offending_items:
+    - {entity-body line reference}
+```
+
+**Mode B (ensign-mode inline fallback) -- gate failure is ADVISORY.** Emit alpha markers `(α: gate-{n} advisory-only in Mode B -- {reason})` inline on each offending item AND include a Stage Report warning `gate-{n} advisory-only in Mode B`. Stage Report still emits; explore-to-clarify advance proceeds. Plan-phase reviewers treat advisory alphas as known coverage gaps.
+
+### Mode B modifier for triple-gate
+
+In Mode B, gate (i) cross-layer recurrence is structurally unavailable because angle (iv) negative-space verification was skipped (see Step 2 Mode B contract). Gate (i) counts as **not applicable** in Mode B, not "failed" -- do NOT emit an advisory alpha for gate (i) in Mode B. Gates (ii)-(v) apply normally.
+
+### FO dispatch-hook audit note
+
+The downstream plan MUST cite the audit scope from parent entity 102 Honest Boundary 9 when declaring FO dispatch-hook coverage for the Mode A blocker payload. Plan ensign: do not assert hook implementation without this citation.
 
 ---
 
