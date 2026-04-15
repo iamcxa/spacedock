@@ -1385,4 +1385,71 @@ Round 1 eliminated all 099-scoped tsc errors (registry.ts self-reference pattern
 
 Round 2 (re-run) confirms all 099-scoped quality fixes from Round 1 remain stable. Test suite executes with 642 passes; failures are all pre-existing (MCP SDK, diff dependency, Next.js module, and nested biome config). TypeScript type-checking passes with zero errors. The entity is ready for merge.
 
+## Pending Knowledge Captures
+
+<capture id="kc-1" severity="HIGH" root="CODE" target="/Users/kent/Project/spacedock/spacebridge/CLAUDE.md">
+  <finding>
+  EntityDetailClient renders EntityBody without threading `status` and `autoAdvance` props (entity-detail-client.tsx:90). Because both props are optional on EntityBody, TypeScript raises no error, but `showGateButtons` is always false -- gate buttons are silently never rendered in the primary entity page view. The component was correctly implemented; the wiring was the gap.
+  </finding>
+  <proposed_edit>
+  Append to spacebridge/CLAUDE.md § UI Component Patterns (create section if absent):
+
+  "When adding new props to a leaf component (e.g., EntityBody), grep all render sites of that component and verify the prop is threaded through every intermediary wrapper. Optional props silently fall back to `undefined` at sites that omit them -- TypeScript will not flag the omission. Example: EntityBody `status`/`autoAdvance` props added in entity 099 were omitted by EntityDetailClient, causing gate buttons to never render."
+  </proposed_edit>
+  <source_stage>review</source_stage>
+  <source_entity>099</source_entity>
+  <source_file>spacebridge/ui/components/entity-detail-client.tsx</source_file>
+  <source_line>90</source_line>
+  <detected_by>pre-scan:goal-backward</detected_by>
+</capture>
+
+## Stage Report: review
+
+**Verdict**: fail
+**Ran at**: 2026-04-15T16:30:00Z
+**HEAD**: 5cec2a5
+**Execute base**: fafdd33
+**feedback-to**: execute
+
+### Pre-scan
+claude-md-compliance: 0 findings (no CLAUDE.md walked up from changed files)
+stale-references: 0 findings (no symbols removed by diff)
+dependency-chain: 0 findings (all new imports resolve; dynamic import at daemon.ts:255 flagged as style under goal-backward instead)
+plan-consistency: 1 finding (graft-runtime-overlay-redesign.md touched in quality commit 54d3bad, not listed in any task files_modified)
+goal-backward: 3 findings (f-001 HIGH CODE orphan-like wiring gap; f-002 MEDIUM CODE AC-4 partial test; f-005 LOW DOC misleading AC-1 label)
+
+### Dispatch summary
+Debate-driven reviewer dispatch was NOT run (simple-mode ensign invocation with explicit fast-path pre-scan + classify instruction per assignment). Inline pre-scan covered five mechanical checks including goal-backward verification.
+
+### Dispatch Gaps
+No external reviewer agents dispatched; pre-scan only. Classification judgment applied inline per assignment ("Fast-path pre-scan + classify since we already went through one feedback-to-execute round and quality re-pass").
+
+### Findings
+
+| Severity | Root | File:Line | Description | Source |
+|----------|------|-----------|-------------|--------|
+| HIGH | CODE | spacebridge/ui/components/entity-detail-client.tsx:90 | EntityDetailClient renders EntityBody without threading `status` or `autoAdvance` props; `showGateButtons` is always false, gate buttons never render on primary entity page | pre-scan:goal-backward |
+| MEDIUM | CODE | spacebridge/tests/integration/captain-chat-and-gate.integration.test.ts:194 | AC-4 reconnect test is partial -- queries chat_events table directly instead of kill/restart shim + getChannelMessagesSince as required by plan task-11 step 6 | pre-scan:goal-backward |
+| MEDIUM | CODE | spacebridge/bin/daemon.ts:255 | Dynamic import of schema module inside gate_decide handler defers resolution to first call; should be top-level import for fail-fast at startup and consistent import discipline | pre-scan:dependency-chain-style |
+| LOW | PLAN | docs/build-pipeline/graft-runtime-overlay-redesign.md:1 | File modified in quality-stage commit (54d3bad) but not listed in any task's files_modified -- unplanned diff surface | pre-scan:plan-consistency |
+| LOW | DOC | spacebridge/tests/integration/captain-chat-and-gate.integration.test.ts:143 | Test comment labels captain-to-FO chat POST as "AC-1" but AC-1 requires FO-to-captain reply MCP tool flow (deferred to 099b); misleading label obscures that AC-1 is not fully verified in 099 | pre-scan:goal-backward |
+
+### Auto-Fix Status
+
+0 blockers auto-fixed. The HIGH CODE finding (f-001) requires threading props through EntityDetailClient and updating page.tsx -- this is a judgment call on prop shape (pass status/auto_advance frontmatter through EntityDetailClient vs. render GateButtons directly in page.tsx) and crosses the "no inline fixes for CRITICAL/HIGH CODE" rule in build-review. Routed to execute per stage contract.
+
+### Accepted Warnings (v1 known-gaps)
+
+- f-003 MEDIUM CODE dynamic schema import in gate_decide: functional, not a bug; style-only. Accepted as v1 known-gap per `cc0529b` precedent.
+- f-004 LOW PLAN unplanned graft file touch: cross-entity hygiene drift, not 099-scope to fix.
+- f-005 LOW DOC misleading AC-1 test label: comment-only; test functionally covers the captain-to-FO path which is the 099 scope.
+
+### Knowledge Capture
+
+d1_written: 1 (prop-threading gap pattern appended to skills/build-review/reference/learned-patterns.md)
+d2_pending: 1 (kc-1 HIGH CODE staged in `## Pending Knowledge Captures` -- target spacebridge/CLAUDE.md § UI Component Patterns)
+skipped: 3 (f-002/f-003 MEDIUM CODE first-occurrence; f-004/f-005 LOW never passes severity gate)
+
+notes: 1 blocker routed to execute (f-001 HIGH CODE -- gate buttons never render). 2 warnings accepted as v1 known-gaps.
+
 
