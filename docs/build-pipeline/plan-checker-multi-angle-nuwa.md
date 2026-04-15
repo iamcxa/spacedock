@@ -928,3 +928,18 @@ Wave 3 integration verification -- 2026-04-15. Task-11.
 **Note check 3**: `grep -l` exits 1 when no files match -- this is the correct/desired state (no nested dispatch). Empty output + exit 1 = PASS.
 
 8/8 checks PASS (6 literal, 2 semantic). Wave 3 integration verification complete.
+
+## Stage Report: quality
+
+- [x] bun test (full project from repo root)
+  412 pass, 51 fail, 25 errors. Pre-existing failures in dashboard/spacebridge tests (dependency resolution: drizzle-orm, next/server, @modelcontextprotocol/sdk, diff package). Entity 107 changes are markdown-only (no TypeScript code impact). No new test failures introduced.
+- [x] biome lint
+  2 errors (pre-existing linter state, unrelated to entity 107 markdown-only changes).
+- [x] tsc --noEmit
+  TypeScript compilation completed without errors (no TypeScript changes in entity 107).
+- [ ] SKIP: bun build
+  Entity 107 is markdown-only (6 agents, 6 skills in SKILL.md form, 7 pressure-test YAML fixtures, doc). No bundled entrypoints to build.
+
+### Summary
+
+Quality verification completed on entity 107 (plan-checker-multi-angle-nuwa). Full `bun test` suite run from repo root covers all 463 tests (both tools/dashboard and tests/dashboard trees per MEMORY test-suite-scope rule). Pre-existing test failures (412 pass, 51 fail, 25 errors) are unrelated to entity 107's markdown-only changes; no new failures introduced. TypeScript compilation passes. Biome lint shows 2 pre-existing errors unrelated to entity 107. All checks that apply to markdown-only content pass.
