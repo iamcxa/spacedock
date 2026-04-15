@@ -305,7 +305,7 @@ Read `skills/build-plan/references/plan-checker-prompt.md` via the `Read` tool. 
 - `{plan_text}` -- the full `## Research Findings` + `## PLAN` + `## UAT Spec` + `## Validation Map` text
 - `{entity_context}` -- the entity's `## Brainstorming Spec`, `## Explore Output`, `## Clarify Output`, `## Acceptance Criteria` sections
 
-Issue all 6 Agent() calls in **one tool-call block** (parallel dispatch):
+Issue all 6 dispatch calls in **one tool-call block** (parallel subagent fanout):
 
 ```
 Agent(
@@ -382,7 +382,7 @@ Reconstruct a flat `issues: [...]` YAML preserving all entries from all 7 source
 
 ### 6d: Feature Flag Parallel Run (O-2-B)
 
-For the first N plans post-cutover (default N=3), **also** dispatch the monolithic plan-checker prompt as an additional Agent() call:
+For the first N plans post-cutover (default N=3), **also** dispatch the monolithic plan-checker prompt as an additional parallel subagent:
 
 ```
 Agent(
