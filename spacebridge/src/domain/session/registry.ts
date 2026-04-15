@@ -29,6 +29,9 @@ export interface SessionRegistry {
   getState(): SessionState;
   getActiveProjectRoots(): string[];
   discoverActiveWorkflows(): Workflow[];
+  /** Returns the sessionId of the most-recently-heartbeated session for the given
+   *  projectRoot, or null if no connected session exists for that root. */
+  getActiveSessionByProjectRoot(projectRoot: string): string | null;
 }
 
 export interface SessionRegistryOptions {
@@ -164,6 +167,18 @@ export async function createSessionRegistry(
         }
       }
       return workflows;
+    },
+
+    getActiveSessionByProjectRoot(projectRoot: string): string | null {
+      let bestSessionId: string | null = null;
+      let bestHeartbeat = -1;
+      for (const [sessionId, record] of state.sessions.entries()) {
+        if (record.projectRoot === projectRoot && record.lastHeartbeat > bestHeartbeat) {
+          bestHeartbeat = record.lastHeartbeat;
+          bestSessionId = sessionId;
+        }
+      }
+      return bestSessionId;
     },
   };
 }
