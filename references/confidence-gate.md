@@ -354,3 +354,7 @@ Composite: {score}% ({PASS|FAIL} at 90% threshold)
 **Legacy entities** (pre-087, no `## Confidence Assessment` section): Display warning "No confidence assessment found -- pre-087 entity, skipping confidence display." Proceed to PR creation without blocking.
 
 **Persistence:** The confidence assessment persists in the entity body from gate time to merge hook time. FO does not re-compute the score at merge time -- it reads the stored result. This handles the timing gap between gate (before shipped advance) and merge hook (after terminal stage reached).
+
+## See Also
+
+**Note on `alignment_confidence`**: This field is computed by `skills/build-alignment-gate/SKILL.md` (first-class pipeline stage as of entity 114) and surfaced on `## Stage Report: brainstorm` for backward-compatibility. It is NOT currently a confidence-gate factor in the 5-factor composite. Future factor expansion can source it from the alignment-gate Stage Report.
