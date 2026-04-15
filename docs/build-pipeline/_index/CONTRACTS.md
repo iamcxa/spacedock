@@ -320,6 +320,7 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add test_first attribute to task schema and TDD plan intelligence in step 4a | in-flight | 2026-04-12 |
 | flatten-dispatch-troops-architecture | plan | Update troop references to troop in dispatch constraint notes | 🔵 planned | 2026-04-14 |
+| plan-checker-multi-angle-nuwa | plan | Step 6 rewrite: 6-way parallel haiku dispatch + Dim 3 synthesis | 🔵 planned | 2026-04-15 |
 
 ### skills/build-plan/references/plan-checker-prompt.md
 
