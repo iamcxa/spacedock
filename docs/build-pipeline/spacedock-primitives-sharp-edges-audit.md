@@ -1,15 +1,15 @@
 ---
 id: 108
 title: Sharp-edges audit of spacedock primitives -- workflow-index + troop contract
-status: draft
+status: explore
 context_status: pending
 source: captain directive (2026-04-15 post-103/106 ship session — session evidence of workflow-index lifecycle gap + troop trust surface)
 created: 2026-04-15T13:45:00+08:00
-started:
+started: 2026-04-15T13:50:00+08:00
 completed:
 verdict:
-score:
-worktree:
+score: 1.0
+worktree: .worktrees/spacedock-ensign-spacedock-primitives-sharp-edges-audit
 issue:
 pr:
 intent: audit
