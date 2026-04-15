@@ -974,3 +974,25 @@ Bare mode -- sequential troop dispatch (no team available)
 - task-6: skills/build-clarify/SKILL.md already contained clarify_self_filter_ratio at line 192 (from task-4). New append at line 513 adds format spec. No conflict -- intended.
 
 knowledge capture: skipped -- no findings met D1/D2 threshold
+
+## Stage Report: quality
+
+status: passed
+
+### Checks
+- bun test: PASS -- 749 pass / 0 fail / 1855 expect() calls / 72 files / 20.24s (matches main baseline)
+- bun lint: SKIPPED -- no root `lint` script; entity changes are markdown/YAML only
+- tsc --noEmit: SKIPPED -- no root tsconfig; entity changes are markdown/YAML only
+- bun build: SKIPPED -- no root build script; entity changes are markdown/YAML only
+
+### Evidence
+```
+ 749 pass
+ 0 fail
+ 1855 expect() calls
+Ran 749 tests across 72 files. [20.24s]
+```
+
+### Notes
+- Initial run surfaced 51 failures in worktree due to missing node_modules in subpackages (spacebridge/ui, tools/dashboard, spacebridge). Ran `bun install` in each to match main. After install, 749/749 pass matches main HEAD exactly.
+- Entity 113's changes are strictly additive markdown sections in skill files + one new YAML fixture. No runtime code changed; lint/tsc/build checks are not applicable at repo-root level.
