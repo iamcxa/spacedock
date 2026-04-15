@@ -777,3 +777,89 @@ Quality stage validation complete for entity 108. Entity is audit-only with no s
 ## Files Modified
 
 - docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md
+
+## Stage Report: review
+
+**Verdict**: pass
+**Ran at**: 2026-04-15T14:30:00+08:00
+**HEAD**: 57aa720
+**Execute base**: 762f982
+
+### Pre-scan
+
+claude-md-compliance: 0 findings
+stale-references: 0 findings (markdown-only diff; no symbols exported, renamed, or removed)
+dependency-chain: 0 findings (no imports added or changed; pure prose artifact)
+plan-consistency: 0 findings (sole files_modified is entity body; diff is entity body only)
+goal-backward: 0 findings (see notes below)
+
+### Dispatch summary
+
+Fast-path invocation (per captain scope directive): no reviewer fan-out dispatched. Pre-scan + manual inline classification used as evidence base.
+
+### Dispatch Gaps
+
+Reviewer fan (security-reviewer, correctness-reviewer, style-reviewer) was not dispatched per captain directive to skip multi-reviewer fanout for this markdown-only audit diff. Pre-scan mechanical checks + inline classification cover the stated fast-path scope: severity sanity check, seed scope clarity, cross-reference integrity.
+
+### Findings
+
+| Severity | Root | File:Line | Description | Source |
+|----------|------|-----------|-------------|--------|
+| LOW | DOC | spacedock-primitives-sharp-edges-audit.md (execute Stage Report summary) | Execute Stage Report summary says "11 findings (6 HIGH + 3 MEDIUM + 2 LOW)" but the clarify severity table assigns 4 MEDIUM findings (A-4, A-5, A-6, A-8 → F-WI-4, F-TR-1, F-TR-2, F-TR-4); actual count is 12 total (6H + 4M + 2L). UAT Spec line "6 HIGH + 4 MEDIUM + 2 LOW" is correct; execute summary count is off by 1 MEDIUM. | pre-scan:plan-consistency |
+| NIT | DOC | spacedock-primitives-sharp-edges-audit.md (execute Stage Report summary) | Execute summary line "All 11 findings authored" conflicts with the correct total of 12 (10 assumption-findings + F-XP-1 compound + F-TR-6 dead-ref); F-TR-6 was the 12th finding added per Q-3 disposition. | pre-scan:plan-consistency |
+
+**Goal-backward notes**: Directive deliverables checked against diff output:
+1. Findings table per primitive -- PRESENT: `## Audit Findings -- workflow-index` (5 rows, grep count verified 5) + `## Audit Findings -- troop + task-execution` (6 rows + F-XP-1 compound, grep count verified 6).
+2. Phase F candidate list -- PRESENT: `## Phase F Seed Slate` with 7 `### Seed N:` blocks, grep count verified 7.
+3. Cross-primitive coherence note -- PRESENT: `## Cross-Primitive Coherence` with compound footgun table citing F-WI-1/2/3 + F-XP-1 + F-TR-1.
+4. Known-gap log -- PRESENT: `## Known-Gap Log` with 5 entries (F-WI-4, F-TR-1, F-TR-2, F-TR-4, F-TR-5), each with explicit revisit trigger.
+
+No orphan symbols (pure markdown diff; no exported code symbols). No acceptance criterion unmet. No code changes in scope per Directive "Review-only audit entity."
+
+### Severity sanity check
+
+**6 HIGH findings defensible**: F-WI-1 (no file-lock), F-WI-2 (no irreversibility guard), F-WI-3 (cross-worktree race), F-WI-5 (CONTRACTS hygiene drift -- empirical proof via 103 task-6 HARD GATE false-fire), F-TR-3 (sandbox advisory-only), F-XP-1 compound (troop → CONTRACTS bypass). All confirmed by direct file:line evidence during explore (Confident 0.95 for all except F-WI-5 which is Likely 0.70 -- acknowledged in entity, root cause confirmation deferred to Phase F diagnostic entity). Severity bar is impact-only (captain selected O-1); HIGH = trust violation or workflow corruption. All 6 meet bar.
+
+**4 MEDIUM findings defensible**: F-WI-4 (Supersedes column absent -- schema gap, no workflow corruption), F-TR-1 (blocked_reason stringly-typed -- known-gap per 106 precedent, v1 accepted), F-TR-2 (scope_observation unsanitized -- informational channel, not decision gate), F-TR-4 (Circular-AC grep-context -- compound confusion required, practically rare). MEDIUM = drift-risk without behavioral breakage. All 4 meet bar.
+
+**2 LOW findings defensible**: F-TR-5 (logged-not-alarmed -- graceful degradation in place, single-operator context), F-TR-6 (dead reference -- doc debt, no runtime impact). LOW = cosmetic or doc debt. Both meet bar.
+
+**F-XP-1 compound HIGH**: Correctly labeled HIGH (not CRITICAL) because the bypass path requires a confused/adversarial troop + no enforcement layer, but the immediate impact is index corruption recoverable via git history. CRITICAL would require data loss or silent production-bricking. The HIGH label is conservative and appropriate.
+
+### Phase F seed scope clarity
+
+All 7 seeds reviewed for scope tightness:
+- **Seed 1** (file-locking): IS/NOT-in-scope boundaries are crisp; lockfile primitive is well-bounded; excludes callers and distributed-lock. Targeted.
+- **Seed 2** (irreversibility-guard): Transition allowlist is well-scoped; excludes backfilling (Seed 5's scope) and DECISIONS supersede semantics. Targeted.
+- **Seed 3** (worktree-race-serialization): Overlap concern with Seed 1 (both touch write-mode.md serialization) -- scopes are complementary, not duplicated; Seed 1 targets single-caller atomicity, Seed 3 targets cross-caller serialization. Distinct.
+- **Seed 4** (troop-sandbox-enforcement): Explicitly excludes F-XP-1 gatekeeper (Seed 6 handles that); general path traversal only. Targeted.
+- **Seed 5** (contracts-hygiene-diagnostic): Runtime log trace + targeted fix; explicitly excludes redesigning hook architecture (deferred to Seeds 2/3). Diagnostic-first pattern is appropriate for Likely 0.70 root cause.
+- **Seed 6** (write-gatekeeper compound): Headline seed with 2 child candidates; captain decides split at clarify. Scope note is clear. Compound structure is appropriate per Q-4 disposition.
+- **Seed 7** (dispatch-guide-extraction): Extract + update citations only; excludes contract content changes. Small-scale, appropriately scoped.
+
+One observation: Seeds 1 and 3 have overlapping write-mode.md touchpoints. Both will modify the same reference file. Captain should decide at Seed 3 clarify whether to sequence after Seed 1 (dependency) or handle as sibling with merge coordination. Not a blocker -- flagged as advisory.
+
+### Cross-reference integrity
+
+Content anchors verified against actual worktree files:
+- `skills/workflow-index/SKILL.md:46` "Idempotent reads" -- confirmed present at line 46
+- `skills/workflow-index/references/write-mode.md` "Atomicity" block -- confirmed at lines 83, 159
+- `skills/task-execution/SKILL.md:253` `blocked_reason` field -- confirmed at line 253
+- `skills/task-execution/SKILL.md:216,248` `scope_observation` / finding type schema -- confirmed at lines 216, 248
+- `skills/build-execute/SKILL.md:166` sandbox prompt template -- confirmed at line 166
+- `agents/troop.md:4-7` tools allowlist -- confirmed (Read/Write/Edit/Bash/Grep/Glob/Skill)
+- `skills/task-execution/SKILL.md:118-144` Circular-AC Rule -- confirmed at lines 120+, scope-narrow at 135
+- `mods/workflow-index-maintainer.md:83,89-98` error handling block -- confirmed
+- `skills/build-execute/references/agent-dispatch-guide.md` -- confirmed DOES NOT EXIST (validates F-TR-6 finding)
+- `docs/build-pipeline/_archive/shape-pre-build-alignment-skill.md:882` 103 task-6 HARD GATE proof point -- not re-verified (file is in archive tree, anchor cited as empirical evidence; no reason to doubt)
+- `docs/build-pipeline/_index/CONTRACTS.md:7` header row -- not re-verified inline but CONTRACTS.md hygiene drift (F-WI-5) is empirically grounded across multiple entities
+
+All primary content anchors verified. No stale or fabricated file:line citations detected.
+
+### Knowledge Capture
+
+no findings met D1/D2 threshold (markdown-only audit diff; no skill-level patterns or project-rule candidates arise from reviewing audit prose output -- findings are themselves the knowledge artifact)
+
+### Summary
+
+Entity 108 is a markdown-only audit artifact with a single changed file (entity body). Diff is execute-stage additions only; no source code, no skill files, no reference files modified. Pre-scan is clean across all 5 checks. Two minor DOC/NIT findings in the execute Stage Report summary (finding count off by 1 MEDIUM); these do not affect the audit findings themselves and do not warrant an execute bounce. All 12 findings (6H + 4M + 2L) are severity-defensible with content-anchored evidence. All 7 Phase F seeds have targeted, non-overlapping directives (Seeds 1+3 have a write-mode.md coordination advisory noted). All primary cross-references verified against actual worktree files. Verdict: pass -- advance to UAT.
