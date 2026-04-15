@@ -11,18 +11,19 @@ import { describe, expect, test } from "bun:test";
 
 describe("ChatInput", () => {
   test("source file begins with 'use client' directive", async () => {
-    const src = await Bun.file(import.meta.dir + "/chat-input.tsx").text();
+    const src = await Bun.file(`${import.meta.dir}/chat-input.tsx`).text();
     expect(src.startsWith('"use client"')).toBe(true);
   });
 
   test("source file fetches /api/entities/[slug]/chat with POST", async () => {
-    const src = await Bun.file(import.meta.dir + "/chat-input.tsx").text();
+    const src = await Bun.file(`${import.meta.dir}/chat-input.tsx`).text();
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: intentionally checking for literal template syntax in source
     expect(src).toContain("/api/entities/${entitySlug}/chat");
     expect(src).toContain('"POST"');
   });
 
   test("source file shows delivered and offline status strings", async () => {
-    const src = await Bun.file(import.meta.dir + "/chat-input.tsx").text();
+    const src = await Bun.file(`${import.meta.dir}/chat-input.tsx`).text();
     expect(src).toContain("delivered");
     expect(src).toContain("offline");
   });

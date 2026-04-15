@@ -75,7 +75,7 @@ export async function createSessionRegistry(
     }
   }
 
-  return {
+  const registry: SessionRegistry = {
     async register(payload: RegisterPayload): Promise<SessionEvent[]> {
       const { projectRoot } = payload;
       if (!projectRoot.startsWith("/")) {
@@ -135,7 +135,7 @@ export async function createSessionRegistry(
       const allEvents: SessionEvent[] = [];
       const sessionIds = Array.from(state.sessions.keys());
       for (const sessionId of sessionIds) {
-        const events = await this.disconnect(sessionId, reason);
+        const events = await registry.disconnect(sessionId, reason);
         allEvents.push(...events);
       }
       return allEvents;
@@ -154,7 +154,7 @@ export async function createSessionRegistry(
     },
 
     discoverActiveWorkflows(): Workflow[] {
-      const roots = this.getActiveProjectRoots();
+      const roots = registry.getActiveProjectRoots();
       const dirSet = new Set<string>();
       const workflows: Workflow[] = [];
       for (const root of roots) {
@@ -181,4 +181,5 @@ export async function createSessionRegistry(
       return bestSessionId;
     },
   };
+  return registry;
 }

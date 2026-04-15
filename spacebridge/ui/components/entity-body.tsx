@@ -49,27 +49,28 @@ function wrapTextRange(
     let node = info.node;
     const nodeStart = info.start;
     let localStart = Math.max(0, rangeStart - nodeStart);
-    let localEnd = Math.min(node.textContent!.length, rangeEnd - nodeStart);
+    let localEnd = Math.min((node.textContent ?? "").length, rangeEnd - nodeStart);
 
     if (localStart > 0) {
       const before = node.splitText(localStart);
-      const splitLen = node.textContent!.length;
+      const splitLen = (node.textContent ?? "").length;
       info.node = before;
       info.start = nodeStart + splitLen;
       node = before;
       localEnd = localEnd - localStart;
       localStart = 0;
     }
-    if (localEnd < node.textContent!.length) {
+    if (localEnd < (node.textContent ?? "").length) {
       node.splitText(localEnd);
     }
 
+    if (!node.parentNode) break;
     const mark = document.createElement("mark");
-    mark.className = "comment-highlight" + (resolved ? " resolved" : "");
+    mark.className = `comment-highlight${resolved ? " resolved" : ""}`;
     mark.setAttribute("data-comment-ids", commentIds.join(","));
     mark.style.cssText =
       "background: rgba(255,212,0,0.25); border-bottom: 2px solid rgba(255,212,0,0.8); cursor: pointer; border-radius: 2px;";
-    node.parentNode!.insertBefore(mark, node);
+    node.parentNode.insertBefore(mark, node);
     mark.appendChild(node);
     break;
   }
@@ -77,7 +78,7 @@ function wrapTextRange(
 
 export function EntityBody({
   body,
-  sectionHeadings,
+  sectionHeadings: _sectionHeadings,
   allComments,
   entitySlug,
   onCommentAdded,
@@ -96,7 +97,8 @@ export function EntityBody({
     const existingMarks = bodyEl.querySelectorAll<HTMLElement>(".comment-highlight");
     for (let m = existingMarks.length - 1; m >= 0; m--) {
       const mark = existingMarks[m];
-      const parent = mark.parentNode!;
+      const parent = mark.parentNode;
+      if (!parent) continue;
       while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
       parent.removeChild(mark);
     }
@@ -107,13 +109,14 @@ export function EntityBody({
 
     // Flatten all text nodes via TreeWalker
     const walker = document.createTreeWalker(bodyEl, NodeFilter.SHOW_TEXT);
-    let node: Text | null;
     let fullText = "";
     const nodeOffsets: Array<{ node: Text; start: number; end: number }> = [];
-    while ((node = walker.nextNode() as Text | null)) {
+    for (;;) {
+      const next = walker.nextNode() as Text | null;
+      if (!next) break;
       const start = fullText.length;
-      fullText += node.textContent;
-      nodeOffsets.push({ node, start, end: fullText.length });
+      fullText += next.textContent;
+      nodeOffsets.push({ node: next, start, end: fullText.length });
     }
 
     // Build intervals for each comment
@@ -166,7 +169,7 @@ export function EntityBody({
       const seg = segments[s];
       wrapTextRange(nodeOffsets, seg.start, seg.end, seg.commentIds, seg.resolved);
     }
-  }, [body, allComments]);
+  }, [allComments]);
 
   // Click handler: highlight click → scroll comment card into view
   function handleArticleClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -175,7 +178,7 @@ export function EntityBody({
     const ids = target.getAttribute("data-comment-ids");
     if (!ids) return;
     const firstId = ids.split(",")[0];
-    const card = document.getElementById("comment-" + firstId);
+    const card = document.getElementById(`comment-${firstId}`);
     if (!card) return;
     card.scrollIntoView({ behavior: "smooth", block: "center" });
     card.classList.add("comment-card-flash");
@@ -189,6 +192,7 @@ export function EntityBody({
       </h2>
 
       {/* Relative container so popover can be absolutely positioned */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: highlight click-to-scroll is a progressive enhancement; keyboard users navigate via comment cards directly */}
       <div className="relative" onClick={handleArticleClick}>
         <article ref={articleRef} className="prose prose-sm dark:prose-invert max-w-none space-y-6">
           <ReactMarkdown
@@ -218,7 +222,7 @@ export function EntityBody({
         />
       </div>
 
-      {showGateButtons && <GateButtons entitySlug={entitySlug} stage={status!} />}
+      {showGateButtons && <GateButtons entitySlug={entitySlug} stage={status ?? ""} />}
 
       <ChatInput entitySlug={entitySlug} />
     </div>

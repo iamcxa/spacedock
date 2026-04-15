@@ -81,7 +81,7 @@ export async function createCoordinationClientBridge(
         state,
         now,
       );
-      const aggregateId = `${slug}::${role}`;
+      const aggregateId = `${slug}::${role}` as const;
       await appendEvents(opts.db, aggregateId, events, nextSeq(aggregateId));
       for (const ev of events) {
         state = evolve(state, ev);
@@ -111,7 +111,7 @@ export async function createCoordinationClientBridge(
       const now = getNow();
       const entry = findByToken(state, token.token);
       if (!entry) throw new LeaseNotFound(token.token);
-      const aggregateId = `${entry.entity_slug}::${entry.role}`;
+      const aggregateId = `${entry.entity_slug}::${entry.role}` as const;
       const events = decide(
         { type: "extend", token: token.token, leaseDurationMs: opts.leaseDurationMs },
         state,
