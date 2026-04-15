@@ -1,8 +1,8 @@
 ---
 id: 106
 title: Plan-Defect Autopilot -- Eliminate Captain-in-Loop for Benign Plan Drift (3-part package)
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: /build
 created: 2026-04-15T00:00:00Z
 started:
@@ -19,6 +19,7 @@ profile:
 auto_advance:
 parent:
 children:
+depends-on: [061]
 ---
 
 ## Directive
@@ -64,6 +65,7 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
 - Given `references/claude-first-officer-runtime.md` after merge, when we grep for the classifier name, then count ≥1 (how to verify: `grep -c 'benign.drift.classifier\|benign drift classifier' references/claude-first-officer-runtime.md`)
 - Given `tests/pressure/` after merge, when we list plan-defect fixtures, then ≥3 files exist covering stale-anchor / circular-AC / rename (how to verify: `ls tests/pressure/ | grep -cE 'plan-defect|circular-ac|stale-anchor|rename' >= 3`)
 - Given a synthetic replay of entity 104's task-0 stale-anchor + task-5 circular-AC scenarios run against the patched skills, when we count captain-interrupt events emitted, then count = 0 (how to verify: dispatch troop against fixture; assert `scope_observation` entries in troop return + zero `captain_escalation` keyword; scripted in a pressure test)
+- Given the new classifier region in `skills/build-execute/SKILL.md` and new Dim 9/10 regions in `skills/build-plan/SKILL.md` after merge, when we grep for `Agent(` calls inside those new regions, then count = 0 (GUARDRAILS "zero Agent dispatches" contract; plan stage generates the exact grep command with line-range scoping)
 
 ## Assumptions
 
@@ -73,6 +75,7 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
 - Evidence:
   - skills/task-execution/SKILL.md:88-114 -- AC run block is a No-Exceptions literal-pass rule; adding a scoped exception is a pattern-preserving extension [primary]
   - tests/pressure/task-execution.yaml:1 -- all 3 existing fixtures use canonical `bun test` commands, none exercise grep-count AC, so the new rule has no conflicting precedent [secondary]
+- → Confirmed: captain, 2026-04-15 (batch)
 
 ### A-2: Plan-checker dry-run dims are additive, not structural
 - Statement: Adding `stale-line-anchor` (Dim 9) and `circular-AC` (Dim 10) to plan-checker fits the existing 8-dim taxonomy (blocker/warning severity) without restructuring. Both run pre-approval on plan YAML.
@@ -80,6 +83,7 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
 - Evidence:
   - skills/build-plan/references/plan-checker-prompt.md:19-145 -- existing 8 dims use identical YAML return schema; dim addition precedent [primary]
   - Angle (i) report: no existing line-anchor or circular-AC detection anywhere in build-plan -- clean greenfield [primary]
+- → Confirmed: captain, 2026-04-15 (batch)
 
 ### A-3: `scope_observation` is the right finding channel
 - Statement: FO benign-drift classifier matches → troop returns DONE with a `scope_observation` finding entry describing the drift class. No new finding type needed.
@@ -87,6 +91,7 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
 - Evidence:
   - skills/task-execution/SKILL.md:163 defines `scope_observation` finding type for surfacing adjacent issues [primary]
   - skills/build-execute/SKILL.md (Angle iv evidence): `scope_observation` appears in 2 skills, established pattern [secondary]
+- → Confirmed: captain, 2026-04-15 (batch)
 
 ### A-4: Entity 061 sequencing conflict is the real risk, not 092
 - Statement: Entity 061 (clarify) and 106 both write `skills/build-plan/SKILL.md` + `tests/pressure/build-plan.yaml`. 092 adds a new output path (non-line-overlap additive). 061 is the blocking coordination target; 092 is low-risk.
@@ -94,6 +99,7 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
 - Evidence:
   - Angle (iii) report: 061 creates `skills/build-plan/SKILL.md` at same file surface [primary]
   - Angle (iii) report: 092 modifies output target (additive path, not dim redefinition) [secondary]
+- → Confirmed: captain, 2026-04-15 (batch)
 
 ### A-5: Line-anchor dry-run is static analysis, not runtime
 - Statement: plan-checker's stale-line-anchor dim reads the referenced file at plan-check time and verifies the line number still resolves to the asserted content. Does not need to execute the plan.
@@ -101,6 +107,7 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
 - Evidence:
   - skills/build-plan/references/plan-checker-prompt.md:19 -- Dim 6a already runs shell commands (`bun test`) at plan-check time, so file Reads are in-budget [primary]
   - Entity 104 stale-anchor symptom (Angle ii report, _archive/brainstorm-nuwa-distillation.md:894) -- drift was line 191 vs expected 183, detectable by static Read [primary]
+- → Confirmed: captain, 2026-04-15 (batch)
 
 ## Option Comparisons
 
@@ -116,6 +123,7 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
   - skills/build-execute/SKILL.md:216-224 -- canonical escalation ladder home [primary]
   - references/claude-first-officer-runtime.md:64 -- model pass-through only, no BLOCKED branch [primary]
   - Angle (iii) report: entity 094 hard-codes FO-runtime `:104` anchor, insertion risk [secondary]
+- → Selected: build-execute/SKILL.md (captain, 2026-04-15, interactive)
 
 ### O-2: `tests/pressure/` fixture file strategy
 
@@ -128,6 +136,7 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
 - Evidence:
   - tests/pressure/task-execution.yaml, build-plan.yaml already exist (Angle iii report) [primary]
   - tests/pressure/graft.yaml:317 -- precedent for defect-class fixture within skill file [secondary]
+- → Selected: 擴充既有 task-execution.yaml + build-plan.yaml + 新增 build-execute-blocked-triage.yaml (captain, 2026-04-15, interactive)
 
 ## Open Questions
 
@@ -135,6 +144,7 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
 - Domain: Organizational (skill contract file choice)
 - Why it matters: APPROACH Part C says `references/claude-first-officer-runtime.md`, but that file has no BLOCKED/escalation section. The actual ladder lives in `skills/build-execute/SKILL.md:216-224`. Shipping Part C as-written would either (a) invent a hanging section in the FO runtime with no context, or (b) the ensign would silently redirect to build-execute and diverge from the plan. Must be resolved before plan stage.
 - Suggested options: see O-1 above -- recommendation A (build-execute) [primary]
+- → Answer: resolved via O-1 selection -- classifier inserts into skills/build-execute/SKILL.md escalation-ladder preamble; APPROACH Part C target-file description must be corrected in plan stage (captain, 2026-04-15, interactive)
 
 ### Q-2: How do we coordinate the `skills/build-plan/SKILL.md` write with entity 061?
 - Domain: Organizational (sibling entity ordering)
@@ -143,6 +153,7 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
   - Declare `depends-on: 061` in frontmatter, block 106 until 061 ships
   - Coordinate in-flight via content-based anchors (already the output of this very entity's Dim 9) and accept conflict resolution at merge
   - Pre-agreement on non-overlapping sections of build-plan/SKILL.md [primary]
+- → Answer: Declare depends-on: 061 in frontmatter; 106 plan/execute blocked until 061 ships (captain, 2026-04-15, interactive)
 
 ### Q-3: Classifier whitelist scope -- strict 3 or extensible registry?
 - Domain: Organizational (future-proofing vs YAGNI)
@@ -151,6 +162,16 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
   - Hard-code 3 classes inline in build-execute/SKILL.md (matches GUARDRAILS, simplest) [primary]
   - External YAML registry with 3 initial entries (extensible, but adds config file)
   - Open-ended -- captain decides
+- → Answer: Hard-code 3 classes inline in skills/build-execute/SKILL.md (captain, 2026-04-15, interactive)
+
+### Q-5: Who owns the line-anchor → content-anchor rewrite?
+- Domain: Organizational (plan-checker auto-action vs advisory)
+- Why it matters: Q-4 decided Dim 9 should *recommend* rewriting line anchors to content anchors. But plan-checker is pre-approval and advisory by contract. If plan ensign auto-rewrites, the plan body mutates before captain approval -- which is exactly the "plan-body mutation" class 104 task-5 flagged. If plan-checker only reports, captain friction returns.
+- Suggested options:
+  - Plan ensign auto-rewrites only when Read confirms a single unambiguous match; falls back to advisory on ambiguity [primary]
+  - Advisory-only (always surface to captain)
+  - Always auto-rewrite (aggressive)
+- → Answer: Plan ensign auto-rewrites only when Read finds exactly one unambiguous match (exact text match count == 1); falls back to captain advisory on ambiguity or zero results. Matches "FO runs autonomously" preference while preserving safety on ambiguous cases (captain, 2026-04-15, interactive)
 
 ### Q-4: Does the line-anchor dry-run need to load the file at plan-check time?
 - Domain: Behavioral (plan-checker performance + correctness)
@@ -159,6 +180,15 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
   - Read every referenced file (simple, plan-check already slow) [primary]
   - Batch Read + cache within single dim pass
   - Recommend auto-rewrite line anchors → content anchors (eliminates dim at source)
+- → Answer: Dim 9 recommends auto-rewrite line anchors to content anchors (e.g., "returns ≥1 match for ..."); plan ensign applies rewrite when captain approves. Root-cause fix: line anchors are bad practice by design -- content anchors make Dim 9 largely self-eliminating (captain, 2026-04-15, interactive)
+
+### Q-6: How does plan verify the GUARDRAILS "zero Agent dispatches" clause?
+- Domain: Organizational (mechanical enforcement of design guarantee)
+- Why it matters: GUARDRAILS states "Classifier is inline string-matching only; zero Agent dispatches". Without a contract test, drift is silent (Phase D MEMORY notes this exact class of drift). Plan should emit a mechanical check rather than trust troop implementation.
+- Suggested options:
+  - Add contract test: `grep -c 'Agent(' <new-code-regions> == 0`; surface as AC [primary]
+  - Leave as GUARDRAILS note without mechanical check
+- → Answer: Add contract test to ## Acceptance Criteria; grep new regions in task-execution/SKILL.md, build-plan/SKILL.md, and build-execute/SKILL.md new sections assert `Agent(` count == 0; plan stage generates the exact command (captain, 2026-04-15, interactive)
 
 ## Core Tensions
 
@@ -194,4 +224,35 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
 
 ## Canonical References
 
-(clarify stage will populate)
+- `skills/build-execute/SKILL.md:216-224` -- BLOCKED escalation ladder (haiku→sonnet→opus); canonical insertion point for Part C benign-drift classifier (O-1 decision)
+- `skills/task-execution/SKILL.md:88-114` -- verbatim-run AC No-Exceptions block; insertion point for Part A Circular-AC rule
+- `skills/build-plan/references/plan-checker-prompt.md:19-145` -- existing 8-dim taxonomy; Dim 9/10 additive home for Part B
+- `docs/build-pipeline/_archive/brainstorm-nuwa-distillation.md:894` -- entity 104 execute Stage Report; primary source for stale-line-anchor (task-0 line 191 vs 183) + circular-AC (task-5) scenarios powering pressure tests
+- `docs/build-pipeline/_archive/explore-nuwa-subagent-first.md:787` -- entity 105 execute Stage Report; same drift class via file rename (agent-dispatch-guide.md → researcher-vs-code-explorer.md)
+- `docs/build-pipeline/phase-e-plan-2-research-and-plan-skills.md` -- entity 061, depends-on for 106 (must ship before 106 executes)
+
+## Follow-up Seed
+
+**094 `:104` anchor leftover** -- entity 094 (warroom-pipeline-graph-visualization) hard-coded `references/claude-first-officer-runtime.md:104` in its clarify annotations. 106's O-1 decision redirects Part C to build-execute (no FO runtime modification), so 094's anchor remains valid under 106. But line-anchor-in-clarify is exactly the bad-practice class 106 is eliminating. Deliberately NOT touched by 106 (file-isolation); future Dim 9 auto-rewrite or 094's next clarify session should convert to content anchor ("the idle-hooks step of the FO event loop").
+
+**Plan-checker Nuwa-ification** -- captain flagged during clarify (2026-04-15): current plan-checker is a single opus prompt sequencing 8 dims; the Nuwa multi-angle synthesis pattern (established by entities 104/105 and mirrored by build-explore Step 2 Mode A's 4-angle fanout) is a natural fit -- dispatch one haiku per dim, synthesize in main session with Port 10 contradiction preservation. Deliberately out-of-scope for 106 to avoid scope creep + 061 cascade risk. Captain to `/build` a new entity after 106 ships (proposed slug: `plan-checker-multi-angle-nuwa` or `plan-checker-parallel-dims`). Inherits MEMORY: subagent-first-for-all-stages-except-clarify + thin-wrapper-agent-pattern.
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- explore recommended against decomposition (3-part coordinated package, 9 files, Medium scale)
+- [x] Re-validation: 5 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  explore ran in same session moments prior, evidence fresh by construction
+- [x] Assumptions confirmed: 5 / 5 (0 corrected)
+  A-1 through A-5 confirmed via batch
+- [x] Options selected: 2 / 2
+  O-1 classifier location → build-execute/SKILL.md (corrects APPROACH Part C target-file description); O-2 fixture strategy → extend task-execution.yaml + build-plan.yaml + new build-execute-blocked-triage.yaml
+- [x] Questions answered: 6 / 6
+  Q-1 resolved via O-1; Q-2 depends-on: 061 declared; Q-3 hard-code 3 classes; Q-4 auto-rewrite line→content anchors; Q-5 plan ensign auto-rewrite only on high-confidence single match; Q-6 zero-Agent-dispatch contract test added to AC
+- [x] Open exploration: 4 gray areas surfaced (0 from templates, 1 from CONTRACTS via 094 anchor follow-up, 2 from directive via Nuwa-ification + GUARDRAILS verification, 1 via freeform Q-5 rewrite ownership)
+- [x] Canonical refs added: 6
+  skills/build-execute/SKILL.md:216-224; skills/task-execution/SKILL.md:88-114; skills/build-plan/references/plan-checker-prompt.md:19-145; _archive/brainstorm-nuwa-distillation.md:894 (104); _archive/explore-nuwa-subagent-first.md:787 (105); phase-e-plan-2-research-and-plan-skills.md (061)
+- [x] Context status: ready
+  gate passed: all 5 A / 2 O / 6 Q annotated; 2 new ACs added during clarify; 2 follow-up seeds recorded
+- [x] Handoff mode: loose
+  auto_advance unset -- captain must say "execute 106" in separate FO session
+- [x] Clarify duration: 8 AskUserQuestion calls (0 batch + 2 option + 4 Q + 2 exploration loops)
