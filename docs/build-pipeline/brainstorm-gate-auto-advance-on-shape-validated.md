@@ -3,7 +3,7 @@ id: 115
 title: Brainstorm Gate Auto-Advance on Shape-Validated + Zero Contradictions
 slug: brainstorm-gate-auto-advance-on-shape-validated
 status: draft
-context_status: pending
+context_status: awaiting-clarify
 source: captain observation
 created: 2026-04-16T01:30:00+08:00
 started:
@@ -77,7 +77,7 @@ You are asking for the First Officer to skip the brainstorm gate and auto-advanc
 
 ## Brainstorming Spec
 
-**APPROACH**: Edit `references/first-officer-shared-core.md` Brainstorm Triage → Gate Resolution section (around L159) to prepend a pre-approval predicate check. When frontmatter `shape_status == validated` AND executability triage scored 5/5 AND count of `⚠ contradicted` annotations in entity body `## Lens Evidence` section == 0, FO emits the literal log line `brainstorm gate auto-resolved: shape-validated, executability 5/5, no lens contradictions`, writes `score: 1.0` to frontmatter, advances to next stage per `effective_stages()`, and emits the dispatch event — all without captain interaction. Any condition failure (any of the 3 predicates false, OR `auto_advance: false` present) falls through to the existing path A/B/C captain gate presentation unchanged. Add a new small reference doc `references/brainstorm-gate-contradiction-check.md` defining the contradiction-count predicate authoritatively (grep-count of `⚠ contradicted` markers in `## Lens Evidence`, with explicit non-triggers for other annotation types like `⚠ stale-evidence`). Append a single comment line on README.md's brainstorm stage `gate: true` line documenting the auto-advance condition so stage-graph readers see the semantic at a glance.
+**APPROACH**: Edit `references/first-officer-shared-core.md` Brainstorm Triage → Gate Resolution section (around L159) to prepend a pre-approval predicate check. When frontmatter `shape_status == validated` AND executability triage scored 5/5 AND count of `⚠ contradicted` annotations in entity body `## Lens Evidence` section == 0 (⚠ contradicted by explore: empirical grep found 0 `⚠ contradicted` instances across active + archive entities — signal has no discriminative power until annotations are produced at scale; see Q-1 + O-1 for captain resolution), FO emits the literal log line `brainstorm gate auto-resolved: shape-validated, executability 5/5, no lens contradictions`, writes `score: 1.0` to frontmatter, advances to next stage per `effective_stages()`, and emits the dispatch event — all without captain interaction. Any condition failure (any of the 3 predicates false, OR `auto_advance: false` present) falls through to the existing path A/B/C captain gate presentation unchanged. Add a new small reference doc `references/brainstorm-gate-contradiction-check.md` defining the contradiction-count predicate authoritatively (grep-count of `⚠ contradicted` markers in `## Lens Evidence`, with explicit non-triggers for other annotation types like `⚠ stale-evidence`). Append a single comment line on README.md's brainstorm stage `gate: true` line documenting the auto-advance condition so stage-graph readers see the semantic at a glance.
 
 **ALTERNATIVE**: Reuse brainstorm's Step 5.5 triple-verification Gate (i) cross-lens recurrence check (≥2 of 4 lenses supporting each claim) as the contradiction signal inline — if all APPROACH claims passed Gate (i), treat as "zero contradictions", no new helper doc needed -- D-01 Rejected: Gate (i) is an intra-brainstorm check that runs BEFORE `## Lens Evidence` is written to the entity body, so FO reading the shipped brainstorm output cannot re-evaluate Gate (i) without re-dispatching brainstorm. A forward-facing data source (count `⚠ contradicted` annotations added by explore/clarify review) is the correct signal for FO auto-advance logic because those annotations persist on the shipped entity body and reflect review-detected contradictions, not just brainstorm-internal cross-lens recurrence.
 
@@ -116,6 +116,133 @@ You are asking for the First Officer to skip the brainstorm gate and auto-advanc
 - Scale: Small (2-3 files: shared-core edit + optional new contradiction-check.md + optional README comment; worst case 3)
 - Scope flag: none (0 decomposition signals; no migrate/rewrite/overhaul words, single subsystem target)
 - Sibling coordination: 3 in-flight shared-core edits flagged in GUARDRAILS for plan-phase merge ordering
+
+## Assumptions
+
+### A-1 -- Brainstorm gate at shared-core L159-169 is the captain-approval rubber-stamp moment entity 115 targets
+
+- Confidence: Confident (0.97)
+- Evidence: `references/first-officer-shared-core.md:159-169` "Gate Resolution" section literally states "Gate passes when the captain explicitly approves advancement... Never self-approves the brainstorm gate. Do not infer approval from silence." [primary]
+- Implication: the pre-approval predicate check must be prepended to this section; FO must bypass "captain explicit approval" requirement when predicate holds.
+
+### A-2 -- Executability score is already computed and frontmatter-written as `passed_count / 5`
+
+- Confidence: Confident (0.96)
+- Evidence: `references/first-officer-shared-core.md:162` "Write `score: {passed_count / 5}` to entity frontmatter (e.g., 5/5 → `score: 1.0`, 4/5 → `score: 0.8`)". 5-point rubric at L120-128 (intent clear / approach decidable / scope bounded / verification possible / size estimable). [primary]
+- Implication: no new scoring logic needed; auto-advance checks existing frontmatter `score == 1.0` OR in-memory triage passed_count == 5.
+
+### A-3 -- alignment-gate is a SEPARATE pipeline stage between brainstorm and clarify, not a brainstorm-internal check
+
+- Confidence: Confident (0.95)
+- Evidence: `docs/build-pipeline/README.md:36-43` defines `alignment-gate` as its own stage with `gate: true` and `feedback-to: brainstorm`. Entity 114 (shipped) extracted the logic from `agents/science-officer.md` Step 3.6 into `skills/build-alignment-gate/SKILL.md` as a first-class stage. [primary]
+- Implication: entity 115's brainstorm-gate auto-advance is orthogonal to alignment-gate's existing auto-advance (composite confidence ≥ 0.90). Two different gates on two different stages. The directive's scope is the brainstorm gate only — do NOT conflate with alignment-gate.
+
+### A-4 -- Three sibling entities edit `first-officer-shared-core.md` on different subsections (merge coordination, no semantic conflict)
+
+- Confidence: Confident (0.93)
+- Evidence: `CONTRACTS.md` shows: `review-stage-parallel-skill-dispatch` (execute, team creation policy section), `pre-ship-confidence-gate` (execute, Pre-Ship Confidence Gate new subsection), `flatten-dispatch-troops-architecture` (plan, Dispatch Modes section). None touch Brainstorm Triage → Gate Resolution subsection. [primary]
+- Implication: plan-phase sequences commits but no substantive conflict. `pre-ship-confidence-gate` is thematically similar (auto-advance) — plan phase may want to check for coherent terminology (e.g., "confidence gate" vs "auto-advance gate").
+
+### A-5 -- `auto_advance: false` frontmatter field already exists as captain opt-out on other gates
+
+- Confidence: Likely (0.78)
+- Evidence: `MEMORY.md fo-confidence-autoadvance.md` mentions the field for plan gate (>95% auto-advance, ≤95% captain gate). `MEMORY.md fo-auto-revision-loop.md` references it. No grep confirmation of the field being read in `references/first-officer-shared-core.md` — the mechanism may be in a separate reference doc or FO-level agent file. [secondary]
+- Implication: verify the actual field-reading code path lives somewhere (likely `references/first-officer-shared-core.md` Dispatch section or agent-level). If not present, 115 must also add the opt-out check.
+
+## Option Comparisons
+
+### O-1 -- How to source the "lens contradictions == 0" signal (contradiction-count data source)
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|--------|------|------|------------|----------------|
+| (a) grep-count `⚠ contradicted` in `## Lens Evidence` section only (brainstorm APPROACH proposal) | Targeted scope — matches the "lens contradictions" wording in directive | **Zero shipped entities have this annotation today** (grep returned 0 across active + archive). Signal has no discriminative power until explore/clarify stages populate at scale. | Low | Viable — but predicated on aspirational contract |
+| (b) grep-count `⚠ contradicted` or `⚠` anywhere in entity body | Broader surface — catches contradictions annotated in any section | Conflates lens contradictions with other `⚠` annotations (stale-evidence, research-contradicted, dedup); false-positive risk. | Low | Rejected — semantic noise |
+| (c) Check structural Q-n entries with `contradicted: true` flag or similar explicit marker | Clean structured data; would require frontmatter/schema update | Requires schema change (violates directive's "no brainstorm stage output changes" guardrail) | Medium | Rejected -- violates guardrail |
+| (d) ✅ Start with (a), but require explore/clarify to actually emit `⚠ contradicted` in at least N entities before shipping 115 — treat it as a 2-part work: (d.1) make the annotation usage canonical; (d.2) add auto-advance predicate | Fixes the data-vacuum problem; 115's predicate becomes meaningful at ship time | Scope escalation — 115 now gates on a writing-convention change across stages; may need 2 entities | Medium | ✅ Recommended — if captain wants meaningful signal |
+
+Recommendation (d) avoids the aspirational-contract trap. Recommendation (a) ships sooner but trivially passes for every entity until annotations are produced at scale. This is the core scope decision.
+
+### O-2 -- Reference-doc placement for contradiction predicate definition
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|--------|------|------|------------|----------------|
+| (a) Separate `references/brainstorm-gate-contradiction-check.md` | Predicate is authoritatively defined; future refactors have a single source | Adds a tiny file for what may be a one-line grep predicate | Low | ✅ Recommended |
+| (b) Inline definition in `first-officer-shared-core.md` Gate Resolution section | Co-located with caller; no cross-file hop | Mixes predicate with gate logic; harder to rev the predicate without touching shared-core | Low | Viable |
+
+Recommendation (a) matches the directive's "可能需要一個新 helper" framing and aligns with how other predicates are plumbed (e.g., `alignment_confidence` formula lives in its own skill file).
+
+## Open Questions
+
+### Q-1 -- Does the `⚠ contradicted` annotation get emitted by explore/clarify in practice, and if not, should 115 include the emission work?
+
+- Domain: Behavioral/Callable + Readable/Textual
+- Why it matters: The APPROACH's 3rd predicate counts annotations that empirically don't exist (grep: 0 matches in active + archive before this session). If the data source stays empty, the predicate trivially passes for every shape_status:validated + 5/5 entity — effectively reducing to a 2-condition predicate. Either 115's scope expands to ensure annotation emission at scale, OR the predicate design changes to use an observable signal.
+- Suggested options:
+  - (a) Expand 115 scope: add explore/clarify emission work so `⚠ contradicted` actually populates (scope → Medium)
+  - (b) Park 115 until a separate "contradiction-annotation hygiene" entity ships first
+  - (c) Redesign predicate: use an observable signal today (e.g., `score: 1.0` alone since it's already frontmatter-written, drop the contradiction check)
+- [primary]
+
+### Q-2 -- Where is `auto_advance: false` actually read by FO?
+
+- Domain: Behavioral/Callable
+- Why it matters: A-5's evidence is MEMORY.md references, not direct code/shared-core evidence. If the field-reading happens in a place 115 doesn't edit, 115 must plumb the short-circuit itself. If it's already load-bearing in shared-core or FO agent, 115 just adds the guard and reuses the existing read path.
+- Suggested options:
+  - (a) Read lives in `references/first-officer-shared-core.md` (likely Dispatch section) -- grep confirms
+  - (b) Read lives in `agents/first-officer.md` agent body
+  - (c) Read is proposed-but-not-yet-landed (in one of the 3 in-flight shared-core edits)
+- [secondary]
+
+### Q-3 -- Does captain want the auto-advance log line to ALSO surface in the dashboard activity stream as a `gate_decision` event, or is log-only sufficient?
+
+- Domain: User-facing Visual + Behavioral/Callable
+- Why it matters: Forensic replay-ability. If captain only sees the log line in FO output, retrospection requires log-stream search. A `gate_decision` activity event would show in dashboard for later review at no extra captain cost. Directive says "log" only — this Q surfaces an adjacent UX choice explore noticed.
+- Suggested options:
+  - (a) Log-only (directive verbatim) — ship minimal
+  - (b) Log + emit `gate_decision` event to `/api/events` with `auto_resolved: true` flag — aligns with dashboard patterns
+  - (c) Defer dashboard surfacing to a follow-up entity — preserves Small scale
+- [secondary]
+
+## Core Tensions
+
+- **essential**: Auto-advance eliminates rubber-stamp captain info-loss, but the 3rd condition ("zero lens contradictions") depends on an annotation contract that has **zero observable instances in shipped entities today**. The APPROACH's data source may be aspirational; without empirical signal, the 3-condition predicate collapses to a 2-condition one with no discriminative power on contradictions.
+- **essential** (preserved from brainstorm): Conservative predicate construction means false-positives are near-zero, BUT the signal must actually exist for the predicate to discriminate anything beyond shape_status + executability.
+- **time-based**: The 3 in-flight shared-core sibling edits (review-stage-parallel-skill-dispatch, pre-ship-confidence-gate, flatten-dispatch-troops-architecture) all touch the same file — merge coordination sequences commits but doesn't block; thematic coherence with `pre-ship-confidence-gate` (both are "auto-advance" patterns) is worth the plan phase reading that entity for shared terminology.
+
+## Honest Boundaries
+
+- Does NOT generalize to clarify or UAT gates — brainstorm-gate-specific per directive.
+- Does NOT modify the 5-point executability rubric — shared-core.md:120-128 contract stays.
+- Does NOT override `auto_advance: false` — opt-out preserved.
+- Does NOT change the `## Lens Evidence` body section format — entity 114 contract frozen.
+- Recommendation validation for O-1 performed against design doc invariants: directive's "no brainstorm stage output changes" rules out O-1(c); empirical grep rules out O-1(a) as meaningful signal → O-1(d) chosen despite scope escalation risk.
+
+## Stage Report: explore
+
+- [x] Mode: B (inline single-pass fallback -- Small entity, target file pre-mapped by brainstorm; re-verified shared-core L115-172 + README L20-75 this session)
+- [x] ⚠ ensign-mode inline fallback -- 4-angle quality not achieved this invocation (acceptable: Small + well-specified + captain-written Pre-Brainstorm Scope Sketch already covers ~3 angles worth of context)
+- [x] Files mapped: 4 across contract, config, memory
+  contract: 2 (first-officer-shared-core.md, skills/build-alignment-gate/SKILL.md), config: 1 (README.md), memory: 1 (MEMORY.md entries). Scale confirmed Small (≤5 files).
+- [x] Assumptions formed: 5 (Confident: 4, Likely: 1, Unclear: 0)
+  A-1/A-2/A-3/A-4 Confident via direct file:line; A-5 Likely (evidence is secondary/MEMORY.md-only).
+- [x] Options surfaced: 2
+  O-1 contradiction-count data source (material, captain must decide); O-2 reference-doc placement.
+- [x] Questions generated: 3
+  Q-1 empirical existence of ⚠ contradicted annotation (highest priority — invalidates or constrains O-1); Q-2 auto_advance read location (blocking for implementation); Q-3 gate_decision event emission (stretch UX).
+- [x] α markers resolved: 0 / 0
+  Brainstorm emitted 0 α markers; none to consume.
+- [x] Brainstorm claim verification: 4 confirmed, 1 contradicted
+  ✓ shared-core L159-169 gate resolution section; ✓ score computation at L162; ✓ alignment-gate as separate stage (README L36); ✓ 3 sibling contracts different subsections (CONTRACTS.md); ⚠ "grep-count of ⚠ contradicted" data source contradicted by empirical scan — 0 matches before this session (see Q-1 + O-1).
+- [x] Scale assessment: confirmed Small (3 core files: shared-core + new contradiction-check + README comment) — but note Q-1's option (a) would escalate to Medium
+- [x] Research dispatched: 0 researchers (skipped -- all tech claims are internal-codebase; no external libs/APIs)
+- [x] Self-test gate (Port 11): all gates pass
+  Gate (i) cross-layer recurrence: N/A in Mode B per Mode B modifier
+  Gate (ii) Track A evidence depth: PASS (A-1..A-4 all ≥2 evidence sources; A-5 has secondary tier — ≥2 covered across MEMORY files)
+  Gate (iii) Track B alternative completeness: PASS (O-1: 4 options 1 recommended; O-2: 2 options 1 recommended)
+  Gate (iv) Track C option surfacing: PASS (Q-1/Q-2/Q-3 each have 3 suggested options)
+  Gate (v) Evidence tier tagging: PASS (all Evidence lines end [primary] or [secondary])
+  Gate (vi) Core Tensions typing: PASS (3 entries, typed essential/essential/time-based)
+- [x] Key escalation: **Q-1 is load-bearing for the entity's coherence.** If captain agrees the `⚠ contradicted` annotation is aspirational-only, O-1(a) ships a predicate with zero discriminative power; the right response is O-1(d) scope expansion or O-1 redesign. Clarify phase must resolve Q-1 FIRST before O-1.
 
 ## Pre-Brainstorm Scope Sketch (informal)
 
