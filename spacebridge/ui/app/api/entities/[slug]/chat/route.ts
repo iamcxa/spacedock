@@ -58,10 +58,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   try {
     const { createSocketClient } = await import("../../../../../../src/ipc/socket-client");
 
+    // Use a sentinel projectRoot for the ephemeral UI client so it doesn't shadow
+    // any real CC session in the daemon's sessionRegistry (O-2a most-recent-heartbeat wins).
     const client = createSocketClient({
       socketPath,
       sessionId: `ui-route-${randomUUID()}`,
-      projectRoot,
+      projectRoot: `ui-ephemeral-chat-${randomUUID()}`,
       pid: process.pid,
     });
 
