@@ -739,3 +739,56 @@ Step 0.5 evidence re-validation result: A-1 holds (SKILL hybrid-classification-h
 ### Summary
 
 Plan stage for entity 105 produced a research-backed 9-task plan covering the 5 Nüwa ports (Port 7 Mode A 4-angle fanout, Port 8 Track-A triple-gate, Port 9 tier tags, Port 10 Core Tensions + Honest Boundaries, Port 11 path-aware self-test). Mode A/B dual-mode preserved per sibling 104 O-1 three-skill precedent. Key decisions: Port 11 MANDATORY under path-aware semantics per Q-1; `references/parallel-explorer-angles.md` as editable reference doc per Q-3; negative-space seed-pattern table per Q-2; FO dispatch-graph audit documented as Task 6 artifact with code changes deferred to downstream entities per parent 102 Honest Boundary 9. Two dispatch gaps (plan-checker + workflow-index append) documented rather than silently skipped; FO must cover both post-handoff.
+
+## Stage Report: execute
+
+status: passed
+base SHA: f95f0ef
+final SHA: bfcf4ae
+waves: 5 of 5 completed (wave 0 + wave 1 + wave 2 + wave 3 + wave 4)
+tasks: 9 done, 0 blocked
+workflow-index transition: f95f0ef (entered before wave 1)
+
+### Per-task summary
+- task-0: DONE (sonnet) -- no commit (verification-only) -- 2 benign drifts (agent-dispatch-guide.md renamed; AC-3 "Mode A" grep mismatch on peer SKILL.md files), captain override applied
+- task-1: DONE (sonnet) -- commit cfcdf3a (1 file) -- create `skills/build-explore/references/parallel-explorer-angles.md` with 4 angles + seed-pattern table + Mode B fallback
+- task-2: DONE (opus) -- commit 3628d50 (batched w/ task-4; same file) -- rewrite Step 2 for 4-angle parallel fanout (Port 7)
+- task-3: DONE (opus) -- commit 0bf5131 (1 file) -- rewrite Track-A classification to triple-gate (Port 8)
+- task-4: DONE (opus) -- commit 3628d50 (batched w/ task-2; 2 files) -- tier-tag + Core Tensions + Honest Boundaries first-class sections (Ports 9+10)
+- task-5: DONE (opus) -- commit d8af478 (1 file) -- Step 6.5 path-aware Self-Test Gate (Port 11)
+- task-6: DONE (sonnet) -- commit ff27377 (1 file) -- FO explore invocation-path audit artifact
+- task-7: DONE (sonnet) -- no commit (verification-only) -- all 9 entity AC grep commands PASS; 1 cross-file drift finding on Mode B warning string between SKILL.md and parallel-explorer-angles.md §6
+- task-8: DONE (sonnet) -- commit bfcf4ae (1 file) -- Canonical References pending marker for post-104-merge coordination
+
+### BLOCKED escalations
+None.
+
+### Stale-file warnings
+None detected across any wave.
+
+### Findings
+
+#### Skill suggestions
+None surfaced.
+
+#### Scope observations
+- **task-0 benign drift A**: `skills/build-explore/references/agent-dispatch-guide.md` was renamed to `researcher-vs-code-explorer.md`. Plan-phase should update the read_first path in any future entity plan citing the old name.
+- **task-0 benign drift B**: AC-3 "Mode A three-way precedent" grep passes only on build-explore/SKILL.md (9 matches) but returns 0 on build-review/SKILL.md and build-plan/SKILL.md. The structural precedent (all three reference `researcher-vs-code-explorer.md` at ~line 28) is intact; only the literal string "Mode A" is missing from the peer SKILL.md files. Plan's AC was too literal for its structural claim.
+- **task-7 cross-file drift**: Mode B warning string differs between authoritative source (SKILL.md Step 2 canonical: `⚠ ensign-mode inline fallback -- 4-angle quality not achieved this invocation`) and descriptive reference (parallel-explorer-angles.md §6: `⚠ Mode B fallback: angle (iv) negative-space skipped ...`). SKILL.md is the emission point; entity AC #2 passes on SKILL.md. Future cleanup: align §6 descriptive text to canonical string.
+- **task-8 pending marker**: sibling 104 had not yet merged when 105 executed; Canonical References line carries `(⏳ post-104-merge: update to docs/build-pipeline/_docs/extraction-framework.md)`. Follow-up edit needed after 104 merges.
+
+#### Pre-existing failures
+None.
+
+#### Unresolved scope gaps
+None.
+
+#### Plan defects surfaced
+- **task-0 stale file path** (`agent-dispatch-guide.md` → `researcher-vs-code-explorer.md`): same plan-drift class as entity 104 task-0 stale-line-anchor. Both point to plan-write-discipline: external file moves between plan-phase and execute-phase corrupt premises.
+
+### Dispatch deviations
+- **Per-task commit batching for SKILL.md (task-2 + task-4)**: forced by same-file conflict. Same deviation as entity 104 tasks 1+2 and 5+6+7. Same future mitigation (plan ensign schedules co-modifying tasks across waves, or marks as batchable).
+- **Wave 3 parallelism**: task-5 + task-6 dispatched in parallel (no file conflict). Wave 4 task-7 + task-8 dispatched in parallel (verification-only + independent body edit).
+
+knowledge capture: skipped -- findings overlap entity 104 observations (agent-dispatch-guide rename, plan-write-discipline stale paths); already in captain-facing record. No new D1/D2 patterns distinct from 104's capture.
+
