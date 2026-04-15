@@ -1,14 +1,15 @@
 ---
 id: 108
 title: Sharp-edges audit of spacedock primitives -- workflow-index + troop contract
-status: uat
+status: shipped
 context_status: ready
 source: captain directive (2026-04-15 post-103/106 ship session — session evidence of workflow-index lifecycle gap + troop trust surface)
 created: 2026-04-15T13:45:00+08:00
 started: 2026-04-15T13:50:00+08:00
-completed:
-verdict:
-score: 0.965
+completed: 2026-04-15T18:45:00+08:00
+verdict: shipped
+score: 0.78
+ship_note: "Captain B-path: audit artifact shipped at UAT 0.78 (4 interactive items: severity/seed scope/F-XP-1 decomp/known-gap triggers); captain async review happens when Phase F seeds get picked up as downstream entities. Same pattern as 107 ship note."
 worktree: .worktrees/spacedock-ensign-spacedock-primitives-sharp-edges-audit
 issue:
 pr:
