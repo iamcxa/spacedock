@@ -893,3 +893,26 @@ scope: 8 CLI + 4 interactive items from UAT Spec
 
 Pass. Advance to confidence gate.
 
+
+## Confidence Assessment
+
+Iteration: 1 of 3 (first pass)
+
+### Per-factor scores
+
+| Factor | Weight | Score | Contribution | Evidence |
+|---|---|---|---|---|
+| test_coverage | 25% | 95% | 23.75 | Quality: 748 pass / 1 fail / 1850 expect() calls. 1 failing test (`Event Pipeline Integration > POST /api/events -> WebSocket broadcast`) is pre-existing on main and unrelated to 105's markdown-only edits. Score reflects literal verdict (1 fail); semantic baseline is unchanged. |
+| type_coverage | 20% | 100% | 20.00 | tsc baseline unchanged. 105 touched 0 TypeScript files. |
+| review_severity | 20% | 100% | 20.00 | Review: 0 CRITICAL, 0 HIGH. 1 MEDIUM (Mode B warning string drift) + 1 LOW (pending-marker bookkeeping) + 1 NIT — informational only. |
+| ac_completeness | 20% | 100% | 20.00 | UAT: 8 CLI pass + 4 deferred-to-live (skipped-with-ack). effective_total = 8; pass = 8 → 100%. |
+| integration_breadth | 15% | 100% | 15.00 | 9/9 tasks DONE. planned_weighted = done_weighted = 8.5 (wave-weighted file sum across task-0..task-8). |
+
+### Composite
+
+95 × 25% + 100 × 20% + 100 × 20% + 100 × 20% + 100 × 15% = **98.75%**
+
+### Routing
+
+Composite 98.75% >= 90% threshold. **Advance to shipped.** Proceed to Merge and Cleanup.
+
