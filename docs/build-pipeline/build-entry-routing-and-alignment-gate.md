@@ -2,11 +2,11 @@
 id: 113
 title: Build Entry Routing + Alignment Gate -- SO Pipeline Dual-Entry, Mid-Flow Direction Check, Clarify Self-Filter
 slug: build-entry-routing-and-alignment-gate
-status: plan
+status: execute
 context_status: ready
 source: /build --from build-entry-routing-and-alignment-gate
 created: 2026-04-15T20:30:00+08:00
-started:
+started: 2026-04-15T21:00:00+08:00
 completed:
 verdict:
 score:
