@@ -886,3 +886,19 @@ failed: 0
 ### Captain Interaction
 - Option presented: A/B/C (skip remaining with ack / pause for manual smoke / structural-only approve)
 - Captain chose: A (2026-04-16)
+
+## Confidence Assessment
+
+Iteration: 1 of 3
+
+| Factor | Weight | Score | Contribution | Evidence |
+|--------|--------|-------|--------------|----------|
+| test_coverage | 25% | 80% | 20.00 | test verdict=pass (822 pass / 1 fail — net +6 pass vs main baseline 816 pass / 7 fail; the 1 failure is pre-existing flaky SSE chat-route test); no ratchet section → pass=80% per spec |
+| type_coverage | 20% | 100% | 20.00 | typecheck SKIPPED (no TS changes in diff — markdown/YAML only); ratchet absent → treat as pass |
+| review_severity | 20% | 100% | 20.00 | 0 CRITICAL, 0 HIGH findings in bare-mode pre-scan |
+| ac_completeness | 20% | 100% | 20.00 | 10 total UAT items; 6 passed (CLI evidence-reused from execute task-8); 4 skipped-with-captain-ack → effective_total = 6, pass rate 6/6 = 100% |
+| integration_breadth | 15% | 100% | 15.00 | 8/8 tasks DONE; all 7 planned files touched (skills/build-alignment-gate/SKILL.md created; README + SO + archive + CONTRACTS + brainstorm + confidence-gate edited) |
+
+**Composite: 95.00%**
+
+Routing: >= 90% threshold → advance to shipped.
