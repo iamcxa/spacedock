@@ -1,8 +1,8 @@
 ---
 id: 110
 title: Gate Enforcement Codification -- Codify Plan 95% + Pre-Ship 90% Gates Into Skills
-status: brainstorm
-context_status: pending
+status: explore
+context_status: awaiting-clarify
 source: captain directive (2026-04-15 post-107 ship review)
 created: 2026-04-15T17:45:00+08:00
 started:
@@ -158,6 +158,119 @@ You are asking for: codify the two existing-but-unenforced confidence gates (pla
 - CONTRACTS.md `_index/CONTRACTS.md` contains a row for `skills/confidence-gate/SKILL.md` referencing entity 110 (how to verify: `grep "skills/confidence-gate/SKILL.md" docs/build-pipeline/_index/CONTRACTS.md` returns a match).
 - MEMORY `fo-confidence-autoadvance.md` carries a "Superseded by" annotation pointing to `skills/confidence-gate/SKILL.md` (how to verify: `grep -i "superseded" /Users/kent/.claude/projects/-Users-kent-Project-spacedock/memory/fo-confidence-autoadvance.md` returns a match).
 
+## Assumptions
+
+### A-1: Entity 087 (pre-ship-confidence-gate) is SHIPPED, not in-flight
+
+- **Confidence**: Confident (0.95)
+- **Statement**: `references/confidence-gate.md` and `references/first-officer-shared-core.md:319-343` are stable post-merge. 110 does NOT need to sequence-after 087 — it can begin immediately. This contradicts Lens (d) primary finding.
+- **Evidence**: git log `6eed99e feat(pipeline): add pre-ship confidence gate with 5-factor scoring (#41)` -- repo:main [primary]; CONTRACTS.md row "087 ✅ final" implied by archive presence -- docs/build-pipeline/_index/CONTRACTS.md [secondary]
+  (⚠ Lens (d) brainstorm finding contradicted: entity 087 reported as "in-flight" was stale CONTRACTS read; cross-phase skepticism per build-explore Step 5.5 corrects to shipped.)
+
+### A-2: Entity 114 (build-alignment-gate) is the structural template
+
+- **Confidence**: Confident (0.95)
+- **Statement**: `skills/build-alignment-gate/SKILL.md` (186 lines, shipped 2026-04-16) is the canonical extraction precedent. 110's `skills/confidence-gate/SKILL.md` mirrors its frontmatter (`user-invocable: false`), Tools split (no Agent / no AskUserQuestion), Input Contract pattern, and BLOCKED return contract.
+- **Evidence**: skills/build-alignment-gate/SKILL.md (existing, 186 lines) -- Lens (c) primary [primary]; git log `db7dca6 feat(execute): alignment-gate-promote-to-stage task-1 -- create skill` -- repo:main [primary]; entity 114 frontmatter `user-invocable: false` mirrors expected confidence-gate frontmatter -- skills/build-alignment-gate/SKILL.md [secondary]
+
+### A-3: Plan-stage 5 factors are explicitly enumerated in MEMORY
+
+- **Confidence**: Confident (0.95)
+- **Statement**: The plan-gate factor set is fully specified in MEMORY `fo-confidence-autoadvance.md`: (1) context completeness, (2) scope clarity, (3) risk level, (4) precedent strength, (5) AC testability. Per-factor weights are NOT specified (MEMORY says "average ≥ 95%" implying uniform 20% weights). This resolves brainstorm α marker on factor weights.
+- **Evidence**: /Users/kent/.claude/projects/-Users-kent-Project-spacedock/memory/fo-confidence-autoadvance.md:18-23 enumerates 5 factors -- MEMORY [primary]; same source line "Average ≥ 95% = auto-advance" implies uniform weights -- MEMORY [primary]
+  (✓ resolved by explore: α marker "plan-stage factor weights deferred" → uniform 20% per MEMORY default; confirmable by codebase grep)
+
+### A-4: Entity 107 retroactive Confidence Assessment is the canonical fixture data
+
+- **Confidence**: Confident (0.95)
+- **Statement**: Entity 107's `## Confidence Assessment` section (composite 76.25%, post-ship retroactive) provides ready-made test fixture data covering all 5 pre-ship factors with cited evidence. Use verbatim as `tests/pressure/confidence-gate-pre-ship-mode.yaml` seed input.
+- **Evidence**: docs/build-pipeline/_archive/plan-checker-multi-angle-nuwa.md `## Confidence Assessment` retroactive section -- archive [primary]; same section §"Gate skip disclosure" enumerates all 5 factors with weights -- archive [primary]
+
+### A-5: `## Confidence Assessment` schema generalizes via `Stage` field + variable factor list
+
+- **Confidence**: Likely (0.75)
+- **Statement**: Existing schema (factor table + Composite + Verdict + Iteration) accommodates both modes by adding a `Stage: plan|pre-ship` field. Plan mode emits 5 MEMORY factors (uniform 20%); pre-ship mode emits 5 confidence-gate.md factors (25/20/20/20/15). Schema generalization is mechanical, not architectural.
+- **Evidence**: references/confidence-gate.md:290-308 §8 schema -- references/ [primary]; MEMORY fo-confidence-autoadvance.md "Log the score in the Stage Report" suggests same physical schema can host plan-mode -- MEMORY [secondary]
+
+### A-6: Pressure-test fixtures use existing `tests/pressure/` skill-creator format
+
+- **Confidence**: Likely (0.70)
+- **Statement**: New `tests/pressure/confidence-gate-{plan|pre-ship}-mode.yaml` follow the established skill-creator pressure-test convention used by plan-checker dim files (Q-3 entity 107 selected dedicated per-dim files). 110 mirrors that pattern.
+- **Evidence**: docs/build-pipeline/_archive/plan-checker-multi-angle-nuwa.md Q-3 → Selected: A "dedicated per-dim files (6 per-dim haiku fixtures + 1 plan-checker-dim-3-synthesis fixture)" -- archive [primary]; tests/pressure/ exists per Lens (c) (file not found for confidence-gate yet) -- Lens (c) [secondary]
+
+## Option Comparisons
+
+### O-1: References/confidence-gate.md retire strategy
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| **Stub-redirect** (5-line file pointing to skills/confidence-gate/SKILL.md) | Preserves backlinks from CONTRACTS, archived entities, FO docs; zero broken-reference risk | Slight maintenance overhead (stub + skill); historical revisions still searchable | Low | ✅ **Recommended** -- safest, mirrors entity 114 pattern (no source-of-truth file deleted) |
+| **Full delete** | Clean repo; forces all consumers to use skills/confidence-gate | Breaks entity 107 retroactive assessment backlink (`per references/confidence-gate.md + references/first-officer-shared-core.md:319-343`); breaks any external docs/PRs referencing line numbers | Medium (migration sweep needed) | Viable but riskier |
+| **Collapse to skill internals appendix** | Mid-ground: keep file but truncate to "see skill" pointer + version log | Awkward dual home; captain explicitly said "retire OR collapse" suggesting either-or | Low | Viable; subset of stub-redirect |
+
+**Validation**: stub-redirect mirrors entity 114's archived-precedent annotation pattern; no design-doc invariant violated.
+
+### O-2: MEMORY `fo-confidence-autoadvance.md` post-codification handling
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| **Annotate as superseded, keep file** | Historical context preserved; future search hits find both old + new; consistent with MEMORY conventions ("never git-track, never delete except by user") | Two sources of truth coexist briefly until search ranking stabilizes | Low | ✅ **Recommended** -- captain MEMORY rule "never delete" + safe default |
+| **Delete file** | Single source of truth; smaller MEMORY surface | Loses authorship lineage; violates global MEMORY discipline | Low | Rejected -- captain MEMORY conventions forbid this |
+| **Move to memory/_archive/ subfolder** | Neat separation; preserves history; signals "no longer authoritative" | MEMORY system has no archive convention today; introducing one is scope creep | Medium | Viable but premature |
+
+**Validation**: aligns with captain global CLAUDE.md MEMORY rule "auto-memory persists; only user explicitly removes."
+
+### O-3: Plan-gate factor weights — uniform vs differential
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| **Uniform 20%** (per MEMORY default) | MEMORY-spec compliant; zero captain-decision burden; mirrors fo-confidence-autoadvance.md "average ≥ 95%" literal | All factors weighted equally; risk-level (factor 3) is arguably more critical than precedent-strength (factor 4) | Low | ✅ **Recommended** -- ship MEMORY default; defer differential weights to follow-up entity if production data shows skew |
+| **Mirror pre-ship weights (25/20/20/20/15)** | Single weight scheme across both modes; simpler skill code | Pre-ship weights are tuned for ship-time signals (test/type/review); plan-time signals (context/scope/risk) have no empirical mapping | Low | Rejected -- semantic mismatch |
+| **Captain-tuned at clarify** | Captain expresses domain knowledge; weights become tuned | Requires captain decision now; no empirical data to inform tuning | Low (captain effort) | Viable -- escalate to clarify Q if captain prefers active tuning |
+
+**Validation**: MEMORY explicitly says "average ≥ 95%"; uniform weights honor stated intent. Returns 5 scores trivially summable.
+
+## Open Questions
+
+### Q-1: Should `## Confidence Assessment` schema add a `Mode` field distinct from `Stage`?
+
+- **Domain**: Organizational (schema design)
+- **Why it matters**: A-5 assumes `Stage: plan|pre-ship` field is sufficient. But future expansion (e.g., "alignment_confidence" surfacing per entity 114, or a hypothetical mid-execute gate) might want `Mode: gate|advisory|retroactive`. Adding both fields now is cheap; adding later is migration cost.
+- **Suggested options**:
+  - Single `Stage` field (current A-5 assumption, YAGNI)
+  - Both `Stage` and `Mode` fields (forward-compat)
+  - Open-ended -- captain decides
+
+### Q-2: Plan-gate placement in build-plan SKILL.md — Step 0.6 vs new terminal Step
+
+- **Domain**: Runnable (skill protocol ordering)
+- **Why it matters**: Directive says "Step 0.6 (right after plan-checker)". Plan-checker currently lives at SKILL.md Step 6 (per recent commits). "Step 0.6" suggests early-phase but plan-checker is post-plan-write. Captain wording may have meant "right after plan-checker passes" semantically. Need exact insertion point.
+- **Suggested options**:
+  - Insert as new Step 7 (right after plan-checker Step 6, before Stage Report Step)
+  - Insert as new Step 0.6 (literal directive text — but conflicts with current Step ordering)
+  - Open-ended -- captain decides
+
+### Q-3: Contract test scope — fixture YAML only, or live skill invocation test?
+
+- **Domain**: Runnable (test discipline)
+- **Why it matters**: GUARDRAILS says "MUST add unconditional Skill() call contract test". Contract tests in spacedock currently take two forms: (a) static YAML fixtures asserting expected schema (e.g., plan-checker dim fixtures), or (b) live `bun test` invoking the skill end-to-end. Both are "contract tests" in MEMORY parlance. Captain preference matters for scope sizing.
+- **Suggested options**:
+  - Static YAML only (lighter, matches plan-checker dim pattern)
+  - Static YAML + 1 live invocation smoke test (heavier, deeper coverage)
+  - Open-ended -- captain decides
+
+## Core Tensions
+
+- **time-based**: ~~entity 087 in-flight~~ → corrected: A-1 confirms 087 shipped, no scheduling tension. Brainstorm Core Tension #1 obsoleted by explore evidence.
+- **essential**: schema-generalization tension preserved -- plan-mode and pre-ship-mode share `## Confidence Assessment` physical layout but factor sets are semantically distinct. A-5 assumes the `Stage` field carries the distinction; Q-1 surfaces whether a separate `Mode` field is also warranted.
+- **domain-based**: skill-codification authority (110) vs reference-doc maintenance (110 retires the doc itself) -- both happen in same entity, no cross-entity conflict, but O-1 must lock retire strategy before plan stage.
+
+## Honest Boundaries
+
+- This explore step did NOT verify that `skills/build-plan/SKILL.md` Step 0.6 placement (Q-2) is structurally feasible -- only that the directive text said "Step 0.6". Plan-stage task-1 must read current SKILL.md ordering and propose insertion point.
+- Cross-phase skepticism applied to Lens (d) and surfaced one stale finding (087 in-flight → shipped). Other Lens findings re-verified inline; no further corrections needed.
+- Plan-stage 5 MEMORY factors (A-3) lack empirical weight data — ship uniform per MEMORY default (O-3 recommended) but actual production data may inform tuning later. This is an acknowledged limitation, not a blocker.
+
 ## Stage Report: brainstorm
 
 - [x] Mode: A (4-lens parallel dispatch)
@@ -171,3 +284,25 @@ You are asking for: codify the two existing-but-unenforced confidence gates (pla
 - [x] Self-test gates: all pass (cross-lens recurrence ≥2 for 7/7 APPROACH claims; tier tags on all citations)
 - Alignment gate: not run (deferred to FO post-handoff per entity 114)
 alignment_confidence: N/A
+
+## Stage Report: explore
+
+- [x] Files mapped: 7 across contract + config layers
+  contract: 2 (references/confidence-gate.md, references/first-officer-shared-core.md), config: 5 (skills/build-plan/SKILL.md, skills/build-alignment-gate/SKILL.md, MEMORY fo-confidence-autoadvance.md, archived entity 107, README.md)
+- [x] Assumptions formed: 6 (Confident: 4, Likely: 2, Unclear: 0)
+  A-1 to A-4 Confident via primary evidence; A-5 Likely (schema generalization untested in code); A-6 Likely (fixture format precedent applies)
+- [x] Options surfaced: 3
+  O-1 retire strategy (stub-redirect recommended); O-2 MEMORY annotation (annotate-keep recommended); O-3 plan-gate weights (uniform 20% recommended)
+- [x] Questions generated: 3
+  Q-1 schema Mode field; Q-2 Step 0.6 placement; Q-3 contract test scope
+- [x] α markers resolved: 2 / 2
+  α-1 (non-goals) → captain decides at clarify (kept as Q-implicit); α-2 (factor weights) → resolved via A-3 + O-3 uniform default per MEMORY
+- [x] Scale assessment: confirmed Medium
+  7 files mapped; 6 A + 3 O + 3 Q within Medium envelope; no decomposition signal
+- [x] Research dispatched: 0 researchers (skipped -- pure codebase refactor, no external tech claims; A-3 factor weights resolved via MEMORY grep)
+
+⚠ Mode B inline fallback used -- justified by 50%+ files already-read in brainstorm Lens (c/d) + 1 inline Bash batch covering recent decisions (Angle ii) and entity 107 retro data. Negative-space (Angle iv) skipped per Mode B contract. Plan-phase reviewers note this coverage gap.
+
+Cross-phase correction: Lens (d) brainstorm finding "entity 087 in-flight" contradicted by git log evidence (commit 6eed99e shipped). A-1 documents the correction.
+
+Self-test gate (Port 11): all 5 checks pass under Mode B modifier. Gate (i) cross-layer recurrence N/A in Mode B; gates (ii-v) verified.
