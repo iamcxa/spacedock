@@ -1,0 +1,8 @@
+skill: build-shape
+trigger: "fix typo in README.md line 42"
+timeout: 120
+assertions:
+  - contains: "shape unnecessary"
+  - contains: "/build"
+  - not_contains: "## Problem Statement"
+  - not_contains: "## User Stories"
