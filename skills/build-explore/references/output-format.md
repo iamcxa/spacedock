@@ -32,6 +32,27 @@ Evidence: src/entity-loader.ts:27 -- validates 3 of 8 fields with Zod
 
 Each assumption is a single block: declarative statement, confidence level with emoji + numeric score (0-1), and evidence with file path and line number. The numeric score makes confidence actionable -- the captain can see at a glance which assumptions carry risk.
 
+### Tier Tag (Port 9)
+
+Every `Evidence:` line in `## Assumptions`, `## Option Comparisons`, and `## Open Questions` MUST carry a trailing bracketed tier tag: `[primary]`, `[secondary]`, or `[tertiary]`. The tag is the final token on the Evidence line.
+
+**Tier semantics:**
+- `[primary]` -- captain directive, Canonical References, ADRs, or design-doc invariants (Step 1b loaded).
+- `[secondary]` -- codebase evidence with >=2 consistent usages (i.e. a pattern, not a single example).
+- `[tertiary]` -- single usage, template match, or "standard practice" claim without codebase confirmation.
+
+**Conflict rule:** when two pieces of evidence disagree, `[primary]` wins over `[secondary]` wins over `[tertiary]`, unless the captain issues a clarify-stage override that explicitly inverts the ordering for the entity.
+
+**Tag-flow invariant:** when explore consumes brainstorm output that already carries bracketed tier tags (e.g., Canonical References annotated `[primary]` in the spec), those tags flow through unchanged -- NO re-tagging, NO syntax conversion, NO promotion/demotion. Explore may add tags to Evidence lines that lacked them; explore may NOT rewrite tags brainstorm already set.
+
+Example Evidence lines with tier tags:
+
+```
+Evidence: src/server.ts:42 -- all 6 existing endpoints use this pattern [secondary]
+Evidence: docs/adr/007-websocket.md -- ADR mandates WS for real-time [primary]
+Evidence: Next.js docs -- "standard practice for standalone output" [tertiary]
+```
+
 **Confidence emoji convention** (mandatory -- enables captain quick-scan during clarify batch review):
 - 🟢 Confident (0.80-1.0) -- strong codebase precedent, 2+ usages
 - 🟡 Likely (0.50-0.79) -- single usage or partial fit
@@ -93,6 +114,60 @@ Suggested options: None -- captain input needed
 ```
 
 Each question includes Domain (one of the 5 GSD domains), Why it matters, and Suggested options (or "None -- captain input needed" when genuinely open). Each field -- the `Q-n:` header, `Domain:`, `Why it matters:`, `Suggested options:`, and any `→ Answer:` annotation appended later by build-clarify -- MUST be separated from the next by exactly one blank line so markdown renders them as distinct paragraphs. Single-newline separation collapses into a wall of text when rendered in the dashboard UI.
+
+---
+
+## Core Tensions + Honest Boundaries (Port 10)
+
+Two first-class sections emitted AFTER `## Open Questions` and BEFORE `## Stage Report: explore`. Emission order is strict: `## Core Tensions` first, then `## Honest Boundaries`.
+
+### Core Tensions
+
+Typed entries capturing design tensions that resist single-option resolution. Each entry is one of three types:
+
+- `time-based` -- tension between short-term and long-term concerns (ship-now vs. Postgres-migration-ready).
+- `domain-based` -- two domains (e.g., router vs. view) impose conflicting constraints on the same surface.
+- `essential` -- genuine design tradeoff with no "right" answer; captain must pick a side.
+
+**Cardinality discipline:** 1-5 entries in the default band. When the count exceeds 5, append an alpha marker on the section header: `(α: tension count {n} outside default 1-5; scale-justified by {directive-signal})`. Under-count is fine; empty uses the escape-hatch literal (below).
+
+**Inter-explorer contradiction routing:** when Step 2 Mode A returns contradictory findings from 2+ code-explorer subagents on the same `file:line`, the contradiction MUST land here, typed `essential` (genuine design tension surfaced by the conflict) or `domain-based` (same evidence read through different domain lenses). Do not flatten by synthesis -- preservation of the conflict is load-bearing for clarify-stage Q&A quality.
+
+**Downstream discipline:** downstream stages annotate but never delete Core Tensions entries. Clarify may append `→ Resolution:` annotations; plan may append `→ Absorbed by task-N`; but the original tension text remains immutable through ship.
+
+```markdown
+## Core Tensions
+
+1. (essential) Sync snapshot API vs async JSON-RPC transport -- channel.ts:399 consumes snap.version synchronously; bridging to async bridge forces either a stubbed version or a promise-awaiting refactor. [primary]
+2. (time-based) Ship single-machine now vs design for multi-machine later -- design doc §3.3 flags cloud migration as goal; current code assumes localhost only. [primary]
+3. (domain-based) Router-layer auth check vs view-layer hydration -- two explorers disagreed at src/router.ts:88 on ownership of session loading. [secondary]
+```
+
+**Escape-hatch literal:** when no tensions are identified after honest inspection, the section contains EXACTLY the literal string `Checked -- no notable constraints identified.` (no list, no prose). This signals "I looked and found none" versus "I forgot to run this step".
+
+```markdown
+## Core Tensions
+
+Checked -- no notable constraints identified.
+```
+
+### Honest Boundaries
+
+Declared limits of this exploration: things the skill could NOT verify, layers intentionally skipped, or scope cuts whose consequences the captain should know.
+
+**Cardinality discipline:** same 1-5 default band with the same alpha-marker escalation (`(α: boundary count {n} outside default 1-5; scale-justified by {directive-signal})`).
+
+**Escape-hatch literal (same rule):** when no boundaries apply, the section contains EXACTLY `Checked -- no notable constraints identified.`
+
+**Downstream discipline:** downstream stages annotate but never delete Honest Boundaries entries. If clarify resolves a boundary, append `→ Cleared: {evidence}`; do not remove the original line.
+
+```markdown
+## Honest Boundaries
+
+1. Mode B ensign-mode inline fallback: Angle (iv) negative-space was skipped; seed absences are unverified. [primary]
+2. 20-file grep cap hit at src/view/**; additional view files may exist outside mapped surface. [secondary]
+3. Researcher skipped for A-3 under Small-scale Confident rule; external API claim carries only [tertiary] evidence.
+```
 
 ---
 
