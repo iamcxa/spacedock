@@ -668,3 +668,36 @@ Auto-revision loop: per MEMORY `fo-auto-revision-loop.md` (2026-04-15), FO dispa
 - [x] Handoff mode: loose
   auto_advance unset -- captain must say "execute 106" in separate FO session
 - [x] Clarify duration: 8 AskUserQuestion calls (0 batch + 2 option + 4 Q + 2 exploration loops)
+
+## Stage Report: execute
+
+FO-authored per `MEMORY :: flatten-dispatch-troops-architecture`. FO dispatched troops directly (no ensign intermediary for execute).
+
+### Waves executed
+
+- **Wave 0 (task-0..3)**: environment verification + 3 pressure fixtures (circular-ac-semantic-pass / stale-line-anchor-dim9 + circular-ac-dim10 / benign-drift-* + genuine-blocker). RED baseline established.
+- **Wave 1 (task-4..6, 3 parallel opus troops)**: Circular-AC Rule in skills/task-execution/SKILL.md / Dim 9+10 in plan-checker-prompt.md + count bump in build-plan/SKILL.md / Benign-Drift Classifier in skills/build-execute/SKILL.md.
+- **Wave 2 (task-7)**: artifact verification 8/8 + D-plan-defect-autopilot-1 appended to DECISIONS.md.
+
+### Acceptance Criteria — all ACs addressed
+
+- AC-1 Circular-AC rule present in task-execution: `grep -c "Circular-AC rule" skills/task-execution/SKILL.md` = 1 ✓
+- AC-2 Dim 9/10 in build-plan tree: `grep -ci "stale-line-anchor|circular-AC" skills/build-plan/SKILL.md skills/build-plan/references/plan-checker-prompt.md` = 6 ✓
+- AC-3 classifier in build-execute (O-1 corrected target): `grep -cE "anchor-drift|file-renamed|semantic-grep-mismatch" skills/build-execute/SKILL.md` = 4 ✓
+- AC-4 new pressure fixtures: blocked-triage present + circular-ac + dim9/10 appended = 4 new test_cases ✓
+- AC-5 synthetic replay evidence: functional replay deferred to UAT per iter 2 revision; artifact presence confirmed (expected_answer:B count = 10 across 3 fixtures)
+- AC-6 zero-Agent-dispatch contract: all 3 new regions grep-scoped Agent( count = 0 ✓
+
+### Known environment finding (not a defect)
+
+`bun test` currently reports 51 pre-existing failures in spacebridge/ui tests due to missing `drizzle-orm` package. All 3 Wave 1 troops flagged this; failures predate 106 and are markdown-edit-orthogonal. Quality stage will re-confirm.
+
+### Commits
+
+- `test(106): wave 0 -- 3 pressure fixtures (circular-ac + Dim 9/10 + blocked-triage) RED baseline`
+- `feat(106): wave 1 -- 3-layer plan-defect defense (Circular-AC Rule + Dim 9/10 + Benign-Drift Classifier)`
+- `feat(106): wave 2 task-7 -- D-plan-defect-autopilot-1 in DECISIONS.md (O-1 classifier location); artifact verification 8/8 pass`
+
+### Confidence (execute stage)
+
+All wave troops returned DONE. Zero BLOCKED escalations. P1 dry-run (pre-execute) predicted 3 classes grounded in 104/105 evidence — execute preserved that grounding. Safe failure mode (tail misses fall through to ladder) preserved in classifier No-Exceptions.
