@@ -186,6 +186,12 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Entity body writes Research Findings PLAN UAT Validation Map Stage Reports | ✅ final | 2026-04-12 |
 
+### docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacedock-primitives-sharp-edges-audit | execute | audit findings -- workflow-index + troop sharp-edges review | 🟡 in-flight | 2026-04-15 |
+
 ### mods/pr-review-loop.md
 
 | Entity | Stage | Intent | Status | Last Updated |
