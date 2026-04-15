@@ -190,7 +190,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| spacedock-primitives-sharp-edges-audit | plan | Entity body authors sharp-edges audit findings tables + Phase F seed slate + known-gap log | 🟡 in-flight | 2026-04-15 |
+| spacedock-primitives-sharp-edges-audit | plan | Entity body authors sharp-edges audit findings tables + Phase F seed slate + known-gap log | ✅ final | 2026-04-15 |
 
 ### mods/pr-review-loop.md
 
