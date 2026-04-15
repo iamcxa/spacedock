@@ -817,3 +817,46 @@ Entity 105 changes: 4 markdown files (skills/build-explore/SKILL.md, 3 reference
 
 Auto-advance to review. No feedback-to.
 
+
+## Stage Report: review
+
+status: passed
+base SHA: f95f0ef
+final SHA: a50fb56 (execute) / 18372ba (post-quality)
+scope: `git diff f95f0ef..HEAD` -- 6 files, +709 / -36, 100% markdown
+
+### Review mode
+
+FO inline review (debate-driven protocol short-circuited): diff is entirely markdown. Three themed reviewers would produce no actionable findings beyond this inline scan.
+
+### Findings
+
+#### CRITICAL
+None.
+
+#### HIGH
+None.
+
+#### MEDIUM
+- **Mode B warning string drift** (task-7 scope_observation): authoritative SKILL.md Step 2 emits `⚠ ensign-mode inline fallback -- 4-angle quality not achieved this invocation`; descriptive reference `parallel-explorer-angles.md` §6 documents a different string. SKILL.md is the emission point so runtime behavior is correct, but reference doc drift risks confusing future skill authors. Recommend follow-up alignment pass.
+
+#### LOW
+- **Pending marker on Canonical References** (task-8): `(⏳ post-104-merge: update to docs/build-pipeline/_docs/extraction-framework.md)` is a temporary annotation. Once sibling 104 merges, a follow-up edit should replace the external path + marker with the vendored local path. This is coordination bookkeeping, not a code defect.
+
+#### NIT
+- task-0 findings about renamed file + Mode A grep literal (already in execute Stage Report) — surfacing again for review completeness: plan-write-discipline should preflight renamed-file paths.
+
+### Inline pre-scan
+
+| Check | Result |
+|---|---|
+| CLAUDE.md compliance | no violations (markdown-only) |
+| Stale refs grep (TODO/FIXME/XXX in diff additions) | 0 |
+| Dependency chain check | new file `parallel-explorer-angles.md` cited by SKILL.md + hybrid-classification-heuristic.md; new `explore-invocation-path-audit.md` is reference-only. No dangling refs. |
+| Plan consistency | 9 tasks committed (2+4 batched; others solo). Stage Report per-task summary matches commit log. |
+| Em-dash discipline | 0 new em-dashes introduced in SKILL.md diff |
+
+### Knowledge capture
+
+Invoked in `capture` mode would surface 1 D2 candidate (plan-write-discipline preflight for renamed files) — already captured in execute Stage Report. No separate capture invocation needed.
+
