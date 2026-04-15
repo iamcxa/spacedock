@@ -1307,3 +1307,42 @@ Auto-advance eligibility: **NOT ELIGIBLE** (80% < 95% threshold, and blockers pr
 - **Updated confidence: 92%**
 
 Auto-advance eligibility: **NOT ELIGIBLE** (92% < 95% threshold). Captain gate recommended.
+
+## Stage Report: execute
+
+- [x] task-0 (wave 0): environment verification — all 10 checks passed; no source modified
+  `test -f spacebridge/bin/daemon.ts` + stub grep + schema grep all exit 0
+- [x] task-1 (wave 0): `@modelcontextprotocol/sdk` added to spacebridge/package.json
+  commit f2d300a — version pinned to match tools/dashboard/package.json
+- [x] task-2 (wave 0): chat_events + gate_events schema tables + test
+  commit c497c67 — `bun test tests/spacebridge/schema-chat-gate.test.ts` passes
+- [x] task-3 (wave 1): chat aggregate (types/decider/evolve/errors/schemas/persistence + 4 test files)
+  commit bca6b99 — `bun test spacebridge/src/domain/chat/` passes (33 tests across 8 files)
+- [x] task-4 (wave 1): gate aggregate (same 6-file + 4-test structure)
+  commit 388cc68 — decider is pure (zero schema/db imports confirmed)
+- [x] task-5 (wave 1): `getActiveSessionByProjectRoot` added to SessionRegistry interface + impl + tests
+  commit 8befc6f — most-recent-heartbeat selection; disconnected sessions ignored
+- [x] task-6 (wave 2): daemon RPC handler registry refactor + captain_chat + gate_decide handlers
+  commit f338a91 — `grep -q "rpcHandlers.get(req.method)"` exits 0; integration test passes
+- [x] task-7 (wave 2): MCP stdio bridge in cli.ts mcp subcommand (action-push forwarding)
+  commit 4557398 — StdioServerTransport wired; notifications/spacebridge/captain_message + gate_decided registered
+- [x] task-8 (wave 3): chat Route Handler POST `/api/entities/[slug]/chat`
+  commit ab7ecf5 — dynamic socket-client import; 200/502 response paths; route.test.ts passes
+- [x] task-9 (wave 3): gate Route Handler POST `/api/entities/[slug]/gate`
+  commit 2a8ac7f — GateAlreadyDecided → 502; route.test.ts passes
+- [x] task-10 (wave 3): chat-input.tsx + gate-buttons.tsx components + entity-body.tsx mount
+  commit fd3de29 — conditional gate render (plan/uat status only); component tests pass
+- [x] task-11 (wave 4): E2E integration test (captain-chat-and-gate) + sentinel projectRoot fix
+  commit 65c339d — full round-trip: UI POST → daemon RPC → MCP shim stdout notification asserted
+- [x] task-12 (wave 4): biome lint:fix sweep + unused import cleanup
+  commit 4f75b7f — format:check exits 0; 3 remaining errors are pre-existing (daemon.ts coordination bridge + noNonNullAssertion in comment tests)
+
+### Recovery Notes
+
+- Prior run had already completed all 13 tasks (waves 0-4) before crash — WIP files for task-3/task-4 were in worktree untracked but all 33 tests passed; committed as-is
+- Chat route test `200 with delivered:false` appeared flaky in full `bun test` run but passes in isolation and in spacebridge-scoped run; root cause is cross-test socket pollution from pre-existing dashboard tests — not introduced by 099
+- All 129 entity-099 unit + integration tests pass
+
+### Summary
+
+All 13 tasks executed across 5 waves. Chat and gate aggregates follow fmodel CQRS pattern (daemon-side per clarify lock), session routing uses project-root + most-recent-heartbeat (O-2a), UI push remains 500ms SSE polling (O-3a). The MCP stdio bridge replaces the cli.ts stub and forwards action-push frames as MCP server notifications. The route handlers open per-request socket clients to the daemon and return synchronous ack. Format check passes; 3 pre-existing lint errors remain in coordination bridge code (not introduced by 099).
