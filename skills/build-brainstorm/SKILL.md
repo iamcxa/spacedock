@@ -502,6 +502,6 @@ When a `## Stage Report: brainstorm` is written (by SO or FO after brainstorm co
 alignment_confidence: {0.0-1.0 or N/A}
 ```
 
-The alignment-gate is owned by `agents/science-officer.md` Step 3.6, not by brainstorm itself. This format spec ensures consistency when SO writes the Stage Report on brainstorm's behalf.
+The alignment-gate is owned by `skills/build-alignment-gate/SKILL.md` (first-class pipeline stage; extracted from `agents/science-officer.md` Step 3.6 by entity 114). The `alignment_confidence` field still surfaces on `## Stage Report: brainstorm` for backward-compatibility (O-1 resolution), but the gate's canonical implementation lives in the new skill file. This format spec ensures consistency when FO writes the Stage Report on brainstorm's behalf.
 
 **Decision lineage**: The /build gatekeeper (entity 113) supersedes entity 103's v1 decision ("no automatic routing -- captain judgment") based on observed friction from SO front-half overhead across entities 097, 099, 101.
