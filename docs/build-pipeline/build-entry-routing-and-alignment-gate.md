@@ -1058,3 +1058,19 @@ All 14 UAT items require live `/build`, `/shape`, or SO-dispatch runtime — exe
 ### Captain Interaction
 - Option presented: A/B/C (skip with ack / pause for manual test / structural-only approve)
 - Captain chose: A (2026-04-16)
+
+## Confidence Assessment
+
+Iteration: 1 of 3
+
+| Factor | Weight | Score | Contribution | Evidence |
+|--------|--------|-------|--------------|----------|
+| test_coverage | 25% | 80% | 20.00 | test verdict=pass, no ratchet section → pass=80% per spec |
+| type_coverage | 20% | 100% | 20.00 | typecheck SKIPPED (no TS changes in diff), ratchet absent → treat as pass |
+| review_severity | 20% | 100% | 20.00 | 0 CRITICAL, 0 HIGH findings |
+| ac_completeness | 20% | 100% | 20.00 | 14 total items, 14 skipped-with-ack → effective_total=0 → 100% |
+| integration_breadth | 15% | 100% | 15.00 | 8/8 tasks DONE, all planned files modified |
+
+**Composite: 95.00%**
+
+Routing: >= 90% threshold → advance to shipped.
