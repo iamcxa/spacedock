@@ -2,7 +2,7 @@
 id: 101
 title: "Graft runtime overlay — eliminate build-time merge, read workflow from plugin"
 status: draft
-context_status: awaiting-clarify
+context_status: ready
 source: /build
 created: 2026-04-14T03:30:00Z
 started:
@@ -334,3 +334,82 @@ SO self-investigation this entity (per MEMORY `so-self-investigation-first`):
 - Entity 090 ship state → self-resolved (frontmatter: clarify/ready, not shipped; Part 2 defers to 101 per 090 A-4)
 - Sibling CONTRACTS "planned" vs code-shipped → self-resolved via cascade (MEMORY A-10 pattern; established in 099 session)
 4 of ~7 potential Qs self-resolved, 4 genuine Qs sent to captain (signal ratio ~57%).
+
+## Clarify Annotations
+
+**Open Questions — resolved 2026-04-15:**
+
+- Q-1 → **Captain answer**: 2-way decomposition (O-1 option b). 101 (Medium architecture) + 101b (Medium cleanup).
+- Q-2 → **Captain answer**: 090 ships Part 1 only; 101 absorbs Part 2 (shipped_config migration). 090 is unblocked on Part 1 independently.
+- Q-3 → **Auto-resolved via Q-1 cascade**: 2-way decomposition places 5 skill-localization bugs (#14/#15/#16/#17/#19) in 101b. Not in 101.
+- Q-4 → **Captain answer + SO web-research-assisted**: manifest.yaml in grafted dir carries `source_plugin` + `workflow_readme_path` fields. Rationale: Claude Code plugin.json has fixed 17-field schema with validator; adding custom fields is risky (may fail validation). manifest.yaml is graft's own file — 101 fully controls schema.
+
+**Captain Research Correction (2026-04-15):**
+
+Captain challenged Q-4's premise "does Claude Code plugin.json support custom fields?". SO self-investigated via WebFetch on official Claude Code plugin docs:
+- plugin.json has explicit 17-field schema: `name, version, description, author, homepage, repository, license, keywords, skills, commands, agents, hooks, mcpServers, outputStyles, lspServers, monitors, userConfig, channels`
+- `claude plugin validate` enforces the schema with errors like `"name: Required"` / `"Plugin has an invalid manifest file"`
+- No documented "unknown fields allowed" for plugin.json (settings.json has this provision; plugin.json does not)
+- Upstream PR to add `workflow_readme` possible but long-cycle (Anthropic approval)
+
+This inverted Q-4's risk assessment: option (a) plugin.json extension was original "Recommended" but reframed as **highest risk**. Captain selected option (c) grafted-dir manifest.yaml fields as the clean choice. Pattern: **trust-but-verify third-party schema extensibility claims via docs + CLI inspection before committing**.
+
+**Option Selection Summary:**
+
+- O-1 → **Option (b)**: 2-way decomposition; 101 (Medium architecture) + 101b (Medium cleanup)
+- O-2 → **Option (a)**: Build `graft migrate` command in 101b; backward-compat for carlove
+- O-3 → **Re-selected from option (a) to option (c)-variant**: NOT plugin.json extension; manifest.yaml in grafted dir carries plugin+README pointer. Implementation detail: FO shared core Step 2 adds new 4th discovery source that, when `.spacedock/workflows/{name}/manifest.yaml` present + has `workflow_readme_path` field, reads README from `{plugin_dir}/{workflow_readme_path}`.
+
+**Assumption Confirmations:**
+
+All 12 assumptions (A-1 through A-12) confirmed. A-11 (4 concurrent FO shared-core writers) remains a plan-stage sequencing concern — 101's new discovery source insert-point must be chosen to minimize conflict.
+
+## Decomposition Recommendation (Confirmed)
+
+⚠️ **Decomposition finalized per Q-1 captain selection**:
+
+**101 (this entity)** — `scale: Medium` (revised from Large), `intent: feature`, scope: architecture redesign
+
+Concrete deliverables (9 items):
+1. Extend manifest.yaml schema to carry `source_plugin` (e.g., "spacedock") + `workflow_readme_path` (e.g., "docs/build-pipeline/README.md") fields
+2. FO shared core Step 2: add 4th discovery source — when grafted dir's manifest.yaml declares plugin+readme path, read README from `{resolved_plugin_dir}/{workflow_readme_path}`
+3. Graft core redesign: eliminate `.origin/` directory; eliminate merged `README.md` in workflow dir; add `source_hash: <sha256>` per skill in manifest.yaml
+4. LOCAL.yaml runtime apply: FO reads LOCAL.yaml at startup, applies `readme_operations` (currently `set-stage-field`) to workflow README in-memory before proceeding. If new body-section op types needed, add to LOCAL.yaml schema.
+5. Hash-based upgrade: compute current plugin SKILL.md SHA256 → compare to manifest.yaml `source_hash` → if changed, reapply LOCAL.yaml overrides to localized `.claude/skills/{name}/SKILL.md` (replaces 3-way merge)
+6. `graft init` updated: stop copying `.origin/`; write new-schema manifest.yaml; still materialize `.claude/skills/` with LOCAL.yaml applied
+7. Absorb 090 Part 2: shipped_config migration added to LOCAL.yaml schema; 090's shipped_stage handling lands here
+8. Include `_archive/`, `_mods/`, `_docs/`, `_index/INDEX.md` in graft init's copy surface (fixes bug #21)
+9. All 10 Directive Acceptance Criteria satisfied
+
+Domain: `spacedock-graft-runtime-overlay`
+
+**101b graft-backward-compat-and-localization-hardening** (child, spawn at handoff) — `scale: Medium`, `intent: feature`, scope: migration + orthogonal bug cleanup
+
+Concrete deliverables (6 items):
+1. `graft migrate` subcommand: converts carlove's existing `.origin/` format to new manifest.yaml + hash schema; idempotent; safe to re-run
+2. Bug #14 fix: root-script false-positive detection (flag stub scripts like `pnpm test` at root that delegate to workspaces)
+3. Bug #15 fix: pre-write diff/confirm before overwriting existing `.claude/skills/{name}` or `.claude/agents/{name}.md`
+4. Bug #16 fix: `mkdir -p .claude/skills/{name}/` explicitly during init (currently FileNotFoundError)
+5. Bug #17 fix: verbatim validation glob works for local plugin installs (currently assumes `~/.claude/plugins/` path)
+6. Bug #19 fix: post-init smoke test — load skills, verify no import errors, report summary
+7. Validate by re-running `graft migrate` + full pressure-test sweep #14-22
+
+Domain: `spacedock-graft-hardening`
+Depends-on: 101
+Parent: 101
+
+## Stage Report: clarify
+
+- [x] Open Questions resolved: 4 / 4
+  Q-1 captain 2-way; Q-2 captain 090-Part-1-only; Q-3 SO cascade via Q-1; Q-4 captain manifest.yaml (after web-research-corrected framing)
+- [x] Options selected: 3 / 3
+  O-1 2-way decomposition; O-2 graft migrate command; O-3 manifest.yaml pointer (corrected from plugin.json extension)
+- [x] Assumptions confirmed: 12 / 12
+  All 12 confirmed; A-11 concurrent-writer risk carries into plan as sequencing concern
+- [x] Decomposition: warranted + finalized
+  101 (Medium architecture) + 101b (Medium cleanup); 101b spawn at FO handoff
+- [x] Child seeds queued: 1
+  101b graft-backward-compat-and-localization-hardening — 6 concrete deliverables specified
+- [x] Captain architectural clarification captured: Q-4 web-research correction documented; plugin.json schema constraints noted for future graft-like entities
+- [x] Sufficiency gate: PASS
+  101 scope is 9 concrete deliverables; plan stage can proceed.
