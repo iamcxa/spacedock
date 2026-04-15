@@ -1,15 +1,15 @@
 ---
 id: 097
 title: "Share view UX fixes — duplicate form, comment content display, activity truncation"
-status: brainstorm
+status: plan
 context_status: ready
 source: entity 058 UAT live test (2026-04-14 captain manual)
 created: 2026-04-14T17:00:00+08:00
-started:
+started: 2026-04-15T18:05:00+08:00
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-share-view-ux-fixes
 issue:
 pr:
 intent: bugfix
@@ -18,7 +18,7 @@ project: spacedock
 auto_advance:
 uat_pending_count:
 parent:
-children:
+children: [111]
 depends-on: [058]
 ---
 
