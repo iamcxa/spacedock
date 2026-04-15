@@ -179,6 +179,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | flatten-dispatch-troops-architecture | plan | Update execute stage description: troop -> troop agent | 🔵 planned | 2026-04-14 |
 | shape-pre-build-alignment-skill | plan | Task 7 -- add shape_status schema row and /shape + --from CLI paths paragraph | 🔵 planned | 2026-04-15 |
 
+### docs/build-pipeline/_index/DECISIONS.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| graft-runtime-overlay-redesign | plan | Append D-101-runtime-overlay decision row (graft build-time merge -> runtime overlay) | 🔵 planned | 2026-04-15 |
+
 ### docs/overhaul/recipes/phase-e-plan-3-build-pipeline.yaml
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -255,6 +261,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | review-stage-parallel-skill-dispatch | execute | Clarify team creation policy in single-entity mode section | 🟡 in-flight | 2026-04-12 |
 | pre-ship-confidence-gate | execute | Add Pre-Ship Confidence Gate subsection to Completion and Gates + Merge steps | 🟡 in-flight | 2026-04-13 |
 | flatten-dispatch-troops-architecture | plan | Add troops-dispatch subsection to Dispatch Modes | 🔵 planned | 2026-04-14 |
+| graft-runtime-overlay-redesign | plan | Add Step 2.4 Plugin-manifest discovery source (in-memory LOCAL.yaml apply) | 🔵 planned | 2026-04-15 |
 
 ### skills/build-brainstorm/SKILL.md
 
@@ -395,6 +402,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | New subroutine skill for codebase mapping symmetric to build-research | ✅ final | 2026-04-12 |
+
+### skills/graft/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| graft-runtime-overlay-redesign | plan | Runtime overlay redesign: manifest source_hash, drop .origin/, LOCAL.yaml runtime apply, hash-based upgrade, shipped_config | 🔵 planned | 2026-04-15 |
 
 ### skills/overhaul/SKILL.md
 
@@ -1112,6 +1125,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Pressure test: troop detects vacuous test passing before implementation | in-flight | 2026-04-12 |
+
+### tests/pressure/graft.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| graft-runtime-overlay-redesign | plan | Add 5 fixtures (manifest source_hash, no .origin/, FO plugin-path discovery, hash-upgrade, fail-loud) + flip #20/#21/#22 to E | 🔵 planned | 2026-04-15 |
 
 ### tests/pressure/overhaul.yaml
 
