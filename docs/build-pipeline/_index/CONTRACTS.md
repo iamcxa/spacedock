@@ -108,6 +108,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | build-entry-routing-and-alignment-gate | plan | Task 3 -- add Step 3.6 Alignment Gate between brainstorm and explore | 🟡 in-flight | 2026-04-15 |
+| alignment-gate-promote-to-stage | plan | Task 3 -- replace Step 3.6 body with single-sentence delegation hint to skills/build-alignment-gate/SKILL.md | 🔵 planned | 2026-04-16 |
 
 ### agents/sharp-edges-reviewer.md
 
@@ -138,6 +139,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | Document war room UI spawn lifecycle + port 8420 + SPACEBRIDGE_SKIP_UI | 🔵 planned | 2026-04-13 |
+
+### docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| alignment-gate-promote-to-stage | plan | Task 4 -- append supersession annotation pointing to skills/build-alignment-gate/SKILL.md | 🔵 planned | 2026-04-16 |
 
 ### docs/build-pipeline/_docs/SO-FO-DISPATCH-SPLIT.md
 
@@ -184,6 +191,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | pre-ship-confidence-gate | execute | Document confidence gate in uat and shipped stage definitions | 🟡 in-flight | 2026-04-13 |
 | flatten-dispatch-troops-architecture | plan | Update execute stage description: troop -> troop agent | 🔵 planned | 2026-04-14 |
 | shape-pre-build-alignment-skill | plan | Task 7 -- add shape_status schema row and /shape + --from CLI paths paragraph | 🔵 planned | 2026-04-15 |
+| alignment-gate-promote-to-stage | plan | Task 2 -- add alignment-gate as 11th stage in stages.states between brainstorm and explore | 🔵 planned | 2026-04-16 |
 
 ### docs/build-pipeline/_index/DECISIONS.md
 
@@ -258,6 +266,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | pre-ship-confidence-gate | execute | New reference doc: 5-factor pre-ship confidence scoring specification | 🟡 in-flight | 2026-04-13 |
+| alignment-gate-promote-to-stage | plan | Task 7 -- correct alignment_confidence sourcing reference (no new factors) | 🔵 planned | 2026-04-16 |
 
 ### references/first-officer-shared-core.md
 
@@ -269,6 +278,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | flatten-dispatch-troops-architecture | plan | Add troops-dispatch subsection to Dispatch Modes | 🔵 planned | 2026-04-14 |
 | graft-runtime-overlay-redesign | plan | Add Step 2.4 Plugin-manifest discovery source (in-memory LOCAL.yaml apply) | ✅ final | 2026-04-15 |
 
+### skills/build-alignment-gate/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| alignment-gate-promote-to-stage | plan | Task 1 -- NEW skill file extracted verbatim from agents/science-officer.md Step 3.6 body (3 branches, retry cap 3, alignment_confidence formula) | 🔵 planned | 2026-04-16 |
+
 ### skills/build-brainstorm/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -279,6 +294,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | brainstorm-nuwa-distillation | plan | Task 3 -- add Lens Subagent Prompts subsection with 4 lens dispatch templates | final | 2026-04-14 |
 | shape-pre-build-alignment-skill | plan | Task 6 -- extend Lens (a) prompt template to accept shape sections as [primary] input | 🔵 planned | 2026-04-15 |
 | build-entry-routing-and-alignment-gate | plan | Task 6 -- add Stage Report format addition + decision lineage note | 🟡 in-flight | 2026-04-15 |
+| alignment-gate-promote-to-stage | plan | Task 6 -- update Stage Report: brainstorm ownership pointer (owned by skills/build-alignment-gate now, not SO Step 3.6) | 🔵 planned | 2026-04-16 |
 
 ### skills/build-clarify/SKILL.md
 
