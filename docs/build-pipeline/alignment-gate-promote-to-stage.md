@@ -857,3 +857,32 @@ reviewer dispatch: SKIPPED — markdown-only diff, no runtime code, no security 
 | NIT | 0 | 0 | 0 | 0 |
 
 knowledge capture: pending — Wave 2 haiku troop disk-persistence anomaly noted in execute Stage Report (D2 candidate surfaces to FO post-merge if pattern recurs on next entity)
+
+## Stage Report: uat
+
+status: passed (option A — 6 CLI items evidence-reused from execute task-8; 4 remaining items captain-ack skip)
+items: 10 total (1 Browser + 6 CLI + 1 API + 2 Interactive)
+executed: 6 (CLI — evidence-passed via execute Stage Report task-8 AC verification)
+skipped with captain ack: 4 (Browser + API + 2 Interactive)
+failed: 0
+
+### UAT Results
+| Item | Type | Status | Evidence |
+|------|------|--------|----------|
+| AC-1 alignment-gate in README | CLI | PASSED | execute task-8: `grep -c "name: alignment-gate" README` = 1 |
+| AC-2 new skill file exists | CLI | PASSED | execute task-8: `test -s skills/build-alignment-gate/SKILL.md` |
+| AC-3 SO Step 3.6 ≤15 lines | CLI | PASSED | execute task-8: awk wc-l = 7 |
+| AC-5 archive supersession | CLI | PASSED | execute task-8: grep count = 2 |
+| AC-6 entity 113 rows finalized | CLI | PASSED | execute task-8: in-flight grep = 0 |
+| AC-8 11-stage ordering | CLI | PASSED | execute task-8: stage count = 11; ordering correct |
+| AC-4 F5 fixture behavioral parity | Interactive | SKIPPED | captain ack — F5 git-diff unchanged confirmed; forge walkthrough deferred |
+| AC-7 dashboard event emission | Browser | SKIPPED | captain ack — runtime test on next pipeline traversal |
+| AC-7 dashboard runtime check | API | SKIPPED | captain ack — runtime test; FO static precondition confirmed in execute |
+| Captain verbatim-preservation review | Interactive | SKIPPED | captain ack — next pipeline traversal exercises this |
+
+### Rationale
+6 CLI items were already grep-verified during execute task-8's integration verification (AC verification table in execute Stage Report). Re-running them in UAT would be redundant — evidence reuse per build-uat's evidence-reuse pattern. The 4 remaining items require live pipeline traversal: alignment-gate fires between brainstorm and explore only when a new entity enters the pipeline. Entity 115 (parked, awaiting 114 ship) will be the first natural test. Captain chose option A: skip with ack, set uat_pending_count: 4, ship now. `/spacedock:uat-resume 114` forces explicit sign-off later if needed.
+
+### Captain Interaction
+- Option presented: A/B/C (skip remaining with ack / pause for manual smoke / structural-only approve)
+- Captain chose: A (2026-04-16)
