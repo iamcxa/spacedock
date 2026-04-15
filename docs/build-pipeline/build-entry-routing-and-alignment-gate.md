@@ -934,3 +934,43 @@ issues:
 - [x] Scale assessment: Medium confirmed
   8 files across 3 layers, within Medium range (5-15); no revision from brainstorm estimate
 - [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident or Likely on internal codebase patterns, no external tech claims)
+
+## Stage Report: execute
+
+status: passed
+base SHA: 61d4166f9a2c959ecc2ee93e7d2b1a1da6325580
+final SHA: 9b6074b
+waves: 4 completed out of 4 declared
+tasks: 8 done, 0 blocked, 0 needs_context-rounds
+workflow-index transition: f746a2c
+
+### Dispatch Mode
+Bare mode -- sequential troop dispatch (no team available)
+
+### Per-task summary
+- task-0: DONE (sonnet) -- inline -- environment verification (0 files)
+- task-1: DONE (sonnet) -- commit 7bc9a66 (1 files) -- add Step 0 Gatekeeper to /build entry
+- task-2: DONE (sonnet) -- commit 06cc4cd (1 files) -- add Raw-Directive Self-Seed to /shape
+- task-3: DONE (sonnet) -- commit d98b1db (1 files) -- add Step 3.6 Alignment Gate to SO
+- task-4: DONE (sonnet) -- commit 4f09708 (1 files) -- add Code-Evidence Self-Filter to clarify
+- task-5: DONE (sonnet) -- commit f87a026 (1 files) -- add F5 alignment-gate smoke fixture
+- task-6: DONE (sonnet) -- commit 9b6074b (2 files) -- add Stage Report format additions + decision lineage
+- task-7: DONE (sonnet) -- inline -- integration verification 7/7 checks passed (0 files)
+
+### AC verification
+| AC | Verify command | Result |
+|----|---------------|--------|
+| AC-1 Gatekeeper halts | `grep "Auto-suggest" skills/build/SKILL.md` | PASS |
+| AC-2 Grey-zone warning | `grep "gatekeeper-warning" skills/build/SKILL.md` | PASS |
+| AC-3 Shape self-seed | `grep "Raw-Directive Self-Seed" skills/build-shape/SKILL.md` | PASS |
+| AC-4 Alignment-gate 3 options | `grep "Step 3.6: Alignment Gate" agents/science-officer.md` | PASS |
+| AC-5 Retry preserves Lens Evidence | `grep "overwrite ONLY.*Brainstorming Spec" agents/science-officer.md` | PASS (task-7 check 2) |
+| AC-6 Escalate writes blocked + supersedes | `grep "context_status: blocked" agents/science-officer.md` | PASS |
+| AC-7 Self-filter auto-resolves | `grep "Code-Evidence Self-Filter" skills/build-clarify/SKILL.md` | PASS |
+| AC-8 Readiness scores in Stage Reports | `grep -E "alignment_confidence\|clarify_self_filter_ratio" skills/build-brainstorm/SKILL.md skills/build-clarify/SKILL.md` | PASS |
+
+### Findings
+#### Scope observations
+- task-6: skills/build-clarify/SKILL.md already contained clarify_self_filter_ratio at line 192 (from task-4). New append at line 513 adds format spec. No conflict -- intended.
+
+knowledge capture: skipped -- no findings met D1/D2 threshold
