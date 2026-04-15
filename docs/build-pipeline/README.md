@@ -34,13 +34,14 @@ stages:
       model: opus
       worktree: false
       gate: true
+      feedback-to: brainstorm
       skill: spacedock:build-alignment-gate
       # First-class extraction of science-officer Step 3.6 (entity 114).
       # Runs after brainstorm; evaluates problem framing against captain
       # intent and Lens Evidence; returns one of three branch outcomes:
-      #   continue -> proceed to explore
-      #   retry    -> re-run brainstorm (retry cap 3)
-      #   escalate-to-shape -> return to shape stage
+      #   continue -> proceed to explore (normal advance)
+      #   retry    -> feedback-to: brainstorm (retry cap 3)
+      #   escalate-to-shape -> skill writes context_status: blocked + supersedes: hint
       # alignment_confidence = 1.0 - (retry_count * 0.2)
       #
       # NAMESPACE NOTE: Migration to `spacebridge:build-alignment-gate` happens when spacebridge plugin skeleton is created (entity 050).
