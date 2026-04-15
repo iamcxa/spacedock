@@ -67,6 +67,42 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | Thin wrapper agent for insecure-defaults trailofbits skill | ✅ final | 2026-04-12 |
 
+### agents/plan-checker-dim-1-requirement-coverage.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### agents/plan-checker-dim-2-task-completeness.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### agents/plan-checker-dim-4-5-context-research-traceability.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### agents/plan-checker-dim-6-validation-sampling.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### agents/plan-checker-dim-7-cross-entity-coherence.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### agents/plan-checker-dim-9-stale-line-anchor.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
 ### agents/sharp-edges-reviewer.md
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -103,6 +139,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | brainstorm-nuwa-distillation | plan | Task 4 -- vendor huashu-nuwa extraction-framework.md to local _docs with functional header per A-7 | final | 2026-04-14 |
+
+### docs/build-pipeline/_docs/nuwa-ports.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
 
 ### docs/build-pipeline/_mods/pr-merge.md
 
@@ -353,6 +395,42 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | overhaul-skill-implementation | plan | Add 3 new recipe primitives (replace-table-block, update-yaml-block, update-section) | planned | 2026-04-12 |
 | flatten-dispatch-troops-architecture | plan | Update troop example references to troop | 🔵 planned | 2026-04-14 |
+
+### skills/plan-checker-dim-1-requirement-coverage/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### skills/plan-checker-dim-2-task-completeness/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### skills/plan-checker-dim-4-5-context-research-traceability/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### skills/plan-checker-dim-6-validation-sampling/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### skills/plan-checker-dim-7-cross-entity-coherence/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### skills/plan-checker-dim-9-stale-line-anchor/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
 
 ### skills/task-execution/SKILL.md
 
@@ -1018,6 +1096,48 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | overhaul-skill-implementation | plan | Pressure test YAML for 4 overhaul discipline scenarios | planned | 2026-04-12 |
+
+### tests/pressure/plan-checker-dim-1-requirement-coverage.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### tests/pressure/plan-checker-dim-2-task-completeness.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### tests/pressure/plan-checker-dim-3-wave-graph.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### tests/pressure/plan-checker-dim-4-5-context-research-traceability.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### tests/pressure/plan-checker-dim-6-validation-sampling.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### tests/pressure/plan-checker-dim-7-cross-entity-coherence.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
+
+### tests/pressure/plan-checker-dim-9-stale-line-anchor.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | 🔵 planned | 2026-04-15 |
 
 ### tests/pressure/README.md
 
