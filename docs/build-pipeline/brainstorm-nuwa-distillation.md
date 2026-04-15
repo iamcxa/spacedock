@@ -1,7 +1,7 @@
 ---
 id: 104
 title: Brainstorm Nüwa-Style Distillation (v2) -- Multi-Lens Collection + Triple-Verification Gate + Tension Preservation
-status: quality
+status: review
 context_status: ready
 source: /build (decomposed from epic 102)
 created: 2026-04-14T00:00:00Z
