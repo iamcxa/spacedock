@@ -1467,4 +1467,103 @@ notes: 1 blocker routed to execute (f-001 HIGH CODE -- gate buttons never render
 
 Round 2 (post-review-fix) confirms that the review feedback fix (threading status+autoAdvance from EntityDetailClient to EntityBody) resolves the HIGH finding without introducing new type errors or lint violations. Test suite runs clean with 749 passes. All pre-existing test failures (MCP SDK module, diff package, Next.js server types) and lint warnings (nested biome.json schema mismatch, daemon.ts pre-existing style) remain as-is. Entity is ready for merge.
 
+## UAT Results
+
+| item | type | status | evidence | notes | re-attempt |
+| ---- | ---- | ------ | -------- | ----- | ---------- |
+| item-cli-1 | cli | pass | (see Evidence: item-cli-1) | mcp subcommand starts, logs "daemon ready" | 0 |
+| item-cli-2 | cli | pass | (see Evidence: item-cli-2) | initialize request → valid response on stdout | 0 |
+| item-api-1 | api | pass | 13/13 route tests pass; chat route: 200 with `delivered:false` when no session | covered by route.test.ts integration suite | 0 |
+| item-api-2 | api | pass | 13/13 route tests pass; chat route: 200 with `delivered:false` (persisted, not pushed) | same test run -- delivered:false case verified | 0 |
+| item-api-3 | api | pass | 13/13 route tests pass; gate route: 200 `{decision:"approved",decidedAt:N}` | gate route integration test -- approve case | 0 |
+| item-api-4 | api | pass | 13/13 route tests pass; gate route: 502 on GateAlreadyDecided | double-approve test confirmed | 0 |
+| item-api-5 | api | pass | 13/13 route tests pass; gate route: 502 on daemon unreachable | daemon-unreachable test confirmed | 0 |
+| item-browser-1 | browser | skipped | -- | pending-captain: browser E2E requires live Next.js session; no e2e mapping for spacebridge UI | 0 |
+| item-browser-2 | browser | skipped | -- | pending-captain: gate button visibility requires live browser + gated entity | 0 |
+| item-browser-3 | browser | skipped | -- | pending-captain: chat delivery UX requires live captain session | 0 |
+| item-browser-4 | browser | skipped | -- | pending-captain: approve gate button E2E requires live FO poll cycle | 0 |
+| item-browser-5 | browser | skipped | -- | pending-captain: daemon-unreachable banner requires live UI smoke | 0 |
+| item-interactive-1 | interactive | skipped | -- | pending-captain: end-to-end chat from spacebridge UI requires live FO session | 0 |
+| item-interactive-2 | interactive | skipped | -- | pending-captain: approve/reject from UI + FO reaction requires live FO session | 0 |
+
+### Evidence: item-cli-1
+
+```terminal
+$ timeout 5 bun run spacebridge/bin/cli.ts mcp
+spacebridge mcp: daemon ready at /Users/kent/.spacedock/spacebridge.sock
+```
+
+### Evidence: item-cli-2
+
+```terminal
+$ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}' | timeout 5 bun run spacebridge/bin/cli.ts mcp 2>/dev/null
+{"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}},"serverInfo":{"name":"spacebridge","version":"0.1.0"}},"jsonrpc":"2.0","id":1}
+```
+
+## E2E Evidence
+
+| Item | Type | Artifact | Path |
+| ---- | ---- | -------- | ---- |
+| item-cli-1 | cli | transcript | (inline in Evidence: item-cli-1) |
+| item-cli-2 | cli | transcript | (inline in Evidence: item-cli-2) |
+| item-api-1 | api | response | bun test route.test.ts -- 13 pass, 0 fail |
+| item-api-2 | api | response | bun test route.test.ts -- delivered:false case |
+| item-api-3 | api | response | bun test gate/route.test.ts -- approve 200 |
+| item-api-4 | api | response | bun test gate/route.test.ts -- GateAlreadyDecided 502 |
+| item-api-5 | api | response | bun test gate/route.test.ts -- unreachable 502 |
+| item-browser-1..5 | browser | -- | pending-captain |
+| item-interactive-1..2 | interactive | -- | pending-captain |
+
+## Stage Report: uat
+
+**Verdict**: pass
+**Ran at**: 2026-04-15T16:34:58Z
+**HEAD**: e0777a7
+**Mode**: normal
+
+### summary
+- total items: 14
+- pass: 7
+- fail: 0
+- skipped: 7
+- infra-level fails: 0
+- assertion fails: 0
+- uat_pending_count (post-run): 7
+
+### automated evidence
+- item-cli-1 (cli): PASS -- exit=0, 1 line captured
+- item-cli-2 (cli): PASS -- exit=0, 1 line captured (valid MCP initialize response)
+- item-api-1 (api): PASS -- bun test route.test.ts 13/13, 200 {messageId, delivered:false}
+- item-api-2 (api): PASS -- same run, delivered:false when no registered session
+- item-api-3 (api): PASS -- gate/route.test.ts 200 {decision:"approved",decidedAt:N}
+- item-api-4 (api): PASS -- gate/route.test.ts 502 GateAlreadyDecided confirmed
+- item-api-5 (api): PASS -- gate/route.test.ts 502 daemon unreachable confirmed
+- integration (cli+api composite): PASS -- bun test integration/captain-chat-and-gate.integration.test.ts 4/4
+
+### captain decisions
+- item-browser-1: skipped (reason: pending-captain -- browser E2E requires live Next.js + spacebridge UI session; no e2e mapping exists for spacebridge UI pages)
+- item-browser-2: skipped (reason: pending-captain -- gate button visibility requires live browser on a gated entity)
+- item-browser-3: skipped (reason: pending-captain -- chat delivery UX flow requires live captain session)
+- item-browser-4: skipped (reason: pending-captain -- approve gate button + FO poll cycle requires live FO session)
+- item-browser-5: skipped (reason: pending-captain -- daemon-unreachable banner requires live UI smoke with daemon killed)
+- item-interactive-1: skipped (reason: pending-captain -- full end-to-end chat requires live CC/FO session)
+- item-interactive-2: skipped (reason: pending-captain -- approve/reject from UI + FO reaction requires live FO session)
+
+notes: Browser and interactive items cannot be automated without a live spacebridge UI session and active FO. All 7 automated items (CLI x2, API x5) pass with direct execution evidence. Integration test (4/4) confirms daemon RPC + MCP shim round-trip. Confidence assessment below.
+
+### Confidence Assessment
+
+**Overall confidence: 78%**
+
+Drivers:
+- (+) All 7 automatable items pass with direct execution evidence (CLI x2, API x5)
+- (+) Integration test 4/4 verifies full daemon RPC + MCP shim round-trip (chat-and-gate E2E at code level)
+- (+) Route handler tests confirm 200/502 response shapes for all 5 API UAT items exactly
+- (+) Review HIGH finding (gate buttons never render) was fixed and verified in round 2 quality pass
+- (-) 5 browser items pending-captain -- gate button render, chat delivery UX, daemon-unreachable banner not browser-verified
+- (-) 2 interactive items pending-captain -- live FO session required to confirm end-to-end captain ↔ CC flow
+- (-) AC-2 gap noted in plan-checker: get_pending_messages mechanism deferred to 099b; captain_message notification path is what's actually wired
+- (-) No e2e mapping exists for spacebridge UI pages; browser items cannot be automated without /e2e-map first
+
+Per captain preference: 78% with 7/14 items skipped (browser + interactive). Automated structural evidence strong; interactive UX requires live captain sign-off session.
 
