@@ -1024,3 +1024,241 @@ Per captain preference (>95% auto-advance, ≤95% captain gate): **88% → capta
 1. Approve deferring plan-checker dispatch to FO (ensign tool-surface constraint) and review inline self-check coverage
 2. Approve deferring workflow-index append to FO application at plan approval
 3. Approve plan's choice to defer all 6 MCP tool handlers to 099b (per clarify Q-2 captain answer — re-confirmation before FO kicks off execute)
+
+## Plan-Checker Run
+
+*O-2-B fallback path — monolithic prompt at `skills/build-plan/references/plan-checker-prompt.md` — run 2026-04-15 by agent subagent (captain-dispatched). Ensign skipped Port 11 Nuwa fanout due to nested-dispatch constraint.*
+
+### Dim 1 — Requirement Coverage
+
+5 Acceptance Criteria from `## Acceptance Criteria`:
+
+| AC | Covering task(s) | Notes |
+|----|-----------------|-------|
+| AC-1: FO reply appears in UI feed within 2s | task-11 | Validation Map row present |
+| AC-2: captain chat → CC session receives via `get_pending_messages` | task-7, task-11 | **PARTIAL MISS** — task-7 explicitly registers an empty tools list and rejects all calls including `get_pending_messages` ("Tool not implemented in 099 scope — see 099b"). task-11 verifies delivery via `notifications/spacebridge/captain_message`, not via `get_pending_messages`. The AC literal text says "connected CC session receives the message via `get_pending_messages` MCP tool" — this mechanism is 099b scope, not 099. |
+| AC-3: gate approve → FO detects | task-9, task-11 | Covered |
+| AC-4: get_pending_messages reconnect recovery | task-11 | Validation Map row present |
+| AC-5: UI connects to daemon via Route Handler → socket RPC, shows "Connected" | task-8, task-10 | task-10 mounts components but the "connection status indicator in UI header" is not explicitly wired in task-10's action |
+
+**issues:**
+```yaml
+issues:
+  - dimension: requirement_coverage
+    severity: blocker
+    description: "AC-2 literal mechanism (CC session receives via get_pending_messages MCP tool) is not covered — task-7 registers empty tools array and explicitly defers get_pending_messages to 099b; task-11 verifies via server notifications instead. The Acceptance Criterion text binds to get_pending_messages specifically."
+    fix_hint: "Either rewrite AC-2 to 'CC session receives captain_message notification via MCP server notification' (matching task-7/11 actual mechanism), or add a task to 099 that stubs get_pending_messages with a passthrough to chat_events. Recommend the AC rewrite — it preserves the split and matches the clarify decision."
+  - dimension: requirement_coverage
+    severity: warning
+    description: "AC-5 requires a 'Connected' status indicator in the UI header; task-10 creates chat-input.tsx and gate-buttons.tsx but no task creates or modifies a header/status-bar component. The connection status indicator is not in any files_modified list."
+    fix_hint: "Add a task (or extend task-10) to create a ConnectionStatus component in the UI header, or clarify that the existing SSE event feed implicit connectivity serves as the status indicator and rewrite AC-5 to match."
+```
+
+### Dim 2 — Task Completeness
+
+All 13 tasks (task-0 through task-12) have: `id`, `model`, `wave`, `read_first`, `action`, `acceptance_criteria`, `files_modified`. No TBD/placeholder text found. task-12 `files_modified` lists `(none — verification-only; may touch formatting via biome --write)` which is explanatory prose, not a file path — acceptable for a sweep task with conditional modifications.
+
+**issues:** `[]`
+
+### Dim 3 — Dependency Correctness
+
+Wave graph:
+- Wave 0: task-0 (read-only), task-1 (package.json), task-2 (schema.ts + test)
+- Wave 1: task-3 (chat domain), task-4 (gate domain), task-5 (registry extension) — parallel, no file overlap ✓
+- Wave 2: task-6 (daemon.ts refactor — reads chat/gate from wave 1), task-7 (cli.ts — reads socket-client/types from wave 0) — task-6 and task-7 both listed as wave 2; task-6 reads `spacebridge/src/domain/chat/decider.ts` etc. which are wave-1 outputs ✓; task-7 reads `spacebridge/src/daemon/auto-fork.ts` (pre-existing) ✓; no overlap between task-6 (daemon.ts) and task-7 (cli.ts) ✓
+- Wave 3: task-8 (chat route), task-9 (gate route), task-10 (UI components + entity-body.tsx) — task-8 reads `chat/schemas.ts` (wave-1 output) ✓; task-9 reads `gate/schemas.ts` (wave-1 output) ✓; task-10 reads `entity-body.tsx` (pre-existing) ✓; no file overlap across wave-3 tasks ✓
+- Wave 4: task-11 (integration test), task-12 (sweep) — task-11 reads daemon.ts + cli.ts (wave-2 outputs) ✓; no file overlap ✓
+
+Cross-wave read_first scan: no wave-N task reads a file first-written by another wave-N task.
+
+`files_modified` overlap within same wave: none detected.
+
+**issues:** `[]`
+
+### Dim 4 — Context Compliance
+
+Clarify locks checked:
+- Chat + gate daemon-side CQRS ✓ (task-6 implements daemon-side handlers; task-8/9 Route Handlers call daemon RPC)
+- Session routing = project-root + most-recent-heartbeat ✓ (task-5 + task-6 implement this)
+- 500ms SSE polling retained ✓ (no task modifies SSE endpoints; O-3a preserved)
+- No CLAUDE.md violations found (LCD schema discipline ✓ in task-2 action; `const`/`let` discipline noted in research findings; no RETURNING clauses in schema DDL)
+
+**issues:** `[]`
+
+### Dim 5 — Research Coverage
+
+Spot-checked task read_first entries against Research Findings / Explore Output / Clarify Output:
+
+- task-0: `spacebridge/bin/cli.ts` ← A-3 (cli.ts:54-74 stub) ✓; `tools/dashboard/src/channel.ts` ← A-2 + Research Library/API Surface ✓; `spacebridge/src/schema.ts` ← Research Upstream Constraints (LCD schema discipline) ✓
+- task-2: `spacebridge/src/schema.ts` ← Research LCD schema, A-7 ✓; `spacebridge/src/domain/comment/persistence.ts` ← Research Existing Patterns ✓
+- task-3: all 6 comment aggregate files ← Research "Comment decider template" / "Comment persistence pattern" / "CQRS domain layout convention" ✓
+- task-6: `spacebridge/src/ipc/socket-server.ts` ← Research "Socket server pushToSession" ✓; `spacebridge/bin/daemon.ts` ← Research "Daemon RPC dispatch (current)" ✓
+- task-7: `spacebridge/src/daemon/auto-fork.ts` ← Research Gotchas "autoForkDaemon must precede MCP registration" ✓; `tools/dashboard/src/channel.ts` ← Research Library/API Surface ✓
+
+One gap: task-8 `read_first` includes `spacebridge/src/domain/chat/schemas.ts` (wave-1 output — not pre-existing). This is legitimate (it's a plan-time read_first that will exist at execute time), not a dangling reference. No true dangling references found.
+
+**issues:** `[]`
+
+### Dim 6 — Validation Sampling
+
+#### 6a — Automated Verify Presence
+
+- task-0 AC: `"All 10 checks pass (each echoed)"` + `"No source file modified by this task"` — **no runnable command** ($ prefix, bun test, curl, etc. absent). The runnable checks are in the action body, not the acceptance_criteria field.
+- task-1 AC: `grep -q '"@modelcontextprotocol/sdk"' spacebridge/package.json` exits 0 ✓
+- task-2 through task-12: all contain `bun test ...` or `grep -q ...` or `test -f ...` commands ✓
+
+**issues:**
+```yaml
+issues:
+  - dimension: validation_sampling
+    task: task-0
+    severity: blocker
+    description: "task-0 acceptance_criteria contains only prose ('All 10 checks pass (each echoed)') with no runnable command. Dim 6a requires at least one $ / bun test / curl / grep command in the AC field itself."
+    fix_hint: "Move at least one representative check into acceptance_criteria, e.g.: '- $(grep -q \"await new Promise<void>(() => {})\" spacebridge/bin/cli.ts && echo PASS)' or add 'All 10 environment checks from action pass without modification to any source file.'"
+```
+
+#### 6b — Feedback Latency
+
+task-11 integration test spawns a real daemon + MCP shim subprocess. No watch-mode flag. No declared latency > 30s (2s bound for AC-1 notification; overall test duration not declared).
+
+**issues:** `[]`
+
+#### 6c — Sampling Continuity
+
+- Wave 0 (3 tasks): task-0 (no runnable AC), task-1 (runnable), task-2 (runnable) → 2/3 have runnable ✓ (window passes — 2 ≥ 2)
+- Wave 1 (3 tasks): task-3 (bun test ✓), task-4 (bun test ✓), task-5 (bun test ✓) → 3/3 ✓
+- Wave 2 (2 tasks): exempt
+- Wave 3 (3 tasks): task-8 (bun test ✓), task-9 (bun test ✓), task-10 (bun test ✓) → 3/3 ✓
+- Wave 4 (2 tasks): exempt
+
+**issues:** `[]`
+
+#### 6d — Wave 0 Completeness
+
+No `<automated>MISSING</automated>` markers found. All `test_first="true"` tasks (task-2, task-3, task-4, task-5, task-6, task-7, task-8, task-9, task-10, task-11) include test files in `files_modified` ✓. All `test_first="true"` tasks include `superpowers:test-driven-development` in `skills` ✓.
+
+**issues:** `[]`
+
+### Dim 7 — Cross-Entity Coherence
+
+CONTRACTS.md checked directly (Skill tool unavailable — graceful degradation per prompt spec; direct Read used as proxy given the known CONTRACTS schema).
+
+Files with cross-entity CONTRACTS entries:
+
+| File | Other entity | Status |
+|------|-------------|--------|
+| `spacebridge/bin/daemon.ts` | spacebridge-nextjs-warroom-sse-feed, spacebridge-l2-daemon-lifecycle, spacebridge-role-aware-lease-manager | 🔵 planned (not in-flight) |
+| `spacebridge/bin/cli.ts` | spacebridge-standalone-dir-distribution | 🔵 planned (not in-flight) |
+| `spacebridge/src/schema.ts` | spacebridge-multi-root-session-registry, spacebridge-plugin-skeleton-drizzle-schema, spacebridge-role-aware-lease-manager | 🔵 planned (not in-flight) |
+| `spacebridge/src/domain/session/registry.ts` | spacebridge-multi-root-session-registry | 🔵 planned (not in-flight) |
+| `spacebridge/src/ipc/socket-server.ts` | spacebridge-multi-root-session-registry | 🔵 planned (not in-flight) |
+| `spacebridge/src/ipc/socket-client.ts` | spacebridge-multi-root-session-registry | 🔵 planned (not in-flight) |
+
+No 🟡 in-flight entries for any spacebridge/* file. All conflicts are planned-vs-planned. Per MEMORY A-10, CONTRACTS rows for 053/054/057 were stale-planned when actually shipped — the same pattern likely applies here. However, `spacebridge-multi-root-session-registry` (entity 057) is confirmed shipped (PR #47), meaning its CONTRACTS entries for `socket-server.ts`, `socket-client.ts`, `registry.ts` may already be final at code level despite showing 🔵 planned.
+
+**issues:**
+```yaml
+issues:
+  - dimension: cross_entity_coherence
+    severity: warning
+    description: "spacebridge/src/domain/session/registry.ts, socket-server.ts, socket-client.ts are listed as 🔵 planned under spacebridge-multi-root-session-registry (entity 057), which is confirmed shipped (PR #47 per Q-1 resolution). CONTRACTS ledger drift (MEMORY A-10) means the 'planned' status is stale. 099 modifies registry.ts (task-5) — the file may already exist with content different from CONTRACTS intent column. Risk: task-5 extends the registry interface assuming 057's shipped state, which the explore confirmed is correct. Low execute risk but CONTRACTS hygiene gap remains."
+    fix_hint: "FO should apply workflow-index append for 099 which will create fresh 099 entries; the stale 057 planned entries are a hygiene issue for entity 108's CONTRACTS-cleanup work (already seeded per Q-1 resolution). No blocking action needed."
+```
+
+### Dim 8 — Type/Test Coverage at Plan Time
+
+#### 8a — Test file pairing
+
+All tasks with TypeScript source files include paired test files in `files_modified`:
+- task-2: `schema.ts` + `schema-chat-gate.test.ts` ✓
+- task-3: 6 chat domain `.ts` files + 4 test files ✓
+- task-4: 6 gate domain `.ts` files + 4 test files ✓
+- task-5: `registry.ts` + `registry-active.test.ts` ✓
+- task-6: `daemon.ts` + `daemon-rpc-chat-gate.test.ts` ✓
+- task-7: `cli.ts` + `cli-mcp.test.ts` ✓
+- task-8: `chat/route.ts` + `chat/route.test.ts` ✓
+- task-9: `gate/route.ts` + `gate/route.test.ts` ✓
+- task-10: `chat-input.tsx` + `chat-input.test.tsx`; `gate-buttons.tsx` + `gate-buttons.test.tsx` ✓; `entity-body.tsx` modified but no entity-body test added (existing tests not referenced)
+- task-11: integration test only, no source file ✓
+
+**issues:**
+```yaml
+issues:
+  - dimension: test_coverage
+    task: task-10
+    severity: warning
+    description: "task-10 modifies entity-body.tsx (mounts two new components) but does not add or reference any entity-body test. Existing entity-body tests (if any) may miss the new mount points."
+    fix_hint: "Add entity-body.test.tsx to task-10 files_modified with a test asserting ChatInput and GateButtons render within EntityBody given appropriate props, or confirm existing entity-body tests cover component mounting."
+```
+
+#### 8b — Type-check config coverage
+
+Research Findings does not explicitly cite tsconfig paths. Skip 8b per prompt spec.
+
+### Dim 9 — Stale-Line-Anchor
+
+Key line citations verified against worktree files:
+
+| Citation | Verified | Result |
+|----------|----------|--------|
+| `spacebridge/bin/cli.ts:54-74` stub | line 54: `else if (subcommand === "mcp")`, line 74: `await new Promise<void>(() => {})` | ✓ exact match |
+| `spacebridge/bin/daemon.ts:96-223` if-chain (Research Findings cites :106-178) | actual if-chain starts at line 107 (`if (req.method === "__status")`), default branch at 177 | Stage Report notes "Minor line-range shift on A-7 (actual 106-178 vs cited 96-223)" — Research cites :106-178 which matches ✓; entity body Clarify Annotations cite :96-223 (off by ~10 lines) |
+| `tools/dashboard/src/channel.ts:178` (reply tool name) | line 178: `name: "reply"` | ✓ |
+| `tools/dashboard/src/channel.ts:615` (StdioServerTransport) | line 615: `const transport = new StdioServerTransport();` | ✓ |
+| `tools/dashboard/src/channel.ts:501` (get_pending_messages handler) | line 504: `if (name === "get_pending_messages")` | ✓ (within ±4 lines — content anchor valid) |
+| `spacebridge/src/ipc/socket-server.ts:176-181` pushToSession | line 176: `pushToSession(sessionId: string, msg: IpcMessage): boolean` | ✓ |
+| `spacebridge/src/ipc/socket-client.ts:121-125` onPush | line 121: `if (msg.type === "event-push" || msg.type === "action-push") opts.onPush?.(msg)` | ✓ |
+| `spacebridge/src/domain/session/registry.ts:21-32` | line 30: `getActiveProjectRoots(): string[]` | ✓ (interface present, `getActiveSessionByProjectRoot` absent as expected) |
+
+One citation drift: entity body cites `spacebridge/bin/daemon.ts:96-223` in Clarify Annotations / Decomposition Recommendation. Actual if-chain is `:107-177`. This is in entity context sections (not task action/read_first), so it's a documentation-only inconsistency, not an execute-time anchor.
+
+**issues:**
+```yaml
+issues:
+  - dimension: stale_line_anchor
+    severity: warning
+    description: "Clarify Annotations + Decomposition Recommendation cite spacebridge/bin/daemon.ts:96-223 for the RPC if-chain; actual range is lines 107-177 (verified in worktree). The correct range appears in Research Findings as :106-178. The stale citation is in entity context sections (not task action/read_first) but could mislead executor."
+    fix_hint: "Update Decomposition Recommendation and Clarify Annotations daemon.ts range to :107-177 to match Research Findings and worktree reality. Low-risk: task-6 action prose is unambiguous and executor will read file directly."
+```
+
+### Dim 10 — Circular-AC
+
+Three `grep -c` patterns found in ACs:
+
+1. task-0 line 458: `grep -cE 'sessionEvents|leaseEvents|commentEvents' spacebridge/src/schema.ts` — greps `schema.ts`, not the entity file. Count on entity file = 3 (in the AC text itself), count on schema.ts = 3 (verified). Not circular.
+2. task-3 AC: `ls spacebridge/src/domain/chat/ | grep -cE "..."` — greps output of `ls`, not a file. Not circular.
+3. task-4 AC: same pattern as task-3. Not circular.
+
+**issues:** `[]`
+
+---
+
+### Overall Summary
+
+| Dim | Result | Count |
+|-----|--------|-------|
+| 1 — Requirement Coverage | 1 blocker (AC-2 mechanism mismatch), 1 warning (AC-5 missing header indicator) | B:1 W:1 |
+| 2 — Task Completeness | PASS | — |
+| 3 — Dependency Correctness | PASS | — |
+| 4 — Context Compliance | PASS | — |
+| 5 — Research Coverage | PASS | — |
+| 6a — Automated Verify Presence | 1 blocker (task-0 prose-only AC) | B:1 |
+| 6b — Feedback Latency | PASS | — |
+| 6c — Sampling Continuity | PASS | — |
+| 6d — Wave 0 Completeness | PASS | — |
+| 7 — Cross-Entity Coherence | 1 warning (stale CONTRACTS for 057 files) | W:1 |
+| 8 — Test/Type Coverage | 1 warning (entity-body.tsx missing test) | W:1 |
+| 9 — Stale-Line-Anchor | 1 warning (daemon.ts line range in context sections) | W:1 |
+| 10 — Circular-AC | PASS | — |
+
+**Total: 2 blockers / 4 warnings / 0 nits**
+
+**Recommendation: REVISION REQUIRED** — 2 blockers must be resolved before execute.
+
+Blocker resolution guidance:
+1. **Dim 1 / AC-2**: Rewrite AC-2 from "CC session receives the message via `get_pending_messages` MCP tool" to "CC session receives `notifications/spacebridge/captain_message` notification via MCP server notification, confirming the message was delivered through the daemon RPC bridge." This aligns with task-7's actual implementation and the Q-2 decomposition decision.
+2. **Dim 6a / task-0**: Add one runnable command to task-0 `acceptance_criteria`, e.g. `$ grep -q "await new Promise<void>(() => {})" spacebridge/bin/cli.ts && echo "stub-present"` or wrap the check list as a shell script assertion.
+
+**Updated confidence**: 88% baseline − (2 × 3%) − (4 × 0.5%) = 88% − 6% − 2% = **80%**
+
+Auto-advance eligibility: **NOT ELIGIBLE** (80% < 95% threshold, and blockers present).
