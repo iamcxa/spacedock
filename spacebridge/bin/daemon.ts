@@ -18,10 +18,27 @@ import {
 } from "../src/daemon/nextjs-child";
 import { isProcessAlive, readPidFile, writePidFile } from "../src/daemon/pid";
 import { createDb } from "../src/db";
+import { decide as chatDecide } from "../src/domain/chat/decider";
+import {
+  appendEvents as chatAppendEvents,
+  loadEvents as chatLoadEvents,
+} from "../src/domain/chat/persistence";
+import { parseCommand as parseChatCommand } from "../src/domain/chat/schemas";
+import { replay as chatReplay } from "../src/domain/chat/evolve";
+import { decide as gateDecide } from "../src/domain/gate/decider";
+import {
+  appendEvents as gateAppendEvents,
+  loadEvents as gateLoadEvents,
+} from "../src/domain/gate/persistence";
+import { parseCommand as parseGateCommand } from "../src/domain/gate/schemas";
+import { replay as gateReplay } from "../src/domain/gate/evolve";
+import { GateAlreadyDecided } from "../src/domain/gate/errors";
 import { LeaseCommandSchema } from "../src/domain/lease/schemas";
+import { createSessionRegistry } from "../src/domain/session/registry";
 import { TokenManager } from "../src/domain/share/token-manager";
 import { createCoordinationClientBridge } from "../src/ipc/coordination-client-bridge";
 import { createSocketServer } from "../src/ipc/socket-server";
+import type { RpcResponsePayload } from "../src/ipc/types";
 import { detectProvider, installGuide } from "../src/tunnel/detect";
 import type { TunnelProvider } from "../src/tunnel/provider";
 
@@ -48,6 +65,23 @@ function resolvePort(): number {
 const startedAt = Date.now();
 
 // ─── start subcommand ────────────────────────────────────────────────────────
+
+// ─── RPC handler registry types ──────────────────────────────────────────────
+
+interface RpcCtx {
+  db: ReturnType<typeof createDb>;
+  server: ReturnType<typeof createSocketServer>;
+  sessionRegistry: Awaited<ReturnType<typeof createSessionRegistry>>;
+  tokenManager: TokenManager;
+  getTunnelProvider: () => TunnelProvider | null;
+  setTunnelProvider: (p: TunnelProvider | null) => void;
+  getTunnelUrl: () => string | null;
+  setTunnelUrl: (u: string | null) => void;
+  startedAt: number;
+  sessions: Map<string, { sessionId: string; registeredAt: number }>;
+}
+
+type RpcHandler = (args: unknown[], ctx: RpcCtx) => Promise<RpcResponsePayload>;
 
 async function cmdStart(): Promise<void> {
   const stateDir = resolveStateDir();
@@ -90,13 +124,175 @@ async function cmdStart(): Promise<void> {
   const entityScanner = async () => [];
 
   const bridge = await createCoordinationClientBridge({ db, entityScanner, leaseDurationMs });
+  const sessionRegistry = await createSessionRegistry({ db });
 
   let janitorTimer: ReturnType<typeof setInterval> | null = null;
+
+  // ─── RPC handler registry ───────────────────────────────────────────────────
+
+  const rpcHandlers = new Map<string, RpcHandler>();
+
+  rpcHandlers.set("__status", async (_args, ctx) => ({
+    result: {
+      pid: process.pid,
+      uptimeMs: Date.now() - startedAt,
+      sessions: ctx.sessions.size,
+    },
+  }));
+
+  rpcHandlers.set("share_create", async (args, ctx) => {
+    const [entitySlug, ttlMs, tunnelBackend] = args as [string, number, string?];
+    if (!entitySlug) return { error: "share_create requires entitySlug" };
+
+    if (!ctx.getTunnelProvider() || !ctx.getTunnelUrl()) {
+      try {
+        const provider = detectProvider(tunnelBackend);
+        if (!provider) return { error: `No tunnel provider available. ${installGuide()}` };
+        ctx.setTunnelProvider(provider);
+        const url = await provider.start(resolvePort());
+        ctx.setTunnelUrl(url);
+        process.stderr.write(`[${ts()}] tunnel started (${provider.name}): ${url}\n`);
+      } catch (err) {
+        ctx.setTunnelProvider(null);
+        ctx.setTunnelUrl(null);
+        return { error: `Failed to start tunnel: ${(err as Error).message}` };
+      }
+    }
+
+    const shareToken = ctx.tokenManager.create({
+      entitySlug,
+      ttlMs: ttlMs ?? 7 * 24 * 60 * 60 * 1000,
+    });
+    const url = `${ctx.getTunnelUrl()}/share/${shareToken.token}`;
+    return { result: { token: shareToken.token, url, entitySlug, expiresAt: shareToken.expiresAt } };
+  });
+
+  rpcHandlers.set("share_revoke", async (args, ctx) => {
+    const [token] = args as [string];
+    if (!token) return { error: "share_revoke requires token" };
+
+    const revoked = ctx.tokenManager.revoke(token);
+    const remaining = ctx.tokenManager.list();
+    const provider = ctx.getTunnelProvider();
+    if (remaining.length === 0 && provider) {
+      process.stderr.write(`[${ts()}] no active share tokens — stopping tunnel\n`);
+      await provider.stop();
+      ctx.setTunnelProvider(null);
+      ctx.setTunnelUrl(null);
+    }
+    return { result: { revoked } };
+  });
+
+  rpcHandlers.set("share_list", async (_args, ctx) => ({
+    result: ctx.tokenManager.list(),
+  }));
+
+  rpcHandlers.set("captain_chat", async (args, ctx) => {
+    let cmd: ReturnType<typeof parseChatCommand>;
+    try {
+      cmd = parseChatCommand(args[0]);
+    } catch (err) {
+      return { error: `Invalid captain_chat args: ${(err as Error).message}` };
+    }
+    if (cmd.type !== "send_captain_message") return { error: "Unexpected command type" };
+
+    const targetSessionId = ctx.sessionRegistry.getActiveSessionByProjectRoot(cmd.projectRoot);
+    if (!targetSessionId) {
+      return { error: `No active CC session for project root: ${cmd.projectRoot}` };
+    }
+
+    const existingEvents = await chatLoadEvents(ctx.db, cmd.targetSessionId || targetSessionId);
+    const state = chatReplay(existingEvents);
+    const now = Date.now();
+    const events = chatDecide({ ...cmd, targetSessionId }, state, now);
+    await chatAppendEvents(ctx.db, targetSessionId, events, existingEvents.length + 1);
+
+    const delivered = ctx.server.pushToSession(targetSessionId, {
+      id: randomUUID(),
+      type: "action-push",
+      payload: { action: "captain_chat", messageId: cmd.messageId, content: cmd.content, sentAt: cmd.sentAt },
+    });
+
+    return { result: { messageId: cmd.messageId, delivered } };
+  });
+
+  rpcHandlers.set("gate_decide", async (args, ctx) => {
+    let cmd: ReturnType<typeof parseGateCommand>;
+    try {
+      cmd = parseGateCommand(args[0]);
+    } catch (err) {
+      return { error: `Invalid gate_decide args: ${(err as Error).message}` };
+    }
+
+    const aggregateId = `${cmd.entitySlug}::${cmd.stage}`;
+    const existingEvents = await gateLoadEvents(ctx.db, aggregateId);
+    const state = gateReplay(existingEvents);
+    const now = Date.now();
+
+    let events: ReturnType<typeof gateDecide>;
+    try {
+      events = gateDecide(cmd, state, now);
+    } catch (err) {
+      if (err instanceof GateAlreadyDecided) {
+        return { error: err.message };
+      }
+      throw err;
+    }
+
+    await gateAppendEvents(ctx.db, aggregateId, events, existingEvents.length + 1);
+
+    const decidedAt = now;
+    const decision = cmd.type === "approve_gate" ? "approved" : "rejected";
+
+    // Notify via SSE events table so UI feed picks up the gate decision
+    await ctx.db.insert((await import("../src/schema")).events).values({
+      type: "gate_decided",
+      entity: cmd.entitySlug,
+      stage: cmd.stage,
+      agent: "captain",
+      workflowDir: process.env.SPACEBRIDGE_PROJECT_ROOT ?? process.cwd(),
+      timestamp: decidedAt,
+      payload: JSON.stringify({ decision, decidedAt }),
+    });
+
+    // Push to active session if available
+    const targetSessionId = ctx.sessionRegistry.getActiveSessionByProjectRoot(
+      process.env.SPACEBRIDGE_PROJECT_ROOT ?? process.cwd(),
+    );
+    if (targetSessionId) {
+      ctx.server.pushToSession(targetSessionId, {
+        id: randomUUID(),
+        type: "action-push",
+        payload: { action: "gate_decided", entitySlug: cmd.entitySlug, stage: cmd.stage, decision, decidedAt },
+      });
+    }
+
+    return { result: { decision, decidedAt } };
+  });
+
+  // ─── Build RpcCtx ────────────────────────────────────────────────────────────
+
+  // server reference captured after createSocketServer below; use a late-binding getter
+  let serverRef: ReturnType<typeof createSocketServer>;
+
+  const rpcCtx: Omit<RpcCtx, "server"> & { server: ReturnType<typeof createSocketServer> } = {
+    db,
+    get server() { return serverRef; },
+    sessionRegistry,
+    tokenManager,
+    getTunnelProvider: () => tunnelProvider,
+    setTunnelProvider: (p) => { tunnelProvider = p; },
+    getTunnelUrl: () => tunnelUrl,
+    setTunnelUrl: (u) => { tunnelUrl = u; },
+    startedAt,
+    sessions,
+  };
 
   const server = createSocketServer({
     socketPath,
     onRegister: (sess) => {
       sessions.set(sess.sessionId, { sessionId: sess.sessionId, registeredAt: Date.now() });
+      sessionRegistry.register(sess).catch(() => {});
       if (autoStopTimer) {
         clearTimeout(autoStopTimer);
         autoStopTimer = null;
@@ -104,77 +300,9 @@ async function cmdStart(): Promise<void> {
       return { sessionToken: randomUUID(), serverVersion: "0.1.0" };
     },
     onRpcRequest: async (_sessionId, req) => {
-      // __status: internal method for status subcommand out-of-process query
-      if (req.method === "__status") {
-        return {
-          result: {
-            pid: process.pid,
-            uptimeMs: Date.now() - startedAt,
-            sessions: sessions.size,
-          },
-        };
-      }
-
-      // share_create: create share token + start tunnel if needed
-      if (req.method === "share_create") {
-        const args = req.args as [string, number, string?];
-        const [entitySlug, ttlMs, tunnelBackend] = args;
-        if (!entitySlug) return { error: "share_create requires entitySlug" };
-
-        // Start tunnel on first share create (or if previous tunnel died)
-        if (!tunnelProvider || !tunnelUrl) {
-          try {
-            const provider = detectProvider(tunnelBackend);
-            if (!provider) {
-              return { error: `No tunnel provider available. ${installGuide()}` };
-            }
-            tunnelProvider = provider;
-            tunnelUrl = await tunnelProvider.start(resolvePort());
-            process.stderr.write(
-              `[${ts()}] tunnel started (${tunnelProvider.name}): ${tunnelUrl}\n`,
-            );
-          } catch (err) {
-            tunnelProvider = null;
-            tunnelUrl = null;
-            return { error: `Failed to start tunnel: ${(err as Error).message}` };
-          }
-        }
-
-        const shareToken = tokenManager.create({
-          entitySlug,
-          ttlMs: ttlMs ?? 7 * 24 * 60 * 60 * 1000,
-        });
-        const url = `${tunnelUrl}/share/${shareToken.token}`;
-        return {
-          result: { token: shareToken.token, url, entitySlug, expiresAt: shareToken.expiresAt },
-        };
-      }
-
-      // share_revoke: revoke a share token; stop tunnel if no active tokens remain
-      if (req.method === "share_revoke") {
-        const args = req.args as [string];
-        const [token] = args;
-        if (!token) return { error: "share_revoke requires token" };
-
-        const revoked = tokenManager.revoke(token);
-        const remaining = tokenManager.list();
-        if (remaining.length === 0 && tunnelProvider) {
-          process.stderr.write(`[${ts()}] no active share tokens — stopping tunnel\n`);
-          await tunnelProvider.stop();
-          tunnelProvider = null;
-          tunnelUrl = null;
-        }
-        return { result: { revoked } };
-      }
-
-      // share_list: list active share tokens
-      if (req.method === "share_list") {
-        const tokens = tokenManager.list();
-        return { result: tokens };
-      }
-
-      // Real ChannelProvider RPC forwarding handled by entity 053
-      return { error: `RPC method ${req.method} not implemented in daemon stub` };
+      const handler = rpcHandlers.get(req.method);
+      if (!handler) return { error: `RPC method ${req.method} not implemented in daemon stub` };
+      return handler(req.args as unknown[], rpcCtx);
     },
     onCoordinationRequest: async (_sessionId, req) => {
       // Build a LeaseCommand from the positional args and validate at the IPC boundary
@@ -218,9 +346,13 @@ async function cmdStart(): Promise<void> {
     },
     onDisconnect: (sessionId) => {
       sessions.delete(sessionId);
+      sessionRegistry.disconnect(sessionId, "explicit").catch(() => {});
       scheduleAutoStop(server);
     },
   });
+
+  // Wire late-binding server reference for rpcCtx
+  serverRef = server;
 
   // Bind socket as first action (A-4: before any heavy init)
   await server.listen();
