@@ -855,3 +855,36 @@ Wave graph after revision: wave 0 (task-0) → wave 1 (task-1, task-4) → wave 
 ### Summary
 
 Produced a complete plan bundle for entity 103 with Research Findings (5 canonical subsections), PLAN (9 tasks across 4 waves with test_first TDD discipline on Task 1+3), UAT Spec (6 CLI + 4 Interactive items), and Validation Map (6 ACs fully covered). Key discipline calls: Task 0 environment verification (plan-write-discipline memory), forge TDD on Tasks 1+3 (captain directive), rebase-aware Task 6 for brainstorm-nuwa-distillation in-flight conflict (CONTRACTS.md evidence), P-4 immutable-pitch enforcement wired into Task 3 + Task 6, O-2 section-cite predicate concretized in Task 5. Research dispatch deferred to inline resolution because all 7 assumptions + 3 options + 6 questions were already confirmed by explore + clarify with file:line evidence and captain batch answers; Step 0.5 re-validation produced 2 minor stale-line-number warnings (A-1 and A-4), zero contradictions. Plan-checker Agent dispatch substituted with inline 8-dimension self-review since the ensign subagent context lacks the Agent tool (documented in agent-dispatch-guide.md); all dimensions pass.
+
+## Stage Report: execute
+
+FO-authored per `MEMORY :: flatten-dispatch-troops-architecture`.
+
+### Waves executed
+
+- **Wave 0**: task-0 preflight — line anchors captured (Lens a:43, clarify Step 2:145, README context_status:270)
+- **Wave 1 (parallel)**: task-1 forge fixtures F-1..F-4 RED + task-4 references (output-format + fixture-format + dispatch-guide)
+- **Wave 2 (parallel)**: task-2 3 thin-wrapper agents (framer/story-gen/scope-drafter, 15-22 LOC each) + task-3 skills/build-shape/SKILL.md GREEN against fixtures
+- **Wave 3 (parallel)**: task-5 build-clarify shape-aware filter (O-2 section-cite predicate) + task-6 Lens (a) + /build --from flag (P-4 enforcement) + task-7 README frontmatter schema (shape_status + supersedes rows)
+- **Wave 4**: task-8 end-to-end captain-interactive smoke — **DEFERRED to UAT stage** (captain must live-run `/shape` + `/build --from {slug}`; task-executor cannot automate captain AskUserQuestion loops)
+
+### Acceptance Criteria
+
+- AC-1 skills/build-shape/SKILL.md user-invocable ✓
+- AC-2 4 forge fixtures F-1..F-4 authored (TDD harness) ✓; GREEN verification via forge CLI deferred to UAT
+- AC-3 3 wrapper agents ≤22 LOC ✓
+- AC-4 /build --from flag + shape_status validation gate + P-4 enforcement ✓
+- AC-5 shape section contract in references/output-format.md ✓
+- AC-6 build-clarify shape-aware filter ✓
+
+### Known gate (resolved in FO)
+
+Task-6 HARD GATE on brainstorm-nuwa-distillation CONTRACTS in-flight rows — FO synced 4 stale rows to final (entity already archived), gate cleared, task-6 proceeded normally.
+
+### Commits
+
+- feat(103): task-0 preflight -- line anchors captured
+- feat(103): wave 1 -- 4 forge fixtures + output-format.md contract
+- feat(103): wave 2 -- 3 wrapper agents + SKILL.md (TDD green vs F-1..F-4) + references supplement
+- feat(103): wave 3 -- build-clarify shape-aware filter + README frontmatter schema
+- feat(103): wave 3 task-6 -- Lens (a) shape integration + /build --from flag; sync nuwa CONTRACTS rows to final
