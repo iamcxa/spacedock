@@ -1,14 +1,15 @@
 ---
 id: 099
 title: "Spacebridge channel bridge — UI ↔ daemon ↔ CC bidirectional communication"
-status: uat
+status: shipped
 context_status: ready
 source: captain observation (2026-04-14 — new UI has no channel support, blocks cutover)
 created: 2026-04-14T13:00:00+08:00
 started: 2026-04-15T18:55:00+08:00
-completed:
-verdict:
-score: 0.92
+completed: 2026-04-16T03:30:00+08:00
+verdict: shipped
+score: 0.78
+ship_note: "Captain B-path: plan 0.92 execute 13 tasks 2 feedback rounds (quality round 1 fixed 8 tsc + 19 lint, review HIGH f-001 prop-threading fix); UAT 0.78 (7 automated pass, 7 browser/interactive pending-captain); live e2e validation deferred to downstream entities (111 / spacebridge UI e2e-map)."
 worktree: .worktrees/spacedock-ensign-spacebridge-channel-bridge-bidirectional
 issue:
 pr:
