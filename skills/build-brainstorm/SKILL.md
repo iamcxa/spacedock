@@ -5,23 +5,48 @@ description: "Non-interactive spec distiller for /build. Takes a captain's direc
 
 # Build-Brainstorm -- Non-Interactive Spec Distiller
 
-You are a leaf skill invoked by `/build`. You receive a captain's directive (feature description, bugfix request, or Linear issue reference) and produce a structured brainstorming spec. You do NOT ask questions -- unclear areas get α markers that build-explore resolves later.
+You are a Mode-A/B dual-mode skill invoked by `/build`. In Mode A (Agent tool available) you dispatch 4 parallel lens subagents per invocation; in Mode B (ensign-wrapped, no Agent) you inline-fallback to single-pass. You are non-interactive to the captain in both modes. You receive a captain's directive (feature description, bugfix request, or Linear issue reference) and produce a structured brainstorming spec. You do NOT ask questions -- unclear areas get α markers that build-explore resolves later.
 
 **Seven steps, in strict order. No interaction with the user at any point.**
 
 ---
 
-## Step 1: Context Enrichment
+## Step 1: Lens Collection (Mode A/B)
+
+Collect 4 orthogonal lenses before writing APPROACH. Each lens produces a subsection in a new `## Lens Evidence` entity body section with ≥1 `file:line` or `entity:ID` citation, each citation tagged `[primary|secondary|tertiary]`.
+
+### Two execution modes
+
+**Mode A -- full 4-lens dispatch (Agent tool available):**
+Dispatch 4 parallel subagents:
+- Lens (a) Captain-stated-intent: `Agent(subagent_type="spacedock:researcher", model="sonnet", prompt=<directive + AC + 1-paragraph task prompt for surfacing explicit captain statements from directive>)`
+- Lens (b) Captain-unstated-intent: `Agent(subagent_type="spacedock:researcher", model="sonnet", prompt=<keyword-driven journal search "search_journal(query: {directive keywords}, limit: 5)" + Core-Tension-clustered sibling entities per Q-2; structural output only -- no semantic ground-truth check>)`
+- Lens (c) Codebase-current-state: `Agent(subagent_type="spacedock:code-explorer", model="sonnet", prompt=<domain-hint + APPROACH keyword file set>)`
+- Lens (d) Sibling-entity: `Agent(subagent_type="spacedock:code-explorer", model="sonnet", prompt=<INDEX.md sibling lookup + CONTRACTS.md overlap scan>)`
+
+All 4 dispatches run in parallel. Each subagent returns structured text; the main session consumes and writes to `## Lens Evidence`.
+
+**Mode B -- inline single-pass fallback (no Agent tool):**
+Read up to 9 files inline (CLAUDE.md, entity file, INDEX.md, CONTRACTS.md, 5 APPROACH keyword files). Write a single-subsection `## Lens Evidence -> ### Inline fallback` block with citations tagged at best-effort tier. Self-test gate (i) cross-lens recurrence is SKIPPED in Mode B (α-marker instead); gates (ii) and (iii) still run.
+
+### Mode selection heuristic
+
+- **Mode A** when Agent tool is present in the runtime `## Tools Available` check.
+- **Mode B** when Agent tool is absent (ensign-wrapped runtime). Do NOT attempt Mode A dispatch and fall back on failure -- detect up-front to avoid cost.
+
+Detection heuristic: inspect whether `Agent` tool is listed in the current runtime's available tools at skill boot. If uncertain, default to Mode B (fail-safe degrades gracefully).
+
+### Context Enrichment (sub-steps, run alongside lens dispatch)
 
 Gather context silently -- no questions, no confirmation prompts.
 
-### 1a -- Issue Reference (if provided)
+#### 1a -- Issue Reference (if provided)
 
 If the directive includes a Linear issue ID or GitHub issue reference:
 - Fetch via Linear MCP (`get_issue`) or GitHub MCP -- extract title, description, labels, acceptance criteria
 - If MCP unavailable: use the reference as-is, note "Issue details not fetched -- MCP unavailable"
 
-### 1b -- Related Entities
+#### 1b -- Related Entities
 
 Grep the workflow directory for entities related to the directive:
 
@@ -31,7 +56,7 @@ grep -rl "{keyword}" {workflow_dir}/*.md {workflow_dir}/_archive/*.md 2>/dev/nul
 
 Extract title keywords from the directive (nouns, verbs) and match against entity files. Record matches as `{id} -- {title} ({status})`.
 
-### 1c -- Session Context
+#### 1c -- Session Context
 
 Search context lake for recent relevant entries:
 
@@ -41,7 +66,7 @@ search_journal(query: "{directive keywords}", limit: 3)
 
 Extract a 1-sentence summary from the most recent match. If no matches: "No recent session context".
 
-### 1d -- Git State
+#### 1d -- Git State
 
 ```bash
 git rev-parse --abbrev-ref HEAD   # branch
@@ -49,7 +74,7 @@ git rev-parse --short HEAD         # sha
 git log --oneline -3               # recent commits
 ```
 
-### 1e -- Timestamp
+#### 1e -- Timestamp
 
 Capture current ISO 8601 timestamp for the entity record.
 
@@ -223,9 +248,48 @@ If any check fails, fix inline before returning. Do not flag to the user -- fix 
 
 ---
 
+## Step 5.5: Triple-Verification Merge Gate + 5-Item Self-Test
+
+### Merge gate (3 gates per candidate APPROACH claim)
+
+Every candidate APPROACH claim passes through 3 independent gates:
+- **Gate (i) cross-lens recurrence**: ≥2 of 4 lens subsections cite supporting evidence for this claim. Skipped in Mode B with α marker.
+- **Gate (ii) generative power (Q-3 predictive marker heuristic)**: claim contains a concrete action verb from the closed set {add, remove, replace, rewrite, rename, dispatch, gate, verify, annotate, vendor, relax, block, emit, append} AND a file/layer name NOT present in the directive text. Binary, grep-verifiable.
+- **Gate (iii) exclusivity**: claim distinguishes this entity from every sibling in `_index/INDEX.md` with overlapping `files_modified` per `_index/CONTRACTS.md`. Failure → seed `Q-n` in `## Open Questions` citing sibling and asking captain to `{merge|link|refine}` (AC line 91).
+
+Claims passing 3/3 → `## Brainstorming Spec -> APPROACH`. Claims passing 1-2/3 → demote to `GUARDRAILS`. Claims passing 0/3 → discard with Stage Report line `gate-{i|ii|iii} discard: {claim summary}`.
+
+### 5-item quality self-test gate
+
+Run after merge gate, before return:
+1. **Claim cardinality**: APPROACH contains 3-7 factual claims (soft target). Out-of-range MUST be α-marked with literal form `(α: claim count {n} outside default 3-7; scale-justified by {directive-signal})` where `{directive-signal}` is one of {`trivial-scope-rename`, `single-line-config-edit`, `medium-feature`, `architectural-overhaul`, `cross-layer-refactor`}.
+2. **Lens support floor**: every APPROACH claim has ≥2 lens citations. Failure: promote to 2+ lenses (re-dispatch a lens subagent) or demote to GUARDRAILS.
+3. **`## Core Tensions` populated OR escape-hatch**: section contains ≥1 typed entry matching `\*\*(time-based|domain-based|essential)\*\*:` OR literal `Checked -- no notable constraints identified.`
+4. **`## Honest Boundaries` populated OR escape-hatch**: section contains ≥1 `- ` bullet OR literal `Checked -- no notable constraints identified.`
+5. **Tier tags on every lens citation**: every `file:line` or `entity:ID` in `## Lens Evidence` carries `[primary|secondary|tertiary]`. `grep -cE '\[primary\]|\[secondary\]|\[tertiary\]'` ≥ citation count.
+
+### Failure routing (Q-1 resolved: Hard-fail to FO/captain)
+
+- **Mode A**: any gate-(i/ii/iii) or self-test item failure returns NO spec output; emit Stage Report blocker payload `{failure_gate: "{gate-id}", failing_claim: "{verbatim claim text}", failing_lens: "{lens-id}"}`. FO/captain routes recovery.
+- **Mode B**: gate (i) failure is auto-α-marked (no ship-block). Gates (ii)/(iii) and self-test items (2)-(5) still run as advisory; failures inline α-markers + Stage Report warning `ensign-mode inline fallback -- gate {n} advisory-only`.
+
+---
+
 ## Step 7: Return Output
 
 Return structured sections as **plain text**. The `/build` skill assembles them into the entity file -- you do NOT write any files.
+
+### Output Contract -- new body sections (Nüwa lens model)
+
+In addition to the prior sections, this skill produces THREE new entity body sections:
+
+- `## Lens Evidence` -- 4 subsections: `### Lens (a) captain-stated-intent`, `### Lens (b) captain-unstated-intent`, `### Lens (c) codebase-current-state`, `### Lens (d) sibling-entity`. Each subsection has ≥1 citation tagged `[primary|secondary|tertiary]`. (Mode B emits a single `### Inline fallback` subsection instead.)
+- `## Core Tensions` -- typed entries `**(time-based|domain-based|essential)**: {text}` OR literal escape-hatch `Checked -- no notable constraints identified.`.
+- `## Honest Boundaries` -- `- ` bullets OR literal escape-hatch `Checked -- no notable constraints identified.`.
+
+**Downstream contract:** `explore`/`clarify` annotate these sections but MUST NOT delete. Only captain (via clarify annotation) may delete.
+
+### Full output template
 
 ```
 ## Directive
@@ -248,6 +312,36 @@ You are asking for {one-sentence plain-language restatement of the directive's c
 - **Problem being solved**: {the pain this addresses}
 - **Expected outcome**: {what concretely changes when this ships}
 - **Explicit non-goals**: {what this does NOT do -- adjacent work, scope boundaries} {(needs clarification -- deferred to explore) if uncertain}
+
+## Lens Evidence
+
+### Lens (a) captain-stated-intent
+
+- {claim} -- {file:line or entity:ID} [primary|secondary|tertiary]
+
+### Lens (b) captain-unstated-intent
+
+- {claim} -- {file:line or entity:ID} [primary|secondary|tertiary]
+
+### Lens (c) codebase-current-state
+
+- {claim} -- {file:line or entity:ID} [primary|secondary|tertiary]
+
+### Lens (d) sibling-entity
+
+- {claim} -- {file:line or entity:ID} [primary|secondary|tertiary]
+
+## Core Tensions
+
+- **(time-based|domain-based|essential)**: {1-sentence tension description}
+
+(Or literal escape-hatch: `Checked -- no notable constraints identified.`)
+
+## Honest Boundaries
+
+- {1-sentence boundary statement}
+
+(Or literal escape-hatch: `Checked -- no notable constraints identified.`)
 
 ## Brainstorming Spec
 
@@ -272,9 +366,10 @@ You are asking for {one-sentence plain-language restatement of the directive's c
 ## Rules
 
 - **NEVER ask the captain questions.** Use α markers for anything unclear. You are non-interactive by design.
-- **NEVER invoke other skills.** You are a leaf skill, not an orchestrator.
+- **Mode-dependent dispatch.** Mode A (Agent tool available) dispatches 4 parallel lens subagents per Step 1.
+  Mode B (no Agent tool) inline-falls-back to a single-pass read. Do NOT invoke non-lens skills.
 - **NEVER write files.** Return text output only -- `/build` handles file creation.
-- **Keep it lightweight.** Read at most 5 files for context enrichment.
+- **File-read cap: 9.** Raised from 5 to accommodate 4 lenses × up to 2 files each + 1 INDEX/CONTRACTS lookup per invocation. Every other read-budget assumption identical to v1.
 - **Preserve the directive verbatim** in the `## Directive` section. Do not rephrase, summarize, or "improve" it.
 - **Use `--` (double dash)** in α markers for grep compatibility: `(needs clarification -- deferred to explore)`. Never use `—` (em dash).
 
@@ -289,6 +384,7 @@ You are asking for {one-sentence plain-language restatement of the directive's c
 - `Bash` -- git commands only (branch, sha, log)
 - `context-lake MCP` -- `search_journal`, `search_insights`
 - `Linear MCP` -- `get_issue` (if issue reference provided)
+- `Agent` -- dispatches 4 parallel lens subagents in Mode A only (Mode B does inline fallback; see Step 1)
 
 **NOT available:**
 - `AskUserQuestion` -- this skill is non-interactive. Use α markers instead.
