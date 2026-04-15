@@ -943,3 +943,72 @@ Wave 3 integration verification -- 2026-04-15. Task-11.
 ### Summary
 
 Quality verification completed on entity 107 (plan-checker-multi-angle-nuwa). Full `bun test` suite run from repo root covers all 463 tests (both tools/dashboard and tests/dashboard trees per MEMORY test-suite-scope rule). Pre-existing test failures (412 pass, 51 fail, 25 errors) are unrelated to entity 107's markdown-only changes; no new failures introduced. TypeScript compilation passes. Biome lint shows 2 pre-existing errors unrelated to entity 107. All checks that apply to markdown-only content pass.
+
+## Stage Report: review
+
+- [x] Read reviewer scratch files and inline sharp-edges findings
+  `docs/build-pipeline/_scratch/107-review-pr-code.md` (3B/3W/1N), sharp-edges findings inline in FO prompt (10 findings: F-01 through F-10)
+- [x] Classify all findings by severity × category
+  Classification table below
+- [x] Auto-fix all confirmed blockers
+  6 blocker fixes applied across 6 commits (bce259a through f0d1fcc)
+- [x] Verify F-06 (glob vacuousness) and F-09 (target_path validity) -- mark as resolved
+  All 6 `skills/plan-checker-dim-*/` dirs confirmed to exist; glob passes non-vacuously. All `target_path:` fields in pressure fixtures point to existing dirs.
+- [x] Mark F-07 as resolved (AC-4 count==10 already amended at captain gate)
+  Captain gate resolution recorded in Stage Report: plan; count amended to "6 or 7" band.
+- [x] Accept remaining warnings as v1 known-gaps with rationale
+  9 warnings/nits accepted (see list below)
+- [x] Append Stage Report to entity body and commit
+
+### Finding Classification
+
+| ID | Source | Severity | Category | Verdict |
+|----|--------|----------|----------|---------|
+| B-1 (variant F1, pr-code B-1) | variant-analysis + pr-code | blocker | schema/missing-frontmatter | auto-fixed `bce259a` |
+| B-2 (variant F2, pr-code B-1 partial) | variant-analysis + pr-code | blocker | schema/fixture-input-nesting | auto-fixed `0098139` |
+| B-3 (pr-code B-2) | pr-code | blocker | contract/tool-allowlist | auto-fixed `188395a` |
+| B-4 (pr-code B-3) | pr-code | blocker | maintainability/stale-line-anchor | auto-fixed `db0bcf4` |
+| F-03 | sharp-edges | blocker | correctness/unsubstituted-placeholder | auto-fixed `be9be8f` |
+| F-02 | sharp-edges | blocker | correctness/durable-state | auto-fixed `f0d1fcc` |
+| F-07 | sharp-edges | blocker | correctness/obsolete-ac | resolved-prior (captain gate) |
+| F-06 | sharp-edges | blocker | correctness/vacuous-glob | resolved-prior (skills dirs exist) |
+| F-09 | sharp-edges | nit | correctness/target-path | resolved-prior (dirs verified) |
+| F-01 | sharp-edges | warning | maintainability/delimiter | known-gap |
+| F-04 | sharp-edges | warning | cosmetic/hardcoded-count | known-gap |
+| F-05 | sharp-edges | warning | schema/mock-field | known-gap |
+| F-08 | sharp-edges | warning | maintainability/deprecated-coupling | known-gap |
+| F-10 | sharp-edges | nit | doc/missing-header | known-gap |
+| pr-code W-1 | pr-code | warning | doc/port-description-drift | known-gap |
+| pr-code W-2 | pr-code | warning | maintainability/dual-authority | known-gap |
+| pr-code W-3 | pr-code | warning | arch/skill-tool-availability | known-gap |
+| pr-code N-1 | pr-code | nit | consistency/missing-rules-section | known-gap (## Rules section IS present in dim-9 SKILL.md; pr-code nit was stale) |
+| variant F3/F4/F5 | variant-analysis | warning | schema/fixture-field | known-gap |
+
+### Auto-Fix Commit SHAs
+
+| Fix | Commit |
+|-----|--------|
+| blocker-1: dim-9 agent missing YAML frontmatter | `bce259a` |
+| blocker-2+3: dim-9 tool allowlist add Grep (agent + SKILL.md) | `188395a` |
+| blocker-4: dim-9 pressure fixture schema (entity_context/file_state under input:) | `0098139` |
+| blocker-5: Step 6b hardcoded line numbers → dim-3-dependency-rules.md | `db0bcf4` |
+| blocker-6: F-03 pre-dispatch placeholder guard | `be9be8f` |
+| blocker-7: F-02 cutover counter durable store (grep Stage Reports) | `f0d1fcc` |
+
+### Accepted Warnings (v1 Known-Gaps)
+
+- **F-01** (dim section delimiters): Machine-readable delimiters are a future hardening concern; plan-checker-prompt.md is deprecated and will be removed post-O-2-B window, making this moot.
+- **F-04** (hardcoded "7 sources" count label): Cosmetic; the count becomes accurate when Dim 11 is added, at which point the label should be updated as part of the dim-11 entity.
+- **F-05** (pressure fixture mock `workflow_index_response:` field): Non-schema field on dim-7 fixture; no runner spec exists yet to validate mock shape. Deferred to runner implementation entity.
+- **F-08** (DEPRECATED file coupling with SKILL.md): Partially mitigated by F-04 blocker fix (dim-3-dependency-rules.md decouples the load-bearing Dim 3 rules). Remaining coupling in Step 6a is bounded by the O-2-B window; after N clean diffs, plan-checker-prompt.md is removed.
+- **F-10** (Boot Sequence references `## plan_text` header): The prompt template is authored by build-plan Step 6 at dispatch time; the header name is a convention, not a structural contract. Nit only.
+- **pr-code W-1** (Port 11 description drift): Documentation accuracy gap in nuwa-ports.md; does not affect runtime behavior. Deferred to a doc-sync pass after O-2-B window closes.
+- **pr-code W-2** (Step 6a dual-authority during O-2-B): Accepted per the O-2-B design; the parallel-run window is intentionally transient. The NOTE clarification was recommended but the dual-authority is a known and intentional property of the feature flag architecture.
+- **pr-code W-3** (Skill tool availability in Dim 7 dispatched context): Acknowledged as "Known architectural unknown" in Step 6a text; graceful-degradation stub exists in SKILL.md. Deferring positive verification to first live dispatch of dim-7 agent.
+- **variant F3/F4/F5** (fixture schema gaps: target_path, sub_rule, assertion fields): Depend on a pressure-test runner spec that does not yet exist. These are v2 runner work items.
+
+### Summary
+
+6 blockers auto-fixed across 6 commits (bce259a–f0d1fcc): dim-9 agent frontmatter added, Grep added to dim-9 tool allowlist in both agent and SKILL.md, dim-9 pressure fixture restructured to correct input: nesting, Step 6b stale line-number reference replaced with stable section-anchor reference to new dim-3-dependency-rules.md, pre-dispatch placeholder guard added to Step 6a, and O-2-B cutover counter made durable via grep-based Stage Report count. 2 prior-resolution findings confirmed (F-06 glob vacuousness: all 6 skill dirs exist; F-07 AC-4 count: already amended at captain gate). 9 warnings/nits accepted as v1 known-gaps -- all are either cosmetic, bounded by the O-2-B window, or require a runner spec that does not yet exist. Verdict: **pass** -- all blockers resolved, no captain decision required.
+
+verdict: pass
