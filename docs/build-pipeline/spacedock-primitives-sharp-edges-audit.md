@@ -2,7 +2,7 @@
 id: 108
 title: Sharp-edges audit of spacedock primitives -- workflow-index + troop contract
 status: explore
-context_status: awaiting-clarify
+context_status: ready
 source: captain directive (2026-04-15 post-103/106 ship session — session evidence of workflow-index lifecycle gap + troop trust surface)
 created: 2026-04-15T13:45:00+08:00
 started: 2026-04-15T13:50:00+08:00
@@ -254,3 +254,64 @@ Also surfaced during mapping (not in original Directive): **CONTRACTS.md hygiene
 - [x] α markers resolved: 0 / 0 (no brainstorm spec block; audit-intent entities carry Directive + Scope instead)
 - [x] Scale assessment: Medium confirmed (18 files across 4 layers — matches frontmatter)
 - [x] Research dispatched: 0 researchers (skipped — audit is internal-primitive scope, no external tech claims; all evidence grounded in codebase grep)
+
+## Clarify Annotations
+
+**Open Questions — resolved by captain 2026-04-15:**
+
+- Q-1 → **Answer**: Document 2 refuted claims (#8 changed_files, #10 files_modified gate) as **Confirmed Mitigations** subsection in audit output; cite file:line; no Phase F seed. Future audits benefit from the skeptical verification trail.
+- Q-2 → **Answer**: Include A-10 (CONTRACTS.md hygiene drift) as **HIGH** finding + spawn dedicated Phase F diagnostic entity. Audit produces pointer; diagnostic entity does runtime log analysis.
+- Q-3 → **Answer**: Generate **LOW** finding for dead reference `skills/build-execute/references/agent-dispatch-guide.md` + Phase F seed to extract dispatch contract from `build-execute/SKILL.md:157-188` into references/ file.
+- Q-4 → **Answer**: Structure cross-primitive compound as **compound headline + per-primitive sub-findings**. One HIGH compound narrative ("troop bypasses workflow-index via Edit/Write") + 2 sub-findings for Phase F seeding: (a) troop-tool-allowlist narrowing, (b) workflow-index write-gatekeeper.
+
+**Option Comparisons — selected by captain 2026-04-15:**
+
+- O-1 → **Selected**: **Impact-only CRITICAL/HIGH/MEDIUM/LOW severity bar**. Aligned with entity 106 HIGH labeling convention.
+- O-2 → **Selected**: **One Phase F entity per HIGH finding**. Medium-ship cadence; matches MEMORY `nuwa-ification-amplifies-taxonomy` audit-first discipline.
+
+**Assumption Severity Assignments — approved by captain 2026-04-15 (all 12 accepted as proposed):**
+
+| # | Finding | Severity | Phase F Seed |
+|---|---------|----------|--------------|
+| A-1 | workflow-index no file-locking primitive | **HIGH** | ✓ `workflow-index-file-locking` |
+| A-2 | no in-flight→final irreversibility guard | **HIGH** | ✓ `workflow-index-irreversibility-guard` |
+| A-3 | cross-worktree append race | **HIGH** | ✓ `workflow-index-worktree-race-serialization` |
+| A-4 | CONTRACTS row schema no Supersedes column | **MEDIUM** | known-gap log |
+| A-5 | `blocked_reason` stringly-typed | **MEDIUM** | known-gap log (per 106 v1 accepted) |
+| A-6 | `scope_observation` injection unprotected | **MEDIUM** | known-gap log |
+| A-7 | worktree sandbox advisory-only | **HIGH** | ✓ `troop-sandbox-enforcement` |
+| A-8 | Circular-AC grep-context trust | **MEDIUM** | known-gap log |
+| A-9 | mod-hook logged-not-alarmed | **LOW** | known-gap log |
+| A-10 | CONTRACTS.md hygiene drift | **HIGH** | ✓ `workflow-index-contracts-hygiene-diagnostic` |
+| Compound | troop bypasses workflow-index via Edit/Write | **HIGH** | ✓ `troop-workflow-index-write-gatekeeper-compound` (+ sub-finding seeds per Q-4) |
+| Dead ref | `agent-dispatch-guide.md` missing | **LOW** | ✓ `build-execute-dispatch-guide-extraction` |
+
+**Phase F seed slate (6 HIGH + 1 LOW = 7 total Phase F seeds)**:
+1. workflow-index-file-locking (HIGH)
+2. workflow-index-irreversibility-guard (HIGH)
+3. workflow-index-worktree-race-serialization (HIGH)
+4. troop-sandbox-enforcement (HIGH)
+5. workflow-index-contracts-hygiene-diagnostic (HIGH — runtime log analysis)
+6. troop-workflow-index-write-gatekeeper-compound (HIGH — cross-primitive headline + 2 sub-findings per Q-4)
+7. build-execute-dispatch-guide-extraction (LOW — doc debt)
+
+**Known-gap log (stays documented, not seeded)**: A-4 (Supersedes column), A-5 (blocked_reason enum), A-6 (scope_observation sanitization), A-8 (Circular-AC context isolation), A-9 (mod-hook alarm channel).
+
+**Confirmed Mitigations (from Q-1)**:
+- Directive footgun #8 `changed_files` hash verify → mitigated by git-diff-tree count cross-check at `skills/build-execute/SKILL.md:437` + subset enforcement at `skills/task-execution/SKILL.md:207`. Content-SHA verification is separately absent (not seeded — below severity bar per captain).
+- Directive footgun #10 `files_modified` plan-vs-runtime gate → mitigated by `skills/task-execution/SKILL.md:207` explicit subset enforcement with BLOCKED revert.
+
+## Stage Report: clarify
+
+- [x] Open Questions resolved: 4 / 4
+  Q-1 Confirmed Mitigations subsection; Q-2 A-10 HIGH + Phase F diagnostic; Q-3 LOW finding + extraction seed; Q-4 compound headline + per-primitive sub-findings
+- [x] Options selected: 2 / 2
+  O-1 impact-only severity bar; O-2 one Phase F entity per HIGH
+- [x] Assumptions confirmed: 10 / 10
+  All 10 assumptions accepted as written; severity assignments approved (proposed mapping accepted unchanged)
+- [x] Phase F seed slate: 7 entities (6 HIGH + 1 LOW)
+  Ready for downstream /build dispatch after 108 ships its audit artifact
+- [x] Decomposition: not-warranted
+  Audit entity scope remains monolithic; Phase F decomposition happens post-ship via seed dispatch, not within 108
+- [x] Sufficiency gate: PASS
+  Entity context complete. Plan stage can proceed directly to authoring the audit artifact (findings table + known-gap log + Confirmed Mitigations + Phase F seed descriptions).
