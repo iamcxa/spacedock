@@ -920,3 +920,20 @@ workflow-index append: 4 append calls, covering 10 tasks across 4 files (skills/
 - [x] Captain architectural clarification captured: Q-4 web-research correction documented; plugin.json schema constraints noted for future graft-like entities
 - [x] Sufficiency gate: PASS
   101 scope is 9 concrete deliverables; plan stage can proceed.
+
+## Stage Report: quality
+
+- [x] Markdown & YAML syntax validation
+  All 6 changed files (.md, .yaml) are pure markup; no TypeScript/JavaScript changes
+- [x] Test suite pass (repo root)
+  bun test: 749 pass, 0 fail, 1855 expects across 72 files
+- [x] TypeScript compilation
+  tsc --noEmit: clean (no errors)
+- [x] Baseline comparison
+  Pre-existing: 749 pass, 0 fail; no regressions introduced
+- [x] Changed files verified
+  6 files: docs/build-pipeline/_index/CONTRACTS.md, DECISIONS.md, graft-runtime-overlay-redesign.md, references/first-officer-shared-core.md, skills/graft/SKILL.md, tests/pressure/graft.yaml
+
+### Summary
+
+Markdown-only changes (870 insertions, 131 deletions across 6 files). Full test suite passes cleanly with no regressions; TypeScript compilation clean. All quality gates pass.
