@@ -412,6 +412,14 @@ N is configurable via:
 
 Default N=3 when neither is set. When N=0 or the cutover counter has exceeded N clean diffs, skip this sub-step entirely.
 
+**Durable cutover counter (F-02 fix):** The counter must survive LLM session restarts. Do NOT rely on in-session memory. Instead, compute the running count by grepping entity Stage Reports:
+
+```
+Grep pattern: "### Parallel-Run Diff" in docs/build-pipeline/*.md
+```
+
+Count the number of existing `### Parallel-Run Diff` subsections found. If count >= N, skip this sub-step. This grep-based approach is durable across session boundaries because it reads from committed entity files, not from session state.
+
 Record both outputs (6-way haiku synthesis from 6c AND monolithic sonnet output) in `## Stage Report: plan` under a `### Parallel-Run Diff` subsection:
 
 ```markdown
