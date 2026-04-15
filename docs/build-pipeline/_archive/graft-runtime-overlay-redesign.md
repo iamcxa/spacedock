@@ -1,14 +1,15 @@
 ---
 id: 101
 title: "Graft runtime overlay — eliminate build-time merge, read workflow from plugin"
-status: uat
+status: shipped
 context_status: ready
 source: /build
 created: 2026-04-14T03:30:00Z
 started: 2026-04-15T18:55:00+08:00
-completed:
-verdict:
-score: 0.96
+completed: 2026-04-15T19:30:00+08:00
+verdict: shipped
+score: 0.87
+ship_note: "Captain B-path: ship at UAT 0.87 (4 CLI items infra-unavailable, 2 interactive pending-captain); runtime validation deferred to 112 (graft-backward-compat) when graft binary executes migrate + pressure sweep."
 worktree: .worktrees/spacedock-ensign-graft-runtime-overlay-redesign
 issue:
 pr:
