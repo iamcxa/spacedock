@@ -910,7 +910,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| share-view-ux-fixes | plan | B-3 CSS fix: replace truncate with line-clamp-2 on ShareLiveFeed detail | 🔵 planned | 2026-04-15 |
+| share-view-ux-fixes | plan | B-3 CSS fix: replace truncate with line-clamp-2 on ShareLiveFeed detail | ✅ final | 2026-04-15 |
 
 ### spacebridge/ui/components/ui/badge.tsx
 
