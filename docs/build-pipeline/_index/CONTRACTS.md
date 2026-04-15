@@ -103,6 +103,12 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | plan-checker-multi-angle-nuwa | plan | Nuwa multi-angle plan-checker port: per-dim skill + wrapper agent + doc + pressure fixture | ✅ final | 2026-04-15 |
 
+### agents/science-officer.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-entry-routing-and-alignment-gate | plan | Task 3 -- add Step 3.6 Alignment Gate between brainstorm and explore | 🔵 planned | 2026-04-15 |
+
 ### agents/sharp-edges-reviewer.md
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -265,6 +271,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | brainstorm-nuwa-distillation | plan | Task 2 -- add Agent tool, Mode A/B Step 1 Lens Collection, Step 5.5 merge gate + 5-item self-test, output-spec for 3 new body sections | final | 2026-04-14 |
 | brainstorm-nuwa-distillation | plan | Task 3 -- add Lens Subagent Prompts subsection with 4 lens dispatch templates | final | 2026-04-14 |
 | shape-pre-build-alignment-skill | plan | Task 6 -- extend Lens (a) prompt template to accept shape sections as [primary] input | 🔵 planned | 2026-04-15 |
+| build-entry-routing-and-alignment-gate | plan | Task 6 -- add Stage Report format addition + decision lineage note | 🔵 planned | 2026-04-15 |
 
 ### skills/build-clarify/SKILL.md
 
@@ -272,6 +279,8 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | clarify-open-exploration-loop | execute | Insert Step 4.5 Open Exploration Loop + update resume case and stage report metric | ✅ final | 2026-04-13 |
 | shape-pre-build-alignment-skill | plan | Task 5 -- add shape-aware assumption filter to Step 2 (shape_status: validated gate) | 🔵 planned | 2026-04-15 |
+| build-entry-routing-and-alignment-gate | plan | Task 4 -- add Code-Evidence Self-Filter to Step 2 pre-presentation | 🔵 planned | 2026-04-15 |
+| build-entry-routing-and-alignment-gate | plan | Task 6 -- add Stage Report: clarify format addition with self-filter fields | 🔵 planned | 2026-04-15 |
 
 ### skills/build-clarify/references/output-format.md
 
@@ -359,6 +368,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | shape-pre-build-alignment-skill | plan | Task 3 -- new captain-interactive skill with 4-step assume/imagine/align/ship flow, 3 subagent dispatches, escape-hatch, immutable-pitch enforcement | 🔵 planned | 2026-04-15 |
+| build-entry-routing-and-alignment-gate | plan | Task 2 -- add Raw-Directive Self-Seed (Entry B) to Step 0 + Step 2 guard | 🔵 planned | 2026-04-15 |
 
 ### skills/build-shape/references/output-format.md
 
@@ -378,6 +388,12 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | shape-pre-build-alignment-skill | plan | Task 4 -- 3-wrapper dispatch shape guide (framer/story-gen/scope-drafter per step) | 🔵 planned | 2026-04-15 |
 
+### skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| build-entry-routing-and-alignment-gate | plan | Task 5 -- forge fixture F5 covering 3 alignment-gate branches | 🔵 planned | 2026-04-15 |
+
 ### skills/build-uat/SKILL.md
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -389,6 +405,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | shape-pre-build-alignment-skill | plan | Task 6 -- accept --from {slug} flag, load validated shape sections, P-4 enforcement | 🔵 planned | 2026-04-15 |
+| build-entry-routing-and-alignment-gate | plan | Task 1 -- add Step 0 Gatekeeper (Sonnet triage) before Args Extraction | 🔵 planned | 2026-04-15 |
 
 ### skills/code-explorer/SKILL.md
 
