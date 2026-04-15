@@ -120,6 +120,8 @@ test_cases:
       cite_file: skills/graft/SKILL.md
       cite_section: "No Exceptions (Load-Bearing)"
       cite_contains: "NEVER auto-resolve conflicts during upgrade. Conflicts require captain decision"
+    expected_actual: E
+    fixed_by: "101 (graft-runtime-overlay-redesign) -- 3-way merge eliminated; hash-based upgrade has no conflict regions. Blanket-policy scenario is structurally impossible."
     history: []
 
   - id: verbatim-skill-copy-for-safety
@@ -397,6 +399,7 @@ test_cases:
       - run: 2026-04-13
         actual: A
         note: "Initially proposed pnpm test without verifying. Captain asked to cross-check CI/CLAUDE.md. Found root test script is a stub."
+    deferred_to: 112
 
   - id: agent-file-overwrite-without-warning
     summary: |
@@ -426,6 +429,7 @@ test_cases:
       - run: 2026-04-13
         actual: A
         note: "Overwrote existing .claude/agents/code-explorer.md without diff or warning. File existed from prior manual setup."
+    deferred_to: 112
 
   - id: localize-skill-dir-creation-not-ensured
     summary: |
@@ -454,6 +458,7 @@ test_cases:
       - run: 2026-04-13
         actual: A
         note: "FileNotFoundError on .claude/skills/build-explore/SKILL.md. Step 8 only created .spacedock dirs, not .claude/skills/{name}/ dirs."
+    deferred_to: 112
 
   - id: verbatim-validation-path-mismatch
     summary: |
@@ -484,6 +489,7 @@ test_cases:
       - run: 2026-04-13
         actual: A
         note: "All 6 verbatim skills showed WARN. Glob path doesn't match local plugin install structure. Runtime resolution works fine."
+    deferred_to: 112
 
   - id: shipped-stage-unconfigured-after-init
     summary: |
@@ -514,6 +520,7 @@ test_cases:
       - run: 2026-04-13
         actual: A
         note: "Shipped stage left unconfigured. Kent noted: 'graft skill 要可以定義 shipped 定義爲何，且也要可以幫使用者設定 pr mod'"
+    deferred_to: 112
 
   - id: no-smoke-test-after-init
     summary: |
@@ -548,6 +555,7 @@ test_cases:
       - run: 2026-04-13
         actual: A
         note: "No smoke test after init. Static validation passed but never verified skills actually load in Claude Code runtime. Kent asked: '是否應該要幫使用者試跑一次新的 skill 確認是否正確？'"
+    deferred_to: 112
 
   - id: workflow-dir-name-collides-with-fo-ignore-list
     summary: |
@@ -575,6 +583,8 @@ test_cases:
       cite_file: skills/graft/SKILL.md
       cite_section: "Phase 1 Step 2"
       cite_contains: "Derive workflow name from source directory basename"
+    expected_actual: E
+    fixed_by: "101 (graft-runtime-overlay-redesign) -- FO discovers grafted workflows via plugin-manifest (Step 2.4), not filesystem README scan. Dir name collision with FO ignore list is structurally impossible in new design."
     history:
       - run: 2026-04-14
         actual: A
@@ -606,6 +616,8 @@ test_cases:
       cite_file: skills/graft/SKILL.md
       cite_section: "Phase 4 Step 8"
       cite_contains: "Create directory structure"
+    expected_actual: E
+    fixed_by: "101 (graft-runtime-overlay-redesign) -- task-4 rewrites graft init Phase 4 Step 8 to create _archive/, _mods/, _docs/, _index/INDEX.md as part of standard init."
     history:
       - run: 2026-04-14
         actual: A
@@ -640,6 +652,8 @@ test_cases:
       - run: 2026-04-14
         actual: A
         note: "_origin/README.md had active commissioned-by, FO would discover two workflows. Fixed by commenting out the field."
+    expected_actual: E
+    fixed_by: "101 (graft-runtime-overlay-redesign) -- .origin/ directory eliminated entirely; no local README.md in workflow dir. Only one README source exists (plugin). Dual discovery is structurally impossible."
 
   - id: manifest-source-hash-present-after-init
     summary: |
