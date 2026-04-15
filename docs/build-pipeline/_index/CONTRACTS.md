@@ -107,7 +107,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-entry-routing-and-alignment-gate | plan | Task 3 -- add Step 3.6 Alignment Gate between brainstorm and explore | 🟡 in-flight | 2026-04-15 |
+| build-entry-routing-and-alignment-gate | plan | Task 3 -- add Step 3.6 Alignment Gate between brainstorm and explore | ✅ final | 2026-04-16 |
 | alignment-gate-promote-to-stage | plan | Task 3 -- replace Step 3.6 body with single-sentence delegation hint to skills/build-alignment-gate/SKILL.md | 🔵 planned | 2026-04-16 |
 
 ### agents/sharp-edges-reviewer.md
@@ -293,7 +293,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | brainstorm-nuwa-distillation | plan | Task 2 -- add Agent tool, Mode A/B Step 1 Lens Collection, Step 5.5 merge gate + 5-item self-test, output-spec for 3 new body sections | final | 2026-04-14 |
 | brainstorm-nuwa-distillation | plan | Task 3 -- add Lens Subagent Prompts subsection with 4 lens dispatch templates | final | 2026-04-14 |
 | shape-pre-build-alignment-skill | plan | Task 6 -- extend Lens (a) prompt template to accept shape sections as [primary] input | 🔵 planned | 2026-04-15 |
-| build-entry-routing-and-alignment-gate | plan | Task 6 -- add Stage Report format addition + decision lineage note | 🟡 in-flight | 2026-04-15 |
+| build-entry-routing-and-alignment-gate | plan | Task 6 -- add Stage Report format addition + decision lineage note | ✅ final | 2026-04-16 |
 | alignment-gate-promote-to-stage | plan | Task 6 -- update Stage Report: brainstorm ownership pointer (owned by skills/build-alignment-gate now, not SO Step 3.6) | 🔵 planned | 2026-04-16 |
 
 ### skills/build-clarify/SKILL.md
@@ -302,8 +302,8 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | clarify-open-exploration-loop | execute | Insert Step 4.5 Open Exploration Loop + update resume case and stage report metric | ✅ final | 2026-04-13 |
 | shape-pre-build-alignment-skill | plan | Task 5 -- add shape-aware assumption filter to Step 2 (shape_status: validated gate) | 🔵 planned | 2026-04-15 |
-| build-entry-routing-and-alignment-gate | plan | Task 4 -- add Code-Evidence Self-Filter to Step 2 pre-presentation | 🟡 in-flight | 2026-04-15 |
-| build-entry-routing-and-alignment-gate | plan | Task 6 -- add Stage Report: clarify format addition with self-filter fields | 🟡 in-flight | 2026-04-15 |
+| build-entry-routing-and-alignment-gate | plan | Task 4 -- add Code-Evidence Self-Filter to Step 2 pre-presentation | ✅ final | 2026-04-16 |
+| build-entry-routing-and-alignment-gate | plan | Task 6 -- add Stage Report: clarify format addition with self-filter fields | ✅ final | 2026-04-16 |
 
 ### skills/build-clarify/references/output-format.md
 
@@ -391,7 +391,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | shape-pre-build-alignment-skill | plan | Task 3 -- new captain-interactive skill with 4-step assume/imagine/align/ship flow, 3 subagent dispatches, escape-hatch, immutable-pitch enforcement | 🔵 planned | 2026-04-15 |
-| build-entry-routing-and-alignment-gate | plan | Task 2 -- add Raw-Directive Self-Seed (Entry B) to Step 0 + Step 2 guard | 🟡 in-flight | 2026-04-15 |
+| build-entry-routing-and-alignment-gate | plan | Task 2 -- add Raw-Directive Self-Seed (Entry B) to Step 0 + Step 2 guard | ✅ final | 2026-04-16 |
 
 ### skills/build-shape/references/output-format.md
 
@@ -415,7 +415,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| build-entry-routing-and-alignment-gate | plan | Task 5 -- forge fixture F5 covering 3 alignment-gate branches | 🟡 in-flight | 2026-04-15 |
+| build-entry-routing-and-alignment-gate | plan | Task 5 -- forge fixture F5 covering 3 alignment-gate branches | ✅ final | 2026-04-16 |
 
 ### skills/build-uat/SKILL.md
 
@@ -428,7 +428,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | shape-pre-build-alignment-skill | plan | Task 6 -- accept --from {slug} flag, load validated shape sections, P-4 enforcement | 🔵 planned | 2026-04-15 |
-| build-entry-routing-and-alignment-gate | plan | Task 1 -- add Step 0 Gatekeeper (Sonnet triage) before Args Extraction | 🟡 in-flight | 2026-04-15 |
+| build-entry-routing-and-alignment-gate | plan | Task 1 -- add Step 0 Gatekeeper (Sonnet triage) before Args Extraction | ✅ final | 2026-04-16 |
 
 ### skills/code-explorer/SKILL.md
 
