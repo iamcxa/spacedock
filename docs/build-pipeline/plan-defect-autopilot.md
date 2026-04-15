@@ -822,3 +822,36 @@ Per MEMORY `fo-auto-revision-loop.md`: 2 blockers auto-dispatched to execute; ex
 
 ### Commit
 - fix(106): review feedback -- 2 execute-fixes applied
+
+## Stage Report: uat
+
+FO-authored.
+
+### CLI (5/5 PASS)
+- Circular-AC rule in task-execution (1)
+- Dim 9/10 present in plan-checker-prompt (2)
+- Benign-Drift Classifier with 3 classes (4)
+- blocked-triage fixture file (1)
+- D-plan-defect-autopilot-1 in DECISIONS.md (1)
+
+### Interactive (captain-signed, 2026-04-15)
+
+Captain: "我沒辦法評估，但看起來可以" — interpreted as hedged approval on both items (No-Exceptions authoring style preservation / 104+105 scenarios absorption).
+
+### v1 Known-gaps (tracked in review Stage Report)
+- Stringly-typed trust surface (blocked_reason self-reporting) — HIGH
+- Copy+delete rename blind spot — HIGH
+- Syntactic unambiguity masking semantic error in Dim 9 — MEDIUM
+- Closed-world Circular-AC guard list — MEDIUM
+- scope_observation injection audit burden — MEDIUM
+- Whitelist enforcement via reviewer discipline — LOW
+
+## Confidence Assessment
+
+- Iteration: 1 of 3
+- Execute completeness: 1.00 (8 tasks DONE, 0 BLOCKED, 3 waves)
+- Quality verdict: 1.00 (PASS, pre-existing orthogonal)
+- Review severity: 0.92 (2 blockers fixed + 6 warnings accepted as v1 known-gaps)
+- UAT coverage: 1.00 (CLI 5/5 + Interactive hedged-approved)
+- Plan→result: 1.00 (all 6 ACs satisfied)
+- **Composite: 0.984** → ≥90% threshold ✓ — advancing to shipped
