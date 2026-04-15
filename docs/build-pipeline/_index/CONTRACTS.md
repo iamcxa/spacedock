@@ -102,7 +102,7 @@ Each section lists a file path with entities that have modified it, their stage,
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
-| brainstorm-nuwa-distillation | plan | Task 4 -- vendor huashu-nuwa extraction-framework.md to local _docs with functional header per A-7 | in-flight | 2026-04-14 |
+| brainstorm-nuwa-distillation | plan | Task 4 -- vendor huashu-nuwa extraction-framework.md to local _docs with functional header per A-7 | final | 2026-04-14 |
 
 ### docs/build-pipeline/_mods/pr-merge.md
 
@@ -208,9 +208,9 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Add given/when/then AC guidance to step 4 for TDD-friendly spec generation | in-flight | 2026-04-12 |
-| brainstorm-nuwa-distillation | plan | Task 1 -- relax leaf constraint and preamble, raise file-read cap 5 to 9 | in-flight | 2026-04-14 |
-| brainstorm-nuwa-distillation | plan | Task 2 -- add Agent tool, Mode A/B Step 1 Lens Collection, Step 5.5 merge gate + 5-item self-test, output-spec for 3 new body sections | in-flight | 2026-04-14 |
-| brainstorm-nuwa-distillation | plan | Task 3 -- add Lens Subagent Prompts subsection with 4 lens dispatch templates | in-flight | 2026-04-14 |
+| brainstorm-nuwa-distillation | plan | Task 1 -- relax leaf constraint and preamble, raise file-read cap 5 to 9 | final | 2026-04-14 |
+| brainstorm-nuwa-distillation | plan | Task 2 -- add Agent tool, Mode A/B Step 1 Lens Collection, Step 5.5 merge gate + 5-item self-test, output-spec for 3 new body sections | final | 2026-04-14 |
+| brainstorm-nuwa-distillation | plan | Task 3 -- add Lens Subagent Prompts subsection with 4 lens dispatch templates | final | 2026-04-14 |
 | shape-pre-build-alignment-skill | plan | Task 6 -- extend Lens (a) prompt template to accept shape sections as [primary] input | 🔵 planned | 2026-04-15 |
 
 ### skills/build-clarify/SKILL.md
