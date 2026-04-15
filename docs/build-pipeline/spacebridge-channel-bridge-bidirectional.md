@@ -2,7 +2,7 @@
 id: 099
 title: "Spacebridge channel bridge — UI ↔ daemon ↔ CC bidirectional communication"
 status: draft
-context_status: awaiting-clarify
+context_status: ready
 source: captain observation (2026-04-14 — new UI has no channel support, blocks cutover)
 created: 2026-04-14T13:00:00+08:00
 started:
@@ -295,3 +295,88 @@ Proposed split (contingent on Q-2 option 2):
 - [x] Scale assessment: revised from Medium to Large (unless decomposed per Q-2 option 2)
   6 MCP tools + infrastructure + chat+gate UI + session routing = Large. Decomposition recommendation proposes 099 (Medium infrastructure) + 099b (Medium MCP tools parallel)
 - [x] Research dispatched: 0 researchers (skipped -- all assumptions are internal codebase verification, no external tech claims; evidence grounded in spacebridge source + tools/dashboard/ reference)
+
+## Clarify Annotations
+
+**Open Questions — resolved 2026-04-15:**
+
+- Q-1 → **SO self-resolved** (git forensics): PR #44/#47/#48 merged; 053/054/057 shipped at code level. CONTRACTS ledger is stale (MEMORY A-10 pattern). No blocker.
+- Q-2 → **Captain answer**: Decompose into 099 (Medium infrastructure) + 099b (Medium MCP tools). 099b parallel-ships 6 MCP tools once 099 bridge infrastructure lands.
+- Q-3 → **SO self-resolved**: Directive Annotations section above serves as errata log; Directive itself stays immutable per skill rules.
+- Q-4 → **Captain redirected the question** — revealed that O-1 framing missed fmodel CQRS reality (054 already runs UI-side CQRS). SO re-investigated fmodel usage and reframed as aggregate-level boundary decision. Final answer: **Chat + Gate both daemon-side CQRS** (new chat + gate aggregates with daemon RPC methods; session routing + synchronous ack).
+- Q-5 → **SO self-resolved via Q-1 cascade**: 053/054/057 unblocked 099; 050/059 have low file-surface overlap (different domain).
+
+**Captain Architectural Clarification (2026-04-15):**
+
+Captain's challenge "何時會使用fmodel？是否ui要走cqrs？" revealed that O-1's original framing (direct SQLite vs daemon RPC) was incorrect. The actual situation:
+- **Both paths are CQRS** — 054 ships UI-side CQRS (Route Handler dynamic-imports domain decide/evolve, runs full command cycle in UI process, writes to shared SQLite)
+- The real boundary question is **where does the command execute**: UI process or daemon process
+- Decision matrix by aggregate:
+  - `comments` — UI-side (already shipped via 054; entity-scoped, no session routing needed)
+  - `chat` (captain → FO) — **daemon-side** (needs session registry lookup + pushToSession synchronous notification; UI-side physically cannot route to specific CC)
+  - `gate` (captain decision) — **daemon-side** (captain expects synchronous ack for approval, not 500ms-poll latency)
+  - `leases` — daemon-side (existing coordination-client-bridge pattern)
+  - `sessions` — daemon-side (existing registry pattern)
+
+**Option Selection Summary:**
+
+- O-1 (UI write-path architecture) → **Re-framed and selected: aggregate-by-aggregate CQRS boundary; Chat + Gate daemon-side**
+- O-2 (active session routing) → **Project-root scoped, most-recent-heartbeat wins** (Recommended option; unchanged by O-1 re-framing; 057 last_heartbeat column supports this)
+- O-3 (daemon → UI push mechanism) → **Keep 500ms SSE polling** (Recommended option; aligns with 053 shipped decision; captain explicitly did not re-contest this)
+
+**Assumption Confirmations**:
+
+All 10 assumptions (A-1 through A-10) ✓ confirmed. A-9 (CONTRACTS stale) upgraded Likely → Confident via git-log verification.
+
+## Decomposition Recommendation (Confirmed)
+
+⚠️ **Decomposition finalized**:
+
+**099 (this entity)** — `scale: Medium`, `intent: feature`, scope: channel bridge infrastructure
+
+Concrete scope:
+1. MCP stdio bridge wiring in `spacebridge/bin/cli.ts` — replace stub (lines 54-74) with real MCP server registration + stdio transport
+2. Daemon RPC handler registry refactor at `spacebridge/bin/daemon.ts:96-223` (flat if-chain → Map<method, handler> pattern)
+3. Session-selection semantics in `spacebridge/src/domain/session/` — add `getActiveSessionByProjectRoot(root)` returning most-recent-heartbeat session
+4. `chat` aggregate in `spacebridge/src/domain/chat/` — types.ts + decider.ts + evolve.ts + schema table chat_events; daemon RPC method `captain_chat` that executes the command cycle AND calls `socket-server.pushToSession(sessionId, actionPush)`
+5. `gate` aggregate in `spacebridge/src/domain/gate/` — types.ts + decider.ts + evolve.ts + schema table gate_events; daemon RPC method `gate_decide` with same pattern
+6. UI Route Handlers: `spacebridge/ui/app/api/entities/[slug]/chat/route.ts` + `.../gate/route.ts` — dynamic-import socket-client, forward to daemon RPC, return synchronous ack
+7. UI components: chat input (`spacebridge/ui/components/chat-input.tsx`) + gate approve/reject (`spacebridge/ui/components/gate-buttons.tsx`)
+8. Activate `action-push` flow: daemon's pushToSession writes to MCP shim side, shim emits notification to CC session's MCP client (appears as tool call result OR server-initiated event)
+9. All 5 Acceptance Criteria from Directive pass in this entity
+
+Domain: `spacebridge-channel-infrastructure`
+
+**099b spacebridge-mcp-tool-parity** (child, spawn at handoff) — `scale: Medium`, `intent: feature`, scope: 6 MCP tool handlers parallel
+
+Concrete scope:
+1. Port each of 6 MCP tool handlers from `tools/dashboard/src/channel.ts`:
+   - `reply` (line 178 → handler 301)
+   - `get_comments` (line 199 → handler 314)
+   - `add_comment` (line 211 → handler 324)
+   - `reply_to_comment` (line 225 → handler 349)
+   - `update_entity` (line 240 → handler 376)
+   - `get_pending_messages` (line 277 → handler 501)
+2. Each tool gets: Zod input schema + MCP tool registration in spacebridge's stdio bridge (depends-on 099) + daemon RPC method (via 099's registry) + domain fmodel operation (comments aggregate is already shipped; `reply` uses comment replies; `update_entity` writes entity_events per 054)
+3. Parallel-friendly: 6 independent tool ports = 6 parallel troop tasks once 099 lands
+4. Plan should structure as one task per tool with shared contract from 099
+
+Domain: `spacebridge-mcp-tools`
+Depends-on: 099
+Parent: 099 (099b is child of 099)
+
+## Stage Report: clarify
+
+- [x] Open Questions resolved: 5 / 5
+  Q-1 SO git-forensics; Q-2 captain decompose; Q-3 SO implicit; Q-4 captain daemon-side both (reframed); Q-5 SO cascade
+- [x] Options selected: 3 / 3
+  O-1 aggregate-level CQRS boundary with chat+gate daemon-side (re-framed via captain challenge); O-2 project-root + most-recent-heartbeat; O-3 keep 500ms SSE polling
+- [x] Assumptions confirmed: 10 / 10
+  All 10 upgraded or confirmed; A-9 (CONTRACTS stale) promoted Likely→Confident via git-log
+- [x] Decomposition: warranted + finalized
+  099 (Medium infrastructure) + 099b (Medium MCP tools parallel); 099b spawn at FO handoff
+- [x] Child seeds queued: 1
+  099b spacebridge-mcp-tool-parity — directive + scope + intent pre-drafted; FO spawns via /build at handoff
+- [x] Captain architectural clarification captured: O-1 reframed from "direct SQLite vs daemon RPC" to aggregate-level CQRS boundary; fmodel usage map + CQRS reality documented for future audits
+- [x] Sufficiency gate: PASS
+  099 scope is concrete (9 deliverables itemized); plan stage can proceed.
