@@ -249,6 +249,36 @@ skill_overrides:
       replace: "code-explorer"           # Must exist in target .claude/agents/ or skills/
 ```
 
+### Runtime Apply Contract (FO startup)
+
+When FO discovers a grafted workflow via Step 2.4 (Plugin-manifest), it applies LOCAL.yaml `readme_operations` in-memory before proceeding:
+
+1. FO reads `.spacedock/workflows/{name}/manifest.yaml` -- extracts `source_plugin` and `workflow_readme_path`.
+2. FO reads `.spacedock/workflows/{name}/LOCAL.yaml` (if present; skip to step 5 if absent).
+3. FO resolves `{plugin_dir}` from `source_plugin` (same resolver as Status Viewer).
+4. FO reads `{plugin_dir}/{workflow_readme_path}` into memory as the base workflow README.
+5. FO applies `readme_operations` in list order against the in-memory README bytes, using the overhaul recipe op dispatcher (`set-stage-field` today; body-section ops are not yet supported and must not be silently ignored if used -- escalate as unknown op type).
+6. **FAIL LOUD** if any op's target stage or field is absent from the plugin README:
+   ```
+   LOCAL.yaml op targets stage/field {stage}/{field} which does not exist in plugin README
+   {workflow_readme_path}. Update LOCAL.yaml or escalate.
+   ```
+   Do NOT silently skip the op. Do NOT continue FO startup with partial ops applied.
+7. FO continues normal startup (Step 3: extract mission/entity-labels/stage-ordering) against the fully applied in-memory README.
+8. **No file is written to disk.** The merged README exists only in FO's working memory for the session. Each FO startup re-applies ops fresh from the plugin source.
+
+### shipped_config Schema
+
+LOCAL.yaml may declare a `shipped_config:` block that controls post-ship behavior. This absorbs entity 090 Part 2 (shipped_config migration) per Q-2 option 1.
+
+```yaml
+shipped_config:
+  pr_mod: kc-pr-flow          # Which PR mod to invoke at shipped stage (optional)
+  auto_merge: false           # Whether FO should auto-merge on green CI (default: false)
+```
+
+FO reads `shipped_config` at startup and registers shipped-stage behavior accordingly. Missing `shipped_config` = default behavior (no mod, no auto-merge). The `pr_mod` value names the mod file (without `.md`) to activate for PR creation at the shipped stage. If the named mod file does not exist in `mods/` or `_mods/`, FO warns at startup but does not block.
+
 ---
 
 # Sub-command: `graft init`
