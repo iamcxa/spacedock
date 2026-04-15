@@ -970,3 +970,34 @@ None.
 
 Invoked in `capture` mode would surface 2 D2 candidates (plan-defect patterns: stale-line-anchor; circular-AC). These are already captured in the execute Stage Report under "Plan defects surfaced" -- no separate capture invocation needed this round.
 
+
+## Stage Report: uat
+
+status: passed
+scope: 7 CLI + 3 interactive items from UAT Spec
+
+### Results
+
+| Item | Type | Result |
+|---|---|---|
+| CLI 1: leaf constraint removed | grep=0 | ✅ pass (0 matches) |
+| CLI 2: orchestrator headings present | grep=2 | ✅ pass (2 matches: Step 1 + Step 5.5) |
+| CLI 3: Q-4 canonical α form | grep=1 | ✅ pass (1 match, line 365) |
+| CLI 4: O-2 escape-hatch landed | grep≥4 | ✅ pass (7 matches combined) |
+| CLI 5: tier-tag parity with 105 | grep≥2 | ✅ pass (15 matches in SKILL.md alone) |
+| CLI 6: vendored file + branding stripped | test+grep=0 | ✅ pass (file present; 0 `huashu-nuwa` matches) |
+| CLI 7: external citations repointed | grep=0 | ⚠️ **semantic pass** -- 6 matches remain, all inside `## PLAN` task definitions + `## UAT Spec` (lines 415, 611, 654, 663, 665, 771). Body prose citations (Canonical References @ line 124, GUARDRAILS @ 355, parent 102 @ 283) are clean. Captain override previously applied: semantic-AC-sufficient / PLAN-body-excluded. |
+| Interactive 1: `/build` trivial-scope α marker | captain smoke test | ⏸️ **deferred to first real /build invocation** -- semantic check passed via CLI 3 (literal α form present). Runtime behavior verification requires live captain directive; cannot be simulated by FO. |
+| Interactive 2: `/build` Mode B visible degradation | captain smoke test | ⏸️ **deferred to first real ensign-wrapped /build invocation** -- SKILL.md line 38 describes Mode B fallback with explicit Stage Report warning; code path is documented but runtime behavior awaits first real invocation. |
+| Interactive 3: review vendored doc | FO inline | ✅ pass -- verified: header block reads cleanly, states adoption date + purpose, origin-brand absent (0 huashu-nuwa matches). Original methodology text intact below header (157 lines total; header is lines 1-7). |
+
+### Summary
+
+- **7 CLI items**: 6 clean pass, 1 semantic pass (PLAN-body self-reference excluded per captain override)
+- **3 interactive items**: 1 pass (inline inspection), 2 deferred to first live `/build` invocation with captain judgment
+- **Deferred-to-live**: Tasks 1 and 2 cannot be exercised without an actual captain /build directive; static skill doc verification confirms the code paths are present and correctly structured. First real invocation will exercise them.
+
+### Decision
+
+Pass. Advance to confidence gate.
+
