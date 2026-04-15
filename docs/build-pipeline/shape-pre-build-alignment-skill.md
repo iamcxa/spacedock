@@ -1002,3 +1002,31 @@ Skipped per Step 5 protocol.
 ### Summary
 
 Entity 103 (shape-pre-build-alignment-skill) is a documentation-focused phase-E Plan deliverable: Brainstorming Spec + Option Comparisons + Open Questions, with no TypeScript implementation changes. All project test/lint/typecheck failures are pre-existing SQLite concurrency issues in tools/dashboard and spacebridge, unrelated to entity 103's work. Quality gate passes with pre-existing failures noted. FO may advance entity to review stage.
+
+## Stage Report: review
+
+FO-authored. Review mode: 2 parallel reviewers (pr-review-toolkit:code-reviewer + spacedock:sharp-edges-reviewer), sonnet model.
+
+### Findings
+
+**Blocker (execute-fix applied)**:
+- [87 IMPORTANT code-review] `subagent_type="build-shape-framer"` etc missing `spacedock:` namespace prefix at 3 dispatch sites in SKILL.md — would fail at runtime. FIXED.
+- [83 IMPORTANT code-review] `skills/build/SKILL.md` --from handler cited `## Problem Statement` as directive source; should be `## Captain Context Snapshot` (raw verbatim). FIXED.
+- [HIGH sharp-edges] Escape-hatch heuristic keyword list underspecified. FIXED — added explicit enum (fix/typo/rename/bump/patch/bugfix/hotfix) + whole-word + case-insensitive + <80 chars rule.
+- [HIGH sharp-edges] P-4 `--from + extra directive` had documented rule but no coded enforcement / forge assertion. FIXED — added P-4 rejection scenario to smoke-tests/build-shape-f4.
+
+**Warning (accepted with known-gaps)**:
+- [82 code-review] build-clarify shape-aware filter regex omits `## References` — intentional (references are citation, not commitment); noted inline.
+- [MEDIUM sharp-edges] Wrappers bypassable if dispatched directly — acceptable v1; choke-point discipline documented; hardening deferred.
+- [MEDIUM sharp-edges] Wrapper mode argument implicit — thin-wrapper pattern leaves no room for validation preamble; acceptable v1.
+- [LOW sharp-edges] `shape_status` draft→validated not atomic — session-interrupt recovery undocumented. Deferred.
+
+**Scope observation (v1 debt)**:
+- Forge fixture multi-document YAML in f4 may or may not be supported by kc-plugin-forge; captain to verify in UAT.
+
+### Auto-revision
+
+Per MEMORY `fo-auto-revision-loop.md`: 4 blockers auto-dispatched to execute without captain gate; executed in single pass; re-verified via grep.
+
+### Commit
+- fix(103): review feedback -- 4 execute-fixes applied
