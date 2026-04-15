@@ -2,7 +2,7 @@
 id: 097
 title: "Share view UX fixes — duplicate form, comment content display, activity truncation"
 status: brainstorm
-context_status: awaiting-clarify
+context_status: ready
 source: entity 058 UAT live test (2026-04-14 captain manual)
 created: 2026-04-14T17:00:00+08:00
 started:
@@ -116,12 +116,9 @@ Directive's 3 bugs cross-referenced against current code (post-093 ship):
 
 ### Q-1: Was the 058 UAT observation against a build running d3d4b4e (post-093) or pre-093?
 - **Domain**: scope validation / bug currency
-- **Why it matters**: If UAT ran against pre-093 build, B-1 (duplicate forms) and B-2 (DOCUMENT COMMENTS rendering gap) were both symptoms of the pre-refactor code that 093 task-5 already cleaned up. The current code has a DIFFERENT shape — no duplicate form (B-1 moot), no DOCUMENT COMMENTS section at all (B-2 isn't "content missing" but "section missing"). 097's scope depends on this answer.
-- **Suggested options**:
-  1. **Pre-093 build confirmed** — close B-1 and reframe B-2 per O-2; 097 scope becomes "B-2 redesign (O-2) + B-3 truncation fix"
-  2. **Post-093 build confirmed with bugs still present** — re-investigate; possible different code path or cache issue; explore missed something
-  3. **Unknown / didn't capture build SHA** — run Option (c) of O-1 (manual re-verify on current deploy before planning)
-- **Evidence for options**: [primary]
+- **Status**: **RESOLVED by SO self-investigation** — pre-093 build confirmed via git timestamp forensics
+- **Evidence**: UAT commit 0a010c9 @ 2026-04-14 17:01:34 (base 952aef9 @ 16:25:30). 093 task-1 through task-5 all shipped 17:45–17:56 on the same day — after UAT. UAT captured pre-refactor state where share page rendered CommentPanel (containing AddCommentForm), explaining B-1 and B-2. 093 task-5 (d3d4b4e) subsequently removed CommentPanel from share path, invalidating both root-cause claims.
+- **Implication**: B-1 is moot against current code (close-as-fixed, O-1 option (a)). B-2 reframes from "content-not-rendered bug" to "section-intentionally-removed UX decision" — Q-2 handles. [primary]
 
 ### Q-2: Should B-2 be reframed as UX regression (O-2 option (a)) or accepted as 093's intended final state (O-2 option (b))?
 - **Domain**: share view UX philosophy / scope boundary
@@ -134,12 +131,9 @@ Directive's 3 bugs cross-referenced against current code (post-093 ship):
 
 ### Q-3: If O-1 picks (a) + O-2 picks (a), does 097 scale escalate to Medium or decompose?
 - **Domain**: scope management / decomposition gate
-- **Why it matters**: 097 is currently `scale: Small`. If B-1 drops (O-1a) and B-2 becomes a CommentPanel-readOnly refactor (O-2a), scope shifts from "3 small CSS/rendering bug fixes" to "1 UX refactor + 1 CSS fix". That crosses the Small→Medium line via complexity, not file count.
-- **Suggested options**:
-  1. **Escalate to Medium, keep single entity** — bump scale frontmatter; plan accordingly
-  2. **Decompose into 097 (B-3 CSS) + 111 (share-view-threads-restore)** — 097 ships fast as true Small; 111 is the Medium UX entity
-  3. **Keep Small, pick O-2b instead** — B-2 accepted as intended state; 097 ships B-3 only; known-gap log carries the UX debate
-- **Evidence for options**: [primary]
+- **Status**: **RESOLVED by SO self-investigation** — decompose recommendation (option 2)
+- **Rationale**: 097's original `intent: bugfix` + `scale: Small` targets mechanical fixes, not UX-design refactors. If Q-2 lands on regression (O-2a), the CommentPanel-readOnly work is a design decision spanning new prop plumbing + share-specific render path — crosses Small→Medium via complexity not file count. Cleanest split: 097 ships B-3 (true Small CSS fix) immediately; spawn child entity 111 `share-view-comment-thread-display` for the UX work if Q-2 selects O-2a. Honors 097's original framing and separates the mechanical fix from the design call. If Q-2 selects O-2b (accept current state), 097 stays Small and B-2 drops entirely — no decomposition needed.
+- **Conditional Decomposition**: child 111 only spawns IF Q-2 resolves to O-2a. [primary]
 
 ## Core Tensions
 
@@ -169,3 +163,56 @@ Directive's 3 bugs cross-referenced against current code (post-093 ship):
 - [x] Scale assessment: Small confirmed for current scope; MAY escalate to Medium pending Q-2/Q-3 captain decisions
 - [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident, no external tech claims, purely codebase grep verification)
   ⚠ ensign-mode inline fallback -- 4-angle quality not achieved this invocation (Mode B per Small-entity heuristic)
+
+## Decomposition Recommendation
+
+⚠️ **Decomposition triggered by Q-2 captain decision (regression reframe)**:
+
+- **097 (this entity)** stays `scale: Small`, scope reduced to **B-3 only** (ShareLiveFeed activity truncation CSS fix at share-live-feed.tsx:81). Domain: frontend-css.
+- **111 share-view-comment-thread-display** (child, spawn at handoff) — `scale: Medium`, `intent: feature`, scope = restore read-only comment threads on share view (readOnly prop on CommentPanel or new ShareCommentPanel variant; render on share path). Domain: frontend-react + spacebridge-share-ux. Depends-on: 097 (to share the post-B-3 baseline).
+
+Rationale: 097's original `intent: bugfix` + `scale: Small` framing is preserved by scoping to mechanical CSS. UX refactor (restoring threaded display) is design-decision work that warrants its own entity with proper brainstorm + clarify flow — not tacked onto a "3 small bug fixes" entity.
+
+## Clarify Annotations
+
+**Open Questions — resolved 2026-04-15:**
+
+- Q-1 → **Resolved by SO self-investigation** (git timestamp forensics): UAT commit 0a010c9 @ 17:01:34, 093 task-1–5 shipped 17:45–17:56 same day. UAT captured pre-093 state. B-1 and B-2 root-cause claims accurate at UAT time but invalidated by 093 task-5's refactor. No captain interaction needed.
+- Q-2 → **Answer (captain)**: **Regression — restore read-only comment threads** (option 1). 093 task-5's submit-only UX is not the intended final state; guests should see existing threaded comments on the share view. Spawn child entity 111 to carry the UX restore work.
+- Q-3 → **Resolved by SO self-investigation** (conditional on Q-2): Q-2 selected regression → decomposition path. 097 ships B-3 only (Small, mechanical CSS); child 111 (Medium, UX refactor) depends-on 097.
+
+**Option Comparisons — selected:**
+
+- O-1 → **Selected (auto via Q-1 resolution)**: **Close B-1 as "already fixed by 093"** (option (a)). 097 scope drops B-1 entirely.
+- O-2 → **Selected (via Q-2)**: **Reframe as UX regression** (option (a)). Work moves to child 111; 097 does not carry B-2 directly.
+
+**Assumption Confirmations:**
+
+- A-1 (B-3 CSS `truncate` root cause) — ✓ confirmed, stays as only 097 fix target.
+- A-2 (093 task-5 refactor removed CommentPanel from share path) — ✓ confirmed, is the load-bearing premise for Q-2's regression framing.
+- A-3 (current share view has no comment thread display) — ✓ confirmed, is the regression 111 will reverse.
+
+**097 Revised Scope (single task):**
+
+- B-3 fix: change `spacebridge/ui/components/share-live-feed.tsx:81` to remove the `truncate` Tailwind class OR replace with multi-line wrap (e.g., `line-clamp-2` or drop class entirely). Captain may express preference at plan stage — likely `line-clamp-2` to balance readability with compact feed.
+
+**Child 111 Seed (to be spawned at handoff):**
+
+- Directive seed: "Restore read-only comment thread display on share view (spacebridge/ui/app/share/[token]/page.tsx). Post-093 refactor removed CommentPanel from share path, eliminating guests' ability to see existing threaded comments. Add readOnly mode to CommentPanel OR create ShareCommentPanel variant; render on share path alongside existing ShareCommentForm + ShareLiveFeed. Depends-on 097."
+- Scope: Medium (multi-file: comment-panel.tsx refactor + share/page.tsx integration + possible new component).
+- Intent: feature (UX restoration is design work, not bugfix — proper brainstorm flow required to pick readOnly-prop vs new-component approach).
+
+## Stage Report: clarify
+
+- [x] Open Questions resolved: 3 / 3
+  Q-1 SO self-resolved (git forensics); Q-2 captain-answered (regression reframe); Q-3 SO self-resolved (decomposition path)
+- [x] Options selected: 2 / 2
+  O-1 close B-1 as 093-fixed (auto via Q-1); O-2 regression reframe (via Q-2)
+- [x] Assumptions confirmed: 3 / 3
+  A-1, A-2, A-3 all confirmed; no revisions needed
+- [x] Decomposition: warranted (Q-2 → option 1 path)
+  097 scale-down to Small (B-3 only); spawn child 111 (Medium, share-view-comment-thread-display)
+- [x] Child seeds queued: 1
+  111 share-view-comment-thread-display — directive + scope + intent pre-drafted above; FO spawns via /build at handoff
+- [x] Sufficiency gate: PASS
+  097 scope is single-task CSS fix; no further clarify rounds needed. Plan stage can proceed immediately.
