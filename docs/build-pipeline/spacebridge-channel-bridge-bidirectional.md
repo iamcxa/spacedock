@@ -1,7 +1,7 @@
 ---
 id: 099
 title: "Spacebridge channel bridge — UI ↔ daemon ↔ CC bidirectional communication"
-status: quality
+status: review
 context_status: ready
 source: captain observation (2026-04-14 — new UI has no channel support, blocks cutover)
 created: 2026-04-14T13:00:00+08:00
@@ -380,3 +380,127 @@ Parent: 099 (099b is child of 099)
 - [x] Captain architectural clarification captured: O-1 reframed from "direct SQLite vs daemon RPC" to aggregate-level CQRS boundary; fmodel usage map + CQRS reality documented for future audits
 - [x] Sufficiency gate: PASS
   099 scope is concrete (9 deliverables itemized); plan stage can proceed.
+
+## Stage Report: quality
+
+**Verdict**: fail
+**Ran at**: 2026-04-15T15:30:00Z
+**HEAD**: 90734d8
+**feedback-to**: execute
+
+### test
+verdict: pass
+command: bun test
+evidence:
+```
+bun test v1.3.9 (cf6cdbbb)
+[nextjs] [nextjs] ready on port 18421
+
+spacebridge/src/domain/session/evolve.test.ts:
+[session/evolve] session_reconnected for unknown session ghost -- no-op
+
+ 749 pass
+ 0 fail
+ 1855 expect() calls
+Ran 749 tests across 72 files. [20.28s]
+```
+
+### lint
+verdict: fail
+command: bunx biome check .
+evidence:
+```
+biome.json:2:14 deserialize -- configuration schema version mismatch (CLI 2.3.4 vs config 2.4.10)
+
+Linting errors across 19 locations:
+bin/daemon.ts:213:37 lint/suspicious/noExplicitAny (1 occurrence)
+bin/daemon.ts:410:60 lint/style/noNonNullAssertion (1 occurrence)
+src/domain/comment/auto-resolve.test.ts:118,131,132 lint/style/noNonNullAssertion (3 occurrences)
+src/domain/comment/evolve.test.ts:25,88,114 lint/style/noNonNullAssertion (3 occurrences)
+src/domain/comment/persistence.test.ts:280 lint/style/noNonNullAssertion (1 occurrence)
+src/ipc/channel-provider-bridge.test.ts:33,50,82,83,97,98,107,108,120 lint/suspicious/noExplicitAny (9 occurrences)
+src/ipc/framing.test.ts:126 lint/suspicious/noExplicitAny (1 occurrence)
+
+× Some errors were emitted while running checks.
+```
+
+### typecheck
+verdict: fail
+command: bunx tsc --noEmit
+evidence:
+```
+error TS2322: src/domain/lease/decider.test.ts(20,5)
+  Type 'Map<string, LeaseToken>' is not assignable to expected 'Map<`${string}::${string}`, LeaseToken>'
+  Type 'string' is not assignable to '`${string}::${string}`'
+
+error TS2339: src/domain/session/registry.ts(135,35)
+  Property 'disconnect' does not exist on type 'SessionRegistry | PromiseLike<SessionRegistry>'
+
+error TS2339: src/domain/session/registry.ts(154,26)
+  Property 'getActiveProjectRoots' does not exist on type 'SessionRegistry | PromiseLike<SessionRegistry>'
+
+error TS2345: src/ipc/coordination-client-bridge.ts(90,38)
+  Argument of type 'string' is not assignable to parameter of type '`${string}::${string}`'
+
+error TS2345: src/ipc/coordination-client-bridge.ts(124,40)
+  Argument of type 'string' is not assignable to parameter of type '`${string}::${string}`'
+
+error TS2345: src/ipc/coordination-concurrent.test.ts(84,34)
+  Argument of type '"sess-1"' is not assignable to parameter of type '`${string}-${string}-${string}-${string}-${string}`'
+
+error TS2345: src/ipc/coordination-concurrent.test.ts(85,34)
+  Argument of type '"sess-2"' is not assignable to parameter of type '`${string}-${string}-${string}-${string}-${string}`'
+
+error TS2345: src/ipc/fo-simulator.integration.test.ts(81,33)
+  Argument of type '"fo-session-1"' is not assignable to parameter of type '`${string}-${string}-${string}-${string}-${string}`'
+
+Total: 8 errors
+```
+
+### build
+verdict: skipped
+command: bun build
+evidence:
+```
+Build script not found in spacebridge/package.json. Spacebridge is a library (exports drizzle-orm + zod utilities), not a bundled application.
+```
+
+### regression
+verdict: fail
+command: n/a -- reuses Step 1 evidence
+classification: current-entity-only
+evidence:
+```
+Step 1 passed all tests (749 green). Regression gate auto-pass: no cross-entity regression possible when full test suite passes.
+
+However, lint and typecheck failures below exist and must be verified against CONTRACTS.md for cross-entity scope.
+- Lint: 19 issues in src/domain/comment, src/ipc, bin/daemon.ts -- must verify if these files are entity-099-owned or multi-entity
+- Typecheck: 8 errors in src/domain/lease, src/domain/session, src/ipc -- must verify ownership
+
+Note: Without git diff output showing file deltas from execute_base_sha, classification assumes current-entity scope for all failures. FO should verify against CONTRACTS.md.
+```
+
+### ratchet
+verdict: pass
+command: n/a -- composite per-language ratchet checks
+evidence:
+```
+#### typescript
+type_coverage: pass (includes src/**/*.ts, bin/**/*.ts per tsconfig include; 47/47 files covered)
+test_count: pass (current=749 tests >= baseline not set, first run initialization)
+ts_strict: pass (tsconfig.json "strict": true confirmed)
+ts_as_any: pass (current=12 `as any` casts, no baseline for first run)
+ts_ignore: pass (current=0 @ts-ignore/@ts-expect-error, no baseline for first run)
+
+First run -- baselines will be initialized only if overall quality verdict becomes pass.
+```
+
+### coverage
+verdict: skipped
+command: n/a
+evidence:
+```
+no threshold configured in workflow ops config
+```
+
+notes: ops.config.json absent from workflow directory; ratchet baselines not initialized pending overall pass verdict.
