@@ -1,8 +1,8 @@
 ---
 id: 110
 title: Gate Enforcement Codification -- Codify Plan 95% + Pre-Ship 90% Gates Into Skills
-status: explore
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: captain directive (2026-04-15 post-107 ship review)
 created: 2026-04-15T17:45:00+08:00
 started:
@@ -210,6 +210,8 @@ You are asking for: codify the two existing-but-unenforced confidence gates (pla
 
 **Validation**: stub-redirect mirrors entity 114's archived-precedent annotation pattern; no design-doc invariant violated.
 
+→ **Selected: Stub-redirect** (captain, 2026-04-16, interactive)
+
 ### O-2: MEMORY `fo-confidence-autoadvance.md` post-codification handling
 
 | Option | Pros | Cons | Complexity | Recommendation |
@@ -220,6 +222,8 @@ You are asking for: codify the two existing-but-unenforced confidence gates (pla
 
 **Validation**: aligns with captain global CLAUDE.md MEMORY rule "auto-memory persists; only user explicitly removes."
 
+→ **Selected: Annotate as superseded, keep file** (captain implicit -- recommendation accepted by default per global MEMORY conventions; flag for captain pushback at plan stage if disagreed, 2026-04-16)
+
 ### O-3: Plan-gate factor weights — uniform vs differential
 
 | Option | Pros | Cons | Complexity | Recommendation |
@@ -229,6 +233,8 @@ You are asking for: codify the two existing-but-unenforced confidence gates (pla
 | **Captain-tuned at clarify** | Captain expresses domain knowledge; weights become tuned | Requires captain decision now; no empirical data to inform tuning | Low (captain effort) | Viable -- escalate to clarify Q if captain prefers active tuning |
 
 **Validation**: MEMORY explicitly says "average ≥ 95%"; uniform weights honor stated intent. Returns 5 scores trivially summable.
+
+→ **Selected: Uniform 20%** (captain implicit -- recommendation accepted by default per MEMORY-spec compliance; tunable via ops.config.json `confidence_weights.plan_gate` if production data informs differential, 2026-04-16)
 
 ## Open Questions
 
@@ -241,6 +247,8 @@ You are asking for: codify the two existing-but-unenforced confidence gates (pla
   - Both `Stage` and `Mode` fields (forward-compat)
   - Open-ended -- captain decides
 
+→ **Answer: Single `Stage` field (YAGNI)** -- A-5 assumption confirmed authoritative; defer Mode field until concrete consumer surfaces (captain, 2026-04-16, interactive)
+
 ### Q-2: Plan-gate placement in build-plan SKILL.md — Step 0.6 vs new terminal Step
 
 - **Domain**: Runnable (skill protocol ordering)
@@ -250,6 +258,8 @@ You are asking for: codify the two existing-but-unenforced confidence gates (pla
   - Insert as new Step 0.6 (literal directive text — but conflicts with current Step ordering)
   - Open-ended -- captain decides
 
+→ **Answer: New Step 7 (after plan-checker Step 6, before Stage Report)** -- "Step 0.6" in directive interpreted as "right after plan-checker passes" semantically; Step 7 honors current SKILL.md ordering (captain, 2026-04-16, interactive)
+
 ### Q-3: Contract test scope — fixture YAML only, or live skill invocation test?
 
 - **Domain**: Runnable (test discipline)
@@ -258,6 +268,8 @@ You are asking for: codify the two existing-but-unenforced confidence gates (pla
   - Static YAML only (lighter, matches plan-checker dim pattern)
   - Static YAML + 1 live invocation smoke test (heavier, deeper coverage)
   - Open-ended -- captain decides
+
+→ **Answer: Static YAML fixtures only** -- mirrors plan-checker per-dim fixture precedent (entity 107 Q-3); two fixtures: `tests/pressure/confidence-gate-plan-mode.yaml` + `tests/pressure/confidence-gate-pre-ship-mode.yaml` (captain, 2026-04-16, interactive)
 
 ## Core Tensions
 
@@ -306,3 +318,23 @@ alignment_confidence: N/A
 Cross-phase correction: Lens (d) brainstorm finding "entity 087 in-flight" contradicted by git log evidence (commit 6eed99e shipped). A-1 documents the correction.
 
 Self-test gate (Port 11): all 5 checks pass under Mode B modifier. Gate (i) cross-layer recurrence N/A in Mode B; gates (ii-v) verified.
+
+## Stage Report: clarify
+
+- [x] Open Questions resolved: 3 / 3 (Q-1 single Stage; Q-2 new Step 7; Q-3 static YAML only)
+- [x] Options selected: 3 / 3 (O-1 stub-redirect captain-explicit; O-2 + O-3 captain-implicit per recommendation defaults)
+- [x] Assumptions confirmed: 6 / 6 (A-1 to A-6, no captain pushback)
+- [x] α markers final: 0 / 2 unresolved (both resolved during explore)
+- [x] Sufficiency gate: PASS — all decisions captured with → Answer/→ Selected annotations; no new gray areas surfaced
+- [x] Captain interaction: 1 AskUserQuestion batch (4 questions) — efficient cohort given pre-recommended evidence
+- [x] Captain decisions tier: Q-1/Q-2/Q-3/O-1 explicit; O-2/O-3 implicit-by-default with audit annotations
+
+Decision lineage:
+- D-110-1: Single `Stage` field schema (no Mode); Q-1 captain explicit
+- D-110-2: New Step 7 placement in build-plan SKILL.md (not literal "0.6"); Q-2 captain explicit
+- D-110-3: Static YAML fixtures only (no live test); Q-3 captain explicit
+- D-110-4: Stub-redirect for references/confidence-gate.md; O-1 captain explicit
+- D-110-5: Annotate MEMORY fo-confidence-autoadvance.md as superseded (no delete); O-2 implicit recommendation accept
+- D-110-6: Uniform 20% plan-gate weights (per MEMORY); O-3 implicit recommendation accept
+
+Ready for FO handoff: confidence-gate skill scope frozen; 7-task plan template available from entity 114 precedent; entity 087 already shipped removes scheduling constraint; pressure-test fixture data available from entity 107 retroactive Confidence Assessment.
