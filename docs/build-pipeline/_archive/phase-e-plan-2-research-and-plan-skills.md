@@ -1,14 +1,14 @@
 ---
 id: 061
 title: Phase E Plan 2 -- build-research + build-plan Skills
-status: clarify
+status: shipped
 context_status: ready
 source: /build
 created: 2026-04-11T04:12:22Z
-started:
-completed:
-verdict:
-score:
+started: 2026-04-11T04:12:22Z
+completed: 2026-04-15T00:00:00Z
+verdict: PASSED (retro-ship)
+score: retroactive
 worktree:
 issue:
 pr:
@@ -189,3 +189,12 @@ AC4 relaxed: `ls tests/pressure/build-research*.yaml` → returns 1 (`build-rese
 ### Namespace Decision (per AC6)
 
 Skills land at `skills/build-*` matching current pattern (defer spacebridge migration to Phase F per spec line 74, entity 050). Evidence: git commit `15772ac fix(phase-e-plan-2): spacebridge:* -> spacedock:* namespace sweep`.
+
+## Stage Report: retro-ship
+
+- [x] Retro-ship reason: plan-driven Phase E work shipped deliverables via direct skill authoring + downstream PRs; pipeline ceremony (plan/execute/quality/review stages) was never run because the skills being authored were the plan-checker infrastructure itself (chicken-and-egg, per MEMORY "Skill Contract Fixes Are Plan-Driven, Not Pipeline-Driven")
+- [x] Deliverables confirmed present: skills/build-plan/SKILL.md (36.3K), skills/build-research/SKILL.md (13.7K), skills/build-plan/references/plan-checker-prompt.md (8-dim taxonomy)
+- [x] Iteration commits post-seed: 10+ commits including 067 (test_first), 075 (research dispatch), 065 (flatten dispatch), plus multiple fix/refactor rounds; skills have been in active production use
+- [x] Consumer evidence: build-brainstorm, build-explore, build-clarify, build-execute all invoke build-plan / build-research; 106 + 107 depend-on 061 and assume it shipped
+- [x] Verdict: PASSED (retro-ship) -- deliverables exist, have been battle-tested via downstream entity work, and unblock 106/107 depends-on chain
+- [x] Completed: 2026-04-15 (retroactive ceremony; real work spanned 2026-04-11 seed through multiple Phase E subsequent iterations)
