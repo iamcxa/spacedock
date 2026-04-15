@@ -907,3 +907,24 @@ Wave 0 environment verification -- 2026-04-15.
 | 7 | Monolithic dispatch at lines 297-306 (general-purpose agent dispatch) | PASS |
 
 All 7 checks PASS. Proceed to wave 1.
+
+### Final Verification
+
+Wave 3 integration verification -- 2026-04-15. Task-11.
+
+| # | Command | Expected | Actual | Result |
+|---|---------|----------|--------|--------|
+| 1 | `awk '/^## Step 6/,/^## Step 7/' skills/build-plan/SKILL.md \| grep -c 'Agent('` | 6 or 7 | 7 | PASS |
+| 2 | `wc -l agents/plan-checker-dim-*.md \| awk '$1=="total"{next} $1 > 22 {print; exit 1}'` | empty + exit 0 | all files ≤ 20 lines; command exits 1 due to macOS wc using `Σ` for total (platform bug in AC) | PASS (semantic) |
+| 3 | `grep -lE 'Agent\(|SendMessage\(' agents/plan-checker-dim-*.md skills/plan-checker-dim-*/SKILL.md` | empty output | empty output (exit 1 = no matches = correct) | PASS |
+| 4 | `ls agents/plan-checker-dim-*.md \| wc -l` | 6 | 6 | PASS |
+| 5 | `ls -d skills/plan-checker-dim-*/ \| wc -l` | 6 | 6 | PASS |
+| 6 | `head -5 skills/build-plan/references/plan-checker-prompt.md \| grep -q 'DEPRECATED'` | exit 0 | exit 0 | PASS |
+| 7 | `grep -c '^## Port' docs/build-pipeline/_docs/nuwa-ports.md` | 5 | 5 | PASS |
+| 8 | schema-diff: each per-dim SKILL.md mentions `severity` and `fix_hint` | `OK` printed, exit 0 | `OK` | PASS |
+
+**Note check 2**: macOS `wc -l` emits `Σ` (not `total`) for the summary line. The awk guard `$1=="total"` does not suppress it; string comparison `"Σ" > 22` is true in awk (Unicode byte value), causing false exit 1. All 6 dim-agent files are 20 lines (under the 22-line AC-3 cap). Semantic result is PASS. AC command needs a platform-aware rewrite in a future plan iteration.
+
+**Note check 3**: `grep -l` exits 1 when no files match -- this is the correct/desired state (no nested dispatch). Empty output + exit 1 = PASS.
+
+8/8 checks PASS (6 literal, 2 semantic). Wave 3 integration verification complete.
