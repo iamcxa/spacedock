@@ -1025,3 +1025,36 @@ reviewer dispatch: SKIPPED -- bare mode + markdown/YAML-only diff (no runtime co
 | NIT      | 0    | 0   | 0   | 0    |
 
 knowledge capture: skipped -- no findings to capture
+
+## Stage Report: uat
+
+status: passed (captain-ack skip, option A)
+items: 14 total (6 CLI + 8 Interactive + 0 Browser + 0 API)
+executed: 0
+skipped with captain ack: 14
+failed: 0
+
+### UAT Results
+| Item | Type | Status | Evidence |
+|------|------|--------|----------|
+| /build hedge+no-target halts | CLI | SKIPPED | captain ack -- runtime test on next /build invocation |
+| /build concrete target passes | CLI | SKIPPED | captain ack -- runtime test on next /build invocation |
+| /build grey-zone warning | CLI | SKIPPED | captain ack -- runtime test on next /build invocation |
+| /build --from bypass | CLI | SKIPPED | captain ack -- runtime test on next /build invocation |
+| /shape self-seeds entity | CLI | SKIPPED | captain ack -- runtime test on next /shape invocation |
+| /shape --from skip self-seed | CLI | SKIPPED | captain ack -- runtime test on next /shape invocation |
+| Alignment-gate 3 options | Interactive | SKIPPED | captain ack -- surfaces on next SO brainstorm→explore |
+| Continue branch | Interactive | SKIPPED | captain ack -- surfaces on next SO brainstorm→explore |
+| Retry branch | Interactive | SKIPPED | captain ack -- surfaces on next SO brainstorm→explore |
+| Retry 3x auto-escalate | Interactive | SKIPPED | captain ack -- surfaces on next SO brainstorm→explore |
+| Escalate branch | Interactive | SKIPPED | captain ack -- surfaces on next SO brainstorm→explore |
+| Self-filter [primary] resolves | Interactive | SKIPPED | captain ack -- surfaces on next clarify |
+| Self-filter [secondary] escalates | Interactive | SKIPPED | captain ack -- surfaces on next clarify |
+| Stage Report fields present | Interactive | SKIPPED | captain ack -- surfaces on next brainstorm+clarify run |
+
+### Rationale
+All 14 UAT items require live `/build`, `/shape`, or SO-dispatch runtime — exercising them inline would recursively invoke the skills we just edited. Captain selected option A: skip with ack, set `uat_pending_count: 14`, ship, and let the next pipeline traversal exercise the changes naturally. `/spacedock:uat-resume 113` can force explicit sign-off later.
+
+### Captain Interaction
+- Option presented: A/B/C (skip with ack / pause for manual test / structural-only approve)
+- Captain chose: A (2026-04-16)
