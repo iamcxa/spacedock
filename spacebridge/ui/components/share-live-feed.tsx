@@ -78,7 +78,7 @@ export function ShareLiveFeed({ token, entitySlug }: ShareLiveFeedProps) {
                   </span>
                 </div>
                 {entry.detail && (
-                  <div className="text-muted-foreground truncate">{entry.detail}</div>
+                  <div className="text-muted-foreground line-clamp-2 break-words">{entry.detail}</div>
                 )}
               </div>
             ))}
