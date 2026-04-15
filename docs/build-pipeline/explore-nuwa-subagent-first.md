@@ -141,7 +141,7 @@ You are asking for a restructure of build-explore so every mapping pass dispatch
 - `skills/build-explore/references/hybrid-classification-heuristic.md` -- Step 5 classification target for Port 8 triple-gate replacement
 - `skills/build-brainstorm/SKILL.md:275` -- sibling 104's leaf-constraint point of comparison (build-explore is NOT a leaf today; line 20 documents Mode A/B infrastructure)
 - `skills/build-review/SKILL.md:27-29` + `skills/build-plan/SKILL.md:27-29` -- three-way precedent uniformity for Mode A/B pattern (sibling 104 A-4 evidence)
-- `/Users/kent/Project/me-company/.agents/skills/huashu-nuwa/references/extraction-framework.md` -- **to be vendored locally per sibling 104 A-7 captain decision**; plan-phase will update this citation to local path after 104 execute lands (⏳ post-104-merge: update to docs/build-pipeline/_docs/extraction-framework.md)
+- `docs/build-pipeline/_docs/extraction-framework.md` -- vendored locally 2026-04-15 per sibling 104 A-7; functional name (no huashu-nuwa prefix). Post-104-merge cleanup landed.
 
 ## Stage Report: brainstorm
 
