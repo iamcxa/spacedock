@@ -3,7 +3,7 @@ id: 113
 title: Build Entry Routing + Alignment Gate -- SO Pipeline Dual-Entry, Mid-Flow Direction Check, Clarify Self-Filter
 slug: build-entry-routing-and-alignment-gate
 status: draft
-context_status: awaiting-clarify
+context_status: ready
 source: /build --from build-entry-routing-and-alignment-gate
 created: 2026-04-15T20:30:00+08:00
 started:
@@ -207,17 +207,20 @@ You are asking for the SO pipeline to gain entry-point routing, a mid-flow align
 - **Confidence**: Confident (0.95)
 - **Evidence**: Angle (iii) CONTRACTS.md scan confirmed all 4 files (build/SKILL.md, build-shape/SKILL.md, build-brainstorm/SKILL.md, build-clarify/SKILL.md) are contracted by entity 103 (shipped) -- CONTRACTS.md [primary]. Lens (d) brainstorm confirmed same -- entity:103 [primary]
 
-**A-4**: Entity 091 (clarify-pre-presentation-evidence-gate, clarify/ready) must ship before entity 113 to avoid merge conflicts on build-clarify/SKILL.md Step 1.5 and agents/science-officer.md.
-- **Confidence**: Likely (0.70)
-- **Evidence**: Angle (iii) found entity 091 writes to both build-clarify/SKILL.md (Step 1.5 provenance rule) and agents/science-officer.md (pre-Step-2 checkpoint) -- clarify-pre-presentation-evidence-gate.md:36-38 [primary]. 091 is in clarify/ready (closer to ship than 113 in draft/pending), so natural ordering has 091 first -- but no formal depends-on is declared and FO could dispatch 113 to execute first if 091 stalls -- INDEX.md [secondary]
+**A-4**: Entity 091 and entity 113 modify different insertion points in both shared files -- no merge conflict regardless of ship order.
+- **Confidence**: Confident (0.90) (upgraded from Likely 0.70)
+- **Evidence**: 091 modifies build-clarify Step 1.5 1a (provenance rule) + science-officer.md Step 3 (clarify pre-presentation checkpoint) -- clarify-pre-presentation-evidence-gate.md:36-38 [primary]. 113 modifies build-clarify Step 2 (self-filter) + science-officer.md Step 3.5 area (alignment-gate between brainstorm/explore) -- entity:113 Scope:In [primary]. Insertion points are disjoint at both file and step level; no depends-on required.
+→ Self-resolved: SO read 091's full APPROACH spec (clarify-pre-presentation-evidence-gate.md:34-48); insertion points confirmed disjoint (Step 1.5 vs Step 2, Step 3 vs Step 3.5)
 
-**A-5**: Alignment-gate retry cap of 3 is appropriate, matching FO auto-revision loop precedent.
-- **Confidence**: Likely (0.75)
-- **Evidence**: FO auto-revision loop caps at 3 iterations before escalation (MEMORY.md fo-auto-revision-loop.md, proven entity 103 iter 1→2) -- memory:fo-auto-revision-loop.md [secondary]. Captain has not formally locked this number for alignment-gate specifically -- entity:113 shape Stage Report locks 6 decisions but retry cap is not among them -- entity:113 [secondary]
+**A-5**: Alignment-gate retry cap of 3 is appropriate, matching FO auto-revision loop precedent. Captain can adjust post-ship.
+- **Confidence**: Confident (0.85) (upgraded from Likely 0.75)
+- **Evidence**: FO auto-revision loop caps at 3 iterations before escalation (MEMORY.md fo-auto-revision-loop.md, proven entity 103 iter 1→2) -- memory:fo-auto-revision-loop.md [secondary]. GUARDRAILS bullet 5 already states "max 3 iterations" -- entity:113 Brainstorming Spec [primary]
+→ Self-resolved: 3-iteration cap is consistent with both FO precedent and entity 113's own GUARDRAILS; no captain lock needed -- tunable post-ship
 
 **A-6**: The Sonnet gatekeeper's hedge-word keyword list can be hardcoded in the skill spec (not a configurable external file) because the list is short (~10 keywords) and changes infrequently.
-- **Confidence**: Likely (0.70)
+- **Confidence**: Confident (0.85) (upgraded from Likely 0.70)
 - **Evidence**: build-brainstorm's α-marker keyword list is hardcoded at SKILL.md:472 ("needs clarification -- deferred to explore") and has never needed external configuration -- skills/build-brainstorm/SKILL.md:472 [secondary]. build-shape's escape-hatch keywords are hardcoded at SKILL.md:62 (fix, typo, rename, bump, patch, bugfix, hotfix) -- skills/build-shape/SKILL.md:62 [secondary]
+→ Self-resolved: 2 existing pipeline keyword lists (brainstorm α-markers, shape escape-hatch) are both hardcoded; no external config precedent exists in this pipeline
 
 ## Option Comparisons
 
@@ -231,6 +234,8 @@ The alignment-gate needs a home -- either in the SO agent file, in the brainstor
 | **(b) New post-synthesis step in skills/build-brainstorm/SKILL.md** | Co-locates with brainstorm output; could leverage the self-test gate pattern (Step 5.5) | Brainstorm is non-interactive by design (SKILL.md:472 "NEVER ask captain questions"); adding AskUserQuestion violates this contract; would need Mode A/B branching for gate | Medium | Viable but contract-breaking |
 | **(c) New standalone skill (e.g., skills/build-alignment-gate/SKILL.md)** | Clean separation; independently testable; can be loaded by SO via Skill() call | New file overhead; SO must call Skill() between brainstorm and explore, adding a dispatch hop; context_status transition ownership becomes ambiguous | Medium | Viable |
 
+→ Selected: **(a)** -- SO self-resolved. Option (b) eliminated by Core Tension (essential): brainstorm is contractually non-interactive. Option (c) adds file overhead + dispatch hop without compensating benefit. Option (a) is co-located with existing Step 3.5 hook and context_status transitions.
+
 ### O-2: Self-filter threshold mechanism
 
 The clarify self-filter needs a rule for "when is code-evidence sufficient to auto-resolve a question?" Two approaches:
@@ -239,6 +244,8 @@ The clarify self-filter needs a rule for "when is code-evidence sufficient to au
 |---|---|---|---|---|
 | **(a) Binary file:line existence** -- if ANY Lens Evidence citation with [primary] tier directly addresses the question, self-resolve | Simple; grep-verifiable; matches the Shape-Aware Filter precedent (binary section-cite check); errs toward escalation (only [primary] tier auto-resolves) | May miss cases where [secondary] evidence is actually sufficient; "directly addresses" is LLM judgment, not mechanical | Low | ✅ Recommended |
 | **(b) Confidence-based** -- self-resolve only if evidence confidence aggregates to ≥ Likely (0.70) across multiple sources | More nuanced; handles cases where 3 weak signals collectively pin the answer | Requires confidence computation before presentation; adds latency; confidence aggregation formula is a new primitive with no precedent in this pipeline | Medium | Viable |
+
+→ Selected: **(a)** -- SO self-resolved. Matches Shape-Aware Filter precedent (A-2, binary section-cite check). GUARDRAILS require "err toward escalation" -- binary [primary]-only is the most conservative threshold. Option (b) introduces a novel confidence aggregation primitive with no pipeline precedent.
 
 ## Open Questions
 
@@ -253,6 +260,8 @@ The clarify self-filter needs a rule for "when is code-evidence sufficient to au
 2. Plan 113 to be additive at different insertion points (Step 2 self-filter vs Step 1.5 provenance) and let either order work
 3. Merge the two entities' build-clarify changes into a single entity (scope creep risk)
 
+→ Self-resolved: **Option 2**. SO read 091's full APPROACH (clarify-pre-presentation-evidence-gate.md:34-48): 091 modifies Step 1.5 1a + SO Step 3 clarify rules; 113 modifies Step 2 + SO Step 3.5 brainstorm/explore boundary. Insertion points are disjoint at both file and step level. No depends-on required; either ship order works. See upgraded A-4 (Confident 0.90).
+
 ### Q-2: build-brainstorm --from shape provenance gap
 
 **Domain**: Readable/Textual (output contract)
@@ -264,6 +273,8 @@ The clarify self-filter needs a rule for "when is code-evidence sufficient to au
 2. Preserve original Captain Context Snapshot bullets and append enriched fields below them (no replacement)
 3. Accept as-is and rely on `source:` frontmatter field (already records `/build --from {slug}`)
 
+→ Self-resolved: **Option 1** as plan task, **Option 3** as existing fallback. `source:` frontmatter already captures `/build --from {slug}` (line 7 of entity file). The enriched template should additionally emit a `**Shape origin**` bullet when `shape_status: validated` for human readability. This is a minor template addition -- include as a plan task in entity 113.
+
 ### Q-3: Entity 103 "no automatic routing in v1" decision — explicit supersession
 
 **Domain**: Readable/Textual (decision traceability)
@@ -274,6 +285,8 @@ The clarify self-filter needs a rule for "when is code-evidence sufficient to au
 1. Add `supersedes: entity-103 decision "no automatic routing in v1"` annotation in entity 113 body
 2. Note in entity 113's RATIONALE that this supersedes 103's v1 decision based on observed friction
 3. No action needed — the shape conversation already captures the evolution context
+
+→ Self-resolved: **Option 2**. RATIONALE already states "Shipping targeted fixes first and generalizing later follows the 'ship the pain, then extract the pattern' discipline." Add one line: "This supersedes entity 103's v1 decision ('no automatic routing -- captain judgment') based on observed friction from SO front-half overhead across entities 097, 099, 101." Shape conversation context is preserved in Captain Context Snapshot Pre-shape bullet.
 
 ## Core Tensions
 
@@ -294,7 +307,29 @@ Scope flag present but decomposition NOT recommended: 4 primitives are tightly c
 
 ## Canonical References
 
-(clarify stage will populate)
+- `agents/science-officer.md:100-149` -- Step 3.5 post-brainstorm research dispatch (alignment-gate insertion point) [primary]
+- `agents/science-officer.md:64-67` -- SO routing table keyed on (status, context_status) [primary]
+- `agents/science-officer.md:77-91` -- Step 2.5 context_status transition ownership [primary]
+- `skills/build-clarify/SKILL.md:152-166` -- Shape-Aware Filter (self-filter precedent) [primary]
+- `skills/build/SKILL.md:20-51` -- current /build entry, zero gating logic (gap confirmed) [primary]
+- `skills/build-shape/SKILL.md:28-44` -- Step 0 arg parsing, no self-seed path (gap confirmed) [primary]
+- `skills/build-brainstorm/SKILL.md:472` -- non-interactive contract ("NEVER ask captain questions") [primary]
+- `docs/build-pipeline/clarify-pre-presentation-evidence-gate.md:34-48` -- entity 091 APPROACH (disjoint insertion points confirmed) [primary]
+- `_archive/shape-pre-build-alignment-skill.md:56-61` -- entity 103 "no automatic routing in v1" decision (superseded by 113) [secondary]
+- `skills/build-explore/references/output-format.md:21-29` -- per-assumption confidence schema (readiness score precedent) [secondary]
+
+## Stage Report: clarify
+
+- [x] Assumptions confirmed: 6/6 (3 Confident unchanged, 3 Likely upgraded to Confident via self-investigation)
+  A-4 0.70→0.90 (091 insertion points disjoint); A-5 0.75→0.85 (GUARDRAILS already state cap 3); A-6 0.70→0.85 (2 hardcoded precedents)
+- [x] Options selected: 2/2 (both self-resolved)
+  O-1 → (a) SO agent file (constraint-eliminated (b)); O-2 → (a) binary [primary]-only (precedent + GUARDRAILS match)
+- [x] Questions resolved: 3/3 (all self-resolved, 0 captain-escalated)
+  Q-1 → Option 2 (disjoint insertion points); Q-2 → Option 1 as plan task + Option 3 fallback; Q-3 → Option 2 (RATIONALE annotation)
+- [x] Captain questions asked: 0
+  All items resolved via SO self-investigation (codebase evidence + architectural constraints)
+- [x] Self-filter: 3 self-resolved, 0 captain-escalated
+  clarify_self_filter_ratio: 1.00
 
 ## Stage Report: explore
 
