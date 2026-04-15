@@ -701,3 +701,99 @@ FO-authored per `MEMORY :: flatten-dispatch-troops-architecture`. FO dispatched 
 ### Confidence (execute stage)
 
 All wave troops returned DONE. Zero BLOCKED escalations. P1 dry-run (pre-execute) predicted 3 classes grounded in 104/105 evidence — execute preserved that grounding. Safe failure mode (tail misses fall through to ladder) preserved in classifier No-Exceptions.
+
+## Stage Report: quality
+
+**Verdict**: pass (pre-existing failures noted)
+**Ran at**: 2026-04-15T06:45:00Z
+**HEAD**: 596ac1e
+
+### test
+verdict: pass
+command: bun test
+evidence:
+```
+bun test v1.3.9 (cf6cdbbb)
+[nextjs] [nextjs] ready on port 18421
+
+spacebridge/src/domain/session/evolve.test.ts:
+[session/evolve] session_reconnected for unknown session ghost -- no-op
+
+ 749 pass
+ 0 fail
+ 1855 expect() calls
+Ran 749 tests across 72 files. [20.32s]
+```
+
+### lint
+verdict: fail (pre-existing)
+command: biome check . (from spacebridge directory)
+scope: pre-existing (biome errors not in entity 106's file delta)
+evidence:
+```
+Lint: 2 errors, 0 warnings
+
+Entity 106 modified only docs/build-pipeline/*.md, tests/pressure/*.yaml, 
+and docs/overhaul/recipes/*.yaml. No source files in spacebridge/ touched.
+Biome lint errors are pre-existing to entity 106.
+```
+
+### typecheck
+verdict: fail (pre-existing)
+command: bunx tsc --noEmit -p ./spacebridge/tsconfig.json
+scope: pre-existing (TS errors in spacebridge source not modified by entity 106)
+evidence:
+```
+spacebridge/src/domain/lease/decider.test.ts(20,5): error TS2322: Type 'Map<string, { token: string; session_id: string; entity_slug: string; role: "SO" | "FO" | "QO"; acquired_at: number; expires_at: number; }>' is not assignable to type 'Map<`${string}::${string}`, LeaseToken>'.
+  Type 'string' is not assignable to type '`${string}::${string}`'.
+spacebridge/src/domain/session/registry.ts(135,35): error TS2339: Property 'disconnect' does not exist on type 'SessionRegistry | PromiseLike<SessionRegistry>'.
+  Property 'disconnect' does not exist on type 'PromiseLike<SessionRegistry>'.
+spacebridge/src/domain/session/registry.ts(154,26): error TS2339: Property 'getActiveProjectRoots' does not exist on type 'SessionRegistry | PromiseLike<SessionRegistry>'.
+  Property 'getActiveProjectRoots' does not exist on type 'PromiseLike<SessionRegistry>'.
+spacebridge/src/ipc/coordination-client-bridge.ts(90,38): error TS2345: Argument of type 'string' is not assignable to parameter of type '`${string}::${string}`'.
+spacebridge/src/ipc/coordination-client-bridge.ts(124,40): error TS2345: Argument of type 'string' is not assignable to parameter of type '`${string}::${string}`'.
+spacebridge/src/ipc/coordination-concurrent.test.ts(84,34): error TS2345: Argument of type '"sess-1"' is not assignable to parameter of type '`${string}-${string}-${string}-${string}-${string}`'.
+spacebridge/src/ipc/coordination-concurrent.test.ts(85,34): error TS2345: Argument of type '"sess-2"' is not assignable to parameter of type '`${string}-${string}-${string}-${string}-${string}`'.
+spacebridge/src/ipc/fo-simulator.integration.test.ts(81,33): error TS2345: Argument of type '"fo-session-1"' is not assignable to parameter of type '`${string}-${string}-${string}-${string}-${string}`'.
+
+Total: 8 TS errors pre-existing to entity 106 (all in spacebridge/src/*, which entity 106 did not modify).
+```
+
+### build
+verdict: skipped
+command: bun build (not configured)
+evidence:
+```
+No build script configured in project package.json. Entity 106 modified only markdown 
+and YAML files (skills/*.md, tests/pressure/*.yaml, docs/*.md, docs/*.yaml). No build 
+artifacts generated or expected.
+```
+
+### regression
+verdict: pass
+command: n/a -- reuses Step 1 evidence
+classification: auto-pass (Step 1 green)
+evidence:
+```
+Step 1 passed: 749 tests pass, 0 fail. All tests green including cross-entity coverage. 
+No regression possible.
+```
+
+### ratchet
+verdict: skipped
+command: n/a -- ops.config.json with ratchet_baselines not configured
+evidence:
+```
+No ops.config.json found at workflow directory. First-run baseline initialization skipped. 
+Ratchet baselines not configured for this workflow.
+```
+
+### coverage
+verdict: skipped
+command: n/a
+evidence:
+```
+no threshold configured in workflow ops config
+```
+
+notes: execute_base_sha = 5984546; all pre-existing failures (lint + typecheck) occur in spacebridge/src files not modified by entity 106's file delta; entity 106 edits are markdown and pressure-test YAML only
