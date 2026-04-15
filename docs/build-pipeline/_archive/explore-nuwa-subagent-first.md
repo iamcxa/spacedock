@@ -1,15 +1,15 @@
 ---
 id: 105
 title: Explore Nüwa-Alignment + Subagent-First Enforcement (v2) -- Multi-Angle Parallel Explorer + Track-A Triple-Gate + Tension Output
-status: uat
+status: shipped
 context_status: ready
 source: /build (decomposed from epic 102)
 created: 2026-04-14T00:00:00Z
 started: 2026-04-14T23:11:25Z
-completed:
-verdict:
-score:
-worktree: .worktrees/spacedock-ensign-explore-nuwa-subagent-first
+completed: 2026-04-15T00:00:00Z
+verdict: PASSED
+score: 0.99
+worktree:
 issue:
 pr:
 intent: feature
