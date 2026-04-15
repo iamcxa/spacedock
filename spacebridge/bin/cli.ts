@@ -1,12 +1,21 @@
 // spacebridge/bin/cli.ts
 // ABOUTME: Unified CLI entry point for spacebridge.
 // Thin wrapper that delegates daemon lifecycle (start/stop/status) to bin/daemon.ts,
-// adds mcp subcommand via autoForkDaemon, and stubs share (entity 058).
+// adds mcp subcommand via autoForkDaemon + real MCP stdio bridge (entity 099), and stubs share (entity 058).
 // Users invoke via: bun run bin/cli.ts <subcommand>
 
+import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 import { autoForkDaemon } from "../src/daemon/auto-fork";
+import { createSocketClient } from "../src/ipc/socket-client";
+import type { IpcMessage } from "../src/ipc/types";
 
 // ─── State directory resolution ──────────────────────────────────────────────
 
@@ -66,12 +75,66 @@ if (import.meta.main) {
       daemonCmd: ["bun", "run", daemonPath, "start"],
     });
 
-    // Daemon is running. The MCP stdio bridge wiring (SocketClient + ChannelProviderBridge)
-    // is entity 053's scope — once entity 053 RPC routing is live, this subcommand will
-    // pipe stdin/stdout as the MCP stdio transport. For now: confirm daemon is up.
+    // ─── MCP stdio bridge (entity 099) ───────────────────────────────────────
+    const sessionId = randomUUID();
+    const projectRoot = process.env.SPACEBRIDGE_PROJECT_ROOT ?? process.cwd();
+
+    const mcpServer = new Server(
+      { name: "spacebridge", version: "0.1.0" },
+      { capabilities: { tools: {} } },
+    );
+
+    // Forward action-push messages from daemon to MCP client as notifications
+    function handleActionPush(msg: IpcMessage): void {
+      const payload = msg.payload as { action?: string; [k: string]: unknown };
+      if (payload.action === "captain_chat") {
+        mcpServer
+          .notification({
+            method: "notifications/spacebridge/captain_message",
+            params: payload,
+          })
+          .catch(() => {});
+      } else if (payload.action === "gate_decided") {
+        mcpServer
+          .notification({
+            method: "notifications/spacebridge/gate_decided",
+            params: payload,
+          })
+          .catch(() => {});
+      }
+    }
+
+    const client = createSocketClient({
+      socketPath,
+      sessionId,
+      projectRoot,
+      pid: process.pid,
+      onPush: handleActionPush,
+      reconnect: { maxRetries: 5 },
+    });
+    await client.connect();
+
+    // Register empty tools list — 099b implements the 6 MCP tools
+    mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [] }));
+
+    mcpServer.setRequestHandler(CallToolRequestSchema, async (req) => {
+      throw new Error(
+        `Tool "${req.params.name}" not implemented in 099 scope — see 099b (spacebridge-mcp-tool-parity)`,
+      );
+    });
+
+    // Graceful shutdown
+    const doShutdown = () => {
+      client.close();
+      mcpServer.close().catch(() => {}).finally(() => process.exit(0));
+    };
+    process.on("SIGTERM", doShutdown);
+    process.on("SIGINT", doShutdown);
+
+    const transport = new StdioServerTransport();
+    await mcpServer.connect(transport);
+
     process.stderr.write(`spacebridge mcp: daemon ready at ${socketPath}\n`);
-    // Keep the process alive so CC stdio transport can connect
-    await new Promise<void>(() => {});
   } else if (subcommand === "share") {
     process.stderr.write("Not yet implemented — see entity 058\n");
     process.exit(0);
