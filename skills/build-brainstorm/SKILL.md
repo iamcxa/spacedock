@@ -36,6 +36,106 @@ Read up to 9 files inline (CLAUDE.md, entity file, INDEX.md, CONTRACTS.md, 5 APP
 
 Detection heuristic: inspect whether `Agent` tool is listed in the current runtime's available tools at skill boot. If uncertain, default to Mode B (fail-safe degrades gracefully).
 
+### Lens Subagent Prompts
+
+Exact prompt templates for each Mode A lens dispatch. Copy-paste contract for implementors; grep-auditable for non-interactivity. Non-interactivity assertion: **every prompt below contains zero `AskUserQuestion` / `Teammate(` references.**
+
+#### Lens (a) -- captain-stated-intent
+
+- **Dispatched agent**: `spacedock:researcher`
+- **Model**: `sonnet`
+- **Input materials**: directive text (verbatim), acceptance criteria from entity file (if present), CLAUDE.md path reference
+- **Prompt template**:
+  ```
+  You are Lens (a): captain-stated-intent.
+
+  Directive: {verbatim directive text}
+
+  Acceptance Criteria (if present): {entity AC block, or "none"}
+
+  Task: Surface all explicit statements, constraints, and goals the captain stated in the directive.
+  Do NOT infer or extrapolate -- report only what is literally present.
+  Return 3-6 lines. Each line: one claim, followed by a citation tag [primary|secondary|tertiary].
+  Format per line: "- {claim} -- directive:verbatim [primary]"
+  Non-interactive: do not ask questions. If something is unclear, note "(unclear)" inline.
+  ```
+- **Return format**: 3-6 bullet lines, each ending with a `[primary|secondary|tertiary]` tag
+- **Non-interactivity assertion**: this prompt contains zero `AskUserQuestion` / `Teammate(` references
+
+#### Lens (b) -- captain-unstated-intent
+
+- **Dispatched agent**: `spacedock:researcher`
+- **Model**: `sonnet`
+- **Input materials**: directive keywords (nouns + verbs, stop-word filtered), INDEX.md sibling list, journal search results
+- **Q-2 scope**: `search_journal(query: "{directive keywords}", limit: 5)` where directive-keyword extraction = directive nouns + verbs with stop-word filter (exclude: a, an, the, is, are, was, be, to, of, in, for, and, or, with, this, that, it, by); plus all siblings clustered by shared Core Tension / Honest Boundary
+- **Prompt template**:
+  ```
+  You are Lens (b): captain-unstated-intent.
+
+  Directive keywords: {nouns + verbs extracted from directive, stop-word filtered}
+
+  Journal search results (search_journal(query: "{directive keywords}", limit: 5)):
+  {journal search output, or "No results"}
+
+  Sibling entities sharing Core Tension / Honest Boundary:
+  {sibling list from INDEX.md, clustered by Core Tension / Honest Boundary, or "None"}
+
+  Task: Infer implicit goals, constraints, and context the captain likely assumed but did not state.
+  Structural output only -- no semantic ground-truth verification (see skill-level Honest Boundary note).
+  Return 3-6 lines. Each line: one inferred claim + evidence citation + [primary|secondary|tertiary] tag.
+  Format per line: "- {inferred claim} -- {entity:ID or journal-entry-id} [secondary]"
+  Non-interactive: do not ask questions. Mark uncertain inferences with "(inferred)".
+  ```
+- **Return format**: 3-6 bullet lines, each ending with a `[primary|secondary|tertiary]` tag
+- **Non-interactivity assertion**: this prompt contains zero `AskUserQuestion` / `Teammate(` references
+- **Note**: structural output only; semantic ground-truth not verifiable (Honest Boundary 7)
+
+#### Lens (c) -- codebase-current-state
+
+- **Dispatched agent**: `spacedock:code-explorer`
+- **Model**: `sonnet`
+- **Input materials**: domain hint (from Step 2 domain classification), APPROACH keyword file set (top 3-5 files most likely touched by the directive)
+- **Prompt template**:
+  ```
+  You are Lens (c): codebase-current-state.
+
+  Domain hint: {classified domain(s) from Step 2}
+
+  APPROACH keyword files to explore: {top 3-5 file paths most likely touched}
+
+  Task: Report the current implementation state relevant to this directive.
+  Find concrete file:line evidence for how the system currently works in the target area.
+  Return 3-6 lines. Each line: one factual observation + file:line citation + [primary|secondary|tertiary] tag.
+  Format per line: "- {observation} -- {file:line} [primary]"
+  Non-interactive: do not ask questions. If a file is missing, note "(file not found)".
+  ```
+- **Return format**: 3-6 bullet lines, each ending with a `[primary|secondary|tertiary]` tag and a `file:line` citation
+- **Non-interactivity assertion**: this prompt contains zero `AskUserQuestion` / `Teammate(` references
+
+#### Lens (d) -- sibling-entity
+
+- **Dispatched agent**: `spacedock:code-explorer`
+- **Model**: `sonnet`
+- **Input materials**: `_index/INDEX.md` sibling lookup (entities with overlapping `files_modified`), `_index/CONTRACTS.md` overlap scan
+- **Prompt template**:
+  ```
+  You are Lens (d): sibling-entity.
+
+  INDEX.md excerpt (siblings with overlapping files_modified):
+  {relevant INDEX.md rows}
+
+  CONTRACTS.md excerpt (overlapping contract lines):
+  {relevant CONTRACTS.md lines}
+
+  Task: Identify sibling entities whose scope overlaps this directive.
+  Report any duplicate work, conflicting contracts, or useful precedents.
+  Return 3-6 lines. Each line: one overlap finding + entity:ID citation + [primary|secondary|tertiary] tag.
+  Format per line: "- {overlap or precedent finding} -- entity:{ID} [secondary]"
+  Non-interactive: do not ask questions. If no siblings found, return "- No overlapping siblings found -- INDEX.md [tertiary]".
+  ```
+- **Return format**: 3-6 bullet lines, each ending with a `[primary|secondary|tertiary]` tag and an `entity:ID` citation
+- **Non-interactivity assertion**: this prompt contains zero `AskUserQuestion` / `Teammate(` references
+
 ### Context Enrichment (sub-steps, run alongside lens dispatch)
 
 Gather context silently -- no questions, no confirmation prompts.
