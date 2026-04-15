@@ -305,6 +305,20 @@ Read `skills/build-plan/references/plan-checker-prompt.md` via the `Read` tool. 
 - `{plan_text}` -- the full `## Research Findings` + `## PLAN` + `## UAT Spec` + `## Validation Map` text
 - `{entity_context}` -- the entity's `## Brainstorming Spec`, `## Explore Output`, `## Clarify Output`, `## Acceptance Criteria` sections
 
+**Pre-dispatch guard (MUST check before issuing any Agent calls):** Assert both substitution strings are valid:
+1. `{plan_text}` is non-empty and does not contain a literal `{` character (unsubstituted placeholder).
+2. `{entity_context}` is non-empty and does not contain a literal `{` character.
+
+If either assertion fails, STOP. Do not dispatch any dim agents. Emit a single blocker issue inline:
+```yaml
+issues:
+  - dimension: dispatch_guard
+    severity: blocker
+    description: "plan_text or entity_context substitution failed -- one or both fields are empty or contain unsubstituted placeholders"
+    fix_hint: "Check that the entity body has a ## PLAN section and ## Acceptance Criteria section before running plan-checker"
+```
+Then skip to Step 7 revision loop with this single issue.
+
 Issue all 6 dispatch calls in **one tool-call block** (parallel subagent fanout):
 
 ```
