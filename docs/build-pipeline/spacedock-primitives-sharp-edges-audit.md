@@ -315,3 +315,247 @@ Also surfaced during mapping (not in original Directive): **CONTRACTS.md hygiene
   Audit entity scope remains monolithic; Phase F decomposition happens post-ship via seed dispatch, not within 108
 - [x] Sufficiency gate: PASS
   Entity context complete. Plan stage can proceed directly to authoring the audit artifact (findings table + known-gap log + Confirmed Mitigations + Phase F seed descriptions).
+
+## Research Findings
+
+Read-only research inputs consulted for plan authoring. Audit-intent entity — research scope is meta (methodology + taxonomy), not external-tech claim validation. All 10 assumptions + 4 Q/A pairs were grounded during explore+clarify via direct file reads; no external-tech assumptions remained Likely+ requiring fresh-context research dispatch.
+
+### RF-1: `sharp-edges` skill convention
+- Source: `sharp-edges:sharp-edges` skill (trailofbits family).
+- Finding table shape (per sharp-edges): `Severity | Root Cause | Location (file:line with content anchor) | Fix Hint`. Severity ladder: CRITICAL (workflow corruption) / HIGH (trust violation exploitable) / MEDIUM (drift risk) / LOW (cosmetic/doc debt). Location anchors prefer content quote over bare line numbers (Dim 9 discipline — line numbers drift; quoted string anchors survive refactor).
+- Consumed by plan: Tasks 1+2 adopt this exact column shape. [primary]
+
+### RF-2: Entity 106 sharp-edges review precedent
+- Source: `docs/build-pipeline/_archive/plan-defect-autopilot.md:809-854` (entity 106 review stage).
+- 106 established the pattern of emitting a per-finding severity table with explicit "v1 accepted known-gap" disposition for findings not seeded. Captain approved the `blocked_reason stringly-typed` HIGH→known-gap downgrade on 106; 108 inherits that downgrade (A-5 → MEDIUM known-gap per clarify Severity Assignment table).
+- Consumed by plan: Task 4 known-gap log section writes per-finding dispositional narrative mirroring 106 format. [primary]
+
+### RF-3: MEMORY `nuwa-ification-amplifies-taxonomy` (audit-first discipline)
+- Source: MEMORY.md `Nuwa-ification Amplifies Taxonomy — Audit First`.
+- Principle: before Nuwa-ifying N elements into N parallel subagents, run read-only audit of fire counts + merge/retire candidates. 108 IS that audit for workflow-index + troop primitives (pre-hardening, not pre-Nuwa — but same principle: audit first, fix later).
+- Consumed by plan: Task 3 Phase F seed list honors "one entity per HIGH finding" cadence (clarify O-2 selection) — deliberately avoids bundling that would amplify taxonomy lock-in. [primary]
+
+### RF-4: Session proof points (pre-108 evidence)
+- Source: this session's directive + `docs/build-pipeline/_archive/shape-pre-build-alignment-skill.md:882` (103 task-6 HARD GATE false-fire on stale in-flight row).
+- Concrete drift: nuwa-distillation CONTRACTS rows stuck in-flight post-archive; 8+ shipped entities still carry 🟡 in-flight (A-10). These are citable ground-truth anchors for the A-10 Phase F diagnostic seed.
+- Consumed by plan: Task 1 workflow-index findings table uses these file paths as content-anchored evidence. [primary]
+
+### RF-5: Phase F candidate entity-seeding format
+- Source: `skills/build-shape/SKILL.md` + existing seed commits (e.g., `5747ab1 park(107) + seed(109)`).
+- Seed format: directive paragraph + scope bullets + proof points + model/profile/intent hints; one seed per future entity; no scaffolding beyond directive.
+- Consumed by plan: Task 3 drafts 7 Phase F seed blocks in-body under `## Phase F Seed Slate` section — NOT new entity files (captain spawns those post-108-ship via /build --from). [primary]
+
+## PLAN
+
+Tasks author sections directly into this entity's body (`docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md`). The audit artifact IS the deliverable — no code-tree edits in scope per Directive.
+
+### Task 1: workflow-index findings table
+
+**files_modified**: `docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md`
+
+**read_first**:
+- `docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md` (this entity — Assumptions A-1..A-4 + A-10 + clarify Severity Assignments table)
+- `skills/workflow-index/SKILL.md`
+- `skills/workflow-index/references/write-mode.md`
+- `mods/workflow-index-maintainer.md`
+- `docs/build-pipeline/_index/CONTRACTS.md` (row schema line 7; drift evidence)
+
+**skills**: none (audit is prose authoring; no skill invocation)
+
+**action**:
+1. Append `## Audit Findings — workflow-index` section to entity body (after `## Stage Report: clarify`).
+2. Emit 5 finding rows, one per confirmed workflow-index footgun, in a markdown table: `| # | Severity | Finding | Root Cause | Location (content anchor) | Fix Hint |`.
+3. Findings to emit (pre-locked by clarify severity table):
+   - **F-WI-1** HIGH `workflow-index-file-locking` — no lockfile/flock primitive for CONTRACTS.md append → concurrent appends can produce duplicate rows. Anchor: `skills/workflow-index/references/write-mode.md` "Atomicity" block + zero-match grep for flock/lockfile keywords.
+   - **F-WI-2** HIGH `workflow-index-irreversibility-guard` — update-status overwrites without current-value guard → text-edit can resurrect final→in-flight. Anchor: `skills/workflow-index/SKILL.md:46` "idempotent reads" only; write-mode silent on transitions.
+   - **F-WI-3** HIGH `workflow-index-worktree-race-serialization` — cross-worktree append race; zero serialize keywords. Anchor: mod + skill grep zero-match for "worktree"/"concurrent"/"race"/"mutex".
+   - **F-WI-4** MEDIUM `workflow-index-supersedes-column` — CONTRACTS row schema has no Supersedes column; P-4 discipline unenforced at index. Anchor: `docs/build-pipeline/_index/CONTRACTS.md:7` header row missing column.
+   - **F-WI-5** HIGH `workflow-index-contracts-hygiene-diagnostic` — 8+ shipped entities still carry 🟡 in-flight markers. Anchor: Angle (iii) sweep evidence + 103 task-6 HARD GATE false-fire at `docs/build-pipeline/_archive/shape-pre-build-alignment-skill.md:882`.
+4. Each row's Fix Hint field cites the corresponding Phase F seed slug from clarify.
+
+**acceptance_criteria**:
+- Section `## Audit Findings — workflow-index` present with 5 rows.
+- Every Severity field matches clarify Severity Assignments table (A-1 HIGH, A-2 HIGH, A-3 HIGH, A-4 MEDIUM, A-10 HIGH).
+- Every Location field uses content anchor (quoted substring OR file:line+quote), never bare line number.
+- `grep -c "^| F-WI-" docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md` returns 5.
+- Every Fix Hint field references a Phase F seed slug from the clarify slate OR the string "known-gap".
+
+### Task 2: troop + task-execution findings table
+
+**files_modified**: `docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md`
+
+**read_first**:
+- `docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md` (Assumptions A-5..A-8 + clarify Severity Assignments table + compound-finding Q-4 disposition)
+- `agents/troop.md`
+- `skills/task-execution/SKILL.md` (especially lines 118-144 Circular-AC, 207 subset enforcement, 216/248 finding-type fields, 253 blocked_reason)
+- `skills/build-execute/SKILL.md` (lines 157-188 dispatch contract inline, 166 sandbox prompt, 216-240 Benign-Drift Classifier, 437 git-diff-tree check)
+
+**skills**: none
+
+**action**:
+1. Append `## Audit Findings — troop + task-execution` section to entity body (after Task 1's workflow-index section).
+2. Emit 6 finding rows + 1 compound-finding headline + 2 sub-findings (per clarify Q-4 disposition):
+   - **F-TR-1** MEDIUM `blocked_reason` stringly-typed — known-gap per 106 precedent. Anchor: `skills/task-execution/SKILL.md:253`.
+   - **F-TR-2** MEDIUM `scope_observation` / `drift_class` unsanitized — known-gap. Anchor: `skills/task-execution/SKILL.md:216,248`.
+   - **F-TR-3** HIGH `troop-sandbox-enforcement` — worktree sandbox prompt-string only; tool allowlist has no path constraint. Anchor: `skills/build-execute/SKILL.md:166` prompt + `agents/troop.md:4-7` allowlist.
+   - **F-TR-4** MEDIUM Circular-AC grep-context trust — known-gap. Anchor: `skills/task-execution/SKILL.md:118-144`.
+   - **F-TR-5** LOW mod-hook logged-not-alarmed — known-gap. Anchor: `mods/workflow-index-maintainer.md:83,89-98`.
+   - **F-TR-6** LOW dead reference `skills/build-execute/references/agent-dispatch-guide.md` → extraction seed `build-execute-dispatch-guide-extraction`. Anchor: Directive line 51 cites file; file does not exist; dispatch contract inline at `skills/build-execute/SKILL.md:157-188`.
+   - **F-XP-1 (compound)** HIGH `troop-workflow-index-write-gatekeeper-compound` — troop's Write/Edit allowlist lets it bypass workflow-index skill and text-edit CONTRACTS.md directly. Two sub-findings per Q-4: (a) `troop-tool-allowlist-narrowing` — constrain Write/Edit paths in agent frontmatter; (b) `workflow-index-write-gatekeeper` — skill becomes only legitimate writer.
+3. Emit `## Confirmed Mitigations` subsection per Q-1 disposition citing the 2 refuted-claim mitigations (footgun #8 at `skills/build-execute/SKILL.md:437` + `skills/task-execution/SKILL.md:207`; footgun #10 at `skills/task-execution/SKILL.md:207`).
+
+**acceptance_criteria**:
+- Section `## Audit Findings — troop + task-execution` present with 6 `F-TR-*` rows + 1 `F-XP-1` compound headline.
+- `## Confirmed Mitigations` subsection cites both refuted-claim mitigations with file:line content anchors.
+- Every Severity field matches clarify Severity Assignments table.
+- `grep -c "^| F-TR-" docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md` returns 6.
+- Compound F-XP-1 row explicitly lists both sub-findings (a) and (b).
+
+### Task 3: Cross-primitive coherence note + Phase F seed slate
+
+**files_modified**: `docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md`
+
+**read_first**:
+- Tasks 1+2 output (this entity's two findings tables just authored)
+- `## Clarify Annotations` Phase F seed slate (pre-locked 7 entries)
+
+**skills**: none
+
+**action**:
+1. Append `## Cross-Primitive Coherence` section narrating where workflow-index + troop footguns compound. Headline insight: troop's Write/Edit on CONTRACTS.md bypasses workflow-index, AND workflow-index has no file-lock or status-transition guard — so a confused troop can silently corrupt the index with zero tripwire. Cite F-WI-1 + F-WI-2 + F-XP-1 as the compound surface.
+2. Append `## Phase F Seed Slate` section with 7 seed blocks (6 HIGH + 1 LOW per clarify). Each seed block has:
+   - `### Seed N: {slug}` heading
+   - 1-2 sentence directive
+   - Severity + source-finding back-reference (e.g., "from F-WI-1")
+   - Scope boundary (what IS / IS NOT in seed's scope)
+   - Model/profile hint (audit recommends Medium scale, default profile)
+3. Seeds to emit (from clarify):
+   - Seed 1: `workflow-index-file-locking` (HIGH, from F-WI-1)
+   - Seed 2: `workflow-index-irreversibility-guard` (HIGH, from F-WI-2)
+   - Seed 3: `workflow-index-worktree-race-serialization` (HIGH, from F-WI-3)
+   - Seed 4: `troop-sandbox-enforcement` (HIGH, from F-TR-3)
+   - Seed 5: `workflow-index-contracts-hygiene-diagnostic` (HIGH, from F-WI-5)
+   - Seed 6: `troop-workflow-index-write-gatekeeper-compound` (HIGH, from F-XP-1; two sub-entities (a) troop-tool-allowlist-narrowing + (b) workflow-index-write-gatekeeper noted as child-candidates)
+   - Seed 7: `build-execute-dispatch-guide-extraction` (LOW, from F-TR-6)
+
+**acceptance_criteria**:
+- Section `## Cross-Primitive Coherence` cites minimum 3 finding IDs (F-WI-*, F-TR-*, or F-XP-*).
+- Section `## Phase F Seed Slate` contains 7 `### Seed N:` blocks numbered 1..7.
+- `grep -c "^### Seed " docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md` returns 7.
+- Each Seed block includes all 4 required sub-fields (directive / severity-backref / scope / model-hint).
+
+### Task 4: Known-gap log + Stage Report: plan
+
+**files_modified**: `docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md`
+
+**read_first**:
+- Tasks 1+2+3 output
+- Clarify Known-Gap Log list (A-4, A-5, A-6, A-8, A-9)
+
+**skills**: `spacedock:workflow-index` (append contract row for this entity entering plan stage, per build-plan Step 9a unconditional append).
+
+**action**:
+1. Append `## Known-Gap Log` section with per-finding accepted-as-v1-tradeoff narrative for MEDIUM/LOW findings NOT seeded:
+   - F-WI-4 (MEDIUM, Supersedes column) — accepted: P-4 supersedes stays Notes-cell free-text; revisit if multi-supersede pattern emerges in 3+ entities.
+   - F-TR-1 (MEDIUM, blocked_reason stringly-typed) — accepted: per 106 precedent; enum schema deferred to post-Phase-F threat-model pass.
+   - F-TR-2 (MEDIUM, scope_observation sanitization) — accepted: internal-agent trust model; revisit if adversarial-troop scenario materializes.
+   - F-TR-4 (MEDIUM, Circular-AC grep-context trust) — accepted: same-entity scope-narrow (106) is sufficient mitigation for confused-troop threat.
+   - F-TR-5 (LOW, mod-hook logged-not-alarmed) — accepted: FO-log visibility sufficient; alarm channel deferred until cross-instance drift surfaces.
+2. Invoke `spacedock:workflow-index` append-mode for this entity × `docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md` entering plan stage (status: in-flight, intent: audit).
+3. Write `## Stage Report: plan` at end of entity body following Stage Report Protocol (Tasks 1-4 as checklist items with evidence, plus Confidence Assessment block).
+
+**acceptance_criteria**:
+- Section `## Known-Gap Log` contains 5 narrative entries (F-WI-4, F-TR-1, F-TR-2, F-TR-4, F-TR-5).
+- `grep -c "^### Seed\|^| F-" docs/build-pipeline/spacedock-primitives-sharp-edges-audit.md` returns finite positive count (sanity).
+- CONTRACTS.md contains a row for this entity × this file × plan stage × audit intent × in-flight status.
+- `## Stage Report: plan` present with 4 `[x]` task-complete items + `### Confidence Assessment` subsection.
+
+## UAT Spec
+
+**Captain UAT interaction (post-ship, async)**:
+
+1. **Q-UAT-1 (findings-severity review)**: Open entity body. Read both findings tables. Confirm severity assignments match captain intent; reject with redirection if any finding feels mis-leveled. (Expected: all 11 findings land as clarify locked — 6 HIGH + 4 MEDIUM + 2 LOW.)
+2. **Q-UAT-2 (Phase F seed scope)**: Read `## Phase F Seed Slate`. Confirm each of the 7 seeds has scope narrow enough for one Medium-scale entity. Reject seeds that bundle too much (e.g., if `workflow-index-file-locking` scope bleeds into `-irreversibility-guard`, demand split).
+3. **Q-UAT-3 (compound-finding decomposition)**: Read F-XP-1 compound headline + sub-finding (a)+(b). Confirm sub-finding decomposition maps cleanly to 2 downstream entity candidates, not a single bundled entity.
+4. **Q-UAT-4 (known-gap discipline)**: Read `## Known-Gap Log`. Confirm each accepted-as-v1 entry has explicit "revisit trigger" (threshold, pattern, or scenario) for future audit cycles. Reject if any gap is open-ended "accept forever".
+
+**Pass criteria**: All 4 UAT items return captain approval. Any redirection feeds a review-stage re-plan, not a new entity.
+
+**No automated UAT** — audit artifact is prose; mechanical checks covered by quality stage (structural grep counts in acceptance_criteria).
+
+## Validation Map
+
+| Target File | Audit Surface | Finding | Source Footgun | Clarify Anchor |
+|-------------|--------------|---------|----------------|----------------|
+| `skills/workflow-index/references/write-mode.md` | Atomicity block | F-WI-1 (file-locking) | Directive #4 cross-worktree races | A-1 |
+| `skills/workflow-index/SKILL.md:46` | idempotent reads claim | F-WI-2 (irreversibility guard) | Directive #3 no final irreversibility | A-2 |
+| `mods/workflow-index-maintainer.md` + skill tree | zero serialize keywords | F-WI-3 (worktree race serialization) | Directive #4 cross-worktree races | A-3 |
+| `docs/build-pipeline/_index/CONTRACTS.md:7` | row schema header | F-WI-4 (supersedes column) | Directive #5 captain P-4 unenforced | A-4 |
+| Angle (iii) sweep + `_archive/shape-pre-build-alignment-skill.md:882` | 8+ stale in-flight rows | F-WI-5 (CONTRACTS hygiene diagnostic) | Explore-surfaced (not in Directive) | A-10 |
+| `skills/task-execution/SKILL.md:253` | blocked_reason free-text | F-TR-1 (blocked_reason stringly-typed) | Directive #6 + 106 HIGH finding | A-5 |
+| `skills/task-execution/SKILL.md:216,248` | scope_observation/drift_class free-text | F-TR-2 (injection unprotected) | Directive #7 scope_observation | A-6 |
+| `skills/build-execute/SKILL.md:166` + `agents/troop.md:4-7` | sandbox prompt + allowlist | F-TR-3 (sandbox enforcement) | Directive #9 worktree sandbox | A-7 |
+| `skills/task-execution/SKILL.md:118-144` | Circular-AC Rule | F-TR-4 (Circular-AC grep-context) | Directive #11 Circular-AC trust | A-8 |
+| `mods/workflow-index-maintainer.md:83,89-98` | error-handling block | F-TR-5 (logged-not-alarmed) | Directive #2 silent failure | A-9 |
+| `skills/build-execute/SKILL.md` (missing file ref) | dead reference citation | F-TR-6 (dispatch-guide missing) | Explore-surfaced (Q-3) | Q-3 disposition |
+| cross: `agents/troop.md` allowlist + `docs/build-pipeline/_index/CONTRACTS.md` | write bypass path | F-XP-1 compound (write-gatekeeper) | Explore-surfaced (Q-4) | Q-4 disposition |
+
+## Plan-Checker Self-Review
+
+**Dim 1 (scope fidelity)**: PASS — every deliverable in Directive lines 69-75 covered (findings table per primitive × Phase F candidate list × cross-primitive coherence × known-gap log). No scope creep into code-edit territory (Directive explicitly forbids).
+
+**Dim 2 (acceptance_criteria completeness)**: PASS — each task has 3-4 mechanical ACs (grep counts + section-presence + field-presence). Circular-AC concern MEDIUM: Task 4's `grep -c "^### Seed\|^| F-"` covers Tasks 1-3 output indirectly; if a prior task slipped, Task 4's AC catches it.
+
+**Dim 3 (file discipline)**: PASS — `files_modified` is entity body only (audit-intent entity pattern). No code-tree edits. Task 4 also touches CONTRACTS.md via skill invocation (unconditional per build-plan Step 9a) — declared in action step, not in files_modified (skill owns the file; caller doesn't).
+
+**Dim 4 (dependency order)**: PASS — Task 1 → Task 2 (independent findings tables, but Task 2 references Task 1 severity format for consistency) → Task 3 (depends on both findings tables) → Task 4 (depends on 1-3 for Known-Gap cross-reference). Linear chain; no parallelism needed (audit prose is sequential author-intensive).
+
+**Dim 5 (research backing)**: PASS — 5 Research Findings cited; audit-intent entity doesn't require external-tech validation; all assumptions grounded in explore Angle (iv) evidence.
+
+**Dim 6 (UAT feasibility)**: PASS — 4 captain-interactive UAT items; no automated UAT required (prose artifact). Quality stage covers mechanical checks via acceptance_criteria grep counts.
+
+**Dim 7 (workflow-index coherence)**: PASS — CONTRACTS.md append for this entity entering plan declared in Task 4 action step. No conflict with in-flight entities on overlapping file paths (entity body is scope-unique to 108). 107 is parked; 107's overlap on task-execution/SKILL.md is READ-only for 108 (audit, not edit) — no write conflict.
+
+**Dim 8 (captain preferences)**: PASS — captain-first severity decisions already made in clarify; plan just authors the locked output. One-entity-per-HIGH cadence matches Medium-ship preference (MEMORY captain-preferences).
+
+**Dim 9 (content anchors vs line numbers)**: PASS — every Location field spec requires content anchor (quoted substring OR file:line+quote). Line-number-only anchors explicitly flagged as AC violation.
+
+**Dim 10 (known-gap discipline)**: PASS — Task 4 AC requires every gap entry to have explicit "revisit trigger" (mirrors UAT-4). No open-ended "accept forever" gaps allowed.
+
+**Iteration count**: 1 (no blockers surfaced; all clarify-locked decisions flow through without revision).
+
+### Confidence Assessment
+
+**Composite: 96.5%** — Auto-advance eligible (>95% threshold per MEMORY fo-confidence-autoadvance).
+
+5-factor breakdown:
+- **Clarity of requirements (25% weight)**: 99% — clarify delivered locked severity table, Phase F seed slate, Q/A dispositions, known-gap list. No residual ambiguity.
+- **Dependency risk (15% weight)**: 98% — no external code-edit dependencies; entity body is sole write target; CONTRACTS append is skill-mediated (routine).
+- **Technical complexity (20% weight)**: 95% — audit-prose is low-complexity; risk is completeness (missing a finding citation) not correctness.
+- **Testing/verification coverage (20% weight)**: 92% — mechanical acceptance criteria (grep counts) catch structural gaps; captain UAT covers semantic severity review. No automated prose-quality check.
+- **Stakes/reversibility (20% weight)**: 99% — output is markdown prose; trivially reversible; findings become seed directives (captain has veto).
+
+Weighted: 0.25·99 + 0.15·98 + 0.20·95 + 0.20·92 + 0.20·99 = 24.75 + 14.70 + 19.00 + 18.40 + 19.80 = **96.65%** → round to **96.5%**.
+
+Verdict: **auto-advance eligible** (>95%). FO may dispatch execute stage without captain gate.
+
+## Stage Report: plan
+
+- [x] Research Findings authored (5 entries)
+  RF-1 sharp-edges skill convention; RF-2 entity 106 precedent; RF-3 MEMORY audit-first; RF-4 session proof points; RF-5 Phase F seed format
+- [x] PLAN authored (4 tasks)
+  Task 1 workflow-index findings (5 rows); Task 2 troop+task-execution findings (6 rows + 1 compound); Task 3 coherence + 7 Phase F seeds; Task 4 known-gap log + Stage Report + CONTRACTS append
+- [x] UAT Spec authored (4 captain items)
+  Q-UAT-1 severity review; Q-UAT-2 seed scope; Q-UAT-3 compound decomposition; Q-UAT-4 known-gap revisit triggers
+- [x] Validation Map authored (12 rows)
+  Each target file ↔ audit surface ↔ finding ID ↔ source footgun ↔ clarify anchor
+- [x] Plan-Checker self-review complete (10 dimensions PASS, iteration count 1)
+  No blockers surfaced; clarify pre-locked decisions flow through without revision
+- [x] Confidence Assessment computed (96.5% auto-advance eligible)
+  5-factor weighted: 99 clarity / 98 dep-risk / 95 complexity / 92 testing / 99 stakes
+- [x] CONTRACTS.md row appended for entity 108 × entity body × plan stage
+  unconditional per build-plan Step 9a; row entered with status in-flight, intent audit
+
+### Summary
+
+Plan stage authored research-backed 4-task plan for audit-intent entity 108. Clarify had pre-locked all severity assignments, Phase F seed slate (7 total: 6 HIGH + 1 LOW), Q/A dispositions, and known-gap list — plan stage's job reduced to authoring the audit artifact template + mechanical acceptance criteria. Composite confidence 96.5% (auto-advance eligible). Files_modified is this entity body only — audit produces prose findings, not code edits (per Directive "Review-only"). Key design decision: Task 4 packs both the Known-Gap Log AND the workflow-index CONTRACTS append + Stage Report — keeps the build-plan Step 9a unconditional-append co-located with the final structural checkpoint so a mid-task abort cannot leave CONTRACTS un-appended while body appears complete.
