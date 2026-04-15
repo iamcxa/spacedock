@@ -1,0 +1,37 @@
+# F5: Alignment-gate branch coverage
+# Tests the three branches of the alignment-gate in agents/science-officer.md Step 3.6
+# Note: This is a structural fixture for forge validation, not a live execution test.
+# Live testing requires captain-interactive AskUserQuestion (Class 3).
+
+skill: spacedock:science-officer
+trigger: "/science build-entry-routing-and-alignment-gate"
+timeout: 180
+
+scenarios:
+  - name: "branch-a-continue"
+    description: "Captain selects Continue at alignment gate"
+    assertions:
+      - contains: "alignment_confidence: 1.0"
+      - contains: "Alignment gate: continue"
+      - not_contains: "context_status: blocked"
+
+  - name: "branch-b-retry"
+    description: "Captain selects Retry then Continue"
+    assertions:
+      - contains: "alignment_confidence"
+      - contains: "Alignment gate: retry"
+      - not_contains: "Lens Evidence"
+
+  - name: "branch-c-escalate"
+    description: "Captain selects Escalate to /shape"
+    assertions:
+      - contains: "context_status: blocked"
+      - contains: "supersedes:"
+      - contains: "alignment_confidence: N/A"
+      - not_contains: "build-explore"
+
+  - name: "retry-preserves-lens-evidence"
+    description: "Retry overwrites Brainstorming Spec but preserves Lens Evidence"
+    assertions:
+      - contains: "Brainstorming Spec"
+      - contains: "Lens Evidence"
