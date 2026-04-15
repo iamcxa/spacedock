@@ -827,3 +827,33 @@ Remaining 1 fail: `chat route — integration > 200 with delivered:false when no
 ### Notes
 - Ran `bun install` in subpackages (spacebridge, tools/dashboard, spacebridge/ui) to resolve module not found errors — same pattern as entity 113. Post-install test count matches expected.
 - Entity 114 modifies only markdown + YAML; lint/tsc/build checks are not applicable at repo root.
+
+## Stage Report: review
+
+status: passed (bare-mode pre-scan only — markdown/YAML-only diff)
+base SHA: a4b2084 (plan commit)
+final SHA: f92ab04
+reviewer dispatch: SKIPPED — markdown-only diff, no runtime code, no security surface, no TypeScript
+
+### Pre-scan checks
+- [x] em-dash drift: 0 em-dash chars in diff (double-dash discipline held)
+- [x] Stale line references: no hardcoded line numbers introduced in new content
+- [x] Import graph: no code files changed (grep for `.ts|.tsx|.js` in changed files returned empty)
+- [x] Plan consistency: 8/8 tasks completed with matching commits; ACs all verified in execute Stage Report
+- [x] Additive discipline: 301 insertions / 60 deletions; deletions confined to (a) SO Step 3.6 body replacement 54→5 lines, (b) 7 CONTRACTS status flips 🟡→✅
+- [x] Scope: Out respected: no 113 body mutation (only archive annotation allowed), no gate behavior changes, no new confidence factors, no other SO step migrations, no dashboard UI, no generic framework, no F5 fixture modification
+
+### Findings
+- Zero CRITICAL, zero HIGH, zero MEDIUM, zero LOW, zero NIT
+- No PLAN findings
+
+### Classification table
+| Severity | CODE | DOC | NEW | PLAN |
+|----------|------|-----|-----|------|
+| CRITICAL | 0 | 0 | 0 | 0 |
+| HIGH | 0 | 0 | 0 | 0 |
+| MEDIUM | 0 | 0 | 0 | 0 |
+| LOW | 0 | 0 | 0 | 0 |
+| NIT | 0 | 0 | 0 | 0 |
+
+knowledge capture: pending — Wave 2 haiku troop disk-persistence anomaly noted in execute Stage Report (D2 candidate surfaces to FO post-merge if pattern recurs on next entity)
