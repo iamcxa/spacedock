@@ -357,7 +357,7 @@ Wait for all 6 to return before proceeding to 6b. Each agent returns a structure
 
 Dim 3 (Dependency Correctness) runs **inline in the main session** -- NOT as a dispatched subagent. This is the synthesis-layer wave-graph correlation step.
 
-Build the wave graph from `wave` attributes in the `## PLAN` section, then apply the following checks verbatim from `references/plan-checker-prompt.md` Dim 3 (lines 43-48):
+Build the wave graph from `wave` attributes in the `## PLAN` section, then apply the checks from `references/dim-3-dependency-rules.md` (section: Wave-Graph Integrity Rules):
 
 - Wave N tasks' `read_first` entries can only reference outputs produced by wave < N tasks (or pre-existing files). A wave 2 task reading a wave 2 task's output is a cycle hint -- **blocker**.
 - `files_modified` overlap between tasks in the same wave -- **warning** (parallelism concern, execute will force serial).
