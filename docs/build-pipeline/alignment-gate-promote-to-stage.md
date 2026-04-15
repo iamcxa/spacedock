@@ -47,3 +47,46 @@ The build pipeline's Alignment Gate is a consequential captain control point —
 - **US-4**: As a skill author / plugin developer, I want science-officer to delegate alignment gate logic to a first-class stage with its own skill file, so that I can bind contracts against a stable stage boundary instead of an accreted single-agent file that bundles routing, context_status management, and captain interaction.
 
 - **US-5**: As a downstream consumer (confidence-gate / plan-checker / dashboard), I want alignment gate to carry a stage row in CONTRACTS.md and a plan-checker Dim 7 tracking entry, so that in-flight gate status is mechanically checkable rather than inferred from transcript archaeology.
+
+## Scope: In
+
+- New file `skills/build-alignment-gate/SKILL.md` created, containing the logic extracted verbatim from `agents/science-officer.md` Step 3.6 (three branches: continue / retry / escalate-to-shape, retry cap 3, alignment_confidence formula `1.0 - (retry_count * 0.2)`)
+- `docs/build-pipeline/README.md` updated to list `alignment-gate` as a named pipeline stage inserted between `brainstorm` and `explore` (making the stage count 11)
+- `agents/science-officer.md` Step 3.6 body replaced with a single routing delegation hint pointing to `skills/build-alignment-gate/SKILL.md`; all alignment decision logic removed from the SO god-object
+- `docs/build-pipeline/_index/CONTRACTS.md` receives a new row for the `alignment-gate` stage (stage name, skill path, input contract, output contract, consumer list); entity 113's row updated to `final` status
+- `references/confidence-gate.md` reviewed and updated if `alignment_confidence` factor sourcing changes as a result of the stage becoming addressable by name (no new factors added, only sourcing reference corrected)
+- `docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md` annotated with a supersession notice pointing to the new `skills/build-alignment-gate/SKILL.md`
+- `effective_stages()` routing in `skills/first-officer/` or `shared-core` updated so the alignment-gate stage identity is recognized and the stage is included/excluded per profile correctly
+- The four existing smoke tests in `skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml` remain passing without modification (behavioral parity guarantee: extraction does not alter the gate's logic)
+- Dashboard activity stream auto-picks up alignment-gate events with no new dashboard code, verified by confirming the graph is data-driven against the stage registry (acceptance criterion: alignment-gate stage name appears in dashboard stage graph after a pipeline run)
+
+## Scope: Out
+
+- Retroactive mutation of entity 113's body content (entity 113 is shipped and frozen; this entity only adds a supersession annotation to the archive doc)
+- Any change to alignment gate behavior: retry cap, branch names (continue / retry / escalate-to-shape), or the `alignment_confidence` formula (behavioral changes are a separate follow-up entity)
+- Adding new factors to `references/confidence-gate.md` beyond correcting the sourcing reference (new gate factors are a separate entity)
+- Migrating other SO internal steps (Step 3.5 research dispatch, Step 3.7+) into first-class stages (each would be its own entity; this entity scopes only Step 3.6)
+- Dashboard UI additions beyond what the data-driven stage graph auto-renders (no new pills, panels, or detail views; deferred to a dedicated dashboard entity)
+- Generalizing a meta-framework for "any future gate becomes a stage" (the pattern may be documented as a note inside the new SKILL.md, but no framework skill or tooling is built here)
+- New forge smoke-test fixtures beyond the four already in `build-shape-f5-alignment-gate.smoke.yaml` (existing fixture coverage is accepted as sufficient for this extraction; new behavioral scenarios belong to a follow-up)
+
+## References
+
+- `docs/build-pipeline/_archive/build-entry-routing-and-alignment-gate.md` -- entity 113 (shipped 2026-04-16), origin of Step 3.6 alignment-gate logic; this entity extracts and promotes its body
+- `agents/science-officer.md` Step 3.6 (~lines 153-205) -- current internal alignment-gate implementation to be extracted
+- `docs/build-pipeline/README.md` stages list -- 10-stage pipeline to become 11 stages with alignment-gate inserted
+- `references/first-officer-shared-core.md` -- effective_stages() routing algorithm to be updated
+- `references/confidence-gate.md` -- confidence factor sourcing; alignment_confidence consumer
+- `docs/build-pipeline/_index/CONTRACTS.md` -- stage-level coherence tracking table
+- `skills/build-shape/smoke-tests/build-shape-f5-alignment-gate.smoke.yaml` -- 4 scenarios (branch-a-continue / branch-b-retry / branch-c-escalate / retry-preserves-lens-evidence), must continue passing post-extraction
+- `skills/build-brainstorm/SKILL.md` "Stage Report: brainstorm (Format Addition)" section -- currently documents alignment_confidence field; may migrate to new alignment-gate stage's Stage Report contract
+- `skills/build-clarify/SKILL.md` -- reference pattern for first-class gated stage skill (alignment-gate should follow its structure)
+
+## Stage Report: shape
+
+- **Directive**: alignment-gate-promote-to-stage (SO depolicing + pipeline control-point visibility + clarify/alignment-gate symmetry restoration)
+- **Subagent dispatches**: framer (2 rounds: 3 candidates + captain-requested synthesis), story-gen (1 round), scope-drafter (1 round)
+- **Captain accepts**: Problem Statement 1/1 (C1 observability-led weave synthesizing A+B+C), User Stories 5/5 (US-1..US-5 all accepted first-round), Scope: In 9/9 (Accept all), Scope: Out 7/7 (Accept all)
+- **Final story count**: 5 (US-1 captain-observability, US-2 captain-dashboard, US-3 FO-routing, US-4 skill-author-binding, US-5 downstream-consumer)
+- **Captain decisions locked during shape**: (1) all 3 problem framings apply (observability / architecture / symmetry), synthesized as one; (2) C1 weave preferred (observability-led); (3) conversation language switched to 中文 mid-session
+- **Decomposition gate**: not triggered (5 US converge on one feature surface — SO's Step 3.6 extraction. Each US is a different stakeholder view of the same promotion action.)
