@@ -2,7 +2,7 @@
 id: 114
 title: Alignment-Gate Promote to Stage -- Pipeline Control Point Visibility + SO Depolicing
 slug: alignment-gate-promote-to-stage
-status: execute
+status: quality
 context_status: ready
 source: /shape
 created: 2026-04-16T00:30:00+08:00
