@@ -797,3 +797,28 @@ no threshold configured in workflow ops config
 ```
 
 notes: execute_base_sha = 5984546; all pre-existing failures (lint + typecheck) occur in spacebridge/src files not modified by entity 106's file delta; entity 106 edits are markdown and pressure-test YAML only
+
+## Stage Report: review
+
+FO-authored. Review mode: 2 parallel reviewers (pr-review-toolkit:code-reviewer + spacedock:sharp-edges-reviewer), sonnet model.
+
+### Findings
+
+**Blocker (execute-fix applied)**:
+- [85 IMPORTANT code-review] `cite_section` mismatch in tests/pressure/build-plan.yaml — pressure test cited "Dimension" suffix but actual headings use "(new)"; would break pressure fixture resolution. FIXED.
+- [HIGH sharp-edges] Benign-Drift Classifier `file-renamed` similarity threshold underspecified. FIXED — added explicit Jaro-Winkler ≥0.7 + same parent directory + primary vs fallback signal contract.
+
+**Warning (accepted with known-gaps)**:
+- [HIGH sharp-edges] Stringly-typed trust surface: classifier matches troop's own `blocked_reason` — adversarial crafting risk. Accepted v1; mitigation: scope_observation trail audit-able post-hoc. Future: cross-signal verification (e.g., Read the referenced file to confirm anchor-drift).
+- [HIGH sharp-edges] Copy+delete rename blind spot (non-git renames invisible to `git log --diff-filter=R`). Accepted v1; sibling-similarity fallback covers subset. Threshold now specified (0.7).
+- [MEDIUM sharp-edges] Dim 9 auto-rewrite: syntactic unambiguity ≠ semantic correctness. Accepted — aspirational language; captain advisory on ambiguous cases.
+- [MEDIUM sharp-edges] Circular-AC guard list closed-world: new entity-body sections not covered until classifier updated. Accepted — entity schema is stable; future additions require follow-up entity (explicit in No-Exceptions).
+- [MEDIUM sharp-edges] scope_observation injection trust: troops can fake drift_class fields. Accepted v1; audit burden on reviewers.
+- [LOW sharp-edges] Whitelist enforcement via reviewer discipline only. Future contract test: `grep -c 'drift_class' SKILL.md == 3`.
+
+### Auto-revision
+
+Per MEMORY `fo-auto-revision-loop.md`: 2 blockers auto-dispatched to execute; executed in single pass; re-verified via scoped grep.
+
+### Commit
+- fix(106): review feedback -- 2 execute-fixes applied
