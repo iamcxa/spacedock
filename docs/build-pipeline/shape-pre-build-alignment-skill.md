@@ -411,6 +411,12 @@ Scope flag resolution: ⚠️ likely-decomposable triggered in brainstorm Step 5
   <acceptance_criteria>
     - Preflight checks 1-6 all pass (or failure recorded with exact file:line context)
     - Line anchors captured for Lens (a), build-clarify Step 2, README schema table
+    - `ls skills/ | grep -x build-shape; test $? -ne 0 && echo "absent: ok"` (build-shape skill dir absent)
+    - `ls agents/ | grep -E '^build-shape-(framer|story-gen|scope-drafter)\.md$'; test $? -ne 0 && echo "absent: ok"` (3 wrapper agents absent)
+    - `test -d smoke-tests && echo "smoke-tests: present" || echo "smoke-tests: missing -- task-1 will create"`
+    - `grep -n "Lens (a) -- captain-stated-intent" skills/build-brainstorm/SKILL.md` returns at least one line (anchor still present post-nuwa-distillation in-flight check)
+    - `grep -n "^## Step 2" skills/build-clarify/SKILL.md` returns the assumption-filter step anchor
+    - `grep -n "context_status" docs/build-pipeline/README.md` returns the schema-table row anchor
   </acceptance_criteria>
 
   <files_modified>
@@ -462,7 +468,7 @@ Scope flag resolution: ⚠️ likely-decomposable triggered in brainstorm Step 5
     - agents/researcher.md
     - agents/troop.md
     - agents/sharp-edges-reviewer.md
-    - skills/build-shape/SKILL.md (from Task 3 if parallel, else placeholder)
+    (Note: wrapper agents preload their target skill by name via the `skills:` frontmatter field — no need to read skills/build-shape/SKILL.md body here.)
   </read_first>
 
   <action>
@@ -504,7 +510,7 @@ Scope flag resolution: ⚠️ likely-decomposable triggered in brainstorm Step 5
   <read_first>
     - skills/build-clarify/SKILL.md (structural reference — captain-interactive 9-step flow)
     - skills/build/SKILL.md (frontmatter pattern)
-    - skills/build-shape/references/output-format.md (from Task 4 if parallel)
+    - skills/build-shape/references/output-format.md (produced by Task 4 in wave 1; format contract precedes SKILL.md authoring)
     - smoke-tests/build-shape-f1-large-ui.smoke.yaml
     - smoke-tests/build-shape-f4-small-escape-hatch.smoke.yaml
     - docs/build-pipeline/shape-pre-build-alignment-skill.md (Brainstorming Spec APPROACH)
@@ -547,10 +553,14 @@ Scope flag resolution: ⚠️ likely-decomposable triggered in brainstorm Step 5
 
   <files_modified>
     - skills/build-shape/SKILL.md
+    - smoke-tests/build-shape-f1-large-ui.smoke.yaml (TDD harness — authored in task-1, iterated RED→GREEN here; may receive minor assertion tuning during green-cycle but no schema changes)
+    - smoke-tests/build-shape-f2-large-runtime.smoke.yaml (same)
+    - smoke-tests/build-shape-f3-medium-workflow.smoke.yaml (same)
+    - smoke-tests/build-shape-f4-small-escape-hatch.smoke.yaml (same)
   </files_modified>
 </task>
 
-<task id="task-4" model="sonnet" wave="2">
+<task id="task-4" model="sonnet" wave="1">
   <read_first>
     - skills/build-clarify/references/output-format.md
     - skills/build-explore/references/gray-area-templates.md
@@ -632,7 +642,7 @@ Scope flag resolution: ⚠️ likely-decomposable triggered in brainstorm Step 5
   </files_modified>
 </task>
 
-<task id="task-6" model="sonnet" wave="3">
+<task id="task-6" model="sonnet" wave="3" blocked_by_external="brainstorm-nuwa-distillation must reach final/shipped status before this task may execute">
   <read_first>
     - skills/build-brainstorm/SKILL.md (Lens (a) prompt template at lines 43-62)
     - skills/build-shape/references/output-format.md (section spec)
@@ -641,7 +651,16 @@ Scope flag resolution: ⚠️ likely-decomposable triggered in brainstorm Step 5
   </read_first>
 
   <action>
-  REBASE-AWARE TASK. First re-read CONTRACTS.md line 187-194: if `brainstorm-nuwa-distillation` entity is `shipped` (not `in-flight`), proceed normally. If still `in-flight`, re-anchor Lens (a) template location via `grep -n "Lens (a) -- captain-stated-intent" skills/build-brainstorm/SKILL.md` and adjust line citations. If the template has been materially restructured beyond the "Input materials" line, ESCALATE to captain via feedback-to: captain — do not paper over.
+  HARD GATE — SERIALIZE AGAINST IN-FLIGHT CROSS-ENTITY CONFLICT.
+
+  Before executing any edits, FO MUST verify that the cross-entity `brainstorm-nuwa-distillation` entity has reached a terminal status (shipped / final / merged) on its three in-flight rows against `skills/build-brainstorm/SKILL.md` (CONTRACTS.md lines 211-213 at plan time). The conflict is structural: both entities modify the same file, and `in-flight + in-flight` on the same file is a hard merge conflict, not a soft rebase hazard.
+
+  Verification protocol (run at task-6 start, BEFORE the rebase-aware re-anchor below):
+    1. `grep -n "brainstorm-nuwa-distillation" docs/build-pipeline/_index/CONTRACTS.md` — inspect status column for all rows on `skills/build-brainstorm/SKILL.md`.
+    2. If ANY row still shows `in-flight` (or `plan` / `execute` / `quality` / `review` / `pr-draft` — any non-terminal), HALT this task. Do NOT extract to a sibling entity (captain directive: scope intact). Instead: FO pauses entity 103 execution, surfaces the gate to captain via a status update on the entity, and resumes only after `brainstorm-nuwa-distillation` reaches `shipped`. Other tasks in waves 0-2 and tasks 5/7 in wave 3 may proceed normally — only task-6 is gated.
+    3. When all rows are terminal, re-read `skills/build-brainstorm/SKILL.md` fresh (post-merge) and proceed.
+
+  REBASE-AWARE STEP (only after gate clears): re-anchor Lens (a) template location via `grep -n "Lens (a) -- captain-stated-intent" skills/build-brainstorm/SKILL.md` and adjust line citations. If the template has been materially restructured beyond the "Input materials" line, ESCALATE to captain via feedback-to: captain — do not paper over.
 
   Edit skills/build-brainstorm/SKILL.md Lens (a) prompt template (current ~line 48-62):
     1. In the "Input materials" line, extend from `directive text (verbatim), acceptance criteria from entity file (if present), CLAUDE.md path reference` to `directive text (verbatim), acceptance criteria from entity file (if present), shape sections from entity body (if present — ## Problem Statement / ## User Stories / ## Scope: In / ## Scope: Out / ## References), CLAUDE.md path reference`.
@@ -658,6 +677,7 @@ Scope flag resolution: ⚠️ likely-decomposable triggered in brainstorm Step 5
   </action>
 
   <acceptance_criteria>
+    - Pre-execute gate verified: `grep -n "brainstorm-nuwa-distillation" docs/build-pipeline/_index/CONTRACTS.md` shows ALL rows on `skills/build-brainstorm/SKILL.md` at terminal status (shipped/final). If any non-terminal row remains, task-6 is HALTED and not retried until the gate clears.
     - `grep "shape sections" skills/build-brainstorm/SKILL.md` finds the Lens (a) extension
     - `grep "Shape sections" skills/build-brainstorm/SKILL.md` finds the prompt-template body line
     - `grep "\\-\\-from" skills/build/SKILL.md` finds --from flag handling
@@ -807,7 +827,19 @@ None. All topics covered via inline research resolution (filesystem Read on cite
 
 ### Plan-checker verdict
 
-PASS (via inline self-review substitution — Agent dispatch unavailable from ensign subagent context). Iteration count: 1. No blockers surfaced. Non-blocking warnings captured as rebase hazards in Task 5 and Task 6 (brainstorm-nuwa-distillation in-flight on skills/build-brainstorm/SKILL.md). Knowledge capture: skipped — no findings met D1/D2 threshold; all learnings are entity-specific to 103's shape-skill integration and already captured in MEMORY.md as prior pattern entries.
+Iteration 1: PASS via inline self-review substitution. Iteration 2: plan-checker subagent surfaced 5 blockers (dependency_correctness x2, validation_sampling x2, cross_entity_coherence x1) — all resolved in this revision. See `### Revision Iteration 2` below for change log. Knowledge capture: skipped — no findings met D1/D2 threshold; all learnings are entity-specific to 103's shape-skill integration and already captured in MEMORY.md as prior pattern entries.
+
+### Revision Iteration 2
+
+Triggered by plan-checker dispatch (5 blockers). Changes applied:
+
+- [x] Blocker #1 (task-2 / dependency_correctness): Removed `skills/build-shape/SKILL.md` from task-2 read_first; added inline note that wrapper agents preload by name via `skills:` frontmatter. No intra-wave file-body dependency between task-2 and task-3 anymore.
+- [x] Blocker #2 (task-3 / dependency_correctness): Moved task-4 from wave 2 → wave 1. Format contract (`output-format.md`) now precedes SKILL.md authoring as a prerequisite in wave 1. task-3 read_first comment updated to reflect wave-1 source.
+- [x] Blocker #3 (task-0 / validation_sampling): Added 6 runnable command-form acceptance criteria to task-0 (ls/grep with absent-checks for build-shape dir, wrapper agents, smoke-tests dir; grep anchors for Lens (a), build-clarify Step 2, README context_status row).
+- [x] Blocker #4 (task-3 / validation_sampling): Added 4 forge fixture files to task-3 files_modified per fix_hint Option A; annotated each as "TDD harness — authored in task-1, iterated RED→GREEN here". Preserves test_first discipline visibility.
+- [x] Blocker #5 (task-6 / cross_entity_coherence): Applied option 1 (serialize). Added `blocked_by_external` attribute to task-6 plus a HARD GATE protocol at the top of the action block: pre-execute verification of all `brainstorm-nuwa-distillation` rows on `skills/build-brainstorm/SKILL.md` reaching terminal status. Other tasks remain unblocked. Sibling-entity extraction explicitly rejected per captain directive (scope intact). Added matching AC line documenting the gate check.
+
+Wave graph after revision: wave 0 (task-0) → wave 1 (task-1, task-4) → wave 2 (task-2, task-3) → wave 3 (task-5, task-6 [gated], task-7) → wave 4 (task-8). Task-6 is the single externally-gated task; FO pauses task-6 only if gate not clear, all other tasks proceed.
 
 ### workflow-index append
 
