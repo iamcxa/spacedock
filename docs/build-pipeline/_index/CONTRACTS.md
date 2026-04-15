@@ -900,6 +900,12 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | Collapsible repo grid Server Component (HTML details, no JS state) | 🔵 planned | 2026-04-13 |
 
+### spacebridge/ui/components/share-live-feed.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| share-view-ux-fixes | plan | B-3 CSS fix: replace truncate with line-clamp-2 on ShareLiveFeed detail | 🔵 planned | 2026-04-15 |
+
 ### spacebridge/ui/components/ui/badge.tsx
 
 | Entity | Stage | Intent | Status | Last Updated |
