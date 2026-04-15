@@ -62,7 +62,7 @@ You are asking for the FO/skill layer to stop waking you up for plan-defect clas
 
 - Given `skills/task-execution/SKILL.md` after this entity merges, when we grep for `Circular-AC rule`, then count ≥1 (how to verify: `grep -c 'Circular-AC rule' skills/task-execution/SKILL.md`)
 - Given `skills/build-plan/SKILL.md` or its references after merge, when we grep for both new dimension names, then total count ≥2 (how to verify: `grep -c 'stale-line-anchor\|circular-AC' skills/build-plan/SKILL.md skills/build-plan/references/*.md`)
-- Given `references/claude-first-officer-runtime.md` after merge, when we grep for the classifier name, then count ≥1 (how to verify: `grep -c 'benign.drift.classifier\|benign drift classifier' references/claude-first-officer-runtime.md`)
+- Given `skills/build-execute/SKILL.md` after merge, when we grep for the classifier name, then count ≥1 (how to verify: `grep -cE 'benign.drift.classifier|Benign-Drift Classifier' skills/build-execute/SKILL.md`)
 - Given `tests/pressure/` after merge, when we list plan-defect fixtures, then ≥3 files exist covering stale-anchor / circular-AC / rename (how to verify: `ls tests/pressure/ | grep -cE 'plan-defect|circular-ac|stale-anchor|rename' >= 3`)
 - Given a synthetic replay of entity 104's task-0 stale-anchor + task-5 circular-AC scenarios run against the patched skills, when we count captain-interrupt events emitted, then count = 0 (how to verify: dispatch troop against fixture; assert `scope_observation` entries in troop return + zero `captain_escalation` keyword; scripted in a pressure test)
 - Given the new classifier region in `skills/build-execute/SKILL.md` and new Dim 9/10 regions in `skills/build-plan/SKILL.md` after merge, when we grep for `Agent(` calls inside those new regions, then count = 0 (GUARDRAILS "zero Agent dispatches" contract; plan stage generates the exact grep command with line-range scoping)
@@ -473,7 +473,7 @@ Scale: Medium. 7 tasks in 3 waves. Wave 0 creates/extends pressure fixtures (inf
   - If (a) and (b) differ: the AC is circular — emit blocker with `fix_hint: "scope grep to a line range excluding the entity file's PLAN/UAT/task-definition blocks, or rewrite the AC to target a specific source file outside docs/build-pipeline/"`.
   - Severity: blocker when counts differ; silent when equal.
 
-  Also add to `skills/build-plan/SKILL.md` at the dimension-table (lines 490-499) two new rows:
+  Also add two new rows to the dimension-table in `skills/build-plan/SKILL.md`. Locate the insertion point semantically at execute time (do NOT rely on pre-computed line numbers — this entity is literally creating Dim 9 stale-line-anchor detection, so the plan itself must not use stale line anchors): use `grep -n "^### 8\. Type/Test Coverage" skills/build-plan/SKILL.md` to find the existing Dim 8 subsection header, then insert `### 9. Stale-Line-Anchor Detection` and `### 10. Circular-AC Detection` as new subsections immediately after the Dim 8 block, matching the existing Dim 8 structure. Then append the corresponding table rows in the dimension-table (find via `grep -n "^| 8 |" skills/build-plan/SKILL.md`):
   | 9 | Stale-Line-Anchor | Every `file:line` citation resolves to asserted content; auto-rewrite to content anchor when unambiguous |
   | 10 | Circular-AC | grep-count ACs are not self-referential against the entity's own PLAN/UAT blocks |
 
@@ -547,7 +547,9 @@ Scale: Medium. 7 tasks in 3 waves. Wave 0 creates/extends pressure fixtures (inf
   </read_first>
 
   <action>
-  End-to-end verification replay. Three parts:
+  Artifact-presence verification only. Functional replay via troop dispatch against fixtures (asserting `scope_observation` entries on BLOCKED returns, per Brainstorming Spec line 67) is UAT-stage responsibility — task-7 verifies artifact presence and contract guards, not runtime behavior. Additionally, append a `D-106-1` entry to `docs/build-pipeline/_index/DECISIONS.md` capturing the O-1 decision (benign-drift classifier inserts into `skills/build-execute/SKILL.md`, not `references/claude-first-officer-runtime.md`) with entity id, date `2026-04-15`, rationale (co-location with escalation ladder at build-execute/SKILL.md:216-224; FO runtime has no BLOCKED content), and scope (files affected: `skills/build-execute/SKILL.md`). If `docs/build-pipeline/_index/DECISIONS.md` does not exist, log this as a known-gap in the Stage Report and open follow-up — do not create the file inline.
+
+  Three parts:
 
   1. Confirm all three fixture files contain the new scenarios: grep counts match plan expectations (see ACs below).
   2. Run the full project test suite: `bun test`. Expect 0 failures.
@@ -570,7 +572,7 @@ Scale: Medium. 7 tasks in 3 waves. Wave 0 creates/extends pressure fixtures (inf
   </acceptance_criteria>
 
   <files_modified>
-    (none -- read-only verification)
+    - docs/build-pipeline/_index/DECISIONS.md (append-only; skip with known-gap note if file does not exist)
   </files_modified>
 </task>
 
@@ -634,6 +636,18 @@ workflow-index append: deferred to FO main context -- ensign subagent lacks reli
 ### Commits
 
 - chore(plan): plan-defect-autopilot 3-part package (A Circular-AC rule + B Dim 9/10 + C benign-drift classifier) with 7 tasks in 3 waves
+
+### Revision Iteration 2 (2026-04-15)
+
+Dual-haiku plan-checker verdict (FO-verified, iter 1): 1 real blocker + 3 real warnings. 2 false-positive blockers dismissed (061 depends-on — 061 archived 2026-04-15 per commit 5f85c28).
+
+Resolutions:
+- [x] Blocker #1 (Dim 1 Requirement Coverage): AC-3 (line 65) `references/claude-first-officer-runtime.md` → `skills/build-execute/SKILL.md` per O-1 clarify-lock. Validation Map row 602 already correct; spec AC body now consistent.
+- [x] Warning #2 (Dim 2 stale-line-anchor hypocrisy in task-5): replaced absolute `lines 490-499` with semantic `grep -n "^### 8\. Type/Test Coverage"` + `grep -n "^| 8 |"`. Plan no longer uses stale line anchors in the entity that creates Dim 9 stale-line-anchor detection.
+- [x] Warning #3 (Dim 6 task-7 no functional replay): added scope note — task-7 is artifact-presence only; functional replay deferred to UAT stage.
+- [x] Warning #4 (Dim 4 DECISIONS.md gap): added D-106-1 append to task-7 action + `docs/build-pipeline/_index/DECISIONS.md` in files_modified, with known-gap fallback.
+
+Auto-revision loop: per MEMORY `fo-auto-revision-loop.md` (2026-04-15), FO dispatched revision without captain gate. Ensign timed out after Edit step 4; FO completed iter 2 subsection inline.
 
 ## Stage Report: clarify
 
