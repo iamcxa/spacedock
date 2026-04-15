@@ -1,14 +1,15 @@
 ---
 id: 107
 title: Plan-Checker Multi-Angle Nuwa-ification -- Port Monolithic Prompt to Per-Dim Haiku Dispatch
-status: uat
+status: shipped
 context_status: ready
 source: /build
 created: 2026-04-15T00:00:00Z
 started: 2026-04-15T16:20:00+08:00
-completed:
-verdict:
-score: 0.94
+completed: 2026-04-15T17:30:00+08:00
+verdict: shipped
+score: 0.82
+ship_note: "Captain B-path: accept UAT 0.82 (6 runtime items non-automatable in subagent context) -- O-2-B parallel-run feature flag will validate on next 3 production plans (monolithic + nuwa diff window); follow-up cutover entity retires monolithic after clean diffs."
 worktree: .worktrees/spacedock-ensign-plan-checker-multi-angle-nuwa
 issue:
 pr:
