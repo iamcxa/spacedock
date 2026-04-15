@@ -380,3 +380,647 @@ Parent: 099 (099b is child of 099)
 - [x] Captain architectural clarification captured: O-1 reframed from "direct SQLite vs daemon RPC" to aggregate-level CQRS boundary; fmodel usage map + CQRS reality documented for future audits
 - [x] Sufficiency gate: PASS
   099 scope is concrete (9 deliverables itemized); plan stage can proceed.
+
+## Research Findings
+
+### Upstream Constraints
+
+- **Clarify lock: chat+gate aggregates are daemon-side CQRS** -- captain's fmodel challenge (clarify §Captain Architectural Clarification) reframed O-1; comments remain UI-side (054 shipped), but chat + gate execute in daemon process with session routing + synchronous ack. Plan MUST NOT fall back to 054's direct-UI pattern for chat/gate (docs/build-pipeline/spacebridge-channel-bridge-bidirectional.md §Clarify Annotations). [primary]
+- **Clarify lock: session routing = project-root scoped, most-recent-heartbeat wins** -- O-2 recommendation (a) selected unchanged; uses sessions.lastHeartbeat column from 057 (spacebridge/src/schema.ts:11-22). [primary]
+- **Clarify lock: keep 500ms SSE polling** -- O-3 recommendation (a); no activation of event-push/action-push IPC for UI→browser channel. action-push IS used for daemon→shim unsolicited delivery (chat/gate ack to CC session). [primary]
+- **LCD schema discipline** (spacebridge/src/schema.ts:1-6) -- new chat/gate tables must: text strings, integer PKs with autoincrement, epoch-ms integer timestamps, no JSON for queryable data, no RETURNING. [primary]
+- **CQRS domain layout convention** (spacebridge/src/domain/comment/) -- each aggregate = types.ts + decider.ts + evolve.ts + errors.ts + schemas.ts + persistence.ts + matching .test.ts; decider is pure (no I/O); persistence is the only file allowed to import from schema/db. [primary]
+- **Decomposition: 099b defers all 6 MCP tool handlers** -- Q-2 captain answer. 099 ships infrastructure + chat/gate only; MCP tool parity is a separate child entity.
+
+### Existing Patterns
+
+- **UI-side CQRS pattern** (spacebridge/ui/app/api/entities/[slug]/comments/route.ts:71-169) -- Route Handler dynamic-imports domain modules via relative path `../../../../../../src/domain/comment/*`, calls createDb(defaultDbPath()), runs load→replay→decide→appendEvents→upsertSnapshot, then inserts notification row into events table for SSE fan-out. This is NOT the pattern 099 uses for chat/gate; documented for contrast.
+- **Comment decider template** (spacebridge/src/domain/comment/decider.ts:13-100) -- pure fn switch(cmd.type), throws typed errors, returns Event[]. 099 mirrors this shape for chat + gate. [primary]
+- **Comment schemas + parseCommand helper** (spacebridge/src/domain/comment/schemas.ts:5-111) -- Zod discriminatedUnion("type") + .passthrough(); parseCommand/parseEvent exported. 099's chat/gate schemas follow this verbatim. [primary]
+- **Comment persistence pattern** (spacebridge/src/domain/comment/persistence.ts:10-48) -- appendEvents(db, aggregateId, events, seqStart) + loadEvents + countEvents sequence. 099 replicates per aggregate. [primary]
+- **Daemon RPC dispatch (current)** (spacebridge/bin/daemon.ts:106-178) -- flat `if (req.method === "__status")...if (req.method === "share_create")` chain with 4 shipped methods + default `RPC method {x} not implemented in daemon stub`. 099 refactors to `Map<string, Handler>` pattern per A-7 and adds 2 new handlers (captain_chat, gate_decide). [primary]
+- **Socket server pushToSession** (spacebridge/src/ipc/socket-server.ts:176-181) -- `pushToSession(sessionId, msg): boolean` already implemented; writes encoded frame, returns false if socket dead. 099 invokes this from daemon RPC handler after successful decide/append, with msg.type === "action-push". [primary]
+- **Shim-side push handler** (spacebridge/src/ipc/socket-client.ts:121-125) -- `if (msg.type === "event-push" || msg.type === "action-push") opts.onPush?.(msg)` already wired. 099 supplies an onPush handler in the MCP shim that converts action-push into MCP server-initiated notification. [primary]
+- **Session registry interface** (spacebridge/src/domain/session/registry.ts:21-32) -- exposes getState / getActiveProjectRoots / discoverActiveWorkflows. 099 adds `getActiveSessionByProjectRoot(root): string | null` to this interface, reading state.sessions Map entries and selecting the one with max lastHeartbeat whose projectRoot matches. [primary]
+
+### Library/API Surface
+
+- **MCP SDK package** (`@modelcontextprotocol/sdk`) -- already used in tools/dashboard/src/channel.ts:1-6 as `import { Server } from "@modelcontextprotocol/sdk/server/index.js"` + `import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"` + `import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js"`. NOT currently in spacebridge/package.json dependencies (checked: only drizzle-orm + zod). 099 Task 1 MUST add dependency + pin to a version matching tools/dashboard's lockfile to avoid protocol skew. Transport instantiation: `const transport = new StdioServerTransport()` + `await server.connect(transport)` (tools/dashboard/src/channel.ts:615). [primary]
+- **MCP low-level handler API** -- tools/dashboard uses `server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [...] }))` + `server.setRequestHandler(CallToolRequestSchema, async (req) => {...})`. 099 follows the same shape in bin/cli.ts. [primary]
+- **Drizzle ORM SQLite insert semantics** (spacebridge/src/domain/comment/persistence.ts:17-25) -- `await db.insert(commentEvents).values({...})`; no RETURNING, no ON CONFLICT; sequenceNumber computed by caller via countEvents+1.
+
+### Known Gotchas
+
+- **bin/cli.ts mcp stub `await new Promise(() => {})`** (spacebridge/bin/cli.ts:74) -- replaced by proper stdio transport loop. If MCP server connection fails, the process must still keep stdin open (CC stdio transport requirement). [primary]
+- **autoForkDaemon must precede MCP registration** (spacebridge/bin/cli.ts:61-67) -- ordering: daemon fork → socket-client connect → MCP server register tools → connect stdio transport. [primary]
+- **session_id mismatch in heartbeat** (spacebridge/src/ipc/socket-server.ts:68-75) -- heartbeat includes sessionId in payload; server logs warning and ignores if mismatched. MCP shim must send heartbeat.sessionId consistent with register.sessionId. Existing socket-client handles correctly. [primary]
+- **UI Route Handler socket-client bootstrap** -- entity 054's UI-side CQRS uses dynamic `await import("../../../../../../src/db")`. For 099, Route Handler dynamically imports socket-client + opens a new SocketClient per request (stateless Route Handler; no pooling in v1). Trade-off: connection-per-request is slow (~10ms) but matches Next.js Route Handler isolation. Pool optimization deferred post-060. [primary]
+- **var hoisting in closure-heavy handlers** (MEMORY 2026-04-09) -- daemon-side chat/gate handlers use `const`/`let` exclusively.
+- **A-4 action-push has zero production publishers today** -- 099 is the first production caller. Existing tests cover `pushToSession` correctness but not steady-state usage. Task 11 integration test covers the full UI→daemon→shim round-trip.
+
+### Reference Examples
+
+- **tools/dashboard/src/channel.ts:1-6** -- MCP SDK import shape (copy into spacebridge/bin/cli.ts).
+- **tools/dashboard/src/channel.ts:615** -- `const transport = new StdioServerTransport(); await server.connect(transport);`.
+- **spacebridge/ui/app/api/entities/[slug]/comments/route.ts:71-169** -- POST Route Handler reference; 099 mirrors top half (parse, validate), diverges to socket-client RPC instead of direct-DB.
+- **spacebridge/src/domain/comment/** -- entire folder is the template 099 clones structurally for `chat` and `gate` aggregates.
+- **spacebridge/bin/daemon.ts:119-151** -- share_create RPC handler shape; 099's captain_chat + gate_decide handlers follow same shape with decide/appendEvents replacing tokenManager calls.
+
+## PLAN
+
+<task id="task-0" model="sonnet" wave="0" skills="" test_first="false">
+  <read_first>
+    - spacebridge/bin/cli.ts
+    - spacebridge/bin/daemon.ts
+    - spacebridge/src/ipc/socket-server.ts
+    - spacebridge/src/ipc/socket-client.ts
+    - spacebridge/src/ipc/types.ts
+    - spacebridge/src/domain/session/registry.ts
+    - spacebridge/src/domain/comment/persistence.ts
+    - spacebridge/src/domain/comment/schemas.ts
+    - spacebridge/src/schema.ts
+    - spacebridge/ui/app/api/entities/[slug]/comments/route.ts
+    - spacebridge/package.json
+    - tools/dashboard/src/channel.ts
+  </read_first>
+
+  <action>
+  Environment verification (per plan-write-discipline MEMORY). Run each check; abort plan if any fails:
+  1. `grep -q "await new Promise<void>(() => {})" spacebridge/bin/cli.ts` -- confirms mcp stub still present.
+  2. `grep -q 'not implemented in daemon stub' spacebridge/bin/daemon.ts` -- confirms flat if-chain default branch present.
+  3. `test ! -d spacebridge/src/domain/chat && test ! -d spacebridge/src/domain/gate` -- confirms chat/gate aggregates absent.
+  4. `! grep -q "getActiveSessionByProjectRoot" spacebridge/src/domain/session/registry.ts` -- confirms target method absent.
+  5. `test ! -f 'spacebridge/ui/app/api/entities/[slug]/chat/route.ts' && test ! -f 'spacebridge/ui/app/api/entities/[slug]/gate/route.ts'` -- confirms new Route Handlers absent.
+  6. `test ! -f spacebridge/ui/components/chat-input.tsx && test ! -f spacebridge/ui/components/gate-buttons.tsx` -- confirms components absent.
+  7. `! grep -q '@modelcontextprotocol/sdk' spacebridge/package.json` -- expects SDK NOT yet a dep.
+  8. `grep -q 'import { Server } from "@modelcontextprotocol/sdk/server/index.js"' tools/dashboard/src/channel.ts` -- confirms template intact.
+  9. `test -f spacebridge/src/domain/comment/decider.ts && test -f spacebridge/src/domain/comment/persistence.ts` -- confirms template intact.
+  10. `grep -cE 'sessionEvents|leaseEvents|commentEvents' spacebridge/src/schema.ts` -- expects ≥3 matches.
+
+  If any check fails, STOP and return feedback-to: captain.
+  </action>
+
+  <acceptance_criteria>
+    - All 10 checks pass (each echoed)
+    - No source file modified by this task
+  </acceptance_criteria>
+
+  <files_modified>
+    - (none — read-only verification)
+  </files_modified>
+</task>
+
+<task id="task-1" model="haiku" wave="0" skills="" test_first="false">
+  <read_first>
+    - spacebridge/package.json
+    - tools/dashboard/package.json
+  </read_first>
+
+  <action>
+  Add `@modelcontextprotocol/sdk` to spacebridge/package.json dependencies. Version: string-match the exact pin in tools/dashboard/package.json (avoid protocol skew). Run `bun install` in the repo root to regenerate bun.lock. No code changes.
+  </action>
+
+  <acceptance_criteria>
+    - `grep -q '"@modelcontextprotocol/sdk"' spacebridge/package.json` exits 0
+    - Version pin in spacebridge/package.json matches tools/dashboard/package.json
+    - `bun install` completes without error
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/package.json
+    - bun.lock
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="0" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - spacebridge/src/schema.ts
+    - spacebridge/src/domain/comment/persistence.ts
+  </read_first>
+
+  <action>
+  Extend spacebridge/src/schema.ts with two event-log tables mirroring `commentEvents` / `sessionEvents` verbatim:
+
+  ```typescript
+  // ─── chat_events — [full CQRS] daemon-side chat aggregate ──
+  export const chatEvents = sqliteTable("chat_events", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    aggregateId: text("aggregate_id").notNull(), // targetSessionId
+    sequenceNumber: integer("sequence_number").notNull(),
+    eventType: text("event_type").notNull(), // captain_message_sent | captain_message_delivered
+    payload: text("payload").notNull(),
+    timestamp: integer("timestamp").notNull(),
+  });
+
+  // ─── gate_events — [full CQRS] daemon-side gate aggregate ──
+  export const gateEvents = sqliteTable("gate_events", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    aggregateId: text("aggregate_id").notNull(), // "${entitySlug}::${stage}"
+    sequenceNumber: integer("sequence_number").notNull(),
+    eventType: text("event_type").notNull(), // gate_approved | gate_rejected
+    payload: text("payload").notNull(),
+    timestamp: integer("timestamp").notNull(),
+  });
+  ```
+
+  Write `tests/spacebridge/schema-chat-gate.test.ts` (Wave 0 infrastructure test): asserts `chatEvents` + `gateEvents` exports exist, column set matches spec, `createDb` + insert dry-run succeeds.
+  </action>
+
+  <acceptance_criteria>
+    - `bun test tests/spacebridge/schema-chat-gate.test.ts` passes
+    - `grep -q 'export const chatEvents' spacebridge/src/schema.ts` exits 0
+    - `grep -q 'export const gateEvents' spacebridge/src/schema.ts` exits 0
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/src/schema.ts
+    - tests/spacebridge/schema-chat-gate.test.ts
+  </files_modified>
+</task>
+
+<task id="task-3" model="sonnet" wave="1" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - spacebridge/src/domain/comment/types.ts
+    - spacebridge/src/domain/comment/decider.ts
+    - spacebridge/src/domain/comment/evolve.ts
+    - spacebridge/src/domain/comment/schemas.ts
+    - spacebridge/src/domain/comment/persistence.ts
+    - spacebridge/src/domain/comment/errors.ts
+    - spacebridge/src/schema.ts
+  </read_first>
+
+  <action>
+  Create `spacebridge/src/domain/chat/` aggregate, mirroring comment aggregate structurally:
+
+  1. `types.ts` — `ChatCommand = { type: "send_captain_message"; messageId: string; targetSessionId: string; projectRoot: string; content: string; sentAt: number }`; `ChatEvent = { type: "captain_message_sent"; messageId; targetSessionId; projectRoot; content; sentAt }` | `{ type: "captain_message_delivered"; messageId; deliveredAt }`; `ChatState = Map<messageId, { messageId; targetSessionId; content; sentAt; deliveredAt: number | null }>`.
+  2. `errors.ts` — `DuplicateMessageId`.
+  3. `decider.ts` — pure `decide(cmd, state, now): ChatEvent[]`. `send_captain_message`: if state.has(messageId) throw DuplicateMessageId; return `[captain_message_sent]`. Session existence is NOT checked in decider (handler responsibility).
+  4. `evolve.ts` — `evolve(state, event): ChatState` + `replay(events)`.
+  5. `schemas.ts` — Zod `ChatCommandSchema` / `ChatEventSchema` via discriminatedUnion + `.passthrough()` + `parseCommand`/`parseEvent` helpers.
+  6. `persistence.ts` — `appendEvents(db, aggregateId, events, seqStart)` + `loadEvents` + `countEvents`; aggregateId = `targetSessionId`; table = `chatEvents`.
+
+  Tests: `decider.test.ts` (happy + duplicate), `evolve.test.ts`, `schemas.test.ts` (malformed rejection), `persistence.test.ts` (round-trip + multi-event).
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/src/domain/chat/` passes
+    - `ls spacebridge/src/domain/chat/ | grep -cE "^(types|decider|evolve|errors|schemas|persistence)\.ts$"` outputs 6
+    - `! grep -E "from.*\"(\\.\\./)+(schema|db)\"" spacebridge/src/domain/chat/decider.ts` (decider is pure — zero schema/db imports)
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/src/domain/chat/types.ts
+    - spacebridge/src/domain/chat/decider.ts
+    - spacebridge/src/domain/chat/evolve.ts
+    - spacebridge/src/domain/chat/errors.ts
+    - spacebridge/src/domain/chat/schemas.ts
+    - spacebridge/src/domain/chat/persistence.ts
+    - spacebridge/src/domain/chat/decider.test.ts
+    - spacebridge/src/domain/chat/evolve.test.ts
+    - spacebridge/src/domain/chat/schemas.test.ts
+    - spacebridge/src/domain/chat/persistence.test.ts
+  </files_modified>
+</task>
+
+<task id="task-4" model="sonnet" wave="1" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - spacebridge/src/domain/comment/types.ts
+    - spacebridge/src/domain/comment/decider.ts
+    - spacebridge/src/domain/comment/evolve.ts
+    - spacebridge/src/domain/comment/schemas.ts
+    - spacebridge/src/domain/comment/persistence.ts
+    - spacebridge/src/schema.ts
+  </read_first>
+
+  <action>
+  Create `spacebridge/src/domain/gate/` aggregate, same structural shape as chat:
+
+  1. `types.ts` — `GateCommand = { type: "approve_gate" | "reject_gate"; entitySlug: string; stage: string; decidedBy: string; reason?: string }`; `GateEvent = { type: "gate_approved"; entitySlug; stage; decidedBy; decidedAt }` | `{ type: "gate_rejected"; entitySlug; stage; decidedBy; reason; decidedAt }`; `GateState = Map<"${entitySlug}::${stage}", { decision: "approved" | "rejected"; decidedAt; decidedBy; reason: string | null }>`.
+  2. `errors.ts` — `GateAlreadyDecided`.
+  3. `decider.ts` — pure; throws `GateAlreadyDecided` if `${entitySlug}::${stage}` already in state.
+  4. `evolve.ts` — `evolve` + `replay`.
+  5. `schemas.ts` — discriminatedUnion + helpers.
+  6. `persistence.ts` — aggregateId = `"${entitySlug}::${stage}"`, table = `gateEvents`.
+
+  Tests mirror chat aggregate tests.
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/src/domain/gate/` passes
+    - `ls spacebridge/src/domain/gate/ | grep -cE "^(types|decider|evolve|errors|schemas|persistence)\.ts$"` outputs 6
+    - Decider has zero schema/db imports
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/src/domain/gate/types.ts
+    - spacebridge/src/domain/gate/decider.ts
+    - spacebridge/src/domain/gate/evolve.ts
+    - spacebridge/src/domain/gate/errors.ts
+    - spacebridge/src/domain/gate/schemas.ts
+    - spacebridge/src/domain/gate/persistence.ts
+    - spacebridge/src/domain/gate/decider.test.ts
+    - spacebridge/src/domain/gate/evolve.test.ts
+    - spacebridge/src/domain/gate/schemas.test.ts
+    - spacebridge/src/domain/gate/persistence.test.ts
+  </files_modified>
+</task>
+
+<task id="task-5" model="sonnet" wave="1" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - spacebridge/src/domain/session/registry.ts
+    - spacebridge/src/domain/session/types.ts
+    - spacebridge/src/domain/session/evolve.ts
+  </read_first>
+
+  <action>
+  Extend `SessionRegistry` interface at spacebridge/src/domain/session/registry.ts with a synchronous method:
+
+  ```typescript
+  getActiveSessionByProjectRoot(projectRoot: string): string | null;
+  ```
+
+  Impl: iterate `state.sessions.values()`, filter `record.projectRoot === projectRoot && record.status === "connected"`, return sessionId of max `lastHeartbeat`, or null.
+
+  Tests at `spacebridge/src/domain/session/registry-active.test.ts`: null when empty; sole session returned; most-recent wins; disconnected ignored; exact string match (no prefix).
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/src/domain/session/registry-active.test.ts` passes
+    - `grep -q "getActiveSessionByProjectRoot" spacebridge/src/domain/session/registry.ts` exits 0
+    - All existing registry tests still pass: `bun test spacebridge/src/domain/session/`
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/src/domain/session/registry.ts
+    - spacebridge/src/domain/session/registry-active.test.ts
+  </files_modified>
+</task>
+
+<task id="task-6" model="sonnet" wave="2" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - spacebridge/bin/daemon.ts
+    - spacebridge/src/ipc/socket-server.ts
+    - spacebridge/src/ipc/types.ts
+    - spacebridge/src/domain/chat/decider.ts
+    - spacebridge/src/domain/chat/persistence.ts
+    - spacebridge/src/domain/chat/schemas.ts
+    - spacebridge/src/domain/chat/evolve.ts
+    - spacebridge/src/domain/gate/decider.ts
+    - spacebridge/src/domain/gate/persistence.ts
+    - spacebridge/src/domain/gate/schemas.ts
+    - spacebridge/src/domain/gate/evolve.ts
+    - spacebridge/src/domain/session/registry.ts
+  </read_first>
+
+  <action>
+  Refactor `spacebridge/bin/daemon.ts:106-178` (`onRpcRequest` if-chain) to a handler registry AND wire 2 new handlers:
+
+  1. Introduce `type RpcHandler = (args: unknown[], ctx: RpcCtx) => Promise<RpcResponsePayload>;` with `RpcCtx = { db, sessionRegistry, socketServer, tokenManager, tunnelControl }` (tunnelControl captures the existing tunnelProvider/tunnelUrl closure mutators).
+  2. `const rpcHandlers = new Map<string, RpcHandler>()`. Extract existing `__status`, `share_create`, `share_revoke`, `share_list` into named handler fns; populate map. Preserve all existing behavior verbatim.
+  3. Add `captain_chat` handler: `parseCommand(args[0])` from chat/schemas → `sessionRegistry.getActiveSessionByProjectRoot(cmd.projectRoot)` → if null return `{ error: "No active CC session for project root" }` → `loadEvents` + `replay` → `decide` → `appendEvents` → `socketServer.pushToSession(targetSessionId, { id: randomUUID(), type: "action-push", payload: { action: "captain_chat", messageId: cmd.messageId, content: cmd.content, sentAt: cmd.sentAt } })` → return `{ result: { messageId, delivered: <pushToSession boolean> } }`.
+  4. Add `gate_decide` handler: parseCommand → decide (throws GateAlreadyDecided propagates as rpc-response error) → appendEvents → lookup active session → pushToSession with `action: "gate_decided"` → insert notification row into `events` table (for SSE feed) → return `{ result: { decision: "approved"|"rejected", decidedAt } }`.
+  5. Replace if-chain with `const handler = rpcHandlers.get(req.method); if (!handler) return { error: \`RPC method ${req.method} not implemented in daemon stub\` }; return handler(req.args as unknown[], ctx);`
+  6. Wire `sessionRegistry = await createSessionRegistry({ db })` in cmdStart; the existing `sessions` Map stays as socket-server book-keeping (socket closeness) but authoritative session lookup goes through sessionRegistry.
+
+  Integration test `spacebridge/bin/daemon-rpc-chat-gate.test.ts`:
+  - boot daemon (SPACEBRIDGE_SKIP_UI=1, test state dir)
+  - register a fake shim session via SocketClient; send heartbeat
+  - rpc captain_chat; assert delivered:true + action-push frame received by test shim
+  - rpc captain_chat with wrong projectRoot; assert error "No active CC session"
+  - rpc gate_decide; assert decision in response + row in `gate_events` + notification row in `events`
+  - rpc gate_decide twice; assert GateAlreadyDecided on 2nd
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/bin/daemon-rpc-chat-gate.test.ts` passes
+    - `grep -q "rpcHandlers.get(req.method)" spacebridge/bin/daemon.ts` exits 0
+    - `grep -qE 'rpcHandlers.set\("captain_chat"' spacebridge/bin/daemon.ts` exits 0
+    - `grep -qE 'rpcHandlers.set\("gate_decide"' spacebridge/bin/daemon.ts` exits 0
+    - All existing daemon tests still pass
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/bin/daemon.ts
+    - spacebridge/bin/daemon-rpc-chat-gate.test.ts
+  </files_modified>
+</task>
+
+<task id="task-7" model="sonnet" wave="2" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - spacebridge/bin/cli.ts
+    - tools/dashboard/src/channel.ts
+    - spacebridge/src/ipc/socket-client.ts
+    - spacebridge/src/ipc/types.ts
+    - spacebridge/src/daemon/auto-fork.ts
+  </read_first>
+
+  <action>
+  Replace the stub body in `spacebridge/bin/cli.ts:54-74` (mcp subcommand) with full MCP stdio bridge. Keep `autoForkDaemon` call intact. After daemon fork:
+
+  1. Create SocketClient: `const client = createSocketClient({ socketPath, sessionId: randomUUID(), projectRoot: process.cwd(), pid: process.pid, onPush: handleActionPush, reconnect: { maxRetries: 5 } }); await client.connect();`
+  2. Create MCP `Server` per tools/dashboard/src/channel.ts:1-6 pattern. Register `ListToolsRequestSchema` handler returning empty tools array (099 does NOT register the 6 MCP tools — 099b's scope). Register `CallToolRequestSchema` handler rejecting any call with "Tool not implemented in 099 scope — see 099b".
+  3. `handleActionPush(msg)` closure: dispatch by `msg.payload.action`:
+     - `captain_chat` → `server.notification({ method: "notifications/spacebridge/captain_message", params: msg.payload })`
+     - `gate_decided` → `server.notification({ method: "notifications/spacebridge/gate_decided", params: msg.payload })`
+  4. `const transport = new StdioServerTransport(); await server.connect(transport);`
+  5. Graceful shutdown: SIGTERM → `client.close()` → `server.close()` → exit(0).
+
+  Test `spacebridge/bin/cli-mcp.test.ts` (integration, spawns subprocess):
+  - spawn `bun run bin/cli.ts mcp` with SPACEBRIDGE_SKIP_UI=1 + test socket path; wait for daemon-ready stderr
+  - send MCP `initialize` JSON-RPC to stdin; assert valid initialize response on stdout within 2s
+  - from a separate test daemon handle, `pushToSession(sessionId, { type: "action-push", payload: { action: "captain_chat", messageId: "m1", content: "hi", sentAt: Date.now() } })`; assert `notifications/spacebridge/captain_message` appears on stdout
+  - kill process with SIGTERM; assert exit code 0
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/bin/cli-mcp.test.ts` passes
+    - `grep -q "StdioServerTransport" spacebridge/bin/cli.ts` exits 0
+    - `grep -q "notifications/spacebridge/captain_message" spacebridge/bin/cli.ts` exits 0
+    - `grep -q "notifications/spacebridge/gate_decided" spacebridge/bin/cli.ts` exits 0
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/bin/cli.ts
+    - spacebridge/bin/cli-mcp.test.ts
+  </files_modified>
+</task>
+
+<task id="task-8" model="sonnet" wave="3" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - spacebridge/ui/app/api/entities/[slug]/comments/route.ts
+    - spacebridge/src/ipc/socket-client.ts
+    - spacebridge/src/domain/chat/schemas.ts
+  </read_first>
+
+  <action>
+  Create `spacebridge/ui/app/api/entities/[slug]/chat/route.ts` with POST handler:
+
+  1. `export const dynamic = "force-dynamic"` + slug regex guard (reuse 054's `SLUG_RE`).
+  2. Parse JSON body `{ content: string }`; derive `projectRoot` from env `SPACEBRIDGE_PROJECT_ROOT` (fallback `process.cwd()`); generate `messageId` via `randomUUID()`; `sentAt = Date.now()`; `targetSessionId` placeholder (empty string) — daemon resolves via projectRoot.
+  3. Validate full command via `parseCommand` from chat/schemas.
+  4. Dynamically `await import("../../../../../../src/ipc/socket-client")` and `await import("node:crypto")`. Resolve `socketPath = ${SPACEBRIDGE_STATE_DIR || ~/.spacedock}/spacebridge.sock`.
+  5. Open per-request SocketClient (sessionId = `ui-route-${randomUUID()}`, projectRoot = captured above, pid = process.pid, no onPush). `await client.connect()`. `await client.request({ id, type: "rpc-request", payload: { method: "captain_chat", args: [command] } })`. `client.close()`.
+  6. Return `Response.json({ messageId, delivered: <from rpc-response> }, { status: 200 })`. On daemon-unreachable (connect error), return 502 with `{ error: "daemon unreachable" }`.
+
+  Test `spacebridge/ui/app/api/entities/[slug]/chat/route.test.ts`:
+  - happy path with mock daemon socket-server returning result:{delivered:true}; assert 200 + body
+  - daemon unreachable (no socket file); assert 502
+  - malformed JSON body; assert 400
+  - invalid slug; assert 400
+  </action>
+
+  <acceptance_criteria>
+    - `bun test 'spacebridge/ui/app/api/entities/[slug]/chat/route.test.ts'` passes
+    - `test -f 'spacebridge/ui/app/api/entities/[slug]/chat/route.ts'` true
+    - `grep -qE 'await import\(.*socket-client' 'spacebridge/ui/app/api/entities/[slug]/chat/route.ts'` exits 0
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/app/api/entities/[slug]/chat/route.ts
+    - spacebridge/ui/app/api/entities/[slug]/chat/route.test.ts
+  </files_modified>
+</task>
+
+<task id="task-9" model="sonnet" wave="3" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - spacebridge/ui/app/api/entities/[slug]/chat/route.ts
+    - spacebridge/src/domain/gate/schemas.ts
+  </read_first>
+
+  <action>
+  Create `spacebridge/ui/app/api/entities/[slug]/gate/route.ts` POST handler mirroring chat/route.ts structure. Body: `{ decision: "approve" | "reject"; stage: string; reason?: string }`. Builds `GateCommand` with `type: decision === "approve" ? "approve_gate" : "reject_gate"`, `entitySlug: slug`, `decidedBy: "captain"`, optional `reason`. Sends `{ method: "gate_decide", args: [command] }`. Returns 200 `{ decision, decidedAt }` OR 502 on daemon unreachable OR on GateAlreadyDecided (daemon returns `{ error }` on 2nd decide — preserve the error message verbatim in 502 body).
+
+  Test `spacebridge/ui/app/api/entities/[slug]/gate/route.test.ts`: happy approve + happy reject + GateAlreadyDecided → 502 + daemon unreachable → 502 + malformed body → 400.
+  </action>
+
+  <acceptance_criteria>
+    - `bun test 'spacebridge/ui/app/api/entities/[slug]/gate/route.test.ts'` passes
+    - `test -f 'spacebridge/ui/app/api/entities/[slug]/gate/route.ts'` true
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/app/api/entities/[slug]/gate/route.ts
+    - spacebridge/ui/app/api/entities/[slug]/gate/route.test.ts
+  </files_modified>
+</task>
+
+<task id="task-10" model="haiku" wave="3" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - spacebridge/ui/components/add-comment-form.tsx
+    - spacebridge/ui/components/reply-form.tsx
+    - spacebridge/ui/components/entity-body.tsx
+  </read_first>
+
+  <action>
+  Create two client components (`"use client"`):
+
+  1. `spacebridge/ui/components/chat-input.tsx` — textarea + Send button. On submit, `fetch("/api/entities/${slug}/chat", { method: "POST", body: JSON.stringify({ content }) })`. Show sending state; on response, render `delivered: true` as green "✓ delivered" OR `delivered: false` as yellow "⚠ CC session offline". Network error: red banner.
+  2. `spacebridge/ui/components/gate-buttons.tsx` — two buttons Approve / Reject. Reject opens a textarea for reason. POSTs to `/api/entities/${slug}/gate`. Disable buttons while in-flight; show result banner on success or error.
+
+  Mount on `spacebridge/ui/components/entity-body.tsx`:
+  - chat-input in a new "Chat" section (below existing comment panel)
+  - gate-buttons conditionally rendered when frontmatter `status` is `plan` or `uat` AND `auto_advance !== true` (reads entity frontmatter already passed as props — extend props if needed)
+
+  Smoke tests at `spacebridge/ui/components/chat-input.test.tsx` + `gate-buttons.test.tsx`: render, fill textarea, click button, assert mocked fetch called with correct URL + body.
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/ui/components/chat-input.test.tsx spacebridge/ui/components/gate-buttons.test.tsx` passes
+    - `test -f spacebridge/ui/components/chat-input.tsx && test -f spacebridge/ui/components/gate-buttons.tsx` true
+    - `grep -qE "chat-input|ChatInput" spacebridge/ui/components/entity-body.tsx` exits 0
+    - `grep -qE "gate-buttons|GateButtons" spacebridge/ui/components/entity-body.tsx` exits 0
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/components/chat-input.tsx
+    - spacebridge/ui/components/gate-buttons.tsx
+    - spacebridge/ui/components/chat-input.test.tsx
+    - spacebridge/ui/components/gate-buttons.test.tsx
+    - spacebridge/ui/components/entity-body.tsx
+  </files_modified>
+</task>
+
+<task id="task-11" model="sonnet" wave="4" skills="superpowers:test-driven-development" test_first="true">
+  <read_first>
+    - spacebridge/bin/daemon.ts
+    - spacebridge/bin/cli.ts
+    - spacebridge/src/ipc/socket-server.ts
+    - spacebridge/src/ipc/socket-client.ts
+  </read_first>
+
+  <action>
+  End-to-end integration test `spacebridge/tests/integration/captain-chat-and-gate.integration.test.ts`:
+
+  1. Boot daemon with SPACEBRIDGE_SKIP_UI=1 + isolated state dir.
+  2. Spawn MCP shim (`bun run bin/cli.ts mcp`) as child process with piped stdio; wait for "daemon ready" stderr.
+  3. Invoke chat Route Handler POST fn directly (import `../../ui/app/api/entities/[slug]/chat/route` and call POST with a mocked NextRequest). Real sockets connect to the test daemon.
+  4. Assert MCP shim stdout emits `notifications/spacebridge/captain_message` within 2s (AC-1 latency).
+  5. Invoke gate Route Handler POST fn; assert `notifications/spacebridge/gate_decided` on stdout.
+  6. Verify AC-4 reconnect path: send 3 chat messages while shim is alive; kill shim; restart shim; assert `getChannelMessagesSince` (existing RPC on channel-provider-bridge) returns the expected events from `chat_events` table OR — if channel-provider-bridge's existing event-source is distinct from chat_events — directly query chat_events via daemon's DB-backed reconnect path and assert 3 rows recoverable.
+
+  Note: test may require a bridge table between chat_events and the existing events-log that `getChannelMessagesSince` reads. If so, Task 6's daemon changes write a mirror row to the `events` table (already done for gate per Task 6 step 4) — do the same for chat to unify the reconnect replay path.
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/tests/integration/captain-chat-and-gate.integration.test.ts` passes
+    - Test asserts `notifications/spacebridge/captain_message` appears on shim stdout within 2s of UI POST (AC-1)
+    - Test asserts `notifications/spacebridge/gate_decided` appears on shim stdout (AC-3)
+    - Test asserts reconnect replay returns the 3 chat messages (AC-4)
+    - Test asserts UI Route Handler → daemon RPC path round-trips (AC-5)
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/tests/integration/captain-chat-and-gate.integration.test.ts
+  </files_modified>
+</task>
+
+<task id="task-12" model="haiku" wave="4" skills="" test_first="false">
+  <read_first>
+    - spacebridge/bin/daemon.ts
+    - spacebridge/bin/cli.ts
+  </read_first>
+
+  <action>
+  Final verification sweep. Run `bun test` from repo root; run `cd spacebridge && bun run lint`; run biome format check. Fix any drift introduced by earlier tasks (import ordering, formatting). Re-run task-11's integration test to confirm end-to-end still passes after formatting changes.
+
+  If any test fails here, fix inline; if a real regression surfaces that requires design change, escalate feedback-to: captain.
+  </action>
+
+  <acceptance_criteria>
+    - `bun test` from repo root exits 0 with no failures
+    - `cd spacebridge && bun run lint` exits 0
+    - `cd spacebridge && bun run format:check` exits 0
+    - All 5 Directive Acceptance Criteria verified by task-11 integration test passing
+  </acceptance_criteria>
+
+  <files_modified>
+    - (none — verification-only; may touch formatting via biome --write)
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+- [ ] Entity detail page loads with chat input visible below comment panel
+- [ ] Entity at plan or uat stage shows Approve / Reject gate buttons; shipped entities do not
+- [ ] Captain types message into chat input and clicks Send; within 2s UI shows green "✓ delivered"
+- [ ] Captain clicks Approve on a gated entity; UI shows "Approved" result; entity advances in FO's next poll cycle
+- [ ] When daemon is stopped, submitting chat shows red "daemon unreachable" banner (no blank failure)
+
+### CLI
+- [ ] `bun run spacebridge/bin/cli.ts mcp` starts MCP shim, logs "daemon ready" to stderr, keeps process alive awaiting stdio
+- [ ] Sending MCP `initialize` request to shim stdin produces valid initialize response on stdout
+
+### API
+- [ ] `POST /api/entities/{slug}/chat` with `{ content: "hello" }` returns 200 `{ messageId, delivered: true }` when a CC session is registered for the project root
+- [ ] `POST /api/entities/{slug}/chat` with no registered session returns 200 `{ messageId, delivered: false }` (message persisted but not pushed)
+- [ ] `POST /api/entities/{slug}/gate` with `{ decision: "approve", stage: "plan" }` returns 200 `{ decision: "approved", decidedAt }`
+- [ ] Double-approve same entity::stage returns 502 with GateAlreadyDecided error body
+- [ ] Daemon unreachable returns 502, not 500
+
+### Interactive
+- [ ] Captain initiates chat from spacebridge UI and receives delivery confirmation end-to-end (live FO session)
+- [ ] Captain approves/rejects a gated entity from UI and sees FO react to the decision (live FO session)
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1 FO reply appears in UI feed within 2s | task-11 | `bun test spacebridge/tests/integration/captain-chat-and-gate.integration.test.ts` | pending | -- |
+| AC-2 Captain chat reaches CC via shim | task-7, task-11 | `bun test spacebridge/tests/integration/captain-chat-and-gate.integration.test.ts` | pending | -- |
+| AC-3 Gate approve flows to FO | task-9, task-11 | `bun test spacebridge/tests/integration/captain-chat-and-gate.integration.test.ts` | pending | -- |
+| AC-4 get_pending_messages reconnect recovery | task-11 | `bun test spacebridge/tests/integration/captain-chat-and-gate.integration.test.ts` (reconnect subcase) | pending | -- |
+| AC-5 UI connects to daemon via Route Handler → socket RPC | task-8, task-10 | `bun test 'spacebridge/ui/app/api/entities/[slug]/chat/route.test.ts'` + manual smoke | pending | -- |
+
+## Stage Report: plan
+
+- [x] Step 0.5 assumption re-validation: all cited assumptions hold
+  Spot-checked A-1 (paths), A-3 (cli.ts:54-74 stub), A-4 (types.ts push types), A-7 (daemon.ts if-chain), A-8 (registry interface) via direct Read. Minor line-range shift on A-7 (actual 106-178 vs cited 96-223) but structure and default branch text unchanged — not a contradiction.
+- [x] Topic extraction + research dedup: 2 residual topics, both inline-researched
+  A-1..A-10 carry inline `(✓ confirmed by explore: ...)` / `(⚠ contradicted: ...)` annotations from 4-angle explore; residual topics (MCP SDK library surface + RPC registry refactor shape) researched inline via direct Read + grep.
+- [x] Research synthesis: 5-subsection Research Findings written
+  No contradictions surfaced (single-source or reinforcing citations throughout).
+- [x] Plan writing: 13 tasks across 5 waves
+  Wave 0 (tasks 0-2): env-verify, add SDK dep, schema tables. Wave 1 (tasks 3-5): chat + gate aggregates + session registry extension (parallel, no file overlap). Wave 2 (tasks 6-7): daemon RPC refactor + MCP shim (sequential — both touch bin/ and rely on Wave 1 aggregates). Wave 3 (tasks 8-10): UI Route Handlers + components (parallel, no file overlap). Wave 4 (tasks 11-12): integration test + final sweep.
+- [x] Self-review: zero placeholders, type signatures consistent across tasks, wave dependencies valid, all 5 ACs mapped in Validation Map
+  Scanned for `TBD`, `add appropriate`, `similar to Task N`, `as needed`, `...` — none found in task actions. Chat/Gate types declared in task-3/4 match consumption in task-6 + task-8/9. Wave ordering: no Wave N read_first references files first-written by another Wave N task.
+- [ ] SKIP: Plan-checker subagent dispatch (Nuwa fanout OR monolithic)
+  Ensign subagent context lacks Agent tool (per ensign-shared-core + MEMORY subagent-cannot-nest-agent-dispatch). Inline self-check performed covering Dim 1 (Requirement Coverage — all 5 ACs rowed), Dim 2 (Task Completeness — all 13 tasks have read_first/action/AC/files_modified), Dim 3 (Dependency — strict wave ordering, no cross-wave read_first violations detected), Dim 4 (Context Compliance — daemon-side CQRS for chat+gate per clarify lock respected; 500ms SSE polling preserved for UI push), Dim 6a/6b/6d (AC presence in Validation Map, 2s latency bound covered by task-11, Wave 0 creates schema tables and test infra before Wave 1 aggregates consume them). Dim 5/7/8/9/10 deferred to build-review stage (ensign has no Agent dispatch + Skill tool for workflow-index read mode in this context).
+- [x] Revision iterations: 0 (no dispatched plan-checker — inline self-check only; see SKIP above)
+- [x] Knowledge capture: skipped — no findings met D1/D2 threshold
+  Research surfaced only entity-specific facts (SDK version pin, daemon-side CQRS architectural lock from clarify). No reusable cross-entity/cross-skill patterns that aren't already in MEMORY.
+- [ ] SKIP: workflow-index append (unconditional step per skill contract) — deferred to FO
+  Ensign subagent context lacks Skill tool for workflow-index:write mode (no positive evidence of Skill tool availability in nested subagent per MEMORY contract-tests-cover-unconditional-calls). Full append payload staged in §"workflow-index append payload" below for FO to apply at plan approval. This is a known skill contract gap — captain and FO should note that Case B band-aid in workflow-index-maintainer mod remains load-bearing until ensign contract allows Skill dispatch.
+
+### workflow-index append payload (for FO to apply on approval)
+
+```
+entity: spacebridge-channel-bridge-bidirectional
+stage: plan
+status: planned
+intent: "Channel bridge infrastructure + chat/gate daemon-side CQRS aggregates + MCP stdio shim"
+files:
+  - spacebridge/package.json
+  - bun.lock
+  - spacebridge/src/schema.ts
+  - tests/spacebridge/schema-chat-gate.test.ts
+  - spacebridge/src/domain/chat/types.ts
+  - spacebridge/src/domain/chat/decider.ts
+  - spacebridge/src/domain/chat/evolve.ts
+  - spacebridge/src/domain/chat/errors.ts
+  - spacebridge/src/domain/chat/schemas.ts
+  - spacebridge/src/domain/chat/persistence.ts
+  - spacebridge/src/domain/chat/decider.test.ts
+  - spacebridge/src/domain/chat/evolve.test.ts
+  - spacebridge/src/domain/chat/schemas.test.ts
+  - spacebridge/src/domain/chat/persistence.test.ts
+  - spacebridge/src/domain/gate/types.ts
+  - spacebridge/src/domain/gate/decider.ts
+  - spacebridge/src/domain/gate/evolve.ts
+  - spacebridge/src/domain/gate/errors.ts
+  - spacebridge/src/domain/gate/schemas.ts
+  - spacebridge/src/domain/gate/persistence.ts
+  - spacebridge/src/domain/gate/decider.test.ts
+  - spacebridge/src/domain/gate/evolve.test.ts
+  - spacebridge/src/domain/gate/schemas.test.ts
+  - spacebridge/src/domain/gate/persistence.test.ts
+  - spacebridge/src/domain/session/registry.ts
+  - spacebridge/src/domain/session/registry-active.test.ts
+  - spacebridge/bin/daemon.ts
+  - spacebridge/bin/daemon-rpc-chat-gate.test.ts
+  - spacebridge/bin/cli.ts
+  - spacebridge/bin/cli-mcp.test.ts
+  - spacebridge/ui/app/api/entities/[slug]/chat/route.ts
+  - spacebridge/ui/app/api/entities/[slug]/chat/route.test.ts
+  - spacebridge/ui/app/api/entities/[slug]/gate/route.ts
+  - spacebridge/ui/app/api/entities/[slug]/gate/route.test.ts
+  - spacebridge/ui/components/chat-input.tsx
+  - spacebridge/ui/components/gate-buttons.tsx
+  - spacebridge/ui/components/chat-input.test.tsx
+  - spacebridge/ui/components/gate-buttons.test.tsx
+  - spacebridge/ui/components/entity-body.tsx
+  - spacebridge/tests/integration/captain-chat-and-gate.integration.test.ts
+```
+
+### Summary
+
+Plan landed 13 tasks across 5 waves, honoring clarify's daemon-side CQRS architecture for chat + gate aggregates, project-root-most-recent-heartbeat session routing, and 500ms SSE polling for UI push. All 5 Directive ACs map to the Wave 4 integration test (task-11). Dependencies 053/054/057 confirmed shipped-at-code despite stale CONTRACTS rows. Plan-checker Agent dispatch and workflow-index Skill dispatch both skipped due to ensign subagent tool-surface constraints — inline self-check covers load-bearing dimensions and the full append payload is staged for FO application. Confidence 88% — captain gate recommended per >95% auto-advance threshold.
+
+### Confidence Assessment
+
+**Overall confidence: 88% — captain gate recommended**
+
+Drivers:
+- (+) Clarify output is unusually concrete (9 itemized deliverables, fmodel architecture locked, all 10 assumptions confirmed)
+- (+) Comment aggregate is a clean structural template for chat + gate
+- (+) `socket-server.pushToSession` + `socket-client.onPush` already wired; action-push IPC type declared (infrastructure ready)
+- (+) 4-angle explore provided deep codebase evidence; minimal residual research gap
+- (−) Plan-checker Nuwa fanout NOT dispatched (ensign tool-surface constraint); Dim 5/7/8/9/10 inline self-check weaker than dedicated agent
+- (−) workflow-index append deferred to FO (ensign contract gap for Skill tool); FO must apply unconditionally at plan approval
+- (−) MCP stdio bridge in task-7 is the most novel subsystem; transport lifecycle edge cases may surface only at execute time
+- (−) task-11 integration test spans daemon + MCP shim + UI Route Handler with real sockets — orchestration can be flaky on CI
+
+Per captain preference (>95% auto-advance, ≤95% captain gate): **88% → captain gate**. Primary captain-review items:
+1. Approve deferring plan-checker dispatch to FO (ensign tool-surface constraint) and review inline self-check coverage
+2. Approve deferring workflow-index append to FO application at plan approval
+3. Approve plan's choice to defer all 6 MCP tool handlers to 099b (per clarify Q-2 captain answer — re-confirmation before FO kicks off execute)
