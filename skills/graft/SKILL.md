@@ -645,12 +645,17 @@ Modify LOCAL.yaml overrides and re-apply.
 
 Read-only status report.
 
-1. Read manifest.yaml
-2. Check if upstream plugin version has changed (compare manifest version vs installed plugin version)
-3. For each localize tier skill:
-   - Compare `.claude/skills/{name}/SKILL.md` against what LOCAL.yaml + `.origin/` would produce
-   - If different: DRIFT detected (someone edited the localized skill directly)
-4. Report:
+1. Read manifest.yaml -- extract `source_plugin`, `workflow_readme_path`, per-skill `source_hash` values
+2. Resolve `{plugin_dir}` from `source_plugin`
+3. Check if upstream plugin version has changed (compare `{plugin_dir}/plugin.json` version vs manifest `source.version`)
+4. For each localize-tier skill:
+   a. Compute `current_hash = sha256(open("{plugin_dir}/skills/{name}/SKILL.md", "rb").read()).hexdigest()`
+   b. If `current_hash != manifest_source_hash[name]`: **UPDATE AVAILABLE** (plugin bytes changed)
+   c. Compute what the current localized skill *should* look like: read plugin bytes + apply LOCAL.yaml `skill_overrides[{name}]`
+   d. Compare computed result against `.claude/skills/{name}/SKILL.md`
+   e. If different: **DRIFT** (localized skill was edited directly, not via LOCAL.yaml)
+5. Check stale override anchors: for each anchor in `skill_overrides[{name}]`, search for it in current plugin bytes. Not found = **STALE OVERRIDE**.
+6. Report:
 
 ```
 ## Graft Status: {workflow-name}
@@ -658,18 +663,23 @@ Read-only status report.
 Source: {plugin}@{manifest_version} (installed: {current_plugin_version})
 Grafted: {date} by {user}
 Last upgrade: {date or "never"}
+README: managed by FO runtime (reads from {plugin_dir}/{workflow_readme_path})
 
-Update available: {yes (X.Y.Z -> A.B.C) | no}
+Update available: {yes | no}
 
 Skills by tier:
   Verbatim ({N}): {list}
   Localized ({M}): {list}
 
+Hash drift (plugin vs manifest):
+  Unchanged: {list}
+  UPDATE AVAILABLE: {list} (plugin bytes changed since last upgrade)
+
 Override health:
   Healthy: {N} overrides across {M} skills
-  Stale: {list of overrides whose anchors may have drifted}
+  Stale anchors: {list of overrides whose anchors no longer exist in plugin bytes}
 
-Drift detection:
+Local drift (localized skill vs plugin+LOCAL.yaml expected):
   Clean: {list}
   DRIFTED: {list} (localized skill was edited directly, not via LOCAL.yaml)
 
@@ -682,27 +692,25 @@ Infrastructure:
 
 # Sub-command: `graft diff`
 
-Show differences between local and origin for localize tier only.
+Show differences between what the plugin + LOCAL.yaml would produce and what is currently in `.claude/skills/`. No `.origin/` reads.
 
-1. For each localize tier skill:
+1. For each localize-tier skill:
+   - Compute expected: read `{plugin_dir}/skills/{name}/SKILL.md` bytes + apply LOCAL.yaml `skill_overrides[{name}]`
+   - Diff expected vs `.claude/skills/{name}/SKILL.md`:
    ```bash
-   git diff --no-index .origin/skills/{name}/SKILL.md .claude/skills/{name}/SKILL.md || true
+   diff <(echo "$expected") .claude/skills/{name}/SKILL.md || true
    ```
-2. For README:
-   ```bash
-   git diff --no-index .origin/README.md .spacedock/workflows/{name}/README.md || true
-   ```
-3. Present diffs grouped by file. Verbatim tier skills are excluded (they reference upstream directly, no local copy to diff).
+2. For README: no local file to diff. Report "README is managed by FO runtime; run FO to observe applied README."
+3. Present diffs grouped by skill. Verbatim tier skills are excluded (they reference upstream directly, no local copy to diff).
 
 ---
 
 ## No Exceptions (Load-Bearing)
 
 - **NEVER** graft a source that lacks `commissioned-by:` frontmatter. Check at Phase 1 Step 1 and stop if absent.
-- **NEVER** modify `.origin/` files after initial copy (init) or upgrade. These are read-only reference copies.
+- **NEVER** modify localized `.claude/skills/` files directly; all changes flow through LOCAL.yaml. Direct edits cause drift (detected by `graft status`).
 - **NEVER** skip the tier classification captain review at Phase 2 Step 5 of init. Even if heuristic is confident, captain confirms.
-- **NEVER** auto-resolve conflicts during upgrade. Conflicts require captain decision.
-- **NEVER** edit localized skills in `.claude/skills/` directly during graft operations. Always generate from `.origin/` + LOCAL.yaml. Direct edits cause drift (detected by `graft status`).
+- **NEVER** auto-resolve stale override escalations during upgrade. Stale anchors require captain decision.
 - **NEVER** copy verbatim tier skills. They reference the upstream plugin. Copying them defeats the purpose of zero-maintenance upstream tracking.
 - **NEVER** run graft init on a workflow that is already grafted. Check at Phase 1 Step 2 and stop. Captain must delete existing graft first, or use `graft upgrade`.
 - **NEVER** assume the target repo has any specific project structure beyond `.claude/skills/`. Graft works with any repo that has a `.claude/` directory.
@@ -713,11 +721,11 @@ Show differences between local and origin for localize tier only.
 
 1. **Phases are strictly ordered** within each sub-command. Never skip, reorder, or combine phases.
 2. **LOCAL.yaml is the single source of truth** for all local customizations. Direct edits to localized skills are drift, not authoritative changes.
-3. **`.origin/` is immutable between graft operations.** Only `graft init` and `graft upgrade` write to `.origin/`. All other operations read from it.
+3. **Plugin is the authoritative upstream source; localized skills are regenerated from plugin bytes + LOCAL.yaml on every upgrade, localize, and reapply.** There is no read-only origin copy on disk. The plugin installation is the origin.
 4. **Tier classification is per-skill, per-graft.** The same skill might be verbatim in one target repo and localize in another. The classification is stored in the manifest, not in the source.
-5. **Approval gates are absolute.** Tier classification (init) and upgrade conflicts require captain confirmation. No auto-approve.
+5. **Approval gates are absolute.** Tier classification (init) and stale-anchor escalations require captain confirmation. No auto-approve.
 6. **Override anchors are fragile.** They depend on specific text existing in the upstream skill. `graft status` and `graft upgrade` detect stale anchors proactively.
-7. **Infrastructure is opt-in but all-or-nothing per skill.** If a skill needs workflow-index, the entire workflow-index skill + CONTRACTS.md + DECISIONS.md must be ported. No partial infra.
+7. **Infrastructure is opt-in but all-or-nothing per skill.** If a skill needs workflow-index, the entire workflow-index skill + CONTRACTS.md + DECISIONS.md + INDEX.md must be ported. No partial infra.
 
 ---
 
