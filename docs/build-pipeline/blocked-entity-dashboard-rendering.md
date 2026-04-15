@@ -2,8 +2,9 @@
 id: 116
 title: Blocked-Entity Dashboard Rendering -- context_status Visibility for Escape-Hatch Branches
 slug: blocked-entity-dashboard-rendering
-status: draft
-context_status: awaiting-clarify
+status: clarify
+context_status: blocked
+supersedes: blocked-entity-spacebridge-ui-rendering
 source: captain observation
 created: 2026-04-16T02:30:00+08:00
 started:
@@ -35,6 +36,32 @@ depends-on: [alignment-gate-promote-to-stage]
 - **Related entities**: 114 alignment-gate-promote-to-stage (shipped 2026-04-16 — first multi-branch gate to use this escape-hatch pattern); 094 warroom-pipeline-graph-visualization (clarify ready — stage graph client rendering); 113 build-entry-routing-and-alignment-gate (shipped — origin of the 3-branch gate logic); MEMORY.md multi-branch-gate-pattern.md (the architectural decision that made this gap visible as a dashboard concern not a schema concern).
 - **Depends-on**: 114 — because (a) 114's escalate-to-shape branch is the first and currently only producer of `context_status: blocked`, and (b) 114 contracts the `context_status: blocked` + `supersedes:` hint format that this entity will render.
 - **Why not shape-first**: Problem is narrow (dashboard rendering add), scope is Small (2-3 files in tools/dashboard/), direction unambiguous. `/build` Step 0 gatekeeper should silent-pass (concrete targets: `tools/dashboard`, `context_status: blocked`, stage graph, activity stream; zero hedge words).
+
+## Park Note (2026-04-16, clarify)
+
+⚠️ **Entity 116 is parked with `context_status: blocked` pending a spacebridge/ui successor.**
+
+During Step 4.5 open exploration of clarify, captain surfaced the architectural contradiction that explore missed: **this entity targets `tools/dashboard/static/*`, which entity 060 (`spacebridge-cutover-remove-static-ui`, clarify/ready) plans to delete**. Entity 060 gates on 059 shipped + 4 parity entities shipped (spacebridge-dependency-graph-view, spacebridge-workflow-visualizer, spacebridge-entity-body-editor, spacebridge-version-history). The rendering work (A-1, A-2, A-3, O-1, Q-1, Q-2) would target dead code; only the data-layer half (A-5, A-6, O-2 — frontmatter-io.ts extension) survives 060.
+
+**Escape-hatch per entity 114's multi-branch-gate pattern**: writing `context_status: blocked` + `supersedes: blocked-entity-spacebridge-ui-rendering`. Captain must open the new entity via `/shape "blocked-entity-spacebridge-ui-rendering"` when parity work clarifies.
+
+**What carries forward to the successor entity:**
+- Goal Check, Core Tensions, Honest Boundaries — unchanged (same user pain, same semantic boundaries)
+- A-4 (046 shipped contract) — unchanged
+- A-5 + O-2 (supersedes parse path via frontmatter-io.ts) — **still valid**; frontmatter-io.ts survives 060 per design doc §2.4
+- A-6 (AgentEventType extension pattern) — unchanged
+- O-3 self-resolution (defer events emission) — unchanged
+- Q-1 answer "awaiting captain action" microcopy — unchanged
+- Q-2 answer `.context-blocked` class — **re-scope to Next.js/Tailwind**; class concept carries, CSS system changes
+- O-1 (label placement inline next to title) — **re-scope to React component tree**; design intent carries
+
+**What needs fresh work in the successor:**
+- Target files: `spacebridge/ui/app/entity/[slug]/page.tsx` + sibling components (replace app.js/detail.js)
+- CSS system: Tailwind classes instead of vanilla CSS
+- Event emission path: if O-3 ever flips, integrate with Next.js SSE feed (entity 053) instead of /api/events
+- Sibling coordination: entity 094 (warroom-pipeline-graph-visualization, spacebridge/ui/) is now a sibling, not a deferred concern
+
+**Self-referential observation**: this entity is the first real `context_status: blocked` test case — it is dogfooding the exact escape-hatch pattern it was designed to visualize. When the successor ships, 116's park state should render as the first grey-out card in the dashboard (after cutover: in spacebridge/ui).
 
 ## Goal Check
 
@@ -140,36 +167,42 @@ You are asking for the dashboard to visually flag entities whose `context_status
 - Confidence: Confident (0.98)
 - Evidence: `tools/dashboard/static/app.js:227` reads `e.context_status` to build csCounts; rendering a grey-out class just adds a conditional at the card-build site, same scope. [primary]
 - Implication: no frontmatter-io plumbing needed for the grey-out half of APPROACH; renderer already has access.
+- → Confirmed: SO self-verified, 2026-04-16 (session-verified via sed app.js:220-260)
 
 ### A-2 -- Dependency-blocked (`ds.status === "blocked"`) and context-status-blocked are visually and semantically distinct and must stay distinct
 
 - Confidence: Confident (0.97)
 - Evidence: `tools/dashboard/static/app.js:369-371` dep-badge uses red `#f85149` + `🚫 →` emoji prefix, driven by `ds.status` (dependency resolution state). `context_status` is frontmatter, driven by skill writes. Two different data paths, two different meanings. [primary]
 - Implication: APPROACH must pick a colour and vocabulary clearly distinct from red + 🚫.
+- → Confirmed: SO self-verified, 2026-04-16 (session-verified via sed app.js:365-375)
 
 ### A-3 -- `detail.js` has zero `context_status` handling today
 
 - Confidence: Confident (0.95)
 - Evidence: `grep -n context_status tools/dashboard/static/detail.js` returns zero matches (re-verified this session). No existing branch to extend — detail-page grey-out is greenfield. [primary]
 - Implication: detail.js change is an additive feature, not a modification of an existing render branch.
+- → Confirmed: SO self-verified, 2026-04-16 (grep verified zero matches this session)
 
 ### A-4 -- Entity 046 (`dashboard-context-status-filter`) is shipped and its chip-render contract at `app.js:223-258` is frozen
 
 - Confidence: Confident (0.96)
 - Evidence: `docs/build-pipeline/_archive/dashboard-context-status-filter.md` — `status: shipped, verdict: PASSED, context_status: ready`. INDEX.md shows 046 in clarify but INDEX is stale (last rebuilt 2026-04-12, misses 114/115/116). [primary]
 - Implication: 046 is not a concurrent-flight conflict risk; it is a contract to respect. 116's grey-out class attaches to the card element, not to 046's chip pipeline. Downgrades the brainstorm GUARDRAIL "coordinate with in-flight 046" to "respect shipped 046 contract at app.js:223-258".
+- → Confirmed: SO self-verified, 2026-04-16 (grep _archive frontmatter verified status: shipped verdict: PASSED)
 
 ### A-5 -- `supersedes` frontmatter field is NOT currently parsed or exposed by the dashboard
 
 - Confidence: Confident (0.94)
 - Evidence: `grep -c supersedes tools/dashboard/static/*.js tools/dashboard/src/*.ts` returns 0 matches across the render tree. Field exists in entity YAML (written by alignment-gate per entity 114 contract) but nothing reads it. [primary]
 - Implication: Rendering the actionable `Open new entity: /shape "{new-slug}"` line requires first parsing `supersedes` — blocks APPROACH's supersedes-surfacing claim unless O-2 resolves the parse path. This was silent in brainstorm Lens (c).
+- → Confirmed: SO self-verified, 2026-04-16 (grep 0 matches verified this session)
 
 ### A-6 -- `AgentEventType` at `types.ts:78-82` is a string-union extensible by adding a literal
 
 - Confidence: Confident (0.92)
 - Evidence: Current union is `"dispatch" | "completion" | "gate" | "feedback" | "merge" | "idle" | "channel_message" | "channel_response" | "permission_request" | "permission_response" | "comment" | "suggestion" | "gate_decision" | "share_created" | "rollback" | "pr_ready" | "pipeline_error" | "entity_shipped"` at `tools/dashboard/src/types.ts:78-82`. Standard TS discriminated-union extension pattern. [secondary]
 - Implication: Optional `/api/events blocked` emission is a 1-token addition + a server-side validator update; no schema migration. Lens (c) under-counted (6 vs 18 variants) but the extension pattern is unchanged.
+- → Confirmed: SO self-verified, 2026-04-16 (types.ts:78-82 18-variant union verified this session)
 
 ## Option Comparisons
 
@@ -183,6 +216,8 @@ You are asking for the dashboard to visually flag entities whose `context_status
 
 Recommendation (a) places the label at the highest-attention scan point (next to entity title), preserves card height compactness for the 99% non-blocked case, and keeps the two semantics (blocked chip as filter vs blocked label as call-to-action) in separate UI affordances.
 
+→ Selected: (a) Inline badge next to entity title in card header (captain, 2026-04-16, interactive)
+
 ### O-2 -- How to source `supersedes` for rendering the actionable next-step line
 
 | Option | Pros | Cons | Complexity | Recommendation |
@@ -193,6 +228,8 @@ Recommendation (a) places the label at the highest-attention scan point (next to
 
 Recommendation (a) keeps YAML parsing centralized in frontmatter-io.ts (A-5 confirmed nothing parses it today), aligns with how other fields are plumbed, and unblocks the supersedes-surfacing half of APPROACH without depending on the optional events path.
 
+→ Selected: (a) Extend frontmatter-io.ts to parse supersedes field (SO self-resolved, 2026-04-16) — forced by: (1) O-3 self-resolved to (b) defer events, which eliminates option (c) [events payload]; (2) option (b) [inline YAML parse] rejected on abstraction-discipline grounds per captain-preferences.md; (a) is the only remaining viable path. Captain may override by explicit override in review.
+
 ### O-3 -- Scope boundary for `/api/events blocked` emission
 
 | Option | Pros | Cons | Complexity | Recommendation |
@@ -201,6 +238,8 @@ Recommendation (a) keeps YAML parsing centralized in frontmatter-io.ts (A-5 conf
 | (b) Defer events emission to a follow-up entity; ship card grey-out + label only | Keeps 116 Small and self-contained; matches captain's "optional 可選" framing | Activity feed misses the blocked transition signal until follow-up ships | Low | ✅ Recommended |
 
 Recommendation (b) matches captain's explicit "可選" framing and the empirical baseline: no blocked entity exists yet, so activity-stream miss is zero-impact at ship time. Defer to a Phase E+1 candidate (already noted in MEMORY.md phase-e-plus-1-candidates.md).
+
+→ Selected: (b) Defer events emission to a follow-up entity (SO self-resolved, 2026-04-16) — directive verbatim "可選：POST blocked 事件到 /api/events" is [primary]-tier captain statement pinning the default to "optional → defer"; code-evidence self-filter confirmed primary evidence auto-resolution per build-clarify Step 2 GUARDRAIL. Captain may override by explicit override in review.
 
 ## Open Questions
 
@@ -213,16 +252,18 @@ Recommendation (b) matches captain's explicit "可選" framing and the empirical
   - (b) "needs new entity" -- shorter, more action-focused
   - (c) "blocked — open new entity" -- explicit verb
 - [secondary]
+- → Answer: (a) "awaiting captain action" -- directive verbatim (captain, 2026-04-16, interactive)
 
 ### Q-2 -- CSS token for grey-out: reuse existing muted/disabled tokens or introduce a new `.blocked` class?
 
 - Domain: User-facing Visual
 - Why it matters: Existing muted/disabled tokens may conflict semantically (disabled = system unavailable; blocked = captain-action-required). A dedicated class keeps semantics clean but adds CSS surface.
 - Suggested options:
-  - (a) Reuse existing `.muted` / `.disabled` token if one exists -- minimum CSS surface
+  - (a) Reuse existing `.muted` / `.disabled` token if one exists -- minimum CSS surface -- ⚠ eliminated by self-filter: no `.muted` or `.blocked` class exists today (only `:disabled` on buttons at detail.css:788)
   - (b) Introduce `.context-blocked` class with custom grey + label styling -- clean semantics, small new surface
   - (c) Defer to whichever pattern 094's spacebridge/ui graph ends up using -- forward-compat with future stage-graph work
 - [secondary]
+- → Answer: (b) Introduce `.context-blocked` class with custom grey + label styling (captain, 2026-04-16, interactive)
 
 ## Core Tensions
 
@@ -264,6 +305,21 @@ Recommendation (b) matches captain's explicit "可選" framing and the empirical
   Gate (v) Evidence tier tagging: PASS (all Evidence lines end [primary] or [secondary])
   Gate (vi) Core Tensions typing: PASS (2 entries, both typed domain-based + essential)
 - [x] Follow-up: INDEX.md is stale (last rebuilt 2026-04-12 per file footer; missing entities 114/115/116). Workflow-index rebuild hook appears not fired. Not blocking 116 but noting for a separate maintenance pass.
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- entity is Small scope, no children proposed
+- [x] Re-validation: 6 assumptions checked, 0 stale, 0 contradicted, 0 deduped, 1 coverage gap (Q-2 narrowed via self-filter — `.muted`/`.blocked` class absent), 0 research re-validated
+- [x] Assumptions confirmed: 6 / 6 (0 corrected) -- all SO self-verified via session-collected evidence per SO-self-investigation-first discipline
+- [x] Options selected: 3 / 3 -- O-1 (captain: inline next to title); O-2 (SO self-resolved: frontmatter-io.ts extension); O-3 (SO self-resolved: defer events per directive "可選")
+- [x] Questions answered: 2 / 2 -- Q-1 "awaiting captain action" (directive verbatim); Q-2 .context-blocked class (after (a) eliminated by self-filter)
+- [x] Self-filter: 1 self-resolved (Q-2 option (a) narrowed), 2 captain-escalated (O-1, Q-1); O-2/O-3 SO-self-resolved under [primary]-tier evidence
+  clarify_self_filter_ratio: 0.50 (5 SO-resolved / 10 total: 6 A batch + O-2 + O-3 + Q-2 option narrow vs O-1 + Q-1 + Q-2 final escalated to captain)
+- [x] Open exploration: 1 gray area surfaced via captain freeform (0 from templates, 0 from CONTRACTS, 0 from directive, 1 via captain) -- **material architectural contradiction: tools/dashboard/static cutover (entity 060) invalidates rendering target**
+- [x] Canonical refs added: 0 (entity 060 referenced inline in Park Note; already discoverable via docs/build-pipeline tree)
+- [x] Context status: **blocked** (escape-hatch per entity 114 multi-branch-gate pattern)
+- [x] Handoff mode: n/a -- entity parked, no FO handoff. Captain must open `blocked-entity-spacebridge-ui-rendering` via /shape when parity work clarifies.
+- [x] Clarify duration: 4 AskUserQuestion calls (1 sequencing + 3 captain decisions in clarify) + 1 captain observation that inverted the outcome
 
 ## Pre-Brainstorm Scope Sketch (informal)
 
