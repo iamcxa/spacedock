@@ -1,24 +1,24 @@
 ---
 id: 101
 title: "Graft runtime overlay — eliminate build-time merge, read workflow from plugin"
-status: plan
-context_status: ready
+status: clarify
+context_status: awaiting-clarify
 source: /build
 created: 2026-04-14T03:30:00Z
-started: 2026-04-15T18:55:00+08:00
+started:
 completed:
 verdict:
 score:
-worktree: .worktrees/spacedock-ensign-graft-runtime-overlay-redesign
+worktree:
 issue:
 pr:
 intent: feature
-scale: Medium
+scale: Large
 project: spacedock
 auto_advance:
 uat_pending_count:
 parent:
-children: [112]
+children:
 ---
 
 ## Directive
@@ -78,7 +78,7 @@ The first real-world `graft init` (spacedock build-pipeline → carlove monorepo
 
 ## Brainstorming Spec
 
-**APPROACH**: Runtime overlay — FO reads workflow README directly from the installed spacedock plugin at startup, then applies LOCAL.yaml overrides in-memory before proceeding with normal stage dispatch.
+**APPROACH**: Runtime overlay — FO reads workflow README directly from the installed spacedock plugin at startup, then applies LOCAL.yaml overrides in-memory before proceeding with normal stage dispatch. (✓ confirmed by explore: FO resolves plugin dir via ${CLAUDE_SKILL_DIR}/../.. -- see A-1; runtime overlay mechanism is a design decision -- see O-1, O-2)
 
 What stays local (project-specific state):
 - `LOCAL.yaml` — override definitions + shipped_config
@@ -91,10 +91,10 @@ What stays local (project-specific state):
 - `.claude/agents/` — localized agents
 
 What is eliminated:
-- `_origin/` directory entirely (README, skill copies, agent copies)
-- Merged `README.md` in workflow dir (FO reads from plugin)
-- 3-way merge on upgrade (replaced by hash-based idempotent reapply)
-- `_docs/` copying (FO reads from plugin source path)
+- `_origin/` directory entirely (README, skill copies, agent copies) (✓ confirmed by explore: replaced by hash-based manifest -- see A-3, A-4)
+- Merged `README.md` in workflow dir (FO reads from plugin) (design decision: depends on O-1 discovery mechanism choice)
+- 3-way merge on upgrade (replaced by hash-based idempotent reapply) (✓ confirmed by explore: full reapply is simpler and preserves all upstream changes -- see A-3)
+- `_docs/` copying (FO reads from plugin source path) (⚠ contradicted: references/first-officer-shared-core.md has no _docs/ reference in startup steps 1-7 -- _docs/ is consumed by skills/humans, not FO core; elimination is correct but rationale is inaccurate -- see A-6)
 
 Localized skill upgrade path (hash-based):
 ```yaml
@@ -132,284 +132,115 @@ Upgrade: compute current plugin SKILL.md hash → if changed → read from plugi
 - Existing carlove graft (_origin/ format) can be migrated to new format via `graft migrate` (how to verify: run on carlove)
 - Pressure tests #20, #22 are structurally impossible in new design (how to verify: review the architecture — no README copy = no dual discovery, no local dir name = no ignore list collision)
 
-## Directive Annotations (explore cross-check 2026-04-15)
-
-- All `_origin/` references in Problem Statement + Spec (lines 40, 93, 94, 96, 118) (⚠ path-convention: actual codebase uses `.origin/` dot-prefix; 28 matches in skills/graft/SKILL.md + 28 in tests/pressure/graft.yaml. Pressure test #22 observes `_origin/` as actual-broken-state; convention is `.origin/`) [primary]
-- "the entire 3-way merge upgrade path" (L26) (✓ confirmed by explore: skills/graft/SKILL.md:33,536 — 3-way merge is prose-driven procedure in SKILL.md, not code) [primary]
-- "FO ignore list" causing bug #20 (L44) (✓ confirmed by explore: references/first-officer-shared-core.md:10 literal list `.git .worktrees node_modules vendor dist build __pycache__`) [primary]
-- "_origin/README retains commissioned-by" bug #22 (L45) (✓ confirmed by explore: first-officer-shared-core.md:10-11 frontmatter-scan with no path-prefix filter beyond ignore list; no dedup guard between discovery sources) [primary]
-- Hash-based upgrade premise (L99-108) (⚠ refuted as existing state: zero hash/sha256/content-hash matches in skills/graft/; manifest tracks `version`, `commit_sha`, `grafted_at` only. 101 must BUILD source_hash field + hash compare. Not a premise-check — it's a deliverable.) [primary]
-- GUARDRAIL "FO shared core must know how to read workflow README from a plugin path" (L113) (✓ confirmed by explore: zero plugin-path-read capability today; FO discovery is filesystem-scan only. This is a NEW FO primitive 101 must add.) [primary]
-- "existing graft dirs with _origin/ should be migrateable to the new format" (L118) (✓ confirmed codebase state: zero `migrate`/`migration` keywords in skills/graft/SKILL.md; `graft migrate` command must be built) [primary]
-
 ## Assumptions
 
-### A-1: `.origin/` (dot-prefix) is the canonical convention, NOT `_origin/` (underscore)
-- **Confidence**: Confident (0.95)
-- **Evidence**: skills/graft/SKILL.md has 28 `.origin/` matches, 0 `_origin/` matches; tests/pressure/graft.yaml has 28 `.origin/` matches; 1 pressure-test observation of `_origin/` is actual-broken-state documentation (test #22 at :586) [primary]
-- **Additional evidence**: .origin/ dot-prefix likely intended to hide from FO scan, though Angle iv seed 8 confirms this doesn't currently work (no dedup) [secondary]
+A-1: FO's spacedock plugin directory is resolvable in grafted repos via `${CLAUDE_SKILL_DIR}/../..` because `spacedock:first-officer` is always loaded from the installed plugin (not localized by graft). This means FO can always find the source plugin's workflow README.
+Confidence: 🟢 Confident (0.90)
+Evidence: skills/first-officer/SKILL.md:8 -- `${CLAUDE_SKILL_DIR}/../../references/` relative path; agents/first-officer.md -- `skills: ["spacedock:first-officer"]` is a plugin reference, never localized
+→ Confirmed: captain, 2026-04-14 (batch)
 
-### A-2: FO has ZERO mechanism today to read workflow README from a plugin path; all discovery is filesystem-scan
-- **Confidence**: Confident (0.95)
-- **Evidence**: references/first-officer-shared-core.md:5-26 Step 2 discovery: explicit path → project-local recursive README scan (ignore list) → `~/.claude/workflows/`. No `{plugin_dir}` or `spacedock_plugin_dir` token resolved for README reading (only for invoking commission/bin/status CLI at :33) [primary]
-- **Additional evidence**: Angle iv seed 1 refuted; claude-first-officer-runtime.md:31-65 shows agent-dispatch resolves via plugin loader but README reading is not plugin-aware [primary]
+A-2: Runtime overlay applies ONLY to the workflow README. Localized skills remain as build-time file copies in `.claude/skills/` because the Claude Code skill loader requires `SKILL.md` files on disk at invocation time.
+Confidence: 🟢 Confident (0.90)
+Evidence: Entity 101 APPROACH "What stays local: .claude/skills/ -- localized skills (content changes require file copies)"; skill loader resolves `.claude/skills/{name}/SKILL.md` synchronously at skill invocation
+→ Confirmed: captain, 2026-04-14 (batch)
 
-### A-3: FO ignore list literal at first-officer-shared-core.md:10 contains `build` — this IS bug #20's root cause
-- **Confidence**: Confident (0.95)
-- **Evidence**: references/first-officer-shared-core.md:10 "Ignore `.git`, `.worktrees`, `node_modules`, `vendor`, `dist`, `build`, and `__pycache__`" [primary]
-- **Additional evidence**: tests/pressure/graft.yaml:552-581 pressure test workflow-dir-name-collides-with-fo-ignore-list documents the exact collision (history: 2026-04-14 actual=A unfixed, manual rename workaround) [primary]
+A-3: Hash-based skill upgrade replaces 3-way merge with "full reapply" -- read fresh plugin `SKILL.md` + apply LOCAL.yaml `skill_overrides` from scratch. Stale anchors (anchor text changed upstream) are detected and escalated to captain, same behavioral contract as current design.
+Confidence: 🟢 Confident (0.90)
+Evidence: Entity 101 APPROACH "compute current plugin SKILL.md hash → if changed → read from plugin → reapply LOCAL.yaml anchors → write to .claude/skills/. No 3-way merge."
+→ Confirmed: captain, 2026-04-14 (batch)
 
-### A-4: Manifest.yaml already exists in graft but has NO source_hash / content_hash / sha256 field
-- **Confidence**: Confident (0.95)
-- **Evidence**: skills/graft/SKILL.md:82,109,407,464,487,579,604 — manifest.yaml tracks `version`, `commit_sha`, `grafted_at` only. Zero grep matches for `sha256`, `source_hash`, `content_hash` in skills/graft/ [primary]
-- **Additional evidence**: Angle iv seed 2 partial-confirmed (exists but schema lacks 101's required field); 101 L99-108 proposes the new schema [primary]
+A-4: Manifest v2 retains the current schema structure (`source.plugin`, `source.workflow_path`, `skills[].tier`, `skills[].name`) but adds per-skill `source_hash` for change detection and removes `_origin/` dependency.
+Confidence: 🟢 Confident (0.85)
+Evidence: skills/graft/SKILL.md:108-178 -- current manifest schema; entity 101 proposes `source_hash` addition as structural simplification, not a full schema redesign
+→ Confirmed: captain, 2026-04-14 (batch)
 
-### A-5: LOCAL.yaml `readme_operations` are applied at graft-time only (produce merged README file on disk); never applied at FO runtime
-- **Confidence**: Confident (0.95)
-- **Evidence**: `readme_operations` keyword matches only in skills/graft/ (:190,425,536); zero matches in references/first-officer-*.md [primary]
-- **Additional evidence**: Angle iv seed 5 refuted; Angle i documents the current anchor model is stage-field addressing via `set-stage-field` op (overhaul recipe vocabulary), which is structured YAML-frontmatter edits not body-section insertion [primary]
+A-5: Migration from v1 to v2 computes `source_hash` values from existing `_origin/` files before deleting the `_origin/` directory. One-time operation via new `graft migrate` sub-command.
+Confidence: 🟡 Likely (0.70)
+Evidence: Entity 101 AC "Existing carlove graft can be migrated via graft migrate"; `_origin/` at SKILL.md:80-89 contains all upstream originals needed for hash computation; no prior migration precedent exists (first version of graft)
+→ Confirmed: captain, 2026-04-14 (batch)
 
-### A-6: LOCAL.yaml op vocabulary is stage-field addressing (structured YAML edits), NOT free-text "insert after section Y"
-- **Confidence**: Confident (0.90)
-- **Evidence**: skills/graft/SKILL.md:185-235 LOCAL.yaml schema: `readme_operations` uses `set-stage-field` op targeting `stage + field` pairs; skill-content override uses `anchor/replace` (text find-replace) [primary]
-- **Additional evidence**: Angle i "Unknown Unknowns" flags this: body-section anchor insertion is NOT supported — if 101's runtime overlay needs body operations, it's a new op type [secondary]
-
-### A-7: Graft init copy surface OMITS _archive/, _mods/, _docs/, _index/INDEX.md — confirmed root cause of bug #21
-- **Confidence**: Confident (0.95)
-- **Evidence**: skills/graft/SKILL.md:398-434 Phase 4 Step 9 copy order only covers `.origin/`, skills/, agents/, manifest.yaml, LOCAL.yaml, merged README [primary]
-- **Additional evidence**: tests/pressure/graft.yaml:583-612 missing-fo-runtime-structure-after-init pressure test (history: 2026-04-14 actual=A unfixed) [primary]
-
-### A-8: No pre-write diff/overwrite-guard in graft init (bug #15 root cause)
-- **Confidence**: Confident (0.95)
-- **Evidence**: Angle iv seed 9 refuted; zero overwrite/diff-before/already-exists keyword matches in skills/graft/ [primary]
-- **Additional evidence**: graft status (line 607) detects drift AFTER the fact via git diff; no pre-write check at init time [secondary]
-
-### A-9: No post-init smoke test (bug #19 root cause); no root-script-false-positive guard (bug #14 root cause)
-- **Confidence**: Confident (0.95)
-- **Evidence**: Angle iv seeds 10+11 refuted; zero smoke/post-init-verify matches + skills/graft/SKILL.md:374-382 reads package.json scripts with no stub heuristic [primary]
-- **Additional evidence**: Captain ran manual smoke test during carlove session (Directive L70 "Kent: 試跑一次確認是否正確") [secondary]
-
-### A-10: Entity 090 (shipped-stage-mod-and-graft-migration) is at `status: clarify / context_status: ready` — NOT fully shipped; Part 2 (shipped_config migration) explicitly defers to 101
-- **Confidence**: Confident (0.95)
-- **Evidence**: docs/build-pipeline/shipped-stage-mod-and-graft-migration.md frontmatter: `status: clarify, context_status: ready`; file on main (not archived) [primary]
-- **Additional evidence**: Angle ii reports 090 A-4 (L76-79) "097 plans to completely replace graft's build-time merge with runtime overlay" — explicit deferral; 090's O-1 captain decision puts Part 2 under 101's scope [primary]
-- **Coordination risk**: 090 Part 1 (pr-review-loop mod) is independent; Part 2 graft changes must not race with 101 (see Q-2)
-
-### A-11: Multiple concurrent writers on `references/first-officer-shared-core.md` + `claude-first-officer-runtime.md` — 101 must coordinate
-- **Confidence**: Confident (0.90)
-- **Evidence**: Angle iii CONTRACTS.md:214-219+239-246: 4 concurrent writers on first-officer-shared-core.md (kc-pr-flow ✅final + review-stage-parallel-skill-dispatch 🟡in-flight + pre-ship-confidence-gate 🟡in-flight + flatten-dispatch-troops-architecture 🔵planned) [primary]
-- **Additional evidence**: 101's new FO primitive (plugin-path README discovery) is a new Step in the shared-core doc; depending on where it inserts, may collide with the other 3 writers' edits [primary]
-
-### A-12: 9 bugs from carlove session all have pressure-test fixtures #14-22; NONE are fixed (actual=A status across all)
-- **Confidence**: Confident (0.95)
-- **Evidence**: tests/pressure/graft.yaml:1-235 contains bugs #1-13 + bd0e83d commit added #14-19 (2026-04-13) + 840b963 added #20-22 (2026-04-14) [primary]
-- **Additional evidence**: Angle ii confirmed no subsequent fix commits; fix status "tests added, fixes pending on entity 101" [primary]
+A-6: `_docs/` is NOT parsed by FO at startup -- it is reference material for humans and skills only. FO's startup sequence (shared-core Steps 1-7) references only `README.md` (Step 3) and `_mods/` (Step 4). Eliminating `_docs/` copying is correct but the entity's stated rationale ("FO reads from plugin source path") is inaccurate.
+Confidence: 🟢 Confident (0.95)
+Evidence: references/first-officer-shared-core.md -- zero references to `_docs/` in any startup step; `_docs/SO-FO-DISPATCH-SPLIT.md` is consumed by skills (build-explore, build-plan), not FO core
+→ Confirmed: captain, 2026-04-14 (batch)
 
 ## Option Comparisons
 
-### O-1: 101 scope decomposition
+### O-1: How does FO discover a grafted workflow's README?
+
+Entity 101 eliminates the merged README from the grafted workflow directory. FO currently discovers workflows by scanning for `README.md` files with `commissioned-by:` frontmatter (shared-core:8-12). Without a local README, FO needs a new discovery mechanism. **O-1 choice constrains O-2** -- if O-1=C, O-2 is moot (graft pre-applies everything).
 
 | Option | Pros | Cons | Complexity | Recommendation |
 |---|---|---|---|---|
-| **(a) 3-way decomposition: 101 (FO plugin-path primitive) + 101b (graft core redesign) + 101c (backward-compat + 5 skill-loc bugs)** | Cleanest separation of concerns; 101 becomes Small-Medium (single new FO capability); 101b becomes Medium; 101c parallel-ships bug cleanup | 3 coordinated entities require strict sequencing (101 → 101b → 101c); more FO dispatch overhead | High (coordination) | Viable |
-| **(b) 2-way decomposition: 101 (FO primitive + graft core redesign) + 101b (backward-compat migrate + 5 skill-loc bugs)** | Groups architectural work in 101; 101b is orthogonal cleanup; ships faster than 3-way; preserves captain's one-entity-per-HIGH pattern from 108 | 101 itself stays Large-ish (FO primitive + graft core) | Medium | ✅ Recommended |
-| **(c) Keep single Large entity — all 9 bugs + architecture + migrate in one** | Matches frontmatter `scale: Large`; ships complete redesign in one cycle | Long-running worktree, high pressure/interrupt risk; 5 orthogonal skill-localization bugs dilute focus on the architectural work | High | Viable |
+| A: Manifest pointer -- FO adds `.spacedock/workflows/*/manifest.yaml` as 4th discovery source; reads `source.plugin` + `source.workflow_path`; resolves plugin via `${CLAUDE_SKILL_DIR}/../..`; reads README from plugin | Clean separation (manifest = graft artifact, README = plugin artifact); eliminates bugs #20 and #22 structurally; no README duplication on disk | FO gains manifest parsing code; couples FO startup to graft's manifest schema; 4th discovery source adds startup complexity | Medium | Recommended |
+| B: Redirect README -- thin README.md in workflow dir with `source-plugin:` + `source-workflow:` fields; FO's existing `commissioned-by:` scan finds it, follows redirect to plugin | Minimal FO scan change; backward-compatible discovery pattern; tooling that expects README still finds one | README still on disk (thin but present); must omit full `commissioned-by:` content to prevent bug #22 dual-config; adds redirect parsing branch to FO | Low | Viable |
+| C: Full pre-computation -- graft writes complete merged README (current approach minus `_origin/`); zero FO change | No FO changes at all; simplest implementation; fixes bugs #21 (dir structure) and partially #22 (no `_origin/` README) | Merged README on disk retains bug #22 risk if FO also discovers plugin's original; "runtime overlay" goal abandoned; must re-run graft on every LOCAL.yaml change | Low | Viable |
 
-**Recommendation validation**: Option (b) groups "what must ship together" (FO plugin-path primitive + graft core redesign — they're tightly coupled) while separating "orthogonal cleanup" (backward-compat + skill-loc bugs don't depend on new architecture). Captain pattern from 108: one entity per HIGH finding. Here the HIGH finding IS "build-time merge architecture is wrong" — one entity. Skill-loc bugs are MEDIUM and orthogonal. (✅ validated)
+### O-2: Who applies LOCAL.yaml readme_operations? (Only relevant if O-1 = A or B)
 
-### O-2: Backward-compat strategy for carlove's existing `.origin/` graft
-
-| Option | Pros | Cons | Complexity | Recommendation |
-|---|---|---|---|---|
-| **(a) Build `graft migrate` command (per Directive AC L132)** | Respects captain commitment; zero manual work for carlove; idempotent | New graft subcommand; migration logic is load-bearing correctness (misapplied migration corrupts state) | Medium | ✅ Recommended |
-| **(b) Manual migration docs only (no subcommand)** | Less code; captain runs the migration as recipe | Captain toil; inconsistent execution across carlove + future grafts; breaks Directive AC L132 | Low | Not recommended |
-| **(c) Dual-support mode — new graft reads either `.origin/`-old or manifest-new** | No migration needed; old grafts work forever | Permanent technical debt; two codepaths in graft forever; violates 101's "eliminate entire 3-way merge path" | High | Not recommended |
-
-**Recommendation validation**: Option (a) matches Directive AC L132 explicit commitment. Return trace: `graft migrate` reads existing .origin/manifest.yaml → computes source_hash from current plugin state → writes new manifest.yaml with source_hash + deletes .origin/ + reapplies LOCAL.yaml to .claude/skills/. 2-level trace confirmed; domain invariant (backward-compat for carlove) respected. (✅ validated)
-
-### O-3: FO plugin-path README discovery — new primitive integration
+If FO reads the README from the plugin (O-1=A or B), the LOCAL.yaml `readme_operations` must be applied somewhere to customize stage definitions (e.g., skill ref rewrites from `spacedock:build-quality` to `build-quality`).
 
 | Option | Pros | Cons | Complexity | Recommendation |
 |---|---|---|---|---|
-| **(a) Add 4th discovery source to first-officer-shared-core.md Step 2: explicit path → project-local → user-scoped → plugin-manifest path** | Minimal edit; additive to existing protocol; other discovery sources unchanged | Merge conflict with 3 concurrent FO-shared-core writers (A-11) — careful insertion point needed | Low | ✅ Recommended |
-| **(b) Replace project-local README scan entirely with plugin-manifest read** | Eliminates bug #22 (dual discovery) structurally — only one source for workflow README | Breaking change for every non-grafted spacedock consumer; violates 090 decision "workflow-index migration is gradual"; huge blast radius | High | Not recommended |
-| **(c) New subsection in LOCAL.yaml declaring where to read workflow README from** | Per-workflow flexibility; doesn't touch FO shared core for non-grafted cases | New config surface; FO must branch on LOCAL.yaml presence; complexity adds to LOCAL.yaml schema | Medium | Viable |
-
-**Recommendation validation**: Option (a) aligns with additive-edit discipline to minimize merge risk per A-11. Plan stage must pick insertion line range outside the 3 concurrent writers' scope. (✅ validated)
+| A: FO at startup (runtime) -- FO reads LOCAL.yaml, applies `readme_operations` to plugin README in-memory before parsing stages | True runtime overlay; LOCAL.yaml changes take effect on FO restart without re-running graft; plugin README is always the authoritative source | FO must parse LOCAL.yaml op format; increases FO startup complexity; LOCAL.yaml syntax errors surface at FO startup, not graft time | Medium | Viable |
+| B: Graft pre-applies into overlay artifact -- graft writes pre-computed stage overrides (e.g., `overrides.yaml` with final field values); FO reads the artifact, not LOCAL.yaml directly | FO stays simple (reads one structured YAML); errors caught at graft time; clear ownership boundary between graft (writes) and FO (reads) | Must re-run `graft localize` after LOCAL.yaml edit; artifact can become stale if graft not re-run; one extra file in workflow dir | Low | Recommended |
 
 ## Open Questions
 
-### Q-1: Decomposition granularity — accept the 2-way split (O-1b) or prefer 3-way (O-1a) / single Large (O-1c)?
-- **Domain**: scope management
-- **Why it matters**: 101 current scope (per Directive + 10 ACs + 9 bugs + new FO primitive + migrate command + LOCAL.yaml runtime apply + hash schema + coordinate with 090) is genuinely Large and spans 3 concerns (architecture / backward-compat / skill-loc cleanup). Decomposition ratio affects ship cadence and merge-conflict risk against A-11's 3 concurrent writers.
-- **Suggested options**: See O-1 table (3-way / 2-way / single).
-- **Evidence for options**: [primary]
+Q-1: LOCAL.yaml `readme_operations` uses `new_value` for `set-stage-field` ops (SKILL.md:195), but overhaul `recipe-format.md` uses `value` for the same operation. Graft Design Principle #3 states "LOCAL.yaml operations use the same op language as overhaul recipes." Which field name is canonical?
 
-### Q-2: How to coordinate with entity 090's Part 2 (shipped_config migration) which defers to 101?
-- **Domain**: cross-entity coordination
-- **Why it matters**: A-10 confirms 090 at `clarify/ready` is waiting. 090 Part 1 (pr-review-loop mod) is independent and can ship without 101. 090 Part 2 explicitly says "absorbed by 101". If 090 ships Part 1+Part 2 before 101, graft/SKILL.md gets shipped_config migration that 101 will promptly rewrite. If 090 ships Part 1 only, Part 2 must be folded into 101's scope.
-- **Suggested options**:
-  1. **090 ships Part 1 only; 101 absorbs Part 2 (shipped_config migration)** — cleanest; 090's A-4 already anticipated this
-  2. **090 ships both parts first; 101 rewrites on top** — more churn but unblocks 090
-  3. **Merge 090 into 101 entirely** — abandon 090 as entity; 101 takes over all graft work
-- **Evidence for options**: [primary]
+Domain: Readable/Textual
 
-### Q-3: Does 101 include the 5 skill-localization bugs (#14 root-script, #15 overwrite-guard, #16 dir-create, #17 verbatim-glob, #19 smoke-test) or spawn as separate entity?
-- **Domain**: scope boundary
-- **Why it matters**: These 5 bugs are orthogonal to the architecture redesign — they're skill-localization correctness issues that persist in both build-time merge AND runtime overlay designs (per Directive L50-57 "remain in both designs"). Including them bloats 101; excluding them leaves technical debt unless a follow-up entity is spawned.
-- **Suggested options**:
-  1. **Spawn 101c as skill-localization-hardening** (per O-1a 3-way recommendation) — ships parallel to 101
-  2. **Include in 101 as "cleanup tasks"** (per O-1c single Large) — one-entity-to-ship
-  3. **Defer indefinitely — known-gap log** — accept bugs as v1 trade-off (MEDIUM severity); captain pattern matches entity 108's known-gap handling
-- **Evidence for options**: [primary]
+Why it matters: Entity 101 will either keep or revise the `readme_operations` format. Any parser (FO if O-2=A, or graft) needs one canonical field name. The divergence may be intentional (graft's persistent overlay context differs from overhaul's one-shot) or an oversight.
 
-### Q-4: When captain says "read workflow README from plugin at startup" — is the intent to read from `{spacedock_plugin_dir}/docs/build-pipeline/README.md` literally, or a more abstract plugin-provided manifest pointing to a workflow README location?
-- **Domain**: architectural foundation
-- **Why it matters**: The concrete API depends on what "plugin" means in runtime context. Option (i): FO looks up `.claude-plugin/plugin.json` in each discovered plugin + reads a new `workflow_readme` field pointing to the README path. Option (ii): FO hardcodes `{plugin_dir}/docs/build-pipeline/README.md` as convention. Option (iii): manifest.yaml in the grafted dir points to plugin + README path by string.
-- **Suggested options**:
-  1. **Option (i) plugin.json declares workflow_readme** — most future-proof, requires plugin.json schema extension, other plugins can adopt
-  2. **Option (ii) hardcoded convention** — simplest, assumes spacedock naming convention universally
-  3. **Option (iii) manifest.yaml declares full path** — most flexible per-graft, slight duplication vs plugin.json
-- **Evidence for options**: [primary]
+Suggested options: (a) Align to overhaul's `value` -- fix graft SKILL.md (preserves Design Principle #3), (b) Keep graft's `new_value` -- more descriptive for persistent overlays (revise Design Principle #3), (c) Support both with fallback (fragile, adds parser complexity)
 
-## Core Tensions
+Q-2: Workflow directory naming strategy for `.spacedock/workflows/{name}/`. Current graft init derives name from source basename with truncation (`build-pipeline` → `build`). Bug #20 showed `build` collides with FO's ignore list. Even without a local README, the workflow dir stores entities, `_index/`, `_mods/` and must be discoverable by status tooling.
 
-- **essential**: **Architecture-first vs bug-cleanup-first ship order** — Q-3 decides whether 101's ship unblocks 060 cutover (architecture only) vs waits for full 9-bug cleanup. Captain framing "build-time merge is systemic" (Directive L110) argues for architecture-first; carlove UAT experience argues that skill-loc bugs bite in practice.
-- **time-based**: **101 vs 3 concurrent FO-shared-core writers** — A-11 documents 4 concurrent planned/in-flight writers on first-officer-shared-core.md. 101's new discovery source adds a 5th writer. Merge-conflict risk climbs with each day 101 stays out of CONTRACTS. Plan stage must pick insertion point precisely.
-- **domain-based**: **Skill localization bugs vs architecture redesign** — bugs #14/#15/#17/#19 are correctness issues in the `graft localize` subcommand that persist in both build-time and runtime designs. They are orthogonal to the core "eliminate build-time merge" thesis; lumping them into 101 dilutes the architectural focus.
+Domain: Organizational/Data-transforming
 
-## Honest Boundaries
+Why it matters: Bug #20 was CRITICAL -- the grafted workflow became invisible to FO. The naming strategy must prevent collisions with FO's ignore list (`.git`, `.worktrees`, `node_modules`, `vendor`, `dist`, `build`, `__pycache__` -- shared-core:10) AND remain human-readable for captain navigation.
 
-- **Explore did not read overhaul recipe op vocabulary** (Angle i Follow-up Topics) — LOCAL.yaml currently reuses overhaul ops, so extending the op set for runtime-overlay may require coordinated changes to overhaul skill too. Plan stage must audit.
-- **Explore did not verify Claude Code plugin loader precedence** (Angle i Unknown Unknowns) — does `.claude/skills/foo` shadow `spacedock:foo`? This affects 101's LOCAL.yaml runtime apply design; untested here.
-- **Explore did not read `tools/dashboard/src/channel.ts` in full** — indirectly referenced via 090 deferral chain; not a 101 target but connected.
-- **Plugin.json schema extension is speculative** (O-3 option (i) + Q-4 option (i)) — assumes Claude Code plugin manifest is schema-extensible; not verified against Claude Code docs this explore.
-- **Pressure tests #14-22 fix verification is out of 101 explore scope** — plan stage must check each test's expected-vs-actual after 101's code lands.
+Suggested options: (a) Always use full source basename without truncation (e.g., `build-pipeline` not `build`), (b) Validate derived name against FO ignore list at init time and reject/warn on collision, (c) Both a + b (belt and suspenders)
+
+Q-3: Library mods at target repo root `mods/`. FO scans `mods/*.md` at repo root for library mods (shared-core:19). Graft init only populates `{workflow_dir}/_mods/`, not repo-root `mods/`. Library mods like `workflow-index-maintainer.md` have no workflow-level override in `_mods/` and would be missing in grafted repos.
+
+Domain: Organizational/Data-transforming
+
+Why it matters: If the grafted workflow depends on library mod behavior (e.g., `_index/` maintenance via `workflow-index-maintainer` startup hook), the missing mod means the behavior silently disappears. Currently 3 library mods exist in spacedock (`pr-review-loop`, `pr-merge`, `workflow-index-maintainer`); only `pr-review-loop` has a workflow-level override in `docs/build-pipeline/_mods/`.
+
+Suggested options: (a) Graft init copies required library mods to target repo root `mods/`, (b) FO also checks plugin's `mods/` directory for library mods at startup (runtime read from plugin), (c) Target repo configures library mods independently (graft documents the requirement in PREREQUISITES.md), (d) Workflow mods at `_mods/` absorb all library mod responsibilities (eliminate library mod dependency)
 
 ## Decomposition Recommendation
 
-⚠️ **Decomposition warranted — 101 scope spans 3 orthogonal concerns**:
+⚠️ Entity 101 spans 3 capability areas with a clear dependency chain. Decomposition is optional but recommended for review isolation:
 
-Recommended split (per O-1 option (b) — 2-way):
+1. `graft-fo-plugin-discovery` -- FO shared core adds grafted-workflow discovery via manifest pointer or redirect README (Small, domain: Behavioral/Callable)
+2. `graft-v2-core` -- Rewrite graft SKILL.md: revised design principles, manifest v2 schema, LOCAL.yaml handling, all 5 sub-commands adapted for hash-based architecture (Large, domain: Runnable/Invokable + Readable/Textual)
+3. `graft-v1-v2-migration` -- Add `graft migrate` sub-command for existing carlove-format grafts (Small-Medium, domain: Organizational/Data-transforming)
 
-- **101 (this entity)** — `scale: Medium` (revised from Large), `intent: feature`, scope: architecture redesign
-  1. New FO primitive: plugin-path workflow README discovery (plugin.json schema extension for `workflow_readme` field; FO shared-core Step 2 adds 4th source per O-3a)
-  2. Graft core redesign: manifest.yaml source_hash schema; eliminate `.origin/` directory; eliminate merged README.md; LOCAL.yaml runtime apply by FO
-  3. Hash-based upgrade flow for localized skills (replaces 3-way merge)
-  4. `graft init` updated to new format
-  5. All 10 Directive ACs satisfied
-  6. Absorb 090 Part 2 (shipped_config migration) per Q-2 option 1
-  - Domain: `spacedock-graft-runtime-overlay`
+Dependencies:
+- 2 depends on 1 (graft v2 init/upgrade relies on FO's new discovery mechanism)
+- 3 depends on 2 (migration target format defined by v2 core)
 
-- **101b graft-backward-compat-and-localization-hardening** (child, spawn at handoff per Q-3 option 1) — `scale: Medium`, `intent: feature`, scope: migration + orthogonal bug cleanup
-  1. `graft migrate` subcommand (per Directive AC L132) — converts carlove's `.origin/` format to new manifest+hash format
-  2. Bug #14 fix: root-script false-positive detection (skip stub scripts at root)
-  3. Bug #15 fix: pre-write diff/confirm before overwriting existing `.claude/skills` / `.claude/agents` files
-  4. Bug #16 fix: `mkdir -p .claude/skills/{name}/` at init
-  5. Bug #17 fix: verbatim validation glob for local plugin installs
-  6. Bug #19 fix: post-init smoke test (load skills, verify no import errors)
-  7. Validate by re-running carlove `graft migrate` + full pressure-test sweep #14-22
-  - Domain: `spacedock-graft-hardening`
-  - Depends-on: 101
-  - Parent: 101
+Alternative: keep as single entity with ordered plan tasks -- entity 1 is small enough (1-2 files) to be a plan task within entity 2.
+
+## Canonical References
+
+(clarify stage will populate)
 
 ## Stage Report: explore
 
-- [x] Files mapped: 15 across contract, router, test, config layers
-  contract: 4 (first-officer-shared-core, claude-first-officer-runtime, plugin.json, build-pipeline/README.md), router: 4 (skills/graft/SKILL.md sections + various skill entries), test: 1 (tests/pressure/graft.yaml with 22 cases), config: 6 (agents/first-officer.md, entity 090 body, entity 101 body, DECISIONS.md, CONTRACTS.md rows for FO + README)
-- [x] Assumptions formed: 12 (Confident: 12, Likely: 0, Unclear: 0)
-  A-1 through A-12 all Confident; strong multi-angle convergence on every finding
-- [x] Options surfaced: 3
-  O-1 decomposition granularity; O-2 backward-compat strategy; O-3 FO plugin-path discovery integration
-- [x] Questions generated: 4
-  Q-1 decomposition preference; Q-2 090 coordination; Q-3 skill-loc bugs scope; Q-4 plugin-path discovery concrete API
-- [x] α markers resolved: 0 / 0 (no α markers in brainstorm spec; Directive + Brainstorming Spec + 10 ACs sufficient)
-- [x] Scale assessment: confirmed Large for current full-scope framing; revises to Medium+Medium if decomposed per O-1b
-  Single entity would genuinely be Large (architecture + 9 bugs + migrate + coordination with 090 + 3 concurrent FO writers). 2-way decomposition per O-1b yields 101 (Medium arch) + 101b (Medium cleanup).
-- [x] Research dispatched: 0 researchers (skipped -- all assumptions grounded in codebase evidence; no external tech claims requiring validation)
-
-SO self-investigation this entity (per MEMORY `so-self-investigation-first`):
-- Path convention `.origin/` vs `_origin/` → self-resolved (codebase grep: 28/28 matches confirm `.origin/`)
-- Entity 097 vs 101 naming confusion → self-resolved (read entity frontmatter: id=101; confusion is 090's stale body text from old numbering)
-- Entity 090 ship state → self-resolved (frontmatter: clarify/ready, not shipped; Part 2 defers to 101 per 090 A-4)
-- Sibling CONTRACTS "planned" vs code-shipped → self-resolved via cascade (MEMORY A-10 pattern; established in 099 session)
-4 of ~7 potential Qs self-resolved, 4 genuine Qs sent to captain (signal ratio ~57%).
-
-## Clarify Annotations
-
-**Open Questions — resolved 2026-04-15:**
-
-- Q-1 → **Captain answer**: 2-way decomposition (O-1 option b). 101 (Medium architecture) + 101b (Medium cleanup).
-- Q-2 → **Captain answer**: 090 ships Part 1 only; 101 absorbs Part 2 (shipped_config migration). 090 is unblocked on Part 1 independently.
-- Q-3 → **Auto-resolved via Q-1 cascade**: 2-way decomposition places 5 skill-localization bugs (#14/#15/#16/#17/#19) in 101b. Not in 101.
-- Q-4 → **Captain answer + SO web-research-assisted**: manifest.yaml in grafted dir carries `source_plugin` + `workflow_readme_path` fields. Rationale: Claude Code plugin.json has fixed 17-field schema with validator; adding custom fields is risky (may fail validation). manifest.yaml is graft's own file — 101 fully controls schema.
-
-**Captain Research Correction (2026-04-15):**
-
-Captain challenged Q-4's premise "does Claude Code plugin.json support custom fields?". SO self-investigated via WebFetch on official Claude Code plugin docs:
-- plugin.json has explicit 17-field schema: `name, version, description, author, homepage, repository, license, keywords, skills, commands, agents, hooks, mcpServers, outputStyles, lspServers, monitors, userConfig, channels`
-- `claude plugin validate` enforces the schema with errors like `"name: Required"` / `"Plugin has an invalid manifest file"`
-- No documented "unknown fields allowed" for plugin.json (settings.json has this provision; plugin.json does not)
-- Upstream PR to add `workflow_readme` possible but long-cycle (Anthropic approval)
-
-This inverted Q-4's risk assessment: option (a) plugin.json extension was original "Recommended" but reframed as **highest risk**. Captain selected option (c) grafted-dir manifest.yaml fields as the clean choice. Pattern: **trust-but-verify third-party schema extensibility claims via docs + CLI inspection before committing**.
-
-**Option Selection Summary:**
-
-- O-1 → **Option (b)**: 2-way decomposition; 101 (Medium architecture) + 101b (Medium cleanup)
-- O-2 → **Option (a)**: Build `graft migrate` command in 101b; backward-compat for carlove
-- O-3 → **Re-selected from option (a) to option (c)-variant**: NOT plugin.json extension; manifest.yaml in grafted dir carries plugin+README pointer. Implementation detail: FO shared core Step 2 adds new 4th discovery source that, when `.spacedock/workflows/{name}/manifest.yaml` present + has `workflow_readme_path` field, reads README from `{plugin_dir}/{workflow_readme_path}`.
-
-**Assumption Confirmations:**
-
-All 12 assumptions (A-1 through A-12) confirmed. A-11 (4 concurrent FO shared-core writers) remains a plan-stage sequencing concern — 101's new discovery source insert-point must be chosen to minimize conflict.
-
-## Decomposition Recommendation (Confirmed)
-
-⚠️ **Decomposition finalized per Q-1 captain selection**:
-
-**101 (this entity)** — `scale: Medium` (revised from Large), `intent: feature`, scope: architecture redesign
-
-Concrete deliverables (9 items):
-1. Extend manifest.yaml schema to carry `source_plugin` (e.g., "spacedock") + `workflow_readme_path` (e.g., "docs/build-pipeline/README.md") fields
-2. FO shared core Step 2: add 4th discovery source — when grafted dir's manifest.yaml declares plugin+readme path, read README from `{resolved_plugin_dir}/{workflow_readme_path}`
-3. Graft core redesign: eliminate `.origin/` directory; eliminate merged `README.md` in workflow dir; add `source_hash: <sha256>` per skill in manifest.yaml
-4. LOCAL.yaml runtime apply: FO reads LOCAL.yaml at startup, applies `readme_operations` (currently `set-stage-field`) to workflow README in-memory before proceeding. If new body-section op types needed, add to LOCAL.yaml schema.
-5. Hash-based upgrade: compute current plugin SKILL.md SHA256 → compare to manifest.yaml `source_hash` → if changed, reapply LOCAL.yaml overrides to localized `.claude/skills/{name}/SKILL.md` (replaces 3-way merge)
-6. `graft init` updated: stop copying `.origin/`; write new-schema manifest.yaml; still materialize `.claude/skills/` with LOCAL.yaml applied
-7. Absorb 090 Part 2: shipped_config migration added to LOCAL.yaml schema; 090's shipped_stage handling lands here
-8. Include `_archive/`, `_mods/`, `_docs/`, `_index/INDEX.md` in graft init's copy surface (fixes bug #21)
-9. All 10 Directive Acceptance Criteria satisfied
-
-Domain: `spacedock-graft-runtime-overlay`
-
-**101b graft-backward-compat-and-localization-hardening** (child, spawn at handoff) — `scale: Medium`, `intent: feature`, scope: migration + orthogonal bug cleanup
-
-Concrete deliverables (6 items):
-1. `graft migrate` subcommand: converts carlove's existing `.origin/` format to new manifest.yaml + hash schema; idempotent; safe to re-run
-2. Bug #14 fix: root-script false-positive detection (flag stub scripts like `pnpm test` at root that delegate to workspaces)
-3. Bug #15 fix: pre-write diff/confirm before overwriting existing `.claude/skills/{name}` or `.claude/agents/{name}.md`
-4. Bug #16 fix: `mkdir -p .claude/skills/{name}/` explicitly during init (currently FileNotFoundError)
-5. Bug #17 fix: verbatim validation glob works for local plugin installs (currently assumes `~/.claude/plugins/` path)
-6. Bug #19 fix: post-init smoke test — load skills, verify no import errors, report summary
-7. Validate by re-running `graft migrate` + full pressure-test sweep #14-22
-
-Domain: `spacedock-graft-hardening`
-Depends-on: 101
-Parent: 101
-
-## Stage Report: clarify
-
-- [x] Open Questions resolved: 4 / 4
-  Q-1 captain 2-way; Q-2 captain 090-Part-1-only; Q-3 SO cascade via Q-1; Q-4 captain manifest.yaml (after web-research-corrected framing)
-- [x] Options selected: 3 / 3
-  O-1 2-way decomposition; O-2 graft migrate command; O-3 manifest.yaml pointer (corrected from plugin.json extension)
-- [x] Assumptions confirmed: 12 / 12
-  All 12 confirmed; A-11 concurrent-writer risk carries into plan as sequencing concern
-- [x] Decomposition: warranted + finalized
-  101 (Medium architecture) + 101b (Medium cleanup); 101b spawn at FO handoff
-- [x] Child seeds queued: 1
-  101b graft-backward-compat-and-localization-hardening — 6 concrete deliverables specified
-- [x] Captain architectural clarification captured: Q-4 web-research correction documented; plugin.json schema constraints noted for future graft-like entities
-- [x] Sufficiency gate: PASS
-  101 scope is 9 concrete deliverables; plan stage can proceed.
+- [x] Files mapped: 20 across domain, contract, config, test
+  domain: 5 (graft/overhaul/commission/FO/refit skills), contract: 4 (FO shared-core, runtime, SO-FO split, recipe-format), config: 10 (README, plugin.json, agent def, 4 mods, 3 entity docs), test: 1 (pressure/graft.yaml)
+- [x] Assumptions formed: 6 (Confident: 5, Likely: 1, Unclear: 0)
+  A-1 plugin dir (0.90), A-2 README-only overlay (0.90), A-3 hash reapply (0.90), A-4 manifest v2 (0.85), A-5 migration (0.70), A-6 _docs/ not FO-parsed (0.95)
+- [x] Options surfaced: 2
+  O-1 FO discovery mechanism (3 options, A recommended); O-2 LOCAL.yaml applicator (2 options, gated by O-1)
+- [x] Questions generated: 3
+  Q-1 op field name divergence; Q-2 workflow dir naming collision; Q-3 library mod porting gap
+- [x] α markers resolved: 0 / 0
+  No α markers in brainstorming spec
+- [x] Scale assessment: confirmed Large
+  20 files across 4 layers; 698-line SKILL.md full rewrite; 5 sub-commands affected; decomposition recommended
+- [x] Research dispatched: 0 researchers (skipped -- all claims are internal architecture, no external tech dependencies)
