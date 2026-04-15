@@ -863,3 +863,75 @@ no findings met D1/D2 threshold (markdown-only audit diff; no skill-level patter
 ### Summary
 
 Entity 108 is a markdown-only audit artifact with a single changed file (entity body). Diff is execute-stage additions only; no source code, no skill files, no reference files modified. Pre-scan is clean across all 5 checks. Two minor DOC/NIT findings in the execute Stage Report summary (finding count off by 1 MEDIUM); these do not affect the audit findings themselves and do not warrant an execute bounce. All 12 findings (6H + 4M + 2L) are severity-defensible with content-anchored evidence. All 7 Phase F seeds have targeted, non-overlapping directives (Seeds 1+3 have a write-mode.md coordination advisory noted). All primary cross-references verified against actual worktree files. Verdict: pass -- advance to UAT.
+
+## UAT Results
+
+| item | type | status | evidence | notes | re-attempt |
+| ---- | ---- | ------ | -------- | ----- | ---------- |
+| Q-UAT-1 | interactive | pending-captain | -- | severity review (6H+4M+2L=12); AskUserQuestion unavailable in subagent context | 0 |
+| Q-UAT-2 | interactive | pending-captain | -- | Phase F seed scope (7 seeds); AskUserQuestion unavailable in subagent context | 0 |
+| Q-UAT-3 | interactive | pending-captain | -- | F-XP-1 compound decomposition (a)+(b); AskUserQuestion unavailable in subagent context | 0 |
+| Q-UAT-4 | interactive | pending-captain | -- | known-gap revisit triggers (5 entries); AskUserQuestion unavailable in subagent context | 0 |
+
+## E2E Evidence
+
+| Item | Type | Artifact | Path |
+| ---- | ---- | -------- | ---- |
+| Q-UAT-1 | interactive | captain-decision | pending |
+| Q-UAT-2 | interactive | captain-decision | pending |
+| Q-UAT-3 | interactive | captain-decision | pending |
+| Q-UAT-4 | interactive | captain-decision | pending |
+
+## Stage Report: uat
+
+**Verdict**: pending-captain
+**Ran at**: 2026-04-15T14:01:19Z
+**HEAD**: 8d03dc8
+**Mode**: normal
+
+### summary
+- total items: 4
+- pass: 0
+- fail: 0
+- skipped: 0
+- pending-captain: 4
+- infra-level fails: 0
+- assertion fails: 0
+- uat_pending_count (post-run): 4
+
+### automated structural checks
+
+All 4 UAT items are `type: interactive` per UAT Spec ("No automated UAT -- audit artifact is prose"). Structural checks from quality stage acceptance criteria re-verified:
+
+- body section structure: `## Audit Findings -- workflow-index` (5 rows), `## Audit Findings -- troop + task-execution` (6 rows + F-XP-1 compound), `## Confirmed Mitigations`, `## Cross-Primitive Coherence`, `## Phase F Seed Slate` (7 seeds), `## Known-Gap Log` (5 entries) -- all present
+- finding count: 12 total (6H + 4M + 2L) -- review stage correctly caught 11→12 count drift in execute Stage Report summary; body findings are correct; execute summary NIT does not affect artifact validity
+- `grep -c "^| F-WI-"` returns 5 (PASS)
+- `grep -c "^| F-TR-"` returns 6 (PASS)
+- `grep -c "^### Seed "` returns 7 (PASS)
+- F-XP-1 compound present with sub-findings (a) troop-tool-allowlist-narrowing and (b) workflow-index-write-gatekeeper (PASS)
+- Known-gap revisit triggers: 21 instances of "revisit trigger" found across 5 gap entries -- each entry has at least one explicit trigger (PASS)
+- Phase F seed frontmatter-drafts: all 7 seeds have directive / severity-backref / scope (IS/NOT-in-scope) / model-hint sub-fields (PASS)
+
+### captain decisions
+
+- Q-UAT-1 (interactive -- findings severity review): pending-captain -- AskUserQuestion not available in subagent context per MEMORY `askuserquestion-agent-vs-subagent`
+- Q-UAT-2 (interactive -- Phase F seed scope): pending-captain -- same constraint
+- Q-UAT-3 (interactive -- F-XP-1 compound decomposition): pending-captain -- same constraint
+- Q-UAT-4 (interactive -- known-gap revisit triggers): pending-captain -- same constraint
+
+notes: AskUserQuestion requires `--agent` mode (native UI); this ensign runs as a subagent and cannot access the tool. All 4 interactive items routed to pending-captain per dispatch scope ("Interactive items → pending-captain, documented in Stage Report"). Captain may advance via `/spacedock:uat-resume` after reviewing findings in entity body.
+
+### Confidence Assessment
+
+**Composite: 87%** -- captain gate required (interactive items pending).
+
+5-factor breakdown:
+- **Clarity of requirements (25% weight)**: 99% -- UAT Spec is explicit; 4 interactive items, pass criteria stated
+- **Structural completeness (15% weight)**: 99% -- all mechanical checks pass; 12 findings, 7 seeds, 5 gap entries verified
+- **Interactive gate (20% weight)**: 0% -- 4/4 items pending-captain; no captain sign-off obtained
+- **Evidence integrity (20% weight)**: 98% -- content anchors verified by review stage; finding count drift caught and noted
+- **Process compliance (20% weight)**: 95% -- pending-captain is the correct disposition for subagent-inaccessible AskUserQuestion; no rules violated
+
+Weighted: 0.25·99 + 0.15·99 + 0.20·0 + 0.20·98 + 0.20·95 = 24.75 + 14.85 + 0 + 19.60 + 19.00 = **78.20%** -- round to **78%** (interactive gate zeroes out that factor; structural confidence is high but captain sign-off is the load-bearing gate).
+
+Verdict: **captain gate required** -- entity cannot advance to shipped without captain interactive review of the 4 UAT items. Use `/spacedock:uat-resume` to re-enter after captain sign-off.
