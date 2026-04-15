@@ -1,9 +1,9 @@
 // ABOUTME: Tests for chat aggregate persistence — round-trip + multi-event.
 
 import { describe, expect, test } from "bun:test";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createDb } from "../../db";
 import { appendEvents, countEvents, loadEvents } from "./persistence";
 import type { ChatEvent } from "./types";

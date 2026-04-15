@@ -2,9 +2,9 @@
 // via socket-server; unit tests cover slug validation and body parsing without daemon.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import { POST } from "./route";
 
 // Navigate from ui/app/api/entities/[slug]/chat/ (6 levels deep in spacebridge/) up to spacebridge/ then into bin/
@@ -23,7 +23,14 @@ async function waitForSocket(socketPath: string, timeoutMs = 8000): Promise<void
     try {
       await Bun.connect({
         unix: socketPath,
-        socket: { open(s) { s.end(); }, data() {}, error() {}, close() {} },
+        socket: {
+          open(s) {
+            s.end();
+          },
+          data() {},
+          error() {},
+          close() {},
+        },
       });
       return;
     } catch {
@@ -101,7 +108,9 @@ describe("chat route — integration", () => {
   afterEach(async () => {
     daemonProc.kill("SIGTERM");
     await daemonProc.exited;
-    try { rmSync(stateDir, { recursive: true, force: true }); } catch {}
+    try {
+      rmSync(stateDir, { recursive: true, force: true });
+    } catch {}
   });
 
   test("200 with delivered:false when no registered CC session for project root", async () => {
@@ -111,7 +120,7 @@ describe("chat route — integration", () => {
     });
     // Daemon is running but no session registered for the project root — delivered:false
     expect(resp.status).toBe(200);
-    const body = await resp.json() as { messageId: string; delivered: boolean };
+    const body = (await resp.json()) as { messageId: string; delivered: boolean };
     expect(typeof body.messageId).toBe("string");
     expect(body.delivered).toBe(false);
   });
@@ -126,7 +135,9 @@ describe("chat route — integration", () => {
       expect(resp.status).toBe(502);
     } finally {
       process.env.SPACEBRIDGE_STATE_DIR = stateDir;
-      try { rmSync(emptyDir, { recursive: true, force: true }); } catch {}
+      try {
+        rmSync(emptyDir, { recursive: true, force: true });
+      } catch {}
     }
   });
 });

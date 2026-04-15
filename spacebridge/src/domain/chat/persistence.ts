@@ -35,9 +35,6 @@ export async function loadEvents(db: SpacebridgeDb, aggregateId: string): Promis
 }
 
 export async function countEvents(db: SpacebridgeDb, aggregateId: string): Promise<number> {
-  const rows = await db
-    .select()
-    .from(chatEvents)
-    .where(eq(chatEvents.aggregateId, aggregateId));
+  const rows = await db.select().from(chatEvents).where(eq(chatEvents.aggregateId, aggregateId));
   return rows.length;
 }

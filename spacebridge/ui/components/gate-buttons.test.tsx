@@ -2,6 +2,7 @@
 // key implementation properties (fetch URL, "use client", approve/reject handlers).
 
 import { describe, expect, test } from "bun:test";
+
 // Note: GateButtons cannot be dynamically imported in the spacebridge test context
 // (React JSX runtime not available outside the Next.js build). Static source analysis
 // covers the contract; full render tests belong in the Next.js test suite.

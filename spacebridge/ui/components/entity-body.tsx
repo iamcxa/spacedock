@@ -5,11 +5,11 @@
 // Supports 3-mode comment UX: document-level, section-level, text-selection popover.
 // Manages local comment state; background router.refresh() keeps RSC in sync.
 
-import { useRef, useEffect } from "react";
+import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
-import { TextSelectionPopover } from "@/components/text-selection-popover";
 import { ChatInput } from "@/components/chat-input";
 import { GateButtons } from "@/components/gate-buttons";
+import { TextSelectionPopover } from "@/components/text-selection-popover";
 
 interface CommentRow {
   commentId: string;
@@ -40,7 +40,7 @@ function wrapTextRange(
   rangeStart: number,
   rangeEnd: number,
   commentIds: string[],
-  resolved: boolean
+  resolved: boolean,
 ) {
   for (let i = 0; i < nodeOffsets.length; i++) {
     const info = nodeOffsets[i];
@@ -84,8 +84,7 @@ export function EntityBody({
   status,
   autoAdvance,
 }: EntityBodyProps) {
-  const showGateButtons =
-    !autoAdvance && (status === "plan" || status === "uat");
+  const showGateButtons = !autoAdvance && (status === "plan" || status === "uat");
   const articleRef = useRef<HTMLElement>(null);
 
   // Inject yellow highlight marks for comments with selectedText
@@ -197,7 +196,11 @@ export function EntityBody({
               h2: ({ node, children, ...props }) => {
                 const headingText = typeof children === "string" ? children : String(children);
                 return (
-                  <h2 {...props} className="text-lg font-semibold mt-6 mb-2 scroll-mt-16" id={headingText}>
+                  <h2
+                    {...props}
+                    className="text-lg font-semibold mt-6 mb-2 scroll-mt-16"
+                    id={headingText}
+                  >
                     {children}
                   </h2>
                 );
@@ -215,9 +218,7 @@ export function EntityBody({
         />
       </div>
 
-      {showGateButtons && (
-        <GateButtons entitySlug={entitySlug} stage={status!} />
-      )}
+      {showGateButtons && <GateButtons entitySlug={entitySlug} stage={status!} />}
 
       <ChatInput entitySlug={entitySlug} />
     </div>

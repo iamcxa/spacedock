@@ -4,10 +4,10 @@
 // Each comment card has id="comment-{commentId}" for scroll-to-comment from highlights.
 
 import { useState } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { CommentThread } from "@/components/comment-thread";
 import { AddCommentForm } from "@/components/add-comment-form";
+import { CommentThread } from "@/components/comment-thread";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CommentRow {
   commentId: string;
@@ -49,10 +49,7 @@ export function CommentPanel({
     onCommentAdded(newComment);
   }
 
-  const totalCount = Object.values(commentsBySection).reduce(
-    (sum, arr) => sum + arr.length,
-    0
-  );
+  const totalCount = Object.values(commentsBySection).reduce((sum, arr) => sum + arr.length, 0);
 
   // General (document-level) comments use empty-string key
   const generalComments = commentsBySection[""] ?? [];

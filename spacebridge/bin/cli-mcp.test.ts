@@ -3,12 +3,11 @@
 // and asserts valid responses + push notifications.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import type { Subprocess } from "bun";
 import { createSocketClient } from "../src/ipc/socket-client";
-import { encodeMessage } from "../src/ipc/framing";
 
 const CLI_SCRIPT = join(import.meta.dir, "cli.ts");
 const DAEMON_SCRIPT = join(import.meta.dir, "daemon.ts");
@@ -27,7 +26,14 @@ async function waitForSocket(socketPath: string, timeoutMs = 8000): Promise<void
     try {
       await Bun.connect({
         unix: socketPath,
-        socket: { open(s) { s.end(); }, data() {}, error() {}, close() {} },
+        socket: {
+          open(s) {
+            s.end();
+          },
+          data() {},
+          error() {},
+          close() {},
+        },
       });
       return;
     } catch {
@@ -39,7 +45,7 @@ async function waitForSocket(socketPath: string, timeoutMs = 8000): Promise<void
 
 // MCP JSON-RPC helpers
 function mcpRequest(id: number | string, method: string, params: unknown = {}): string {
-  return JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n";
+  return `${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`;
 }
 
 async function readMcpMessage(
@@ -115,7 +121,9 @@ describe("cli.ts mcp — MCP stdio bridge", () => {
     shimProc.kill("SIGTERM");
     daemonProc.kill("SIGTERM");
     await Promise.allSettled([shimProc.exited, daemonProc.exited]);
-    try { rmSync(stateDir, { recursive: true, force: true }); } catch {}
+    try {
+      rmSync(stateDir, { recursive: true, force: true });
+    } catch {}
   });
 
   test("MCP initialize request returns valid response", async () => {
@@ -130,7 +138,7 @@ describe("cli.ts mcp — MCP stdio bridge", () => {
     shimProc.stdin.write(new TextEncoder().encode(initMsg));
     shimProc.stdin.flush();
 
-    const response = await readMcpMessage(reader, 3000) as {
+    const response = (await readMcpMessage(reader, 3000)) as {
       jsonrpc: string;
       id: number;
       result?: { protocolVersion: string; serverInfo: { name: string } };
@@ -173,20 +181,22 @@ describe("cli.ts mcp — MCP stdio bridge", () => {
       type: "rpc-request",
       payload: {
         method: "captain_chat",
-        args: [{
-          type: "send_captain_message",
-          messageId: msgId,
-          targetSessionId: "unused",
-          projectRoot: stateDir,
-          content: "test push",
-          sentAt: Date.now(),
-        }],
+        args: [
+          {
+            type: "send_captain_message",
+            messageId: msgId,
+            targetSessionId: "unused",
+            projectRoot: stateDir,
+            content: "test push",
+            sentAt: Date.now(),
+          },
+        ],
       },
     });
     helperClient.close();
 
     // Read next message from shim stdout — should be the notification
-    const notification = await readMcpMessage(reader, 3000) as {
+    const notification = (await readMcpMessage(reader, 3000)) as {
       method?: string;
       params?: { messageId?: string };
     };

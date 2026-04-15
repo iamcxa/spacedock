@@ -10,7 +10,11 @@ const NOW = 1_700_000_000_000;
 describe("decide — approve_gate", () => {
   test("happy path returns gate_approved event", () => {
     const state: GateState = new Map();
-    const events = decide({ type: "approve_gate", entitySlug: "entity-001", stage: "plan", decidedBy: "captain" }, state, NOW);
+    const events = decide(
+      { type: "approve_gate", entitySlug: "entity-001", stage: "plan", decidedBy: "captain" },
+      state,
+      NOW,
+    );
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe("gate_approved");
     if (events[0].type === "gate_approved") {
@@ -21,10 +25,24 @@ describe("decide — approve_gate", () => {
 
   test("duplicate gate throws GateAlreadyDecided", () => {
     const state: GateState = new Map([
-      ["entity-001::plan", { decision: "approved", entitySlug: "entity-001", stage: "plan", decidedBy: "captain", decidedAt: NOW, reason: null }],
+      [
+        "entity-001::plan",
+        {
+          decision: "approved",
+          entitySlug: "entity-001",
+          stage: "plan",
+          decidedBy: "captain",
+          decidedAt: NOW,
+          reason: null,
+        },
+      ],
     ]);
     expect(() =>
-      decide({ type: "approve_gate", entitySlug: "entity-001", stage: "plan", decidedBy: "captain" }, state, NOW),
+      decide(
+        { type: "approve_gate", entitySlug: "entity-001", stage: "plan", decidedBy: "captain" },
+        state,
+        NOW,
+      ),
     ).toThrow(GateAlreadyDecided);
   });
 });
@@ -32,7 +50,17 @@ describe("decide — approve_gate", () => {
 describe("decide — reject_gate", () => {
   test("happy path returns gate_rejected event", () => {
     const state: GateState = new Map();
-    const events = decide({ type: "reject_gate", entitySlug: "entity-001", stage: "plan", decidedBy: "captain", reason: "needs revision" }, state, NOW);
+    const events = decide(
+      {
+        type: "reject_gate",
+        entitySlug: "entity-001",
+        stage: "plan",
+        decidedBy: "captain",
+        reason: "needs revision",
+      },
+      state,
+      NOW,
+    );
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe("gate_rejected");
     if (events[0].type === "gate_rejected") {
@@ -42,10 +70,24 @@ describe("decide — reject_gate", () => {
 
   test("duplicate reject throws GateAlreadyDecided", () => {
     const state: GateState = new Map([
-      ["entity-001::plan", { decision: "rejected", entitySlug: "entity-001", stage: "plan", decidedBy: "captain", decidedAt: NOW, reason: "x" }],
+      [
+        "entity-001::plan",
+        {
+          decision: "rejected",
+          entitySlug: "entity-001",
+          stage: "plan",
+          decidedBy: "captain",
+          decidedAt: NOW,
+          reason: "x",
+        },
+      ],
     ]);
     expect(() =>
-      decide({ type: "reject_gate", entitySlug: "entity-001", stage: "plan", decidedBy: "captain" }, state, NOW),
+      decide(
+        { type: "reject_gate", entitySlug: "entity-001", stage: "plan", decidedBy: "captain" },
+        state,
+        NOW,
+      ),
     ).toThrow(GateAlreadyDecided);
   });
 });

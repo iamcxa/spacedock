@@ -9,10 +9,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { autoForkDaemon } from "../src/daemon/auto-fork";
 import { createSocketClient } from "../src/ipc/socket-client";
 import type { IpcMessage } from "../src/ipc/types";
@@ -126,7 +123,10 @@ if (import.meta.main) {
     // Graceful shutdown
     const doShutdown = () => {
       client.close();
-      mcpServer.close().catch(() => {}).finally(() => process.exit(0));
+      mcpServer
+        .close()
+        .catch(() => {})
+        .finally(() => process.exit(0));
     };
     process.on("SIGTERM", doShutdown);
     process.on("SIGINT", doShutdown);

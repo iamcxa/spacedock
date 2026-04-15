@@ -69,15 +69,11 @@ export function ChatInput({ entitySlug }: ChatInputProps) {
             {status === "sending" ? "Sending…" : "Send"}
           </Button>
 
-          {status === "delivered" && (
-            <span className="text-sm text-green-600">✓ delivered</span>
-          )}
+          {status === "delivered" && <span className="text-sm text-green-600">✓ delivered</span>}
           {status === "offline" && (
             <span className="text-sm text-yellow-600">⚠ CC session offline — message queued</span>
           )}
-          {status === "error" && (
-            <span className="text-sm text-red-600">Error: {errorMsg}</span>
-          )}
+          {status === "error" && <span className="text-sm text-red-600">Error: {errorMsg}</span>}
         </div>
       </form>
     </div>

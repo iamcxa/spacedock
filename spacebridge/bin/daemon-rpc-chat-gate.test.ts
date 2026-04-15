@@ -3,10 +3,9 @@
 // Registers a fake shim session, then exercises new RPC handlers.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { createSocketClient } from "../src/ipc/socket-client";
 
 const DAEMON_SCRIPT = join(import.meta.dir, "daemon.ts");
@@ -21,17 +20,16 @@ function makeTempDir(): string {
   return dir;
 }
 
-async function waitForDaemonReady(
-  socketPath: string,
-  timeoutMs = TIMEOUT_MS,
-): Promise<void> {
+async function waitForDaemonReady(socketPath: string, timeoutMs = TIMEOUT_MS): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
       await Bun.connect({
         unix: socketPath,
         socket: {
-          open(socket) { socket.end(); },
+          open(socket) {
+            socket.end();
+          },
           data() {},
           error() {},
           close() {},
@@ -72,7 +70,9 @@ describe("daemon RPC registry — captain_chat + gate_decide", () => {
   afterEach(async () => {
     daemonProc.kill("SIGTERM");
     await daemonProc.exited;
-    try { rmSync(stateDir, { recursive: true, force: true }); } catch {}
+    try {
+      rmSync(stateDir, { recursive: true, force: true });
+    } catch {}
   });
 
   test("captain_chat: delivered:true when session registered for project root", async () => {
@@ -110,7 +110,10 @@ describe("daemon RPC registry — captain_chat + gate_decide", () => {
     });
 
     expect(resp.type).toBe("rpc-response");
-    const payload = resp.payload as { result?: { messageId: string; delivered: boolean }; error?: string };
+    const payload = resp.payload as {
+      result?: { messageId: string; delivered: boolean };
+      error?: string;
+    };
     expect(payload.error).toBeUndefined();
     expect(payload.result?.messageId).toBe(msgId);
     expect(payload.result?.delivered).toBe(true);
@@ -118,9 +121,7 @@ describe("daemon RPC registry — captain_chat + gate_decide", () => {
     // The shim should have received an action-push with captain_chat
     // Allow brief propagation
     await Bun.sleep(50);
-    const chatPush = pushMessages.find(
-      (m) => (m as { type: string }).type === "action-push",
-    );
+    const chatPush = pushMessages.find((m) => (m as { type: string }).type === "action-push");
     expect(chatPush).toBeDefined();
 
     client.close();
@@ -185,7 +186,10 @@ describe("daemon RPC registry — captain_chat + gate_decide", () => {
       },
     });
 
-    const payload = resp.payload as { result?: { decision: string; decidedAt: number }; error?: string };
+    const payload = resp.payload as {
+      result?: { decision: string; decidedAt: number };
+      error?: string;
+    };
     expect(payload.error).toBeUndefined();
     expect(payload.result?.decision).toBe("approved");
     expect(typeof payload.result?.decidedAt).toBe("number");

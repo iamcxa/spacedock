@@ -2,9 +2,9 @@
 // with real daemon for approve/reject/double-decide/unreachable scenarios.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import { POST } from "./route";
 
 const DAEMON_SCRIPT = join(import.meta.dir, "../../../../../..", "bin", "daemon.ts");
@@ -22,7 +22,14 @@ async function waitForSocket(socketPath: string, timeoutMs = 8000): Promise<void
     try {
       await Bun.connect({
         unix: socketPath,
-        socket: { open(s) { s.end(); }, data() {}, error() {}, close() {} },
+        socket: {
+          open(s) {
+            s.end();
+          },
+          data() {},
+          error() {},
+          close() {},
+        },
       });
       return;
     } catch {
@@ -105,7 +112,9 @@ describe("gate route — integration", () => {
     daemonProc.kill("SIGTERM");
     await daemonProc.exited;
     delete process.env.SPACEBRIDGE_STATE_DIR;
-    try { rmSync(stateDir, { recursive: true, force: true }); } catch {}
+    try {
+      rmSync(stateDir, { recursive: true, force: true });
+    } catch {}
   });
 
   test("200 approve returns decision=approved + decidedAt", async () => {
@@ -114,18 +123,21 @@ describe("gate route — integration", () => {
       params: Promise.resolve({ slug }),
     });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as { decision: string; decidedAt: number };
+    const body = (await resp.json()) as { decision: string; decidedAt: number };
     expect(body.decision).toBe("approved");
     expect(typeof body.decidedAt).toBe("number");
   });
 
   test("200 reject returns decision=rejected", async () => {
     const slug = `entity-${randomUUID().slice(0, 8)}`;
-    const resp = await POST(makeRequest(slug, { decision: "reject", stage: "uat", reason: "not ready" }), {
-      params: Promise.resolve({ slug }),
-    });
+    const resp = await POST(
+      makeRequest(slug, { decision: "reject", stage: "uat", reason: "not ready" }),
+      {
+        params: Promise.resolve({ slug }),
+      },
+    );
     expect(resp.status).toBe(200);
-    const body = await resp.json() as { decision: string };
+    const body = (await resp.json()) as { decision: string };
     expect(body.decision).toBe("rejected");
   });
 
@@ -137,7 +149,7 @@ describe("gate route — integration", () => {
       params: Promise.resolve({ slug }),
     });
     expect(resp2.status).toBe(502);
-    const body = await resp2.json() as { error: string };
+    const body = (await resp2.json()) as { error: string };
     expect(body.error).toMatch(/already/i);
   });
 
@@ -152,7 +164,9 @@ describe("gate route — integration", () => {
       expect(resp.status).toBe(502);
     } finally {
       process.env.SPACEBRIDGE_STATE_DIR = stateDir;
-      try { rmSync(emptyDir, { recursive: true, force: true }); } catch {}
+      try {
+        rmSync(emptyDir, { recursive: true, force: true });
+      } catch {}
     }
   });
 });

@@ -19,20 +19,20 @@ import {
 import { isProcessAlive, readPidFile, writePidFile } from "../src/daemon/pid";
 import { createDb } from "../src/db";
 import { decide as chatDecide } from "../src/domain/chat/decider";
+import { replay as chatReplay } from "../src/domain/chat/evolve";
 import {
   appendEvents as chatAppendEvents,
   loadEvents as chatLoadEvents,
 } from "../src/domain/chat/persistence";
 import { parseCommand as parseChatCommand } from "../src/domain/chat/schemas";
-import { replay as chatReplay } from "../src/domain/chat/evolve";
 import { decide as gateDecide } from "../src/domain/gate/decider";
+import { GateAlreadyDecided } from "../src/domain/gate/errors";
+import { replay as gateReplay } from "../src/domain/gate/evolve";
 import {
   appendEvents as gateAppendEvents,
   loadEvents as gateLoadEvents,
 } from "../src/domain/gate/persistence";
 import { parseCommand as parseGateCommand } from "../src/domain/gate/schemas";
-import { replay as gateReplay } from "../src/domain/gate/evolve";
-import { GateAlreadyDecided } from "../src/domain/gate/errors";
 import { LeaseCommandSchema } from "../src/domain/lease/schemas";
 import { createSessionRegistry } from "../src/domain/session/registry";
 import { TokenManager } from "../src/domain/share/token-manager";
@@ -164,7 +164,9 @@ async function cmdStart(): Promise<void> {
       ttlMs: ttlMs ?? 7 * 24 * 60 * 60 * 1000,
     });
     const url = `${ctx.getTunnelUrl()}/share/${shareToken.token}`;
-    return { result: { token: shareToken.token, url, entitySlug, expiresAt: shareToken.expiresAt } };
+    return {
+      result: { token: shareToken.token, url, entitySlug, expiresAt: shareToken.expiresAt },
+    };
   });
 
   rpcHandlers.set("share_revoke", async (args, ctx) => {
@@ -210,7 +212,12 @@ async function cmdStart(): Promise<void> {
     const delivered = ctx.server.pushToSession(targetSessionId, {
       id: randomUUID(),
       type: "action-push",
-      payload: { action: "captain_chat", messageId: cmd.messageId, content: cmd.content, sentAt: cmd.sentAt },
+      payload: {
+        action: "captain_chat",
+        messageId: cmd.messageId,
+        content: cmd.content,
+        sentAt: cmd.sentAt,
+      },
     });
 
     return { result: { messageId: cmd.messageId, delivered } };
@@ -263,7 +270,13 @@ async function cmdStart(): Promise<void> {
       ctx.server.pushToSession(targetSessionId, {
         id: randomUUID(),
         type: "action-push",
-        payload: { action: "gate_decided", entitySlug: cmd.entitySlug, stage: cmd.stage, decision, decidedAt },
+        payload: {
+          action: "gate_decided",
+          entitySlug: cmd.entitySlug,
+          stage: cmd.stage,
+          decision,
+          decidedAt,
+        },
       });
     }
 
@@ -277,13 +290,19 @@ async function cmdStart(): Promise<void> {
 
   const rpcCtx: Omit<RpcCtx, "server"> & { server: ReturnType<typeof createSocketServer> } = {
     db,
-    get server() { return serverRef; },
+    get server() {
+      return serverRef;
+    },
     sessionRegistry,
     tokenManager,
     getTunnelProvider: () => tunnelProvider,
-    setTunnelProvider: (p) => { tunnelProvider = p; },
+    setTunnelProvider: (p) => {
+      tunnelProvider = p;
+    },
     getTunnelUrl: () => tunnelUrl,
-    setTunnelUrl: (u) => { tunnelUrl = u; },
+    setTunnelUrl: (u) => {
+      tunnelUrl = u;
+    },
     startedAt,
     sessions,
   };

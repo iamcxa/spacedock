@@ -1,12 +1,13 @@
 "use client";
+
 // spacebridge/ui/components/entity-detail-client.tsx
 // ABOUTME: Client Component boundary for entity detail page. Manages commentsBySection
 // state, renders two-column grid layout with EntityBody (left) and CommentPanel (right).
 
-import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { EntityBody } from "@/components/entity-body";
+import { useCallback, useState } from "react";
 import { CommentPanel } from "@/components/comment-panel";
+import { EntityBody } from "@/components/entity-body";
 
 interface CommentRow {
   commentId: string;
@@ -28,9 +29,7 @@ interface EntityDetailClientProps {
   entitySlug: string;
 }
 
-function buildCommentsBySection(
-  rows: CommentRow[]
-): Record<string, CommentRow[]> {
+function buildCommentsBySection(rows: CommentRow[]): Record<string, CommentRow[]> {
   const map: Record<string, CommentRow[]> = {};
   for (const row of rows) {
     if (row.parentId !== null) continue;
@@ -49,28 +48,35 @@ export function EntityDetailClient({
 }: EntityDetailClientProps) {
   const router = useRouter();
   const [commentsBySection, setCommentsBySection] = useState(() =>
-    buildCommentsBySection(commentRows)
+    buildCommentsBySection(commentRows),
   );
 
-  const handleCommentAdded = useCallback((newComment: CommentRow) => {
-    const key = newComment.sectionHeading;
-    setCommentsBySection((prev) => ({
-      ...prev,
-      [key]: [...(prev[key] ?? []), newComment],
-    }));
-    router.refresh();
-  }, [router]);
+  const handleCommentAdded = useCallback(
+    (newComment: CommentRow) => {
+      const key = newComment.sectionHeading;
+      setCommentsBySection((prev) => ({
+        ...prev,
+        [key]: [...(prev[key] ?? []), newComment],
+      }));
+      router.refresh();
+    },
+    [router],
+  );
 
   const scrollToHighlight = useCallback((commentId: string) => {
-    const marks = document.querySelectorAll('.comment-highlight');
+    const marks = document.querySelectorAll(".comment-highlight");
     for (const mark of marks) {
-      const ids = (mark.getAttribute('data-comment-ids') || '').split(',');
+      const ids = (mark.getAttribute("data-comment-ids") || "").split(",");
       if (ids.includes(commentId)) {
-        mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        mark.classList.add('comment-highlight-flash');
-        mark.addEventListener('animationend', () => {
-          mark.classList.remove('comment-highlight-flash');
-        }, { once: true });
+        mark.scrollIntoView({ behavior: "smooth", block: "center" });
+        mark.classList.add("comment-highlight-flash");
+        mark.addEventListener(
+          "animationend",
+          () => {
+            mark.classList.remove("comment-highlight-flash");
+          },
+          { once: true },
+        );
         break;
       }
     }

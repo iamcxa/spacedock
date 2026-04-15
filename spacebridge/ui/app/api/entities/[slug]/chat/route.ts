@@ -77,14 +77,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
     client.close();
 
-    const payload = resp.payload as { result?: { messageId: string; delivered: boolean }; error?: string };
+    const payload = resp.payload as {
+      result?: { messageId: string; delivered: boolean };
+      error?: string;
+    };
     if (payload.error) {
       // Daemon returned an error (e.g., no active session) — still 200, delivered:false
       return Response.json({ messageId, delivered: false, reason: payload.error }, { status: 200 });
     }
 
     return Response.json(
-      { messageId: payload.result?.messageId ?? messageId, delivered: payload.result?.delivered ?? false },
+      {
+        messageId: payload.result?.messageId ?? messageId,
+        delivered: payload.result?.delivered ?? false,
+      },
       { status: 200 },
     );
   } catch {

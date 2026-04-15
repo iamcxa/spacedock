@@ -1,9 +1,9 @@
 // ABOUTME: Tests for gate aggregate persistence — round-trip + multi-event.
 
 import { describe, expect, test } from "bun:test";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createDb } from "../../db";
 import { appendEvents, countEvents, loadEvents } from "./persistence";
 import type { GateEvent } from "./types";
@@ -79,13 +79,30 @@ describe("gate persistence", () => {
     await appendEvents(
       db,
       agg1,
-      [{ type: "gate_approved", entitySlug: "entity-201", stage: "plan", decidedBy: "captain", decidedAt: NOW }],
+      [
+        {
+          type: "gate_approved",
+          entitySlug: "entity-201",
+          stage: "plan",
+          decidedBy: "captain",
+          decidedAt: NOW,
+        },
+      ],
       1,
     );
     await appendEvents(
       db,
       agg2,
-      [{ type: "gate_rejected", entitySlug: "entity-202", stage: "uat", decidedBy: "captain", reason: "bad", decidedAt: NOW }],
+      [
+        {
+          type: "gate_rejected",
+          entitySlug: "entity-202",
+          stage: "uat",
+          decidedBy: "captain",
+          reason: "bad",
+          decidedAt: NOW,
+        },
+      ],
       1,
     );
     expect(await loadEvents(db, agg1)).toHaveLength(1);

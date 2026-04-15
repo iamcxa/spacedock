@@ -1,9 +1,9 @@
 // ABOUTME: Tests for SessionRegistry.getActiveSessionByProjectRoot — most-recent-heartbeat wins.
 
 import { describe, expect, test } from "bun:test";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createDb } from "../../db";
 import { createSessionRegistry } from "./registry";
 
@@ -59,10 +59,20 @@ describe("getActiveSessionByProjectRoot", () => {
     const sessionNew = "session-new";
 
     tick = 1_000_000;
-    await registry.register({ sessionId: sessionOld, projectRoot: ROOT_A, pid: 100, protocolVersion: 1 });
+    await registry.register({
+      sessionId: sessionOld,
+      projectRoot: ROOT_A,
+      pid: 100,
+      protocolVersion: 1,
+    });
 
     tick = 1_000_100;
-    await registry.register({ sessionId: sessionNew, projectRoot: ROOT_A, pid: 101, protocolVersion: 1 });
+    await registry.register({
+      sessionId: sessionNew,
+      projectRoot: ROOT_A,
+      pid: 101,
+      protocolVersion: 1,
+    });
 
     tick = 1_000_200;
     await registry.heartbeat(sessionNew);

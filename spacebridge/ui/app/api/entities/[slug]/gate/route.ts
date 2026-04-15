@@ -44,7 +44,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     );
   }
 
-  const { decision, stage, reason } = b as { decision: "approve" | "reject"; stage: string; reason?: string };
+  const { decision, stage, reason } = b as {
+    decision: "approve" | "reject";
+    stage: string;
+    reason?: string;
+  };
 
   const command = {
     type: decision === "approve" ? "approve_gate" : "reject_gate",
@@ -78,7 +82,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
     client.close();
 
-    const payload = resp.payload as { result?: { decision: string; decidedAt: number }; error?: string };
+    const payload = resp.payload as {
+      result?: { decision: string; decidedAt: number };
+      error?: string;
+    };
     if (payload.error) {
       // GateAlreadyDecided or other daemon error — return 502 with verbatim error
       return Response.json({ error: payload.error }, { status: 502 });
