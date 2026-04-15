@@ -1012,3 +1012,64 @@ Quality verification completed on entity 107 (plan-checker-multi-angle-nuwa). Fu
 6 blockers auto-fixed across 6 commits (bce259a–f0d1fcc): dim-9 agent frontmatter added, Grep added to dim-9 tool allowlist in both agent and SKILL.md, dim-9 pressure fixture restructured to correct input: nesting, Step 6b stale line-number reference replaced with stable section-anchor reference to new dim-3-dependency-rules.md, pre-dispatch placeholder guard added to Step 6a, and O-2-B cutover counter made durable via grep-based Stage Report count. 2 prior-resolution findings confirmed (F-06 glob vacuousness: all 6 skill dirs exist; F-07 AC-4 count: already amended at captain gate). 9 warnings/nits accepted as v1 known-gaps -- all are either cosmetic, bounded by the O-2-B window, or require a runner spec that does not yet exist. Verdict: **pass** -- all blockers resolved, no captain decision required.
 
 verdict: pass
+
+## Stage Report: uat
+
+**Verdict**: pending-captain
+**Ran at**: 2026-04-15T10:44:38Z
+**HEAD**: 86279a5
+**Mode**: normal
+
+### summary
+- total items: 6
+- pass: 0
+- fail: 0
+- skipped: 0
+- pending-captain: 6
+- infra-level fails: 0
+- assertion fails: 0
+- uat_pending_count (post-run): 0 (no items reached captain sign-off yet)
+
+### item classification
+
+| item | description | type | status |
+| ---- | ----------- | ---- | ------ |
+| item-1 | build-plan on clarified entity dispatches 6 haiku agents in parallel (observed in agent logs as single tool-call block) | interactive | pending-captain |
+| item-2 | Dim 3 wave-graph violation in seeded plan produces issue with `dimension: dependency_correctness` identical in shape to pre-port output (schema diff) | interactive | pending-captain |
+| item-3 | Dim 7 Skill-unavailable graceful-degradation path emits warning YAML stub (not silent skip) when Skill tool is absent in dispatched context | interactive | pending-captain |
+| item-4 | Parallel-run diff window (N=3 plans) shows zero schema/severity deviation between monolithic and Nuwa outputs before captain cutover | interactive | pending-captain |
+| item-5 | Captain runs build-plan on a test entity; observes per-dim haiku returns converging in synthesis; confirms output YAML schema unchanged from pre-port Stage Report artifacts | interactive | pending-captain |
+| item-6 | Captain decides cutover after N-plan diff window (separate follow-up entity per O-2-B) | interactive | pending-captain |
+
+### classification rationale
+
+Items 1-4 are declared CLI in the UAT Spec but are runtime-behavioral: they require live build-plan dispatch with a real clarified entity, observation of agent log tool-call blocks, live Skill-tool-absent context injection, and a multi-plan O-2-B diff window. None are mechanically automatable via grep/wc from this subagent context. Structural proxies (AC-1 through AC-7 grep commands from the Validation Map) were verified at the execute stage and all passed (see Stage Report: execute Final Verification table). UAT-layer verification of these items requires live captain observation.
+
+Items 5-6 are typed `interactive` in the UAT Spec and pass directly to captain sign-off.
+
+Item-6 ("captain decides cutover") is scoped to a separate follow-up entity (O-2-B per UAT Spec note). It is pending-captain with the expectation that FO routes this to the O-2-B entity rather than blocking this entity's ship.
+
+### structural evidence (proxy -- execute-stage verification)
+
+The following Validation Map checks were re-confirmed against worktree HEAD (86279a5):
+
+- **AC-1** (YAML schema backward-compat -- `severity` + `fix_hint` in all per-dim SKILL.md): PASS -- `for d in skills/plan-checker-dim-*/SKILL.md; do grep -q severity "$d" && grep -q fix_hint "$d"; done` exits 0, no failures printed.
+- **AC-3** (wrapper ≤22 lines): PASS -- all 6 agents/plan-checker-dim-*.md are exactly 20 lines each (120 total / 6 = 20; all under the 22-line cap).
+- **AC-4** (Step 6 Agent() count == 6 or 7): PASS -- count = 7 (within the "6 or 7" band per captain gate resolution; 7th is O-2-B parallel-run agent during diff window).
+- **AC-5** (zero nested Agent/SendMessage): PASS -- `grep -lE 'Agent\(|SendMessage\(' agents/plan-checker-dim-*.md skills/plan-checker-dim-*/SKILL.md` returns empty output (exit 1 = no matches = correct state).
+- **AC-7** (depends-on 061+106 shipped): PASS -- confirmed at execute wave 0 task-0 verification.
+- 6 agent files present (`ls agents/plan-checker-dim-*.md | wc -l` = 6). PASS.
+- 6 skill dirs present (`ls -d skills/plan-checker-dim-*/ | wc -l` = 6). PASS.
+- DEPRECATED banner on plan-checker-prompt.md: PASS.
+- 5 Port entries in nuwa-ports.md: PASS.
+- 7 pressure fixture YAML files present (dim-1, dim-2, dim-3-wave-graph, dim-4-5, dim-6, dim-7, dim-9): PASS.
+
+AC-2 and AC-6 (fixture replay assertions) require live pressure-test runner execution -- not available from this subagent context. These are covered by the pending-captain interactive items (item-2 and the O-2-B diff window).
+
+### captain decisions
+(none yet -- all items pending-captain sign-off)
+
+### notes
+- All 6 UAT items are pending-captain. FO should route captain sign-off for items 1-5 via live build-plan dispatch on a test entity. Item-6 is O-2-B scope and may be deferred to the follow-up cutover entity.
+- No `feedback-to: execute` routing -- no infra-level or assertion fails found. All structural proxies pass.
+- Confidence Assessment: 0.82 -- structural evidence strong (execute stage passed 8/8 checks + all AC proxy greps pass at UAT HEAD); runtime behavioral verification (items 1-5) requires captain live observation. Risk residual is the O-2-B haiku capability gap (Dim 6, 4 sub-rules) that the plan itself flagged as "verify at execute/rollout time".
