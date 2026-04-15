@@ -32,14 +32,14 @@ test_cases:
           action: "Extend the setup function to handle new config keys"
           acceptance_criteria: "bun test tests/setup.test.ts"
           files_modified: [src/foo.ts]
-    entity_context: |
-      ## Acceptance Criteria
+      entity_context: |
+        ## Acceptance Criteria
 
-      - AC-1: setup function handles new config keys
-    file_state:
-      path: src/foo.ts
-      line_183_content: "  // blank line inside utility block"
-      function_setup_actual_line: 191
+        - AC-1: setup function handles new config keys
+      file_state:
+        path: src/foo.ts
+        line_183_content: "  // blank line inside utility block"
+        function_setup_actual_line: 191
     expected_issues:
       - dimension: stale_line_anchor
         severity: blocker
