@@ -15,6 +15,29 @@ Features enter the build pipeline with a distilled spec. This skill produces tha
 
 ---
 
+## Step 0: Gatekeeper (Sonnet Triage)
+
+Before any args extraction, evaluate the captain's raw directive text on two syntactic axes:
+
+**Axis 1 -- Hedge-word presence**: Pattern-match against this closed keyword set (whole-word, case-insensitive): `maybe`, `possibly`, `perhaps`, `might`, `could try`, `not sure`, `wondering`, `or perhaps`, `可能`, `某種`, `我在想`, `也許`, `或許`, `不確定`.
+
+**Axis 2 -- Concrete-target presence**: Regex for any of: file paths (`/` or `.` in token), component/module names (PascalCase or kebab-case tokens >5 chars), entity slugs (matches `[a-z]+-[a-z]+-` pattern), acceptance-criteria-like phrasing ("when X then Y", "given X"), `--from` flag presence.
+
+**Decision matrix**:
+
+| Hedge-words | Concrete-target | Action |
+|---|---|---|
+| YES | NO | Auto-suggest: emit `Directive appears underspecified. Consider running /shape "{directive}" for product-level alignment first.` and HALT. Do not proceed to Args Extraction. |
+| YES | YES | Grey-zone: log `gatekeeper-warning: hedge-words detected but concrete target present -- proceeding` in the eventual Stage Report. Proceed to Args Extraction. |
+| NO | YES | Silent pass-through. Proceed to Args Extraction. |
+| NO | NO | Grey-zone: log `gatekeeper-warning: no concrete target but no hedge-words -- proceeding` in the eventual Stage Report. Proceed to Args Extraction. |
+
+**`--from` flag bypass**: If the directive contains `--from {slug}`, skip the gatekeeper entirely -- the directive is already shape-validated.
+
+**Supersession note**: This gatekeeper supersedes entity 103's v1 decision ("no automatic routing -- captain judgment") based on observed friction from SO front-half overhead across entities 097, 099, 101.
+
+---
+
 ## Args Extraction
 
 If the user's invocation includes text beyond the command:
