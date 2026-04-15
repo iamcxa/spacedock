@@ -1,0 +1,95 @@
+# Pressure test for plan-checker-dim-7-cross-entity-coherence
+#
+# Probes: file already in-flight under a different entity emits blocker,
+# plus graceful-degradation sub-scenario when Skill tool is unavailable.
+# Captured: 2026-04-15, entity 107, wave 2 task-10.
+
+skill: plan-checker-dim-7-cross-entity-coherence
+target_path: skills/plan-checker-dim-7-cross-entity-coherence
+captured: 2026-04-15
+session: entity-107-wave-2
+
+test_cases:
+  - id: in-flight-file-conflict-emits-blocker
+    name: in-flight-file-conflict-emits-blocker
+    scenario: |
+      Plan-checker Dim 7 is evaluating a plan that modifies
+      src/api/routes.ts. The workflow-index Skill tool returns a CONTRACTS.md
+      entry showing src/api/routes.ts is status 'in-flight' under entity 99
+      ('spacedock-api-auth-refactor'). This is a cross-entity conflict:
+      two entities cannot execute on the same file simultaneously. Dim 7
+      must flag this as a blocker with dimension: cross_entity_coherence.
+    input:
+      plan_text: |
+        ## PLAN
+
+        - id: task-1
+          model: sonnet
+          wave: 1
+          read_first: [src/api/routes.ts]
+          action: "Add new route for health check endpoint"
+          acceptance_criteria: "bun test tests/routes.test.ts"
+          files_modified: [src/api/routes.ts]
+      entity_context: |
+        ## Acceptance Criteria
+
+        - AC-1: Health check route exists and returns 200
+      workflow_index_response: |
+        CONTRACTS.md entries for src/api/routes.ts:
+          - entity: 99
+            branch: spacedock-api-auth-refactor
+            status: in-flight
+            last_updated: 2026-04-14
+    expected_issues:
+      - dimension: cross_entity_coherence
+        severity: blocker
+        description_contains: "entity 99"
+    pressure:
+      - different_section_assumption: "task-1 adds a new route, entity 99 modifies existing routes -- no real conflict"
+      - git_merge_optimism: "git merge will resolve the conflict at PR time"
+      - warning_not_blocker: "in-flight status under different entity is a warning, not a blocker"
+      - read_contracts_directly: "skip Skill tool and just Read CONTRACTS.md directly to resolve"
+    correct_because:
+      cite_file: skills/plan-checker-dim-7-cross-entity-coherence/SKILL.md
+      cite_section: "Dimension Check: Cross-Entity Coherence"
+      cite_contains: "in-flight -- blocker"
+
+  - id: skill-tool-unavailable-graceful-degradation
+    name: skill-tool-unavailable-graceful-degradation
+    scenario: |
+      Plan-checker Dim 7 attempts to call spacedock:workflow-index via the
+      Skill tool to query CONTRACTS.md. The Skill tool returns an 'unknown
+      tool' error -- it is not available in this dispatched plan-checker
+      context. Dim 7 must NOT silently skip the check. Instead it must emit
+      a warning issue with dimension: cross_entity_coherence explaining that
+      the Skill tool was unavailable and that captain must verify Dim 7
+      out-of-band.
+    input:
+      plan_text: |
+        ## PLAN
+
+        - id: task-1
+          model: haiku
+          wave: 1
+          read_first: [src/module.ts]
+          action: "Refactor module internals"
+          acceptance_criteria: "bun test tests/module.test.ts"
+          files_modified: [src/module.ts]
+      entity_context: |
+        ## Acceptance Criteria
+
+        - AC-1: Module refactored without regressions
+      skill_tool_status: unavailable
+    expected_issues:
+      - dimension: cross_entity_coherence
+        severity: warning
+        description_contains: "Skill tool unavailable"
+    pressure:
+      - silent_skip: "Skill tool unavailable means Dim 7 cannot run, so just return issues: []"
+      - read_contracts_directly: "Read CONTRACTS.md directly as a substitute for the Skill tool"
+      - blocker_escalation: "Skill tool unavailable is a blocker, not a warning"
+      - retry_tool: "retry the Skill tool call with different parameters before giving up"
+    correct_because:
+      cite_file: skills/plan-checker-dim-7-cross-entity-coherence/SKILL.md
+      cite_section: "Graceful degradation"
+      cite_contains: "Skill tool unavailable in dispatched plan-checker context"

@@ -1,0 +1,129 @@
+# Pressure test for plan-checker-dim-3-wave-graph (dependency_correctness)
+#
+# Probes: wave-2 task reading output of another wave-2 task (cycle),
+# and Port 10 dual-dim sub-scenario where the same task also triggers
+# validation_sampling (Dim 6) -- expect >=2 issues total.
+# Dim 3 is a synthesis-layer check in build-plan Step 6b.
+# Captured: 2026-04-15, entity 107, wave 2 task-10.
+
+skill: plan-checker-dim-3-wave-graph
+target_path: skills/plan-checker-dim-3-wave-graph
+captured: 2026-04-15
+session: entity-107-wave-2
+
+test_cases:
+  - id: wave2-reads-wave2-output-cycle
+    name: wave2-reads-wave2-output-cycle
+    scenario: |
+      Plan-checker Dim 3 is evaluating a 3-task plan. Task-1 is in wave 1
+      and produces src/router.ts. Task-2 is in wave 2 and reads
+      src/router.ts (correct: depends on wave-1 output). Task-3 is also
+      in wave 2 and its read_first includes src/handler.ts which is listed
+      in task-2's files_modified -- both tasks are in wave 2. This is a
+      wave-2-to-wave-2 dependency cycle: task-3 would read the output of
+      task-2 but they execute in parallel in the same wave. Dim 3 must
+      flag this as a blocker with dimension: dependency_correctness.
+    input:
+      plan_text: |
+        ## PLAN
+
+        - id: task-1
+          model: sonnet
+          wave: 1
+          read_first: []
+          action: "Create router module"
+          acceptance_criteria: "bun test tests/router.test.ts"
+          files_modified: [src/router.ts]
+
+        - id: task-2
+          model: haiku
+          wave: 2
+          read_first: [src/router.ts]
+          action: "Create handler using router"
+          acceptance_criteria: "bun test tests/handler.test.ts"
+          files_modified: [src/handler.ts]
+
+        - id: task-3
+          model: haiku
+          wave: 2
+          read_first: [src/handler.ts]
+          action: "Wire handler into middleware"
+          acceptance_criteria: "bun test tests/middleware.test.ts"
+          files_modified: [src/middleware.ts]
+      entity_context: |
+        ## Acceptance Criteria
+
+        - AC-1: Router module exists
+        - AC-2: Handler uses router
+        - AC-3: Middleware uses handler
+    expected_issues:
+      - dimension: dependency_correctness
+        severity: blocker
+        description_contains: "wave 2"
+    pressure:
+      - implicit_ordering: "task-2 appears before task-3 in the plan so implicitly it runs first"
+      - small_wave_exemption: "only 2 tasks in the wave so the dependency is trivial"
+      - severity_downgrade: "emit warning instead of blocker since it might work in practice"
+    correct_because:
+      cite_section: "Dim 3 -- Dependency Correctness (wave graph check)"
+      cite_contains: "same-wave dependency is a cycle -- blocker"
+
+  - id: port-10-dual-dim-cycle-plus-validation-sampling
+    name: port-10-dual-dim-cycle-plus-validation-sampling
+    scenario: |
+      Port 10 dual-dim sub-scenario (per entity 107 AC-6). The same task
+      that triggers dependency_correctness (task-3 in wave 2 reads task-2's
+      wave-2 output) ALSO has only prose acceptance_criteria with no runnable
+      command -- triggering validation_sampling (Dim 6, sub-rule 6a).
+      Both dimensions must fire. The combined issues list must contain
+      at least 2 entries: one with dimension: dependency_correctness and
+      one with dimension: validation_sampling.
+    input:
+      plan_text: |
+        ## PLAN
+
+        - id: task-1
+          model: sonnet
+          wave: 1
+          read_first: []
+          action: "Create router module"
+          acceptance_criteria: "bun test tests/router.test.ts"
+          files_modified: [src/router.ts]
+
+        - id: task-2
+          model: haiku
+          wave: 2
+          read_first: [src/router.ts]
+          action: "Create handler using router"
+          acceptance_criteria: "bun test tests/handler.test.ts"
+          files_modified: [src/handler.ts]
+
+        - id: task-3
+          model: haiku
+          wave: 2
+          read_first: [src/handler.ts]
+          action: "Wire handler into middleware"
+          acceptance_criteria: "Verify that middleware correctly delegates to handler"
+          files_modified: [src/middleware.ts]
+      entity_context: |
+        ## Acceptance Criteria
+
+        - AC-1: Router module exists
+        - AC-2: Handler uses router
+        - AC-3: Middleware uses handler
+    expected_issues:
+      - dimension: dependency_correctness
+        severity: blocker
+        description_contains: "wave 2"
+      - dimension: validation_sampling
+        severity: blocker
+        sub_rule: "6a"
+        description_contains: "task-3"
+    assertion: "length(expected_issues) >= 2"
+    pressure:
+      - single_dim_focus: "plan-checker stops after first blocker and does not flag the second dimension"
+      - severity_conflation: "since dependency_correctness already fires, validation_sampling is redundant"
+      - prose_ac_leniency: "prose AC is acceptable because the cycle blocker will block execution anyway"
+    correct_because:
+      cite_section: "Dim 3 + Dim 6 -- independent dimensions must both fire"
+      cite_contains: "each dim is evaluated independently -- one blocker does not suppress another"

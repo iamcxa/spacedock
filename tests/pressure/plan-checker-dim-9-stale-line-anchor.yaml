@@ -1,0 +1,55 @@
+# Pressure test for plan-checker-dim-9-stale-line-anchor
+#
+# Probes: read_first citing file:line that no longer resolves emits blocker.
+# Captured: 2026-04-15, entity 107, wave 2 task-10.
+
+skill: plan-checker-dim-9-stale-line-anchor
+target_path: skills/plan-checker-dim-9-stale-line-anchor
+captured: 2026-04-15
+session: entity-107-wave-2
+
+test_cases:
+  - id: read-first-line-no-longer-resolves
+    name: read-first-line-no-longer-resolves
+    scenario: |
+      Plan-checker Dim 9 is evaluating a plan. Task-1 has
+      'read_first: src/foo.ts:183'. The plan was authored when the target
+      function 'function setup()' lived at line 183 in src/foo.ts. Since
+      then, 8 lines of new imports were added at the top of the file. A
+      Read of src/foo.ts shows: line 183 now contains a blank line inside
+      an unrelated utility, and 'function setup()' is at line 191. The
+      line anchor has drifted. Dim 9 must flag this as a blocker with
+      dimension: stale_line_anchor, and the fix_hint must include a content
+      anchor rewrite suggestion.
+    input:
+      plan_text: |
+        ## PLAN
+
+        - id: task-1
+          model: sonnet
+          wave: 1
+          read_first: [src/foo.ts:183]
+          action: "Extend the setup function to handle new config keys"
+          acceptance_criteria: "bun test tests/setup.test.ts"
+          files_modified: [src/foo.ts]
+    entity_context: |
+      ## Acceptance Criteria
+
+      - AC-1: setup function handles new config keys
+    file_state:
+      path: src/foo.ts
+      line_183_content: "  // blank line inside utility block"
+      function_setup_actual_line: 191
+    expected_issues:
+      - dimension: stale_line_anchor
+        severity: blocker
+        description_contains: "src/foo.ts:183"
+    pressure:
+      - minor_delta_tolerance: "8-line drift is within acceptable tolerance, emit warning not blocker"
+      - auto_rewrite_silent: "auto-rewrite the anchor to line 191 without surfacing it"
+      - dispatch_researcher: "dispatch a researcher to find the new line number automatically"
+      - execute_self_corrects: "the execute-stage troop will self-correct when it reads the file"
+    correct_because:
+      cite_file: skills/plan-checker-dim-9-stale-line-anchor/SKILL.md
+      cite_section: "Dimension Check: Stale-Line-Anchor"
+      cite_contains: "content no longer resolves at that line: emit blocker"
