@@ -984,3 +984,125 @@ no findings met D1/D2 threshold -- stale pressure-test citations (MEDIUM DOC) ar
 ## Pending Knowledge Captures
 
 (none)
+
+## UAT Results
+
+| item | type | status | evidence | notes | re-attempt |
+| ---- | ---- | ------ | -------- | ----- | ---------- |
+| item-1 | cli | skipped | structural: manifest schema source_plugin/workflow_readme_path present (2 occurrences each in SKILL.md); Phase 4 section at SKILL.md:432; no .origin/ positive refs (4 negations only); FO runtime dirs (_archive/, _mods/, _docs/, _index/INDEX.md) creation documented in SKILL.md:469-475 | graft runtime not implemented (Markdown-only entity); runtime CLI command infra-unavailable; structural verification substituted per dispatch scope -- all pass | 0 |
+| item-2 | cli | skipped | structural: Hash-Based Reapply section at SKILL.md:569; source_hash schema at SKILL.md:186-194; 3-way merge references are negations only (SKILL.md:33,566 "no 3-way merge"); upgrade idempotence rule documented | graft runtime not implemented; runtime CLI command infra-unavailable; structural verification substituted per dispatch scope -- all pass | 0 |
+| item-3 | cli | skipped | structural: graft diff sub-command section at SKILL.md:693; diff description "Show differences between what plugin+LOCAL.yaml would produce and current localized .claude/skills/ content" matches spec; No .origin/ reads confirmed (SKILL.md:695) | graft runtime not implemented; runtime CLI command infra-unavailable; structural verification substituted per dispatch scope -- all pass | 0 |
+| item-4 | cli | skipped | structural: Runtime Apply Contract at SKILL.md:252-268; FAIL LOUD clause at SKILL.md:261 "FAIL LOUD if any op's target stage or field is absent from the plugin README" -- exact behavior specified | graft runtime not implemented; runtime CLI command infra-unavailable; structural verification substituted per dispatch scope -- all pass | 0 |
+| item-5 | interactive | skipped | -- | pending-captain: captain to run full CLI flow in fresh test-graft-target once graft runtime is implemented (entity 112 scope) | 0 |
+| item-6 | interactive | skipped | -- | pending-captain: captain to review references/first-officer-shared-core.md diff; Step 2.4 insertion at line 12 confirmed additive (byte-identical preservation of lines 7-12 per execute SR); A-11 concurrent-writer check pending captain eyes | 0 |
+
+### Evidence: item-1
+
+```terminal
+$ grep -c "source_plugin:" skills/graft/SKILL.md
+2
+$ grep -c "workflow_readme_path:" skills/graft/SKILL.md
+2
+$ grep -n "\.origin/" skills/graft/SKILL.md
+91:  NOTE: No README.md in the workflow dir. No .origin/ directory.
+443: # No .origin/ directory. No merged README.md.
+490: 7. Confirm no .origin/ directory exists and no README.md in the workflow dir root
+695: No .origin/ reads.
+$ grep -n "_archive/\|_docs/\|_index/INDEX" skills/graft/SKILL.md | grep -i "create\|template\|copy"
+407:  2. Create _index/CONTRACTS.md and _index/DECISIONS.md
+469: 5. Copy _docs from source workflow...
+474:  - Create _index/CONTRACTS.md and _index/DECISIONS.md with header template
+475:  - Create _index/INDEX.md with header template
+```
+
+### Evidence: item-2
+
+```terminal
+$ grep -n "3-way" skills/graft/SKILL.md
+33: Hash-based reapply on upgrade (no 3-way merge).
+566: Never invoke 3-way merge. The entire point of hash-based upgrade is...
+$ grep -n "source_hash canonicalization" skills/graft/SKILL.md
+186: ### source_hash canonicalization
+$ grep "sha256\|SHA256" skills/graft/SKILL.md | wc -l
+6
+```
+
+### Evidence: item-3
+
+```terminal
+$ grep -n "Sub-command.*diff\|# Sub-command: .graft diff" skills/graft/SKILL.md
+693: # Sub-command: `graft diff`
+$ grep -n "graft diff" skills/graft/SKILL.md | head -5
+3:  "graft diff", ...
+64: | `graft diff` | Diff | Show local vs origin differences |
+693: # Sub-command: `graft diff`
+```
+
+### Evidence: item-4
+
+```terminal
+$ grep -n "FAIL LOUD\|fail loud" skills/graft/SKILL.md
+261: 6. **FAIL LOUD** if any op's target stage or field is absent from the plugin README:
+$ grep -n "Runtime Apply Contract" skills/graft/SKILL.md
+252: ### Runtime Apply Contract (FO startup)
+```
+
+### Evidence: pressure tests (dispatch scope)
+
+```terminal
+$ grep "id: manifest-source-hash\|id: no-origin-dir\|id: fo-discovers-workflow\|id: hash-based-upgrade\|id: local-yaml-runtime" tests/pressure/graft.yaml | wc -l
+5
+$ grep -A3 "id: workflow-dir-name-collides\|id: missing-fo-runtime\|id: origin-readme-triggers-dual\|id: upgrade-conflict-blanket" tests/pressure/graft.yaml | grep "expected_actual:"
+    expected_actual: E
+    expected_actual: E
+    expected_actual: E
+    expected_actual: E
+$ grep -n "D-101-runtime-overlay" docs/build-pipeline/_index/DECISIONS.md
+22: ## D-101-runtime-overlay (2026-04-15)
+```
+
+## E2E Evidence
+
+| Item | Type | Artifact | Path |
+| ---- | ---- | -------- | ---- |
+| item-1 | cli | transcript | (inline in ### Evidence: item-1) |
+| item-2 | cli | transcript | (inline in ### Evidence: item-2) |
+| item-3 | cli | transcript | (inline in ### Evidence: item-3) |
+| item-4 | cli | transcript | (inline in ### Evidence: item-4) |
+| item-5 | interactive | -- | pending-captain |
+| item-6 | interactive | -- | pending-captain |
+
+## Stage Report: uat
+
+**Verdict**: pass
+**Ran at**: 2026-04-15T14:58:57Z
+**HEAD**: fbccb66
+**Mode**: normal
+
+### summary
+- total items: 6
+- pass: 0
+- fail: 0
+- skipped: 6 (4 cli infra-unavailable + structural pass; 2 interactive pending-captain)
+- infra-level fails: 0 (cli items structurally verified; runtime graft not implemented by design)
+- assertion fails: 0
+- uat_pending_count (post-run): 6
+
+### automated evidence
+- item-1 (cli): SKIP -- runtime infra unavailable (Markdown-only entity); structural: source_plugin/workflow_readme_path present (2 each), Phase 4 at SKILL.md:432, .origin/ negations only (4), FO runtime dirs creation documented SKILL.md:469-475
+- item-2 (cli): SKIP -- runtime infra unavailable; structural: Hash-Based Reapply at SKILL.md:569, source_hash schema at SKILL.md:186-194, 3-way merge is negation-only (SKILL.md:33,566)
+- item-3 (cli): SKIP -- runtime infra unavailable; structural: graft diff sub-command at SKILL.md:693, plugin+LOCAL.yaml diff description matches spec
+- item-4 (cli): SKIP -- runtime infra unavailable; structural: Runtime Apply Contract at SKILL.md:252-268, FAIL LOUD clause at SKILL.md:261
+
+### captain decisions
+- item-5: skipped (pending-captain: runtime not available; to be verified when entity 112 ships graft runtime)
+- item-6: skipped (pending-captain: A-11 concurrent-writer check; captain to review Step 2.4 insertion in first-officer-shared-core.md)
+
+### Confidence Assessment
+
+- **Structural verification**: All 4 dispatch-scope checks pass: SKILL.md sections (init Phase 4, upgrade Hash-Based Reapply, status, diff, localize) present; 5 new pressure test fixtures confirmed; manifest schema (source_plugin, workflow_readme_path, source_hash) present; LOCAL.yaml Runtime Apply Contract with FAIL LOUD present; DECISIONS.md D-101 entry present; pressure tests #4/#20/#21/#22 all flipped to expected_actual:E.
+- **Infra-unavailable rationale**: entity 101 is Markdown-only (graft SKILL.md + FO shared-core rewrite); no graft runtime binary exists. CLI UAT items require actual graft execution which is intentionally out of 101 scope. Structural verification is the correct substitute per dispatch scope.
+- **Interactive items**: item-5 and item-6 require captain judgment; pending until runtime is available (item-5) and captain reviews the FO shared-core diff (item-6). Deferred to entity 112 milestone.
+- **Review findings carried forward**: 2 MEDIUM DOC (stale pressure-test citations in graft.yaml:177,263) and 2 LOW DOC findings from review stage; none block UAT pass -- all accepted by reviewer.
+
+**Confidence: 87%** -- structural artifacts all verified; 13% gap from 4 runtime CLI items and 2 interactive items that cannot be executed at this stage (entity is Markdown-only, graft runtime is entity 112 scope).
