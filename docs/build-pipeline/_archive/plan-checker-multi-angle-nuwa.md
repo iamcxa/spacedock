@@ -1074,3 +1074,28 @@ AC-2 and AC-6 (fixture replay assertions) require live pressure-test runner exec
 - All 6 UAT items are pending-captain. FO should route captain sign-off for items 1-5 via live build-plan dispatch on a test entity. Item-6 is O-2-B scope and may be deferred to the follow-up cutover entity.
 - No `feedback-to: execute` routing -- no infra-level or assertion fails found. All structural proxies pass.
 - Confidence Assessment: 0.82 -- structural evidence strong (execute stage passed 8/8 checks + all AC proxy greps pass at UAT HEAD); runtime behavioral verification (items 1-5) requires captain live observation. Risk residual is the O-2-B haiku capability gap (Dim 6, 4 sub-rules) that the plan itself flagged as "verify at execute/rollout time".
+
+---
+
+## Confidence Assessment
+
+**Computed retroactively on 2026-04-15 after ship.** This entity shipped before the FO pre-ship confidence gate (per `references/confidence-gate.md` + `references/first-officer-shared-core.md:319-343`) was invoked. The captain-B ship path at UAT 0.82 collapsed two distinct metrics (UAT ensign score vs 5-factor composite) into one. This section reconstructs the 5-factor composite honestly for audit + future `gate-enforcement-codification` fixture data.
+
+Iteration: 1 of 1 (retroactive, no auto-fix loop ran)
+
+| Factor | Weight | Score | Contribution | Evidence |
+|---|---:|---:|---:|---|
+| test_coverage | 25% | 80% | 20.00 | Quality Stage Report `test verdict=pass`; no `### ratchet` section → default pass=80% per confidence-gate.md §3 Factor 1 rule 4 (pre-existing failures accepted, not regressed by 107) |
+| type_coverage | 20% | 80% | 16.00 | Quality Stage Report `typecheck verdict=pass`; no ratchet → default 80% |
+| review_severity | 20% | 75% | 15.00 | 6 blockers auto-fixed (counts as remediated) + 9 warnings accepted as v1 known-gaps + 0 blockers remaining (verdict: pass); ported monolithic prompt preserved semantics |
+| uat_coverage | 20% | 55% | 11.00 | 6/6 items pending-captain (none auto-passed mechanically); all structural proxies pass but runtime items 1-5 deferred to O-2-B parallel-run window (outside UAT ensign context by design) |
+| plan_files_modified_match | 15% | 95% | 14.25 | PLAN `<files_modified>` lists match actual diff on all 12 tasks; one deviation (Step 6b extracted `dim-3-dependency-rules.md` during review-stage auto-fix) not in original files_modified but appropriate given blocker-4 fix scope |
+| **Composite** | 100% | — | **76.25%** | **Below 90% threshold** |
+
+### Gate skip disclosure
+
+- **Spec per `confidence-gate.md`:** composite 76.25% < 90% should have triggered Section 7 auto-fix loop (up to 3 iterations) OR captain override before merge.
+- **What actually happened:** FO accepted UAT ensign's self-scored 0.82 as the ship signal; captain chose B-path (defer runtime validation to O-2-B parallel-run window); merge proceeded without 5-factor gate.
+- **Captain override rationale (B-path):** O-2-B feature flag is the designed validation mechanism — first 3 production plans run monolithic + nuwa in parallel with diff window in Stage Report. This is a canary-deployment tradeoff: converts one-shot static confidence into N-run diff observation. Captain explicitly accepted the residual risk at UAT gate.
+- **Protocol debt:** pre-ship 5-factor computation was not run; `## Confidence Assessment` section was not written at gate time; this section is the retroactive honest record.
+- **Root cause:** the 90% pre-ship gate is spec'd in `confidence-gate.md` but NOT codified in `spacedock:first-officer` skill as a mandatory Skill() call — it's tribal knowledge in shared-core docs. Entity 110 `gate-enforcement-codification` seeded to close this gap.
