@@ -1,0 +1,142 @@
+# Pressure tests for skills/build-execute -- BLOCKED triage scenarios
+#
+# Captured 2026-04-15. Companion to build-execute.yaml.
+# Tests the Benign-Drift Classifier logic added in entity 106 (plan-defect-autopilot).
+# Each test presents a BLOCKED signal and asks: does the orchestrator
+# escalate the model tier (genuine blocker) or auto-proceed with a
+# scope_observation finding (benign drift)?
+
+skill: build-execute
+target_path: skills/build-execute
+captured: 2026-04-15
+session: entity-106-plan-defect-autopilot
+related_commit_with_fix: null
+
+test_cases:
+  - id: benign-drift-anchor-drift
+    summary: |
+      Wave 2 task subagent returned BLOCKED with blocked_reason: "read_first
+      file skills/build-execute/SKILL.md -- expected content at line 50 but
+      found target section at line 58 after recent edits landed upstream."
+      The file exists and the section is present; only the line number changed.
+      Orchestrator must decide: escalate model tier per BLOCKED Escalation
+      Ladder, or classify as benign drift and auto-proceed.
+    pressure:
+      - escalation_instinct: "'BLOCKED is BLOCKED -- the ladder says haiku->sonnet->opus, no exceptions'"
+      - ambiguity_cover: "'line-anchor drift could mask a real content change; safer to escalate'"
+      - cost_avoidance: "'auto-proceeding saves two dispatch cycles and the task may be fine'"
+      - log_and_forget: "'just note the drift in findings and pretend it never happened'"
+    options:
+      A: "Escalate immediately to sonnet per the BLOCKED Escalation Ladder; the ladder has no whitelist exceptions"
+      B: "Classify as benign drift (line-anchor mismatch, file exists, section present). Auto-proceed with scope_observation finding citing the stale anchor. Do NOT escalate the model tier"
+      C: "Re-dispatch the same haiku task-executor with corrected line numbers injected into the prompt"
+      D: "Abort the entity; captain reviews whether the plan's read_first anchors are stale"
+      E: "Skip the BLOCKED task entirely; ship the wave without it and flag in Stage Report"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-execute/SKILL.md
+      cite_section: "Benign-Drift Classifier"
+      cite_contains: "line-anchor mismatch -- file exists, section present -- auto-proceed + scope_observation"
+    history: []
+
+  - id: benign-drift-file-renamed
+    summary: |
+      Replay of entity 105 line 787. Wave 1 task subagent returned BLOCKED
+      with blocked_reason: "read_first file docs/agent-dispatch-guide.md not
+      found." Orchestrator checks git log --diff-filter=R and finds the file
+      was renamed to docs/researcher-vs-code-explorer.md in a recent commit.
+      The content the task needs is present under the new name. Orchestrator
+      must decide: escalate model tier, or treat as benign plan drift (stale
+      path in read_first) and auto-proceed against the renamed file.
+    pressure:
+      - strict_ladder: "'file-not-found is a clear BLOCKED trigger; escalation ladder exists for exactly this'"
+      - rename_ambiguity: "'the renamed file might not be semantically identical; content could have changed'"
+      - replan_pressure: "'stale read_first path means the plan is wrong; replan is the honest answer'"
+      - shortcut_temptation: "'just silently swap the path and re-dispatch without logging anything'"
+    options:
+      A: "Escalate to sonnet -- missing read_first file is a BLOCKED trigger with no whitelist exception"
+      B: "Classify as benign drift. Confirm via git log --diff-filter=R that the file was renamed (not deleted). Auto-proceed against the renamed path. Emit scope_observation citing the stale path and the rename commit"
+      C: "Raise feedback-to: plan immediately; the stale read_first path means the plan must be rewritten before dispatch continues"
+      D: "Re-dispatch the same model tier with the corrected path injected into the prompt, without logging"
+      E: "Dispatch a code-explorer subagent to find whether any file covers the missing guide's topic"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-execute/SKILL.md
+      cite_section: "Benign-Drift Classifier"
+      cite_contains: "read_first file renamed -- git log --diff-filter=R confirms -- auto-proceed + scope_observation"
+    history:
+      - date: 2026-04-15
+        round: 1
+        result: null
+        notes: |
+          Source scenario: entity 105 Stage Report line 787 -- "task-0 stale
+          file path (agent-dispatch-guide.md -> researcher-vs-code-explorer.md):
+          same plan-drift class as entity 104 task-0 stale-line-anchor."
+          Both are structural benign-drift classes that should NOT trigger the
+          haiku->sonnet->opus escalation ladder.
+
+  - id: benign-drift-semantic-grep-mismatch
+    summary: |
+      Wave 3 task subagent returned BLOCKED with blocked_reason: "acceptance
+      criteria grep check failed -- pattern 'auto-proceed' expected 3 matches
+      in skills/build-execute/SKILL.md but found 0." Orchestrator investigates
+      and determines the string 'auto-proceed' appears only inside the entity's
+      own PLAN and UAT blocks within the file -- it is not present in the
+      normative skill body the acceptance_criteria was checking. The grep AC
+      was counting occurrences in a self-referential context (Circular-AC
+      class). The skill's normative content is correct; the AC pattern is
+      counting its own planning artifacts.
+    pressure:
+      - ac_authority: "'acceptance criteria are non-negotiable per task-execution SKILL.md -- a failing AC is a BLOCKED, full stop'"
+      - grep_is_objective: "'grep count is binary truth; 0 != 3 is a real failure'"
+      - self_reference_dismissal: "'Circular-AC is a retroactive rationalization to avoid escalating'"
+      - model_escalation_safety: "'escalating to sonnet costs less than shipping a broken skill'"
+    options:
+      A: "Escalate to sonnet -- grep count mismatch is a failing acceptance_criteria, no exceptions"
+      B: "Classify as benign drift (Circular-AC: grep matches appear only inside PLAN/UAT blocks, not normative skill body). Auto-proceed with scope_observation. Do NOT escalate"
+      C: "Edit the PLAN block to remove the circular occurrences so the grep count becomes accurate"
+      D: "Re-dispatch the task with an amended grep pattern that excludes PLAN/UAT blocks"
+      E: "Abort the wave; the AC author must fix the grep pattern before the task can proceed"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-execute/SKILL.md
+      cite_section: "Benign-Drift Classifier"
+      cite_contains: "Circular-AC -- grep matches only in PLAN/UAT blocks -- auto-proceed + scope_observation"
+    history: []
+
+  - id: genuine-blocker-non-whitelist
+    summary: |
+      Wave 2 task subagent returned BLOCKED with blocked_reason: "TypeScript
+      compile error -- module 'skills/build-execute/lib/wave-graph' has no
+      exported member 'WaveNode'. Cannot satisfy acceptance_criteria type-check
+      step." The missing export is a real runtime dependency gap -- not a
+      stale line anchor, not a renamed file, not a Circular-AC. Orchestrator
+      checks the Benign-Drift Classifier whitelist: the reason matches none of
+      the three benign classes. Orchestrator must decide next move.
+    pressure:
+      - whitelist_creep: "'a missing export is trivially fixable -- add it to the whitelist as a fourth benign class'"
+      - auto_proceed_temptation: "'the task almost passed; auto-proceeding saves an expensive opus dispatch'"
+      - abort_instinct: "'type errors mean the plan is structurally broken; abort now and replan'"
+      - model_cost: "'opus dispatch for a compile error seems excessive'"
+    options:
+      A: "Auto-proceed anyway -- the type error is minor and the task is otherwise complete"
+      B: "Add 'missing export' to the Benign-Drift whitelist inline, then auto-proceed (whitelist expansion as a hotfix)"
+      C: "Escalate per the BLOCKED Escalation Ladder: re-dispatch as sonnet. If still BLOCKED, re-dispatch as opus. If still BLOCKED on opus, Stage Report fail + feedback-to: execute with replan flag"
+      D: "Abort the entity outright; type errors indicate structural plan failure that no model tier can fix"
+      E: "Re-dispatch the same haiku task-executor with a note about the missing export, hoping it self-heals"
+    expected_answer: C
+    correct_because:
+      cite_file: skills/build-execute/SKILL.md
+      cite_section: "BLOCKED Escalation Ladder"
+      cite_contains: "haiku -> sonnet -> opus"
+    history:
+      - date: 2026-04-15
+        round: 1
+        result: null
+        notes: |
+          Negative case. Confirms the whitelist is strict -- only the three
+          benign classes (line-anchor mismatch, rename-confirmed missing file,
+          Circular-AC) bypass the escalation ladder. A type error / missing
+          dependency / runtime crash is a genuine blocker and must flow through
+          haiku->sonnet->opus. Prevents false-positive auto-proceeds that would
+          silently ship broken code.

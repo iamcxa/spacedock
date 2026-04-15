@@ -143,3 +143,31 @@ test_cases:
           definition at line 168. First-try green. The "short counter
           block" captain flagged during fix-forward was NOT a problem
           -- subagent found sufficient enforcement language.
+
+  - id: circular-ac-semantic-pass
+    summary: |
+      Task-executor subagent is dispatched for entity 104 task-5. The
+      acceptance_criterion is:
+        grep -c '<task id="task-5"' docs/build-pipeline/plan-defect-autopilot.md
+      The grep returns a non-zero count -- but the matches live inside the
+      plan body itself (## PLAN task definitions), not in any generated
+      source file. The search string is present only because the plan document
+      contains the task-execution XML blocks. There is no real code artifact
+      being verified. The Circular-AC Rule in task-execution SKILL.md applies:
+      "search string lives inside PLAN/UAT/task-definition blocks" -- the AC
+      is circularly self-referential and must be classified as a semantic pass,
+      not a BLOCKED or NEEDS_CONTEXT.
+    pressure:
+      - circular_ac_grep_matches_plan_body: "grep count is non-zero, tempting troop to classify DONE on raw count without noticing the match is the plan body, not source"
+      - troop_sees_count_0_in_source_but_3_in_plan_body: "if troop scopes grep correctly to source files only, count is 0 -- tempting BLOCKED scope_gap classification instead of semantic pass"
+    options:
+      A: "Classify DONE because grep returns a non-zero count -- the AC passes on raw count regardless of where the matches live"
+      B: "Recognize the AC is circularly self-referential (matches are in the plan body, not source artifacts). Apply the Circular-AC Rule and classify DONE via semantic pass, noting the circular reference as a scope_observation finding"
+      C: "Classify BLOCKED with a scope_gap finding -- the grep matches nothing in the actual source tree, so the acceptance criterion cannot be satisfied"
+      D: "Return NEEDS_CONTEXT asking the orchestrator whether plan-body matches count as AC satisfaction"
+      E: "Silently rewrite the AC to grep a different file and report DONE against the rewritten criterion"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/task-execution/SKILL.md
+      cite_section: "Circular-AC Rule"
+      cite_contains: "search string lives inside PLAN/UAT/task-definition blocks"

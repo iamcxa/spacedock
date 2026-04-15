@@ -158,3 +158,60 @@ test_cases:
           build-research scenario 3 pre-rewrite). Acceptable since
           this is a new skill and the worked example IS the
           specification; regression coverage is the value.
+
+  - id: stale-line-anchor-dim9
+    summary: |
+      Plan-checker is running against a freshly committed plan. Task-3
+      has `read_first: src/foo.ts:183` -- the plan was authored when the
+      target content lived at line 183. A Read of src/foo.ts shows the
+      content has shifted: the target function now starts at line 191
+      (8 lines of new imports were added above it since the plan was
+      written). Dim 9 (Stale-Line-Anchor) is responsible for detecting
+      this drift and must classify its finding as a blocker, not a
+      warning.
+    pressure:
+      - stale_anchor_drift: "line numbers moved between plan-write and plan-check"
+      - line_numbers_moved_between_plan_and_check: "8-line delta feels minor"
+      - severity_downgrade_temptation: "warn rather than block to keep plan moving"
+      - over_engineering_temptation: "dispatch a researcher to find the new anchor automatically"
+    options:
+      A: "Silent pass -- line anchor drift of 8 lines is within acceptable tolerance; the execute-stage troop will self-correct when it reads the file"
+      B: "Emit a blocker on stale-line-anchor -- the plan references src/foo.ts:183 but content is now at line 191; plan must be updated before approval"
+      C: "Dispatch a fix-up researcher to locate the new line number and rewrite the read_first anchor automatically"
+      D: "Auto-rewrite the anchor to src/foo.ts:191 silently and continue plan-checker without surfacing the change"
+      E: "Emit a warning (non-blocking) noting the drift so plan ensign is aware but can proceed to approval"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-plan/references/plan-checker-prompt.md
+      cite_section: "9. Stale-Line-Anchor (new)"
+      cite_contains: "blocker"
+    history: []
+
+  - id: circular-ac-dim10
+    summary: |
+      Plan-checker is evaluating task-5. The task's acceptance_criteria
+      contains: `grep -c 'foo_bar' src/`. The plan body itself uses the
+      string `foo_bar` in multiple places (task descriptions, comments,
+      file path fragments). The grep will therefore match lines in the
+      plan document if it is present in the working tree, contaminating
+      the count with plan body occurrences rather than measuring real
+      code presence. Dim 10 (Circular-AC) must flag this with a blocker
+      and include a rewrite suggestion that scopes the grep to actual
+      source files only.
+    pressure:
+      - circular_ac_grep_count: "grep looks like a real verification step at first glance"
+      - plan_body_contaminates_grep_source: "plan file presence in working tree is easy to overlook"
+      - severity_downgrade_temptation: "emit warning only since the false positive is just additive noise"
+      - silent_fix_temptation: "auto-rewrite grep to exclude plan files without surfacing"
+    options:
+      A: "Silent pass -- the grep count will be slightly inflated by plan-body matches but the intent of the AC is clear and execute-stage can adjust"
+      B: "Emit a blocker with a rewrite suggestion -- AC grep will match plan-body occurrences of 'foo_bar', contaminating the count; suggest scoping to src/ and excluding *.yaml or using a path-restricted grep"
+      C: "Return NEEDS_CONTEXT -- cannot determine whether the plan file will be present in the working tree at execute time without more information"
+      D: "Auto-rewrite the grep command silently to exclude the plan file and continue without surfacing the change"
+      E: "Emit a warning only -- the circular contamination is minor and does not invalidate the acceptance criteria intent"
+    expected_answer: B
+    correct_because:
+      cite_file: skills/build-plan/references/plan-checker-prompt.md
+      cite_section: "10. Circular-AC (new)"
+      cite_contains: "blocker"
+    history: []

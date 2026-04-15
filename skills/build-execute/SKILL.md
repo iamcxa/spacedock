@@ -213,6 +213,34 @@ Update the `## Validation Map` after each successful commit: set `status: done` 
 
 ---
 
+## Benign-Drift Classifier
+
+Runs on **every** BLOCKED return from a troop dispatch, **before** the haiku -> sonnet -> opus ladder fires. Uses **inline string matching only** (zero subagent dispatches) on the troop's returned `blocked_reason` string and `findings[*].type`. Matches against exactly **three** hard-coded whitelisted classes. Match -> auto-proceed (classify task as DONE) + inject a `scope_observation` finding + continue wave. No match -> fall through to escalation ladder unchanged.
+
+The three whitelisted classes:
+
+1. **anchor-drift** -- `blocked_reason` contains the substring `line` AND one of `mismatch`, `shifted`, `not found at line`, or `content moved`. Captures stale line-number anchors when the file exists and the section is still present (entity 104 line 895 class). Auto-proceed: line-anchor mismatch -- file exists, section present -- auto-proceed + scope_observation.
+
+2. **file-renamed** -- `blocked_reason` contains the substring `read_first` AND one of `not found`, `ENOENT`, or `does not exist`. Additionally, **must verify** via `git log --diff-filter=R --follow -- <original-path>` that a rename entry exists; OR fall back to a sibling-file path-similarity check (substring overlap >=70%, bounded to the same parent directory). Similarity check: substring overlap >=70% (Jaro-Winkler or Levenshtein ratio >=0.7), bounded to the same parent directory. Fall-through to ladder if similarity < threshold. Primary signal is `git log --diff-filter=R --follow`; sibling-similarity is fallback only. **FP guard (P1):** if `git log --diff-filter=R` returns zero rename entries AND no similar-named sibling is found, **skip the classifier** and fall through to the ladder. Captures the entity 105 line 787 class. Auto-proceed: read_first file renamed -- git log --diff-filter=R confirms -- auto-proceed + scope_observation.
+
+3. **semantic-grep-mismatch** -- `blocked_reason` contains the substring `grep` AND `count` mismatch, AND the searched literal string actually appears inside the current entity file's `## PLAN`, `## UAT Spec`, or `<task>` blocks (mirroring the Circular-AC rule guard list). Captures the entity 104 line 896 Circular-AC class where an AC counts its own planning artifacts. Auto-proceed: Circular-AC -- grep matches only in PLAN/UAT blocks -- auto-proceed + scope_observation.
+
+On **match**: classify the task as DONE, inject a finding `{type: scope_observation, drift_class: <one of the three>, original_blocked_reason: <verbatim>}` into the wave-state findings list, log a one-line FO narration entry (`benign-drift auto-proceed: task-{id} class={drift_class}`), and continue wave execution. The orchestrator's serial-commit loop commits the task per Step 4.5 as if it had returned DONE first-hand.
+
+On **no match**: fall through to the BLOCKED Escalation Ladder unchanged.
+
+### Benign-Drift Classifier -- No Exceptions
+
+- **NEVER expand the whitelist at runtime.** If a fourth class appears in the wild, open a new entity to evaluate and ship it through the pipeline. A 4th class added inline is a silent contract change that downstream review cannot see.
+- **NEVER auto-proceed without injecting a `scope_observation` finding.** The finding is the audit trail; without it, the plan ensign cannot see that drift occurred and the next iteration's plan stays stale.
+- **NEVER match by regex complexity that exceeds substring matching.** Substring-only is the discipline -- regex creep enables ambiguous matches that justify auto-proceed on real blockers.
+- **NEVER apply the classifier to non-BLOCKED statuses.** DONE / NEEDS_CONTEXT statuses bypass the classifier entirely; the classifier only inspects BLOCKED returns.
+- **NEVER skip the git-log FP guard for the file-renamed class.** A missing file with no rename entry and no similar-named sibling is a real plan defect; auto-proceeding would silently ship against a phantom path.
+
+**Rationale.** The three whitelisted classes were captured from real entity drift: entity 104 line 895 (stale line anchor), entity 104 line 896 (circular AC), and entity 105 line 787 (file rename). Each cost a captain-in-loop escalation despite being mechanically benign. Tail misses (e.g., entity 104 Step 5.5 numbering collision, em-dash drift) intentionally fall through to the escalation ladder + captain escalation -- this is the **safe failure mode**: the classifier under-classifies rather than over-classifies, so any genuine blocker still receives full ladder treatment.
+
+---
+
 ## BLOCKED Escalation Ladder
 
 Per spec lines 274-276, a BLOCKED task is re-dispatched with escalating model tiers before terminal failure:

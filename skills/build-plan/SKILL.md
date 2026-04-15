@@ -320,6 +320,8 @@ Wait for the dispatched subagent to return. Parse its YAML output into a list of
 6. Validation Sampling (Full Nyquist) -- 6a presence / 6b latency / 6c continuity / 6d wave-0 completeness
 7. Cross-Entity Coherence -- `files_modified` cross-checked against `CONTRACTS.md`
 8. Type/Test Coverage -- source files have test pairing and type-check config coverage
+9. Stale-Line-Anchor -- every `file:line` citation resolves to asserted content; auto-rewrite to content anchor when unambiguous
+10. Circular-AC -- grep-count ACs are not self-referential against the entity's own PLAN/UAT blocks
 
 ---
 
@@ -485,7 +487,7 @@ The `chore(index):` commits from step 9a are already in place from the `workflow
 
 ## Plan-Checker Dimensions (Reference)
 
-The full plan-checker prompt template, including all 8 dimensions and YAML output format, lives in `skills/build-plan/references/plan-checker-prompt.md`. Step 6 reads that file and dispatches the rendered template as the prompt of an `Agent(subagent_type="general-purpose", model="sonnet", ...)` call. Keep the template in its own reference file so SKILL.md stays readable.
+The full plan-checker prompt template, including all 10 dimensions and YAML output format, lives in `skills/build-plan/references/plan-checker-prompt.md`. Step 6 reads that file and dispatches the rendered template as the prompt of an `Agent(subagent_type="general-purpose", model="sonnet", ...)` call. Keep the template in its own reference file so SKILL.md stays readable.
 
 | # | Dimension | Check |
 |---|-----------|-------|
@@ -497,6 +499,8 @@ The full plan-checker prompt template, including all 8 dimensions and YAML outpu
 | 6 | Validation Sampling | Full Nyquist: 6a presence / 6b latency / 6c continuity / 6d wave-0 |
 | 7 | Cross-Entity Coherence | `files_modified` cross-checked against `CONTRACTS.md` |
 | 8 | Type/Test Coverage | Source files have test pairing and type-check config coverage |
+| 9 | Stale-Line-Anchor | Every `file:line` citation resolves to asserted content; auto-rewrite to content anchor when unambiguous |
+| 10 | Circular-AC | grep-count ACs are not self-referential against the entity's own PLAN/UAT blocks |
 
 ---
 
