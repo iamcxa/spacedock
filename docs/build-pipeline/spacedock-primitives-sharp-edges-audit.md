@@ -600,3 +600,112 @@ The following claims from the original Directive were refuted by codebase eviden
 **Directive footgun #8 — `changed_files` no hash verification**: Mitigated. `skills/build-execute/SKILL.md:437` implements a git-diff-tree count cross-check comparing troop-reported `changed_files` count against actual git diff output. `skills/task-execution/SKILL.md:207` enforces that `changed_files` must be a subset of `files_modified` with BLOCKED revert on violation. Note: content-SHA verification (byte-level hash of changed content) is separately absent, but git-diff-tree count cross-check is a functional guard against fabricated file lists. Content-SHA gap is below severity bar per captain (not seeded).
 
 **Directive footgun #10 — `files_modified` plan-vs-runtime gate gap**: Mitigated. `skills/task-execution/SKILL.md:207` "Cross-check the list against `task.files_modified`. If the cross-check finds a path in changed_files that is NOT in files_modified, you have a scope violation -- revert that file and return BLOCKED per the Scope Discipline section." This is an explicit, unconditional subset enforcement with BLOCKED revert — the claimed gap does not exist in the current skill.
+
+## Cross-Primitive Coherence
+
+The two audited primitives (workflow-index and troop + task-execution) do not fail independently — their footguns compound in ways that make individual fixes insufficient without addressing the interaction surface.
+
+**Headline compound failure path**: A confused or adversarial troop can directly Write/Edit `docs/build-pipeline/_index/CONTRACTS.md` (F-XP-1 / F-TR-3) because its tool allowlist has no path constraint. When it does so, it bypasses every protection workflow-index nominally provides: no file-lock is acquired (F-WI-1), no status-transition guard rejects the edit (F-WI-2), and no serialization prevents a concurrent FO from clobbering the same section (F-WI-3). The result is a silently corrupted index with zero tripwire — the mod's "Workflow-index skill is the only legitimate writer" rule (`mods/workflow-index-maintainer.md:103`) is prose, not enforcement.
+
+**Secondary compound path — stale-index cascading into false gates**: F-WI-5 (CONTRACTS hygiene drift — 8+ entities stuck in-flight) directly amplifies F-WI-2 (no irreversibility guard). When a shipped entity's row stays `🟡 in-flight` because the final-transition hook didn't fire, the plan-checker Dimension 7 cross-entity coherence check reads the stale row and fires a HARD GATE on any new entity that touches the same files — even though the prior entity has shipped and the conflict is resolved. This is the exact failure mode documented in entity 103 task-6. The two footguns together create a self-reinforcing false-positive trap: drift accumulates because there is no irreversibility guard, and drift causes gate fires because there is no hygiene correction mechanism.
+
+**Tertiary compound — `blocked_reason` self-serve + classifier auto-proceed**: F-TR-1 (`blocked_reason` stringly-typed) means a confused troop can author a `blocked_reason` that happens to substring-match the Benign-Drift Classifier's auto-proceed patterns. If that troop also had a scope violation touching `CONTRACTS.md` (F-TR-3 + F-XP-1), the classifier may auto-proceed the task, committing the index corruption without captain review.
+
+**Compound footgun table**:
+
+| Compound | Primary Findings | Failure Mode | Severity |
+|----------|-----------------|-------------|----------|
+| Troop → CONTRACTS direct write | F-XP-1 + F-WI-1 + F-WI-2 + F-WI-3 | Troop bypasses skill, no lock/guard/serialization catches the bypass | HIGH |
+| Stale-index → false HARD GATE | F-WI-5 + F-WI-2 | Shipped entity stuck in-flight, plan-checker blocks new entity on resolved conflict | HIGH |
+| Blocked-reason craft → auto-proceed | F-TR-1 + F-TR-3 + F-XP-1 | Confused troop authors classifier-matching blocked_reason while also making unauthorized writes | MEDIUM |
+| Circular-AC + stale entity file | F-TR-4 + F-WI-2 | Troop self-satisfies AC grep from plan body, returns DONE on unrealized artifact; irreversibility gap means a corrective status update could also be reversed | MEDIUM |
+
+The first two compounds are the highest-ROI targets for Phase F: fixing F-XP-1 (write-gatekeeper) and F-WI-5 (hygiene diagnostic) together eliminates the two worst cascades. The stale-index cascade is also the most operationally painful — it was the direct cause of a captain-intervention during this session.
+
+## Phase F Seed Slate
+
+Seven seeds pre-locked by clarify, one entity per HIGH finding plus the LOW doc-debt seed.
+
+### Seed 1: workflow-index-file-locking
+
+**Directive**: Add a file-locking primitive to the workflow-index write path so concurrent CONTRACTS.md appends from parallel FO instances or parallel wave tasks cannot interleave or duplicate rows.
+
+**Severity**: HIGH -- source finding F-WI-1 (A-1 Confident 0.95)
+
+**Scope**:
+- IS in scope: implement lockfile sentinel (`_index/.lock`) or equivalent serialization mechanism; update `skills/workflow-index/references/write-mode.md` append + update-status-bulk operations to acquire/release lock; add pressure-test fixture for concurrent-append scenario
+- NOT in scope: changes to callers (build-plan, build-execute, mod) — lock acquisition is internal to the skill; not in scope: cross-instance distributed locking (single-host assumption for v1)
+
+**Model/profile hint**: Medium scale, default profile; sonnet sufficient for implementation + write-mode.md update
+
+### Seed 2: workflow-index-irreversibility-guard
+
+**Directive**: Add a status-transition allowlist to `update-status` and `update-status-bulk` operations so that `final` rows reject all further updates except `reverted`, and `in-flight` → `final` transitions require a `shipped_date` input.
+
+**Severity**: HIGH -- source finding F-WI-2 (A-2 Confident 0.95)
+
+**Scope**:
+- IS in scope: transition validation in write-mode.md operations; `shipped_date` field addition to `update-status-bulk` input schema; pressure-test fixture for invalid transition (final → in-flight attempt)
+- NOT in scope: backfilling `shipped_date` for existing rows (that is Seed 5's diagnostic scope); not in scope: DECISIONS.md supersede semantics (separate path)
+
+**Model/profile hint**: Medium scale, default profile; sonnet sufficient
+
+### Seed 3: workflow-index-worktree-race-serialization
+
+**Directive**: Add a write-serialization layer to the workflow-index skill so that all CONTRACTS.md Edit calls are forced through a single serialized path, preventing cross-worktree append races.
+
+**Severity**: HIGH -- source finding F-WI-3 (A-3 Confident 0.95)
+
+**Scope**:
+- IS in scope: design and implement serialization mechanism (lockfile, Git-level branch guard, or FO-central write queue); update write-mode.md; add concurrent-write pressure-test fixture
+- NOT in scope: changes to individual callers beyond acquiring the lock via the skill; not in scope: distributed-lock protocol across machines
+
+**Model/profile hint**: Medium scale, default profile; consider opus if serialization design has multiple viable approaches requiring architectural choice
+
+### Seed 4: troop-sandbox-enforcement
+
+**Directive**: Enforce the worktree sandbox boundary at the tool level so that troop agents cannot access paths outside their declared worktree root, eliminating the advisory-only nature of the current prompt-string constraint.
+
+**Severity**: HIGH -- source finding F-TR-3 (A-7 Confident 0.95)
+
+**Scope**:
+- IS in scope: `agents/troop.md` tool allowlist extension with path-prefix constraints; evaluate platform-level cwd-lock options; if platform does not support path-filter in allowlist, implement Bash/Read/Write/Edit wrapper shim; pressure-test fixture for out-of-worktree path attempt
+- NOT in scope: sandbox enforcement for other agent types (ensign, researcher); not in scope: F-XP-1 gatekeeper (that seed handles workflow-index write specifically — this seed handles general path traversal)
+
+**Model/profile hint**: Medium scale, default profile; may require platform-layer investigation before implementation
+
+### Seed 5: workflow-index-contracts-hygiene-diagnostic
+
+**Directive**: Run a diagnostic pass to identify why 8+ shipped entities still carry stale `🟡 in-flight` markers in CONTRACTS.md, trace the hook-fire failure path per entity, and implement a targeted fix for the root cause.
+
+**Severity**: HIGH -- source finding F-WI-5 (A-10 Likely 0.70; root cause unconfirmed — requires runtime trace)
+
+**Scope**:
+- IS in scope: enumerate all shipped entities with stale CONTRACTS rows; for each, determine whether failure is (a) missing `## Files Modified` section, (b) no idle-hook tick after ship, (c) archive-before-idle ordering, or (d) missing `shipped_date` input; implement fix for dominant root cause; backfill stale rows
+- NOT in scope: redesigning the hook architecture (that belongs in Seed 2/3 if the fix is schema-level); not in scope: writing a new pressure-test framework (deferred per MEMORY pressure-test-preservation-todo)
+
+**Model/profile hint**: Medium scale, default profile; diagnostic-heavy — sonnet for log trace, sonnet for fix implementation
+
+### Seed 6: troop-workflow-index-write-gatekeeper-compound
+
+**Directive**: Close the cross-primitive bypass path where troop's unconstrained Write/Edit allowlist lets it directly mutate `docs/build-pipeline/_index/CONTRACTS.md` and `docs/build-pipeline/_index/DECISIONS.md`, bypassing workflow-index skill format invariants and commit discipline.
+
+**Severity**: HIGH -- source finding F-XP-1 compound (Q-4 disposition: headline seed with two child entity candidates)
+
+**Scope**:
+- IS in scope: compound headline — establish that `_index/` files are protected from direct Write/Edit by non-skill callers; two child-entity candidates: (a) `troop-tool-allowlist-narrowing` — constrain Write/Edit in `agents/troop.md` to exclude `docs/build-pipeline/_index/`; (b) `workflow-index-write-gatekeeper` — add a platform-level or skill-level guard that rejects direct edits to `_index/` files
+- NOT in scope: general troop sandbox (Seed 4 handles that); not in scope: workflow-index locking (Seeds 1+3); child entities (a) and (b) may be dispatched as separate entities from this compound seed per captain decision
+
+**Model/profile hint**: Medium scale, default profile; captain should decide at clarify whether to ship as one entity or split into child entities (a) and (b)
+
+### Seed 7: build-execute-dispatch-guide-extraction
+
+**Directive**: Extract the dispatch contract currently living inline at `skills/build-execute/SKILL.md:157-188` into a standalone reference file `skills/build-execute/references/agent-dispatch-guide.md`, and update all cross-skill citations to use the stable path.
+
+**Severity**: LOW -- source finding F-TR-6 (Q-3 disposition: LOW doc debt)
+
+**Scope**:
+- IS in scope: create `skills/build-execute/references/agent-dispatch-guide.md` with content from SKILL.md Step 4b lines 157-188; update SKILL.md to reference the new file; search for any other cross-skill citations pointing to the dead path and fix them
+- NOT in scope: changes to the dispatch contract content itself; not in scope: similar extraction for other inline contracts in other skills (can be a follow-on)
+
+**Model/profile hint**: Small scale, default profile; sonnet sufficient; fast ship
