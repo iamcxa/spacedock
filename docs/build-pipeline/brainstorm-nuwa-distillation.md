@@ -89,8 +89,8 @@ You are asking for a restructure of build-brainstorm so that every APPROACH clai
 - Given a directive invoking build-brainstorm v2, when the skill runs, then the output contains `## Lens Evidence` with 4 distinct lens subsections (captain-stated / captain-unstated / codebase-current / sibling-entity), each with ≥1 citation and a `[primary|secondary|tertiary]` tier tag (how to verify: `grep -c "^### Lens " output.md` returns 4; for each subsection, `grep 'file:\|entity:'` yields ≥1; `grep -E '\[primary\]|\[secondary\]|\[tertiary\]' output.md` yields ≥4).
 - Given any APPROACH claim produced by v2, when traced through `## Lens Evidence`, then ≥2 distinct lens subsections cite supporting evidence (how to verify: pick any APPROACH factual assertion; assert ≥2 of 4 lens subsections contain supporting citations by keyword match).
 - Given a directive whose scope overlaps an active sibling entity, when build-brainstorm v2 runs, then the output contains a `Q-n` in `## Open Questions` (seeded in brainstorm per merge-gate-iii failure) citing the sibling `{id} ({title})` and asking captain to `{merge|link|refine}`, AND `**Dedup flag:**` is absent from Captain Context Snapshot (how to verify: seed a directive mirroring an active sibling's title; `grep "Q-[0-9]" output.md | grep {sibling-id}` yields ≥1; `grep 'Dedup flag:' output.md` yields 0).
-- Given any brainstorm v2 output, when `## Honest Boundaries` is inspected, then it is either populated with ≥1 declared limit OR contains the epic-102-Q-3-resolved escape-hatch string (how to verify: `grep -A 20 "^## Honest Boundaries$" output.md | grep -E "^- |escape-hatch-string-from-Q3"` yields ≥1; exact escape-hatch string inherited from parent 102 Q-3 resolution at epic clarify).
-- Given any brainstorm v2 output, when `## Core Tensions` is inspected, then it is either populated with ≥1 typed tension entry (time-based / domain-based / essential) OR contains the epic-102-Q-3-resolved escape-hatch string (how to verify: same grep pattern against `## Core Tensions` header; each populated entry matches `\*\*(time-based|domain-based|essential)\*\*:`).
+- Given any brainstorm v2 output, when `## Honest Boundaries` is inspected, then it is either populated with ≥1 declared limit OR contains the epic-102-Q-3-resolved escape-hatch string (how to verify: `grep -A 20 "^## Honest Boundaries$" output.md | grep -E "^- |Checked -- no notable constraints identified\."` yields ≥1; exact escape-hatch string inherited from parent 102 Q-3 resolution at epic clarify).
+- Given any brainstorm v2 output, when `## Core Tensions` is inspected, then it is either populated with ≥1 typed tension entry (time-based / domain-based / essential) OR contains the epic-102-Q-3-resolved escape-hatch string (how to verify: `grep -A 20 "^## Core Tensions$" output.md | grep -E "^- |Checked -- no notable constraints identified\."` yields ≥1; each populated entry matches `\*\*(time-based|domain-based|essential)\*\*:`).
 - Given v2 ships, when the non-interactive-to-captain contract is audited, then the skill's main-session text issues zero AskUserQuestion/Teammate calls (how to verify: `grep -cE "AskUserQuestion|Teammate\(" skills/build-brainstorm/SKILL.md` returns 0; subagent prompt templates independently confirmed non-interactive by inspection).
 - Given 4-lens analysis runs on 3 distinct fixture directives, when file-read budget is audited, then total Read count ≤ 9 per invocation across all 3 fixtures (how to verify: instrument Read counter in a dogfood harness; assert count ≤ 9 for each of the 3 fixtures; fixtures chosen to cover Small/Medium/Large scales).
 - Given APPROACH contains a load-bearing assertion supported by only 1 lens, when the self-test gate runs, then the skill either blocks return with Stage Report entry `gate-ii failed: claim {n} supported by only {lens}; promote to 2+ lenses or demote to GUARDRAILS` OR emits the claim α-marked with that specific failure reason (how to verify: seed a directive constructed to produce a single-lens claim; assert block-return OR α-marker with exact failure string -- silent acceptance is a failure).
@@ -124,7 +124,7 @@ You are asking for a restructure of build-brainstorm so that every APPROACH clai
 (parent 102 seeds propagated; child clarify stage will populate further:)
 
 - `/Users/kent/Project/me-company/.agents/skills/huashu-nuwa/SKILL.md` -- methodology spec, Phase 0 through Phase 4 (external; fragility noted in A-7)
-- `/Users/kent/Project/me-company/.agents/skills/huashu-nuwa/references/extraction-framework.md` -- triple-verification gate (Part 一), contradiction preservation (Part 三), information-insufficiency (Part 四), quality self-check (Part 六) -- **to be vendored locally per A-7 captain decision**; plan-phase will relocate to `docs/build-pipeline/_docs/extraction-framework.md` (or a skill-scoped path) with functional naming (no `huashu-nuwa-` prefix)
+- `docs/build-pipeline/_docs/extraction-framework.md` -- triple-verification gate (Part 一), contradiction preservation (Part 三), information-insufficiency (Part 四), quality self-check (Part 六). Vendored locally 2026-04-15 per A-7; functional name (no huashu-nuwa prefix).
 - `docs/build-pipeline/brainstorm-dual-lens-cross-entity-dedup.md` -- parent epic 102 with full APPROACH, decisions, and cross-child coordination
 - `skills/build-brainstorm/SKILL.md` -- target skill file (modification target; current contents are the pre-v2 baseline)
 - `skills/build-brainstorm/references/alpha-marker-protocol.md` -- α-marker convention this enhancement preserves
@@ -287,6 +287,24 @@ Child-specific Core Tension: the 5-item self-test gate's failure semantics (ship
 
 → Answer: Ship 104 first (captain, 2026-04-15, interactive) -- rationale: epic 102 is frozen and sibling 105 depends on 104's tier-tag format, so 104-first unblocks cross-child coordination. `build-flow-tdd-discipline` rebases its given/when/then Step 4 additions onto v2-restructured Step 4 when it advances past its current in-flight execute stage. Plan-phase MUST (a) append a CONTRACTS entry for 104's Step 4 surface claim, (b) note the rebase handoff in 104's `## Ship Notes` (to be added at plan), (c) not add `depends-on` frontmatter (would create circular wait since TDD is already execute-stage in-flight -- depends-on goes the other direction implicitly).
 
+## Ship Notes
+
+### Ship-order coordination with `build-flow-tdd-discipline`
+
+Per Q-5 captain decision 2026-04-15: entity 104 ships first. `build-flow-tdd-discipline` (in-flight at execute stage per CONTRACTS.md:183) rebases its Step 4 given/when/then AC guidance onto v2-restructured Step 4 when it next advances. Rebase instruction: TDD's Step 4 additions lift onto the new "Step 4: Brainstorming Spec" output-format block preserved from v1; the 4-lens + merge-gate + self-test additions land in Steps 1 and 5.5, leaving Step 4 semantically available for TDD augmentation.
+
+### Tier-tag parity with sibling 105
+
+Bracketed `[primary|secondary|tertiary]` tier-tag syntax frozen per epic 102 O-1. Sibling 105 consumes this syntax at runtime (105 Canonical Refs + AC). Ship-order independent: 104 ships with the syntax fixed; 105 inherits and emits the same form in its own lens output.
+
+### Future-entity candidates
+
+Out-of-scope items surfaced during plan but deferred:
+- Raising the 5-file cap pipeline-wide (parent 102 Core Tension 2). Current plan raises only build-brainstorm to 9. Other skills remain at 5.
+- Dashboard renderer special-casing for `## Lens Evidence` / `## Core Tensions` / `## Honest Boundaries` (per parent 102 Q-2 resolution: generic markdown H2 rendering for now).
+- Backfill of v2 schema into 36+ shipped v1 entities (Honest Boundary: forward-only upgrade).
+- Pipeline-wide O-2 escape-hatch string rollout beyond entity 104.
+
 ## Stage Report: explore
 
 - [x] Files mapped: 7 across skills and docs
@@ -355,7 +373,7 @@ Inline serial research (plan-stage fallback per SKILL.md Step 2). Broad technolo
 - **Mode B degraded-quality semantics** -- Mode B inline fallback cannot achieve true 4-lens triangulation; the self-test gate's cross-lens recurrence check (gate i) MUST be relaxed in Mode B or the gate always hard-fails. Per O-3 path-aware decision: Mode A = ship-blocking, Mode B = advisory (α markers + Stage Report warning). Gates (ii) and (iii) still run in Mode B.
 - **CONTRACTS merge collision with `build-flow-tdd-discipline`** -- Q-5 settled "ship 104 first"; but `build-flow-tdd-discipline` is at execute stage in-flight per CONTRACTS.md:183. If TDD merges first, v2 rebases its Step 4 section onto TDD's given/when/then AC guidance. Plan Task 7 appends a Ship Notes sub-section capturing the rebase instruction for the other entity's FO to find via CONTRACTS grep.
 - **Sibling 105 parallel-plan coupling** -- 105's plan may land before or after 104's plan. Tier-tag bracketed syntax is frozen by epic 102 O-1 as non-negotiable input (105 inherits, no re-opening). No plan-time coupling required if both sides honor the O-1 string verbatim. Plan Task 2's self-test gate item (v) asserts this exact bracketed form.
-- **Extraction-framework external path fragility (A-7)** -- external `me-company/.agents/skills/huashu-nuwa/references/extraction-framework.md` reference breaks if external repo moves. Captain directive 2026-04-15: vendor with functional name (no `huashu-nuwa-` prefix), place under `docs/build-pipeline/_docs/extraction-framework.md`. Plan Task 4 handles the copy + citation updates. Source file confirmed readable (~5KB, 2026-04-15).
+- **Extraction-framework external path fragility (A-7)** -- external reference has been vendored per captain directive 2026-04-15. Functional name (no `huashu-nuwa-` prefix), located at `docs/build-pipeline/_docs/extraction-framework.md`. Plan Task 4 handles the copy; Task 5 updates citations. Source file confirmed readable (~5KB, 2026-04-15).
 - **Nested Agent dispatch silently degrades** (MEMORY.md `subagent-cannot-nest-agent-dispatch`) -- v2 MUST detect Mode B (no Agent tool in current context) and fallback, not attempt dispatch and fail. Detection heuristic: presence of `Agent` tool in the skill's runtime context. Plan Task 2 writes this detection step.
 - **Lens (b) unstated-intent has no ground-truth (Honest Boundary 7)** -- self-test gate can only verify structural presence (subsection exists, ≥1 citation, tier tag), NOT semantic correctness. Plan Task 2 writes the gate as structural-only for lens (b) explicitly.
 
