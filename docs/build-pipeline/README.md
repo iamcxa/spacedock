@@ -268,6 +268,7 @@ children:
 | `title` | string | Human-readable feature name |
 | `status` | enum | One of: draft, brainstorm, explore, clarify, plan, execute, quality, review, uat, shipped, epic |
 | `context_status` | enum | `pending`, `exploring`, `awaiting-clarify`, `ready`. Orthogonal to `status`. Tracks context maturity during draft/explore/clarify phases. |
+| shape_status | enum | (absent) = shape has never run; `draft` = shape session started, not yet validated; `validated` = shape sections locked (immutable-pitch discipline, P-4); `n/a` = entity created via `/build` directly. Set by `/shape` skill. Read by `/build --from {slug}` to load shape sections into brainstorm Lens (a). |
 | `source` | string | Where this feature came from (e.g., `/build`, `commission seed`) |
 | `created` | ISO 8601 | Entity creation timestamp (set by `/build`) |
 | `started` | ISO 8601 | When active work began (first move beyond draft) |
@@ -284,6 +285,15 @@ children:
 | `uat_pending_count` | integer | Count of UAT items skipped with captain ack during uat stage. If non-zero, entity shipped with pending verification; `/spacedock:uat-resume {slug}` re-runs pending items. |
 | `parent` | string | Slug of parent epic (if this entity was decomposed from a larger one). |
 | `children` | list | `[slug1, slug2, ...]` (if this entity is an epic/tracker with child entities). |
+| supersedes | string | Slug of a `shape_status: validated` entity this entity revises. When captain wants to change a validated shape, a NEW entity is opened with `supersedes: {old-slug}`; the old entity remains frozen (immutable-pitch discipline, P-4). No auto-close of the old entity. |
+
+### /shape Integration
+
+The `/shape` skill is an optional pre-processor that runs BEFORE `/build` for Medium+ features. It produces a validated shape artifact (problem statement, user stories, scope boundaries) that `/build --from {slug}` consumes as enrichment.
+
+- **Classic flow** -- `/build "raw directive"` is unchanged. No shape required. Entity gets `shape_status: n/a`.
+- **Shape-first flow** -- captain runs `/shape "directive"`, iterates with subagents to validate problem statement and user stories, then runs `/build --from {slug}`. When an entity has `shape_status: validated`, `/build --from {slug}` reads the entity's `## Problem Statement`, `## User Stories`, `## Scope: In`, `## Scope: Out`, and `## References` sections and passes them to build-brainstorm Lens (a) as [primary] tier citations.
+- **Revision** -- once `shape_status: validated` is set, the five shape sections are immutable (immutable-pitch discipline, P-4). To revise, open a NEW entity with `supersedes: {old-slug}` and run `/shape` against it. The old entity stays frozen.
 
 ## Stages
 
