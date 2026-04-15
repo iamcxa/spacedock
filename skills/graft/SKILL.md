@@ -404,60 +404,60 @@ Present detected values as defaults, captain confirms or overrides.
 ### Step 8 -- Create directory structure
 
 ```bash
-mkdir -p .spacedock/workflows/{name}/.origin/skills
+# Workflow state dirs (FO runtime structure — all required)
+mkdir -p .spacedock/workflows/{name}/_archive
+mkdir -p .spacedock/workflows/{name}/_mods
+mkdir -p .spacedock/workflows/{name}/_docs
 mkdir -p .spacedock/workflows/{name}/_index
+
+# No .origin/ directory. No merged README.md.
+# FO reads the workflow README from the plugin at startup via manifest.yaml.
 ```
 
 ### Step 9 -- Write files (in order)
 
-1. **Copy upstream originals to `.origin/`:**
-   - Copy source README.md -> `.origin/README.md`
-   - For each localize tier skill:
-     - Copy source SKILL.md -> `.origin/skills/{name}/SKILL.md`
-     - If the skill's SKILL.md contains `Read →` or `Read ->` references to `references/*.md` files, also copy those reference files -> `.origin/skills/{name}/references/`
-   - For each localize tier skill that references agents (e.g., `spacedock:code-explorer`):
-     - Check if the agent definition exists in source plugin's `agents/` directory
-     - Copy agent .md file -> `.origin/agents/{agent-name}.md`
+1. **Write manifest.yaml** to `.spacedock/workflows/{name}/manifest.yaml` using new schema:
+   - Top-level `source_plugin:` (e.g., `spacedock`) and `workflow_readme_path:` (e.g., `docs/build-pipeline/README.md`)
+   - For each localize-tier skill: include `source_hash: <sha256>` computed from the plugin's SKILL.md bytes at init time (binary read, no normalization; see `## Manifest Schema / source_hash canonicalization`)
 
-2. **Write manifest.yaml** to `.origin/manifest.yaml`
+2. **Write LOCAL.yaml** to `.spacedock/workflows/{name}/LOCAL.yaml` with collected overrides
 
-3. **Write LOCAL.yaml** with collected overrides
+3. **Apply localized skills:**
+   For each localize-tier skill:
+   - Read plugin SKILL.md bytes from `{plugin_dir}/skills/{name}/SKILL.md`
+   - Compute SHA256 of bytes; store as `source_hash` in manifest (step 1)
+   - Apply `skill_overrides[{name}]` from LOCAL.yaml (anchor-based find-replace against the plugin bytes)
+   - If an anchor is not found in the plugin bytes, stop and escalate: "Anchor not found: '{anchor}' in {plugin_dir}/skills/{name}/SKILL.md. Update LOCAL.yaml."
+   - Write result to `.claude/skills/{name}/SKILL.md` (create dir with `mkdir -p .claude/skills/{name}/` first)
+   - Copy reference files from `{plugin_dir}/skills/{name}/references/` -> `.claude/skills/{name}/references/` (if any)
 
-4. **Apply localized skills:**
-   For each localize tier skill:
-   - Start from `.origin/skills/{name}/SKILL.md`
-   - Apply `skill_overrides[{name}]` from LOCAL.yaml (anchor-based find-replace)
-   - Write result to `.claude/skills/{name}/SKILL.md`
-   - If `.origin/skills/{name}/references/` exists, copy reference files to `.claude/skills/{name}/references/`
-
-5. **Apply localized agents** (if any were copied in step 1):
-   For each agent in `.origin/agents/`:
+4. **Apply localized agents** (if any localize-tier skill references agents):
+   For each required agent from `{plugin_dir}/agents/{agent-name}.md`:
    - Apply namespace overrides (e.g., `spacedock:` -> local refs)
    - Write result to `.claude/agents/{agent-name}.md`
 
-6. **Apply README overlay:**
-   - Start from `.origin/README.md`
-   - Apply `readme_operations` from LOCAL.yaml (same logic as overhaul Step 4)
-   - Write merged result to `README.md`
+5. **Copy _docs** from source workflow's `_docs/` directory (if present) to `.spacedock/workflows/{name}/_docs/`
 
-7. **Port infrastructure** (if Tier 3 skills present):
+6. **Port infrastructure** (if Tier 3 skills present):
    - Copy workflow-index SKILL.md to `.claude/skills/workflow-index/SKILL.md`
    - Apply namespace overrides (spacedock:workflow-index -> workflow-index)
-   - Create empty `_index/CONTRACTS.md` and `_index/DECISIONS.md` with header template
+   - Create `_index/CONTRACTS.md` and `_index/DECISIONS.md` with header template
+   - Create `_index/INDEX.md` with header template (required by workflow-index read mode)
    - Copy workflow-index reference files to `.claude/skills/workflow-index/references/`
 
-8. **Write prerequisites doc** to `.spacedock/workflows/{name}/PREREQUISITES.md`
+7. **Write prerequisites doc** to `.spacedock/workflows/{name}/PREREQUISITES.md`
 
 ### Step 10 -- Post-apply validation
 
-1. YAML parse check on merged README
-2. Stage-body correspondence (each stage has a body subsection)
+1. manifest.yaml parse check: verify `source_plugin`, `workflow_readme_path` present at top level
+2. manifest.yaml skill entries: every localize-tier skill has `source_hash` (non-empty string)
 3. Skill ref resolution:
    - Verbatim refs (`spacedock:build-*`) -- verify spacedock plugin is installed
    - Localize refs (`build-*`) -- verify `.claude/skills/{name}/SKILL.md` exists
 4. Reference file resolution: for each localize skill with `references` in manifest, verify files exist at `.claude/skills/{name}/references/`
 5. Agent resolution: for each agent in manifest `agents` list, verify `.claude/agents/{name}.md` exists
-6. Infrastructure files exist (if Tier 3)
+6. FO runtime dirs: verify `_archive/`, `_mods/`, `_docs/`, `_index/INDEX.md` all exist
+7. Confirm no `.origin/` directory exists and no `README.md` in the workflow dir root
 
 ### Step 11 -- Report
 
@@ -475,13 +475,21 @@ Skills:
   Infrastructure ported: {list or "none"}
 
 Files created:
-  .spacedock/workflows/{name}/README.md          (merged)
-  .spacedock/workflows/{name}/.origin/manifest.yaml
-  .spacedock/workflows/{name}/.origin/README.md
+  .spacedock/workflows/{name}/manifest.yaml      (source_plugin + workflow_readme_path + source_hash per skill)
   .spacedock/workflows/{name}/LOCAL.yaml
+  .spacedock/workflows/{name}/_archive/          (empty, FO runtime dir)
+  .spacedock/workflows/{name}/_mods/             (empty, FO runtime dir)
+  .spacedock/workflows/{name}/_docs/             (copied from source if present)
+  .spacedock/workflows/{name}/_index/CONTRACTS.md
+  .spacedock/workflows/{name}/_index/DECISIONS.md
+  .spacedock/workflows/{name}/_index/INDEX.md
   .claude/skills/{localized skill list}
   .claude/agents/{agent list if any}
   {infra files if any}
+
+NOTE: No README.md in workflow dir. FO reads workflow README from:
+  {plugin_dir}/{workflow_readme_path}
+  LOCAL.yaml readme_operations are applied in-memory at FO startup.
 
 Prerequisites: see PREREQUISITES.md
 Next: run the workflow with `claude --agent spacedock:first-officer`
