@@ -804,3 +804,26 @@ Mixed: Wave 1 (3 troops parallel, sonnet), Wave 2 (3 troops parallel haiku — a
 - CONTRACTS task-5's "add new header" 5a sub-item was already completed during pre-execute workflow-index append by FO (required for plan-checker Dim 7 visibility). Task-5's actual work was only 5b (finalize 113 rows) plus noting that entity 114's rows were already present. Zero duplication.
 
 knowledge capture: staged — Wave 2 haiku troop persistence anomaly (D2 candidate for `mods/` or troop agent reference doc review).
+
+## Stage Report: quality
+
+status: passed
+
+### Checks
+- bun test: PASS (822 pass / 1 fail — NET IMPROVEMENT vs main baseline 816 pass / 7 fail; the 1 failure is a pre-existing flaky SSE integration test also failing on main)
+- bun lint: SKIPPED — no root `lint` script; entity changes are markdown-only
+- tsc --noEmit: SKIPPED — no root tsconfig; entity changes are markdown-only
+- bun build: SKIPPED — no root build script; entity changes are markdown-only
+
+### Evidence
+```
+Worktree:  822 pass / 1 fail / 1997 expect calls / 89 files / 25.99s
+Main base: 816 pass / 7 fail / 1991 expect calls / 89 files / 66.53s
+Delta:     +6 pass, -6 fail (entity 114 is a net test improvement)
+```
+
+Remaining 1 fail: `chat route — integration > 200 with delivered:false when no registered CC session for project root` — pre-existing flakiness on main, unrelated to entity 114 (markdown-only changes).
+
+### Notes
+- Ran `bun install` in subpackages (spacebridge, tools/dashboard, spacebridge/ui) to resolve module not found errors — same pattern as entity 113. Post-install test count matches expected.
+- Entity 114 modifies only markdown + YAML; lint/tsc/build checks are not applicable at repo root.
