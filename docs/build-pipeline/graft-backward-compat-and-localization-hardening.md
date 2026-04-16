@@ -2,7 +2,9 @@
 id: 112
 title: Graft Backward-Compat and Localization Hardening -- Migration + Bug Sweep (101b)
 status: brainstorm
-context_status: pending
+context_status: blocked
+blocked-until: pensee-11-workflow-install-vs-graft-resolved
+park-reason: "Captain 2026-04-16 — pensée #11 (me-company /docs/decision-thinking/workflow-install-vs-graft.md) flags graft mental model as wrong direction; investing in graft hardening reinforces the wrong horse. Park until pensée #11 enriches and decides graft retire / coexist / role re-cut."
 source: entity 101 explore+clarify decomposition (2026-04-15 O-1 option-b 2-way split + Q-3 option-1 spawn-at-handoff)
 created: 2026-04-15T18:55:00+08:00
 started:
@@ -144,3 +146,98 @@ You are asking for: ship the graft-side migration command + 6 outstanding bug fi
 - ⚠ Mode B inline fallback used -- justified by parent 101 already shipped with rich Assumptions (A-1 through A-11) covering full file surface; 4-lens dispatch would be redundant per "50%+ files already-read" heuristic.
 - Alignment gate: not run (deferred to FO post-handoff)
 alignment_confidence: N/A
+
+## Assumptions
+
+### A-1: Parent 101 manifest+hash schema is canonical migrate target
+
+- **Confidence**: Confident (0.95)
+- **Statement**: `graft migrate` reads existing `.origin/` layout and writes the new manifest schema introduced by 101 (`source_hash`, `commit_sha`, `grafted_at`, skill tier metadata). Schema authority is 101; 112 only consumes.
+- **Evidence**: docs/build-pipeline/_archive/graft-runtime-overlay-redesign.md A-4 + Phase 4 references -- archive [primary]; skills/graft/SKILL.md:105 Manifest Schema section (post-101 state) -- skills/graft/SKILL.md [primary]
+
+### A-2: Bug #15 pre-write diff is graft-init in-line check, NOT a new LOCAL.yaml op
+
+- **Confidence**: Likely (0.75)
+- **Statement**: Implement bug #15 as Phase 4 step inside graft init — before writing `.claude/skills/{name}/{file}` or `.claude/agents/{name}.md`, check existence + emit prompt/warning. Avoid introducing a new LOCAL.yaml op type to stay out of 101's vocabulary territory.
+- **Evidence**: skills/graft/SKILL.md:185-235 LOCAL.yaml op vocab is fixed (`set-stage-field`, `anchor/replace`) -- skills/graft/SKILL.md [primary]; directive Out of scope L44 forbids 101 architecture changes -- directive [primary]
+  (✓ resolved by explore: α marker "LOCAL.yaml op vocabulary scope" → in-line graft-init check, NOT new op)
+
+### A-3: Pressure-test history rows are append-not-overwrite
+
+- **Confidence**: Confident (0.95)
+- **Statement**: `tests/pressure/graft.yaml` `history:` rows accumulate over time (each fix attempt adds a dated row). 112's fix lands as a new row "2026-04-16 actual=A fixed", preserving prior "2026-04-14 actual=A unfixed" entry for audit.
+- **Evidence**: tests/pressure/graft.yaml convention (parent 101 explore confirmed history field semantics) -- tests/pressure/graft.yaml [primary]
+
+### A-4: Synthetic fixture under tests/fixtures/graft-legacy-origin/ is acceptable proxy for migrate testing
+
+- **Confidence**: Likely (0.70)
+- **Statement**: Live carlove access may not be available at execute time; a synthetic fixture replicating the .origin/ layout (skill copies, agent copies, merged README, manifest without source_hash) provides repeatable testing. Real carlove run is captain-optional dogfood validation.
+- **Evidence**: parent 101 ship_note "runtime validation deferred to 112 (graft-backward-compat) when graft binary executes migrate + pressure sweep" implies live carlove preferred but not strict -- entity:101 [primary]
+
+## Option Comparisons
+
+### O-1: Migrate testing strategy — synthetic fixture vs live carlove vs both
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| **Synthetic fixture only** | Repeatable; CI-runnable; no captain coordination | May miss carlove-specific edge cases | Low | Viable baseline |
+| **Live carlove only** | Real-world validation; dogfood proof | Requires captain access; non-repeatable in CI | Medium (logistics) | Risky as sole verification |
+| **Both (synthetic in CI + live carlove dogfood)** | CI repeatability + real-world signal | Slightly more execute work | Medium | ✅ **Recommended** -- mirrors entity 107 dogfood-after-fix pattern (MEMORY) |
+
+**Validation**: aligns with MEMORY `dogfood-validation-must-follow-fixes` — synthetic fixture is the ship gate, carlove run is the post-ship validation.
+
+### O-2: Wave structure — 5 waves vs combined waves
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|---|---|---|---|---|
+| **5 waves as brainstormed (fixes → migrate → smoke → sweep)** | Each wave independently testable; clear dependency order | More wave overhead in plan | Medium | ✅ **Recommended** -- preserves "each deliverable testable on its own" RATIONALE |
+| **3 waves (all fixes parallel + migrate + sweep)** | Faster execute; fewer wave gates | Bug fix interdependencies might surface; smoke test coupled to fixes | Low | Viable but less safe |
+| **1 monolithic wave** | Maximum parallelism | Loses sequencing; carlove sweep depends on everything | Low | Rejected -- destroys validation signal |
+
+**Validation**: 5-wave structure mirrors entity 107's wave ordering precedent; sweep-last is required for clean validation outcomes.
+
+## Open Questions
+
+### Q-1: Bug #15 UX — silent overwrite warning vs interactive confirmation?
+
+- **Domain**: User-facing CLI behavior
+- **Why it matters**: Pre-write diff/confirm could be a printed warning + auto-proceed (CI-friendly), an interactive y/N prompt (safer but blocks CI), or a `--force` flag toggle (mid-ground).
+- **Suggested options**:
+  - Warning + auto-proceed (CI-safe default; mention in `--dry-run` output)
+  - Interactive y/N prompt (default), `--yes` flag for CI
+  - `--force` flag required for overwrite (default refuses)
+
+### Q-2: Should `graft migrate` be reversible (`graft migrate --rollback`) or one-way?
+
+- **Domain**: Tooling safety
+- **Why it matters**: One-way migrate is simpler but unsafe if migrate has bugs. Reversible adds .origin-backup/ temp dir + rollback subcommand. Captain has implicit "captain decisions tier" preference for safety.
+- **Suggested options**:
+  - One-way (simpler, document "git revert" as recovery)
+  - Reversible with --rollback (safer, adds backup dir)
+  - One-way + auto-create timestamped backup (mid-ground)
+
+## Core Tensions
+
+- **time-based**: synthetic fixture creation is wave-1 work — but bug fixes need fixtures too. Either fixture lands in wave 0 (before fixes) or fixes use existing inline test data.
+- **essential**: carlove live validation is captain-gated dogfood — entity 112's verdict can be "shipped with synthetic fixture pass" even if carlove run is deferred. Captain accepts this risk explicitly or at clarify.
+- **domain-based**: brainstorm Core Tension #1 (bug #15 op type) → resolved by A-2; dropped from explore Core Tensions.
+
+## Honest Boundaries
+
+- This explore did not enumerate the exact synthetic fixture layout — wave 0 task must read parent 101 archive Phase 4 Step 9 to confirm what `.origin/` contained.
+- Bug #15 prompt UX (Q-1) is captain-judgment — explore cannot pick without UX preference signal.
+- Migrate reversibility (Q-2) is risk-tolerance call — explore cannot decide without captain risk preference.
+
+## Stage Report: explore
+
+- [x] Files mapped: 4 (skills/graft/SKILL.md, tests/pressure/graft.yaml, _archive/graft-runtime-overlay-redesign.md, references/first-officer-shared-core.md)
+- [x] Assumptions formed: 4 (Confident: 2, Likely: 2)
+- [x] Options surfaced: 2 (O-1 testing strategy, O-2 wave structure)
+- [x] Questions generated: 2 (Q-1 bug #15 UX, Q-2 migrate reversibility)
+- [x] α markers resolved: 1 / 1 (LOCAL.yaml op vocabulary → in-line check via A-2)
+- [x] Scale assessment: confirmed Medium (4 files mapped; 6 deliverables in 5 waves; depends on parent 101 archive)
+- [x] Research dispatched: 0 researchers (skipped -- pure tooling/CLI work, no external tech claims; parent 101 provides architectural baseline)
+
+⚠ Mode B inline fallback used -- justified by parent 101 archive providing equivalent of full 4-angle coverage. Plan-phase reviewers note this coverage gap.
+
+Self-test gate (Port 11): Mode B modifier applies; gates (ii)-(v) pass.
