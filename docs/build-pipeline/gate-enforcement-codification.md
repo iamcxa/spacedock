@@ -1069,3 +1069,32 @@ notes: Entity 110 is documentation-only (markdown, YAML). Pre-existing test fail
 All 6 ACs pass. The skill correctly ports the 5-factor specs with accurate weights and thresholds for both modes. Cross-references resolve. Schema is uniform between modes (Stage field distinguishes). No-exceptions blocks are present in both the caller (build-plan) and the skill (confidence-gate Rules section).
 
 The one MEDIUM finding (Step 6.9 step-number/position mismatch) creates a readability risk where FO encounters "After Step 7 PASS" before reading Step 7. This should be fixed before advance -- suggested resolution: renumber Step 6.9 to Step 7.5 and relocate the block to after Step 7 in the file. All other findings are LOW/NIT and non-blocking.
+
+## Stage Report: uat
+
+status: passed-pending-interactive
+iteration count: 1
+
+### CLI Verification Results
+
+| Item | Command | Result | Evidence | Status |
+|------|---------|--------|----------|--------|
+| 1 | `grep -c "user-invocable: false" skills/confidence-gate/SKILL.md` | PASS | Returns 1 (line 4 of frontmatter) | ✓ PASS |
+| 2 | `grep -E "^Stage: plan\|pre-ship" skills/confidence-gate/SKILL.md` | PASS | Finds 2 literal matches: description line + schema field | ✓ PASS |
+| 3 | `grep "spacedock:confidence-gate" skills/build-plan/SKILL.md` | PASS | Found at line 515 (Step 7.5 implementation; note: UAT spec cited Step 6.9, but actual implementation uses Step 7.5 post-review rename — semantic intent "after plan-checker PASS" preserved) | ✓ PASS |
+| 4 | `grep "spacedock:confidence-gate" references/first-officer-shared-core.md` | PASS | Found at line 324 (Pre-Ship Confidence Gate section Skill() replacement) | ✓ PASS |
+| 5 | `wc -l references/confidence-gate.md` | PASS | Returns 7 lines (within 3-10 range; stub-redirect per D-110-4) | ✓ PASS |
+| 6 | YAML parse on both pressure fixtures | PASS | `bun -e` invocation succeeds, prints "ok" | ✓ PASS |
+| 7 | `grep "gate-enforcement-codification" docs/build-pipeline/_index/CONTRACTS.md` | PASS | Returns 12 matches across 6 rows (file contracts + per-call entries) | ✓ PASS |
+
+### Interactive Verification Pending
+
+- [ ] **D-110-1 Live Validation** (Captain sign-off): Review `## Confidence Assessment` output contract in skills/confidence-gate/SKILL.md (Step 4) and confirm `Stage: plan|pre-ship` field is sufficient for FO to route decisions correctly. Interactive review required; no automation possible.
+
+- [ ] **D-110-4 Stub-Redirect Intent** (Captain sign-off): Confirm content of references/confidence-gate.md (7-line stub) satisfies intent to eliminate dangling backlinks while maintaining discoverability. Interactive review required; no automation possible.
+
+### Overall Verdict
+
+**passed-pending-interactive**
+
+All 7 CLI items PASS. The 2 Interactive items require captain review but are structural completeness checks, not blockers. The step-number mismatch (Step 6.9 vs Step 7.5) noted by quality stage review was addressed in the actual implementation — the semantic intent (gate fires right after plan-checker PASS) is preserved, and the file's execution order is now internally consistent (Step 7 Revision Loop → Step 7.5 Confidence Gate). Ready for captain gate.
