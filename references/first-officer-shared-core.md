@@ -319,29 +319,14 @@ If the stage is gated:
 
 ### Pre-Ship Confidence Gate
 
-When the UAT gate passes (captain approval or auto-resolve) and the next stage is terminal (shipped), FO runs the pre-ship confidence gate BEFORE advancing:
+When the UAT gate passes (captain approval or auto-resolve) and the next stage is terminal (shipped), FO runs the pre-ship confidence gate BEFORE advancing. Invoke:
 
-1. Read `references/confidence-gate.md` for the scoring specification and parsing patterns.
-2. Read the entity file fresh. Parse all 4 Stage Reports using the LAST occurrence of each section (handles feedback-loop re-runs with multiple Stage Report entries):
-   - `## Stage Report: execute` — per-task DONE/BLOCKED status and file counts
-   - `## Stage Report: quality` — test, typecheck, ratchet verdicts
-   - `## Stage Report: review` — findings table with severity classification
-   - `## Stage Report: uat` — summary counts (total, pass, fail, skipped)
-   - `## PLAN` — task wave assignments and `<files_modified>` lists (for factor 5)
-3. Compute the 5-factor composite score per `references/confidence-gate.md` Section 3–4.
-4. Write `## Confidence Assessment` to the entity body (Section 8 format) with all factor scores, evidence, composite, and iteration number.
-5. Route based on composite:
-   - **Composite >= 90%**: Advance to shipped (terminal). Proceed to Merge and Cleanup.
-   - **Composite < 90%**: Enter auto-fix loop (Section 7 of confidence-gate.md):
-     - Identify lowest-scoring factor by contribution (score × weight).
-     - Generate a targeted fix task description.
-     - Prepend to `## Auto-Fix PLAN (iteration N)` in entity body.
-     - Set entity `status: execute`, dispatch ensign. Entity flows through execute → quality → review → UAT → confidence normally.
-     - On UAT re-dispatch: pass `skip_interactive_passed: true` (auto-pass previously-approved interactive items).
-     - Track iteration in `## Confidence Assessment` section (`Iteration: N of 3`).
-     - **Cap at 3 iterations.** On 3rd attempt still < 90%: escalate to captain with full per-factor breakdown (see Section 7e). Do NOT retry without explicit captain override.
+Skill("spacedock:confidence-gate", args={
+  mode: "pre_ship_gate",
+  entity_path: "{current entity file path}"
+})
 
-See `references/confidence-gate.md` for factor definitions, parsing specification, auto-fix loop details, and captain escalation message format.
+Routes on composite: >= 90% advance to shipped; < 90% enter auto-fix loop (cap 3 iterations, escalate to captain on 3rd fail). See `skills/confidence-gate/SKILL.md` for factor rubric and auto-fix loop spec.
 
 ## Feedback Rejection Flow
 
