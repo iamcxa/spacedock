@@ -6,7 +6,7 @@ status: draft
 context_status: pending
 source: /shape (post-PR #55 strategic pivot, 2026-04-16)
 created: 2026-04-16T00:00:00+08:00
-shape_status: draft
+shape_status: validated
 intent:
 scale:
 project: spacedock
