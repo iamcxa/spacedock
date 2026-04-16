@@ -74,6 +74,15 @@ Do NOT attempt to auto-repair mismatched states -- that risks masking upstream b
 
 After each skill completes, re-read the entity frontmatter and apply the routing table again. Continue until `context_status: ready` OR the captain pauses the session.
 
+**No-question auto-advance (MANDATORY)**: Between skills (brainstorm → explore, explore → clarify), do NOT stop to ask the captain "continue?" / "推進嗎?" / "explore 下一步?". Chain directly into the next skill. The only legitimate stops between skills are:
+
+1. **Blocker in the completed skill's Stage Report** — e.g., alignment-gate failure, merge-gate hard-fail, state-machine violation, missing file. Report the specific blocker and wait.
+2. **Captain issued an explicit pause** — e.g., "pause", "stop", "暫停", "先停一下". Mid-skill captain messages count; "continue" / "go" / "繼續" do NOT count as pauses.
+3. **`context_status: ready` reached** — present FO handoff per Step 4.
+4. **`build-clarify` is the NEXT skill** — clarify is captain-interactive by nature; the skill itself will handle AskUserQuestion loops. SO still auto-enters clarify without a gate question, the skill then drives captain interaction.
+
+Presenting a brainstorm/explore summary to the captain and asking "continue?" is a red flag — it wastes a turn and violates this rule. Just run the next skill. The captain can interrupt at any time if they want to pause.
+
 ### Step 2.5: SO owns context_status transitions in SO-direct mode
 
 In the normal FO-driven flow, the ensign wrapper between skills writes the `context_status` frontmatter transitions. In SO-direct mode (which this agent enables) there is no ensign, so **you are responsible for writing the transitions after each skill completes**. The underlying skills do not touch `context_status` except for `build-clarify`, which sets `context_status: ready` during its Step 5 sufficiency gate.
