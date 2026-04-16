@@ -202,6 +202,49 @@ async function cmdStart(): Promise<void> {
     return { result: { revoked } };
   });
 
+  // ─── UI-direct tunnel management (entity 100 P1b) ─────────────────────────
+  rpcHandlers.set("tunnel_start", async (args, ctx) => {
+    if (ctx.getTunnelProvider() && ctx.getTunnelUrl()) {
+      return { result: { url: ctx.getTunnelUrl(), already_running: true } };
+    }
+    const backend = (args[0] as string | undefined) ?? undefined;
+    try {
+      const provider = detectProvider(backend);
+      if (!provider) return { error: `No tunnel provider available. ${installGuide()}` };
+      ctx.setTunnelProvider(provider);
+      const url = await provider.start(resolvePort());
+      ctx.setTunnelUrl(url);
+      process.stderr.write(`[${ts()}] tunnel started (${provider.name}): ${url}\n`);
+      return { result: { url, provider: provider.name } };
+    } catch (err) {
+      ctx.setTunnelProvider(null);
+      ctx.setTunnelUrl(null);
+      return { error: `Failed to start tunnel: ${(err as Error).message}` };
+    }
+  });
+
+  rpcHandlers.set("tunnel_stop", async (_args, ctx) => {
+    const provider = ctx.getTunnelProvider();
+    if (!provider) return { result: { stopped: false, reason: "no active tunnel" } };
+    await provider.stop();
+    ctx.setTunnelProvider(null);
+    ctx.setTunnelUrl(null);
+    process.stderr.write(`[${ts()}] tunnel stopped\n`);
+    return { result: { stopped: true } };
+  });
+
+  rpcHandlers.set("tunnel_status", async (_args, ctx) => {
+    const provider = ctx.getTunnelProvider();
+    const url = ctx.getTunnelUrl();
+    return {
+      result: {
+        active: !!provider && !!url,
+        url: url ?? null,
+        provider: provider?.name ?? null,
+      },
+    };
+  });
+
   rpcHandlers.set("share_list", async (_args, ctx) => ({
     result: ctx.tokenManager.list(),
   }));
