@@ -1,8 +1,8 @@
 ---
 id: 117
 title: "Spacebridge Design System -- Dark-Mode-First Tokens + Component Library + Theme Toggle"
-status: explore
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: entity 060 shape (US-2, 2026-04-16)
 created: 2026-04-16T20:00:00+08:00
 started:
@@ -117,26 +117,32 @@ You are asking for a unified design system that makes Spacebridge load in dark m
 A-1: All 11 existing shadcn/ui primitives (avatar, badge, button, card, collapsible, scroll-area, separator, skeleton, tabs, textarea, tooltip) already consume tokens exclusively via Tailwind utility classes -- no internal hardcoded color values need fixing.
 Confidence: Confident (0.90)
 Evidence: spacebridge/ui/components/ui/button.tsx:7-28 -- 6 variants + 4 sizes all via semantic CSS var tokens (bg-primary, text-primary-foreground, etc.) [primary]; spacebridge/ui/components/ui/badge.tsx:5 -- 4 variants all via CSS var tokens [secondary]; spacebridge/ui/components/ui/card.tsx:8 -- spacing via Tailwind scale p-6, space-y-1.5, no hardcoded colors [secondary]. Angle (i) audited all 11 primitives.
+→ Confirmed: captain, 2026-04-16 (batch)
 
 A-2: The existing `:root` / `.dark` CSS variable blocks in globals.css (oklch-based) are the correct foundation for the token system -- they do not need to be replaced, only extended with typography and spacing tokens.
 Confidence: Confident (0.95)
 Evidence: spacebridge/ui/app/globals.css:46-113 -- 30+ oklch color tokens defined in :root, mirrored in .dark block [primary]; spacebridge/ui/components.json:1 -- shadcn configured with cssVariables: true, baseColor: neutral [primary]; angle (i) confirms 54 token consumption occurrences across 23 files via Tailwind utilities [secondary].
+→ Confirmed: captain, 2026-04-16 (batch)
 
-A-3: Typography does not need a custom scale beyond Tailwind defaults -- the codebase uses text-xs/text-sm exclusively (80 occurrences), with text-lg and text-2xl as rare exceptions. The "typography scale" deliverable means documenting the Tailwind scale as the authoritative scale and ensuring Geist font loads correctly.
-Confidence: Likely (0.70)
-Evidence: angle (i) found text-xs + text-sm account for the overwhelming majority of 80 font-size occurrences [secondary]; angle (iv) confirms no custom --font-size or --text- tokens exist [secondary]. Gate (ii): claim predicts that plan will document Tailwind scale rather than define custom tokens -- predictive of execute output. Gate (iii): exclusive to this entity's design-system scope.
+A-3: Typography uses Tailwind default scale as primary (text-xs/text-sm dominant, 80 occurrences), with custom semantic tokens added only when needed for reusable design patterns (e.g., section headers, entity slug monospace). Hybrid approach: Tailwind-first for rapid development, custom tokens for semantic consistency.
+Confidence: Confident (0.85)
+Evidence: angle (i) found text-xs + text-sm account for the overwhelming majority of 80 font-size occurrences [secondary]; angle (iv) confirms no custom --font-size or --text- tokens exist [secondary]; angle (i) found recurring section-label pattern (text-sm font-semibold text-muted-foreground uppercase tracking-wide) across 3 files -- candidate for semantic token [secondary].
+→ Corrected by captain, 2026-04-16 (batch): "a + b 必要時就新增新的自定義 token 但能沿用的就以 Tailwind 為主，模組快速開發又保持彈性"
 
-A-4: Spacing does not need custom CSS tokens -- the codebase uses Tailwind numeric scale exclusively (101 occurrences of p-2, p-3, gap-2, gap-4, etc.) with no custom spacing values. The "spacing scale" deliverable means documenting the Tailwind 4px grid as the authoritative scale.
-Confidence: Likely (0.70)
-Evidence: angle (i) confirms all padding/margin/gap uses Tailwind numeric scale values with zero custom CSS spacing [secondary]; angle (iv) confirms no --spacing or --space- custom properties exist [secondary]. Same gate reasoning as A-3.
+A-4: Spacing uses Tailwind numeric scale as primary (101 occurrences), with custom semantic spacing tokens added only when needed for consistent cross-component patterns. Hybrid approach: Tailwind 4px grid as default, custom tokens for design-system-level spacing contracts.
+Confidence: Confident (0.85)
+Evidence: angle (i) confirms all padding/margin/gap uses Tailwind numeric scale values with zero custom CSS spacing [secondary]; angle (iv) confirms no --spacing or --space- custom properties exist [secondary].
+→ Corrected by captain, 2026-04-16 (batch): "a + b 必要時就新增新的自定義 token 但能沿用的就以 Tailwind 為主，模組快速開發又保持彈性"
 
 A-5: The `entity-body.tsx` comment highlight marks (imperatively created via `document.createElement`) cannot use Tailwind classes and must use CSS custom properties via inline `style` attributes. The `--highlight-*` tokens defined in globals.css will be consumed as `var(--highlight-bg)` in the imperative code.
 Confidence: Confident (0.85)
 Evidence: spacebridge/ui/components/entity-body.tsx:72 -- uses rgba(255,212,0,...) as inline style for DOM-injected comment highlight mark elements [primary]; spacebridge/ui/app/globals.css:124-150 -- .comment-highlight class also uses hardcoded rgba [primary]. Gate (ii): predicts plan will wire CSS vars into imperative JS -- predictive. Gate (i): crosses frontend (entity-body.tsx) + config (globals.css) layers.
+→ Confirmed: captain, 2026-04-16 (batch)
 
-A-6: Entity 094 (pipeline graph) consumes tokens via `hsl(var(--primary))` pattern for SVG rendering. After 117 ships, 094's execute stage must verify its token name references still resolve correctly under the oklch palette -- but no breaking change is expected because Tailwind's `@theme inline` bridge maps CSS var names identically regardless of color space.
-Confidence: Likely (0.75)
-Evidence: docs/build-pipeline/warroom-pipeline-graph-visualization.md:95-97 -- A-7 maps Primer hex to hsl(var(--primary)) [secondary]; spacebridge/ui/app/globals.css:54 -- --primary is defined as oklch(0.205 0 0), consumed via Tailwind bridge as bg-primary [primary]. Note: hsl() wrapping a CSS var that contains oklch() will fail silently -- 094's execute must use the Tailwind utility class (bg-primary) not hsl(var(--primary)) directly.
+A-6: Entity 094 (pipeline graph) plans to consume tokens via `hsl(var(--primary))` pattern for SVG rendering. This will silently fail because --primary contains oklch() not hsl() values. 094's execute must use Tailwind utility classes (bg-primary) or raw var(--primary) without hsl() wrapping. 117's architecture doc should document the correct token consumption pattern.
+Confidence: Confident (0.90)
+Evidence: docs/build-pipeline/warroom-pipeline-graph-visualization.md:95-97 -- A-7 maps Primer hex to hsl(var(--primary)) [secondary]; spacebridge/ui/app/globals.css:54 -- --primary is defined as oklch(0.205 0 0) [primary]. Self-verified: hsl(oklch(...)) is invalid CSS. 094's scope, not 117's -- but 117's arch doc must document correct pattern.
+→ Confirmed: captain, 2026-04-16 (batch)
 
 ## Option Comparisons
 
@@ -149,6 +155,8 @@ Angle (i) found 13 hardcoded Tailwind palette colors (green-600, red-200, yellow
 | Convert to semantic status tokens (--status-approved, --status-rejected, --status-pending) in globals.css and consume via Tailwind | Token discipline consistent across entire codebase. Dark mode can adjust status colors independently. GUARDRAIL compliance ("no hardcoded hex or absolute-pixel values outside the token file"). | More tokens to maintain. Status colors are intentionally direct (green = approved) -- adding indirection may be over-engineering. | Low | ✅ Recommended |
 | Keep hardcoded Tailwind palette colors as intentional semantic overrides for status states | No change required. Tailwind palette colors DO have dark mode variants (green-600 renders differently in dark). Simpler. | Violates the directive's explicit constraint ("no hardcoded hex or absolute-pixel values outside the token file"). Tailwind palette colors are not CSS custom properties. | None | Viable but violates directive |
 
+→ Selected: Convert to semantic status tokens (captain, 2026-04-16, interactive)
+
 ### O-2: Token file architecture -- restructure globals.css vs new tokens.css
 
 Parent 060 Scope: In says "ships a CSS design-token file (`tokens.css`)" but the APPROACH says "restructure globals.css". These conflict.
@@ -158,6 +166,8 @@ Parent 060 Scope: In says "ships a CSS design-token file (`tokens.css`)" but the
 | Keep tokens in globals.css (restructure with clear sections) | Single file import. shadcn/ui convention already uses globals.css for tokens. No import chain change needed. Tailwind v4 `@theme inline` already references globals.css. | 060 Scope: In explicitly says "tokens.css". File grows larger. Harder to share tokens across projects. | Low | ✅ Recommended |
 | Create separate tokens.css imported by globals.css | Matches 060 Scope: In literally. Clean separation. Shareable across projects. | Extra import hop. shadcn convention is globals.css. Tailwind v4 @theme inline must reference the right file. More complex for a single-project codebase. | Low | Viable |
 
+→ Selected: Keep tokens in globals.css, restructure with clear sections (captain, 2026-04-16, interactive)
+
 ### O-3: Default theme strategy -- dark-only vs dark-with-system-fallback
 
 The directive says "dark mode as default theme on first load" which could mean: (a) always dark unless user explicitly toggles, or (b) dark as fallback when system preference is unset, but respect system preference when available.
@@ -166,6 +176,8 @@ The directive says "dark mode as default theme on first load" which could mean: 
 |---|---|---|---|---|
 | defaultTheme="dark" (always dark on first load, ignore system preference) | Matches directive literally ("dark mode as default on first load"). Predictable. Captain pain was "顏色不對 -- 應該要是 dark mode" -- this guarantees dark. | Ignores users who prefer light mode via OS settings. next-themes still offers system/light/dark in the toggle -- just not on first load. | Low | ✅ Recommended |
 | defaultTheme="system" with dark fallback | Respects OS preference. Modern convention. | Captain explicitly said dark should be default -- system preference might show light, which is the exact pain being fixed. | Low | Viable |
+
+→ Selected: defaultTheme="dark" -- always dark on first load, ignore system preference (captain, 2026-04-16, interactive)
 
 ## Open Questions
 
@@ -177,6 +189,8 @@ Suggested options:
 - (a) Three options: system / light / dark (shadcn convention, more flexible)
 - (b) Two options: light / dark (simpler, captain's pain is about default not about system detection)
 
+→ Answer: (a) Three options: system / light / dark (captain, 2026-04-16, interactive)
+
 Q-2: Should the Geist font be loaded via the `geist` npm package (maintained by Vercel, provides next/font integration) or via `next/font/local` with self-hosted font files?
 
 Domain: User-facing Visual, Readable / Textual
@@ -184,6 +198,53 @@ Why it matters: The `geist` npm package is the official Vercel-maintained distri
 Suggested options:
 - (a) `geist` npm package (official, maintained, clean API: `import { GeistSans, GeistMono } from 'geist/font'`)
 - (b) `next/font/local` with self-hosted .woff2 files (no npm dependency, full control, but manual font file management)
+
+→ Answer: (a) geist npm package -- official Vercel-maintained, clean next/font integration (captain, 2026-04-16, interactive)
+
+Q-3: Where should the ThemeToggle component be placed in the UI?
+
+Domain: User-facing Visual
+Why it matters: The toggle needs to be accessible from both the war room (repo/entity list) and the entity detail page. Placement affects layout component architecture.
+Suggested options:
+- (a) War room header right corner
+- (b) Sidebar footer
+- (c) Dedicated settings page
+
+→ Answer: Other -- extract a shared header component used by both war room (page.tsx) and entity detail (entity/[slug]/page.tsx); place ThemeToggle in the shared header. This creates a reusable layout primitive for sibling entities. (captain, 2026-04-16, interactive)
+
+Q-4: Should the share view (share/[token]/layout.tsx) inherit the ThemeProvider and offer a theme toggle, or stay fixed dark?
+
+Domain: User-facing Visual
+Why it matters: Share view has an independent layout for external collaborators. ThemeProvider is in root layout.tsx so share view inherits the theme context automatically, but the toggle placement and UX for external users is a separate decision.
+Suggested options:
+- (a) Fixed dark, no toggle (simplest, share view stays minimal)
+- (b) ThemeProvider + toggle (respect external collaborator preference)
+- (c) Follow system preference (defaultTheme="system" for share only)
+
+→ Answer: (b) ThemeProvider + toggle -- share view also gets theme switching capability for external collaborators (captain, 2026-04-16, interactive)
+
+Q-5: Where should the design system architecture doc live, and how should it integrate with CLAUDE.md?
+
+Domain: Readable / Textual, Organizational
+Why it matters: Captain wants systematic organization of development guidelines -- not scattered files under docs/ but a structured subfolder (e.g., docs/rules/) with CLAUDE.md integration so AI agents can consume the token consumption rules automatically.
+Suggested options:
+- (a) docs/spacebridge-design-system.md (flat, per 060 Scope:In)
+- (b) docs/rules/design-system.md (subfolder structure)
+- (c) spacebridge/ui/CLAUDE.md (co-located with UI code, auto-discoverable by AI)
+
+A-7: comment.tsx uses 3 hardcoded Tailwind palette colors (bg-blue-500, bg-purple-500, bg-green-500) for author avatar role colors (captain/fo/guest). These should be converted to semantic role tokens (--avatar-captain, --avatar-fo, --avatar-guest) alongside the O-1 status token work.
+Confidence: Confident (0.95)
+Evidence: spacebridge/ui/components/comment.tsx:44-46 -- hardcoded role-based avatar colors [primary]; O-1 selected "convert to semantic tokens" -- same principle applies to role colors [primary].
+→ Confirmed: captain, 2026-04-16 (interactive, Step 4.5 exploration)
+
+Q-6: text-selection-popover.tsx and add-comment-form.tsx were not audited in explore (20-file cap). Do they contain hardcoded color values that need tokenization?
+
+Domain: User-facing Visual
+Why it matters: Honest Boundary flagged these 2 files as unaudited. If they have hardcoded values, the scope expands.
+
+→ Self-resolved: grep for hardcoded color patterns (#hex, rgba, oklch, Tailwind palette colors) returned zero matches in both files. Both are clean -- no additional token work needed. A-1 coverage upgraded from "11 shadcn primitives" to "all components in spacebridge/ui/components/".
+
+→ Answer: Other -- architecture doc should live in a structured subfolder (docs/rules/ or similar), NOT flat under docs/. Must integrate with CLAUDE.md system so AI agents enforcing token discipline can reference the rules. Exact subfolder name deferred to plan stage, but the principle is: development guidelines are machine-consumable rules, not standalone docs. (captain, 2026-04-16, interactive)
 
 ## Core Tensions
 
@@ -214,3 +275,28 @@ Suggested options:
 - [x] Scale assessment: Medium confirmed
   18 files mapped; 6 assumptions + 3 options + 2 questions consistent with Medium complexity
 - [x] Research dispatched: 0 researchers (skipped -- all assumptions validated by 4-angle codebase exploration; no external technology claims remaining after brainstorm research)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  Medium scale, no children proposed
+- [x] Re-validation: 6 assumptions checked, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps filled in 1.5, 0 research re-validated
+  All evidence from same session; no elapsed time for drift
+- [x] Assumptions confirmed: 7 / 7 (2 corrected)
+  A-1, A-2, A-5, A-6 confirmed as-is (batch); A-3, A-4 corrected by captain (hybrid Tailwind-first + custom tokens when needed); A-7 added during exploration (comment.tsx avatar role colors)
+- [x] Options selected: 3 / 3
+  O-1 convert to semantic status tokens; O-2 keep tokens in globals.css; O-3 defaultTheme="dark"
+- [x] Questions answered: 6 / 6 (0 deferred)
+  Q-1 three options (system/light/dark); Q-2 geist npm package; Q-3 shared header for ThemeToggle (captain freeform); Q-4 share view gets ThemeProvider + toggle; Q-5 architecture doc in structured subfolder with CLAUDE.md integration; Q-6 self-resolved (text-selection-popover + add-comment-form clean)
+- [x] Self-filter: 0 self-resolved pre-presentation, 2 captain-escalated (Q-1, Q-2); 1 self-resolved during exploration (Q-6)
+  clarify_self_filter_ratio: 0.0 (pre-presentation); 0.14 (overall including Q-6)
+- [x] Open exploration: 4 gray areas surfaced (0 from templates, 0 from CONTRACTS, 0 from directive, 4 via captain freeform)
+  Q-3 ThemeToggle placement (captain: shared header); Q-4 share view theme (captain: ThemeProvider + toggle); Q-5 architecture doc organization (captain: structured subfolder + CLAUDE.md); A-7 comment.tsx avatar colors (captain: semantic role tokens)
+- [x] Canonical refs added: 0
+  No file paths or ADRs cited by captain during Q&A
+- [x] Context status: ready
+  Gate passed: 7 assumptions confirmed, 3 options selected, 6 questions answered, acceptance criteria α-clean
+- [x] Handoff mode: loose
+  No auto_advance: true in frontmatter; captain must invoke FO in separate session
+- [x] Clarify duration: 8 AskUserQuestion calls + 1 assumption batch presentation
+  Batch(1) + O-1(1) + O-2(1) + O-3(1) + Q-1(1) + Q-2(1) + exploration(3 iterations: toggle placement, share view, doc org + audit + avatar colors + complete)
