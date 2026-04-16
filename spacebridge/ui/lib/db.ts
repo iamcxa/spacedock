@@ -1,11 +1,13 @@
 // ABOUTME: Read-only Drizzle DB factory for spacebridge UI process.
 // Opens ~/.spacedock/spacebridge.db (or SPACEBRIDGE_DB_PATH env) with readonly:true.
-// Uses better-sqlite3 — works in both Bun and Node (Next.js dev server spawns Node workers).
-// Previously used bun:sqlite which silently broke Next.js dev (Node runtime cannot import bun: modules).
+// Uses bun:sqlite — for consistency with src/db.ts (write path). UAT/production runs via
+// `bun run build && bun run start` which launches standalone server.js on Bun runtime.
+// `bun run dev` launches Next dev workers on Node where bun:sqlite is unavailable --
+// for UAT use the production build instead of dev mode.
 // SQLite WAL is one-writer-many-readers — UI process must never write.
+import { Database } from "bun:sqlite";
 import { homedir } from "node:os";
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { drizzle } from "drizzle-orm/bun-sqlite";
 import * as schema from "./schema";
 
 export type SpacebridgeReadDb = ReturnType<typeof drizzle<typeof schema>>;
@@ -17,7 +19,7 @@ export interface ReadOnlyDbHandle {
 
 export function openReadOnlyDb(dbPath?: string): ReadOnlyDbHandle {
   const resolvedPath = dbPath ?? defaultDbPath();
-  const sqlite = new Database(resolvedPath, { readonly: true, fileMustExist: true });
+  const sqlite = new Database(resolvedPath, { readonly: true });
   return {
     db: drizzle(sqlite, { schema }),
     close: () => sqlite.close(),
