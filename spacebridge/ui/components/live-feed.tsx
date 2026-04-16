@@ -18,7 +18,7 @@ export function LiveFeed() {
   // Auto-scroll to newest (top) when events change — per MEMORY auto-scroll direction gotcha
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  }, [events]);
 
   return (
     <div className="flex flex-col h-full border rounded-lg p-3">
