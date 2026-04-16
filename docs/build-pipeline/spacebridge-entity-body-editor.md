@@ -1,8 +1,8 @@
 ---
 id: 119
 title: "Spacebridge Entity Body Editor -- Full Render + Edit Parity with Legacy detail.html"
-status: explore
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: entity 060 shape (US-1 parity, 2026-04-16)
 created: 2026-04-16T20:02:00+08:00
 started:
@@ -123,6 +123,8 @@ Confidence: Confident (0.95)
 
 Evidence: docs/build-pipeline/spacebridge-cutover-remove-static-ui.md:56 -- "Audit document listing every legacy dashboard UI feature with per-feature status (present / degraded / missing) in Spacebridge, committed to `docs/spacebridge-parity-audit.md`." [primary]
 
+→ Auto-confirmed via 1f self-verification, 2026-04-16 (SO direct-read of 060 Scope In line :56) [self-verified]
+
 A-2: Section-aware rendering strategy: pre-split entity body on section markers (`## Stage Report:`, `## Assumptions`, `## Options`, `## Option Comparisons`, `## Open Questions`) BEFORE passing remaining markdown to `react-markdown`, then render each split section with a dedicated custom React component. Mirrors 047's canonical pattern.
 
 Confidence: Confident (0.92)
@@ -165,6 +167,36 @@ Confidence: Confident (0.95)
 
 Evidence: docs/build-pipeline/spacebridge-session-list-ui.md:156 -- "→ Selected: URL query param -- but key is `?repo=owner/name`, NOT `?session={sessionId}` (captain, 2026-04-16, interactive -- corrected by Q-2 reframe per entity 100 hierarchy alignment)" [primary]; docs/build-pipeline/spacebridge-session-list-ui.md:65 -- current `.limit(1)` at entity/[slug]/page.tsx:59-66 is the targeted UX failure [primary]; 119 depends-on: [120] [primary].
 
+### 1f Self-Verification Audit (2026-04-16, SO direct-read)
+
+A-2 through A-8 auto-confirmed via direct file read in session; A-1 annotated inline above.
+
+- A-2 [self-verified]: detail.js:62-64,86-138 + 047:108-110 + entity-body.tsx:197-215 all re-read; pre-split pattern + custom component rendering confirmed on legacy side, gap confirmed on Spacebridge side
+- A-3 [self-verified]: entity-body.tsx:9 `import ReactMarkdown from "react-markdown"` confirmed
+- A-4 [self-verified]: duplicate `interface CommentRow` at entity-body.tsx:14 + entity-detail-client.tsx:12 confirmed; `ls spacebridge/ui/types/` returned "No such file or directory" -- greenfield dir confirmed
+- A-5 [self-verified]: detail.js:711-717 `isEntityAtGate(entityStatus, stages)` + entity-body.tsx:88 hardcoded `(status === "plan" || status === "uat")` both re-read; derivation gap confirmed
+- A-6 [self-verified]: 047 archive :61 literal text match -- "each Q-n's Domain / Why it matters / Suggested options / Answer lines render as distinct markdown paragraphs"
+- A-7 [self-verified]: 117 :130 captain-corrected token strategy + :213 shared header mandate both grep-confirmed
+- A-8 [self-verified]: 120 :156 `→ Selected: URL query param ... ?repo=owner/name` grep-confirmed
+
+Verification ratio: 8 / 8 = 1.0. Zero [needs-captain-judgment] items. Per build-clarify Step 2, captain batch skipped -- proceeding directly to O-1 selection.
+
+A-9: Per-section comment placement -- all comments continue to render in the right-side `<CommentPanel>`; pre-split section components expose `id={headingText}` on their heading so `scrollToHighlight` still resolves to the heading anchor inside the new section DOM; `wrapTextRange` runs per-section for text-selection highlights. Section components do NOT embed inline comment threads.
+
+Confidence: Confident (captain, 2026-04-16, interactive)
+
+Evidence: spacebridge/ui/components/entity-detail-client.tsx:94 -- existing right-panel + scrollToHighlight architecture [primary]; spacebridge/ui/components/entity-body.tsx:206 -- `id={headingText}` on h2 heading (must transfer to section components) [primary]; 111 clarify-pending status means cross-section thread UX stays in 111's scope [secondary].
+
+→ Confirmed: captain, 2026-04-16 (interactive, Step 4.5 open exploration)
+
+A-10: Section component testing strategy -- each new section component (`<StageReportSection>`, `<AssumptionsSection>`, `<OptionsSection>`, `<OpenQuestionsSection>`) ships with its own `*.test.tsx` co-located in `spacebridge/ui/components/` using bun test + React Testing Library, rendering with fixture markdown strings and asserting DOM structure. Follows the pattern already proven by `gate-buttons.test.tsx` and `chat-input.test.tsx`.
+
+Confidence: Confident (captain, 2026-04-16, interactive)
+
+Evidence: spacebridge/ui/components/gate-buttons.test.tsx -- existing bun test + RTL precedent [primary]; spacebridge/ui/components/chat-input.test.tsx -- second existing precedent [primary]; spacebridge/ui/package.json bun test runner already configured [secondary].
+
+→ Confirmed: captain, 2026-04-16 (interactive, Step 4.5 open exploration)
+
 ## Option Comparisons
 
 ### O-1: Gate WebSocket `gate_decision` event parity
@@ -179,6 +211,8 @@ Legacy detail.js:1148 listens for WebSocket `gate_decision` events to update the
 
 Return value trace: (a) flows through existing WS bridge registered at spacebridge/ui/app layout; cost is one additional event-type case in the receiver. (b) regresses real-time parity vs legacy. (c) adds a new endpoint surface — audit doc row would need "119 owns new SSE endpoint" annotation which risks boundary blur with 053.
 
+→ Selected: (a) Port WS listener to use-gate-events hook (captain, 2026-04-16, interactive)
+
 ### O-2: Status-poll race detection parity
 
 Legacy detail.js:846 polls `/api/entity/detail` every 5 seconds after a local gate decision to detect race conditions (gate resolved by another actor). Without polling, the UI could stay in Pending state indefinitely if WebSocket delivery drops.
@@ -191,6 +225,8 @@ Legacy detail.js:846 polls `/api/entity/detail` every 5 seconds after a local ga
 
 Return value trace: `router.refresh()` triggers a server roundtrip that returns new RSC payload; Next.js reconciles. Cost comparable to a 1-endpoint poll for a small RSC tree. (c) fails the parity guarantee.
 
+→ Selected: (a) router.refresh() on focus + 5s interval (captain, 2026-04-16, interactive)
+
 ### O-3: Body section-aware rendering implementation strategy
 
 How exactly does `entity-body.tsx` pre-split the body and render split sections?
@@ -202,6 +238,8 @@ How exactly does `entity-body.tsx` pre-split the body and render split sections?
 | (c) Two-pass: parse full markdown AST (via remark), transform nodes with matching heading IDs into custom React components via `rehype` | Most robust against nested heading edge cases | Large dependency surface; team unfamiliar with remark/rehype custom transforms; overkill for 4 known section types | High | Not recommended |
 
 Return value trace: (a) returns a small component tree (header + split sections) consumed directly by the render. (b) requires sibling-walker which `react-markdown`'s components API does not directly provide. (c) requires remark/rehype plugin authoring, a stack the codebase does not currently use.
+
+→ Selected: (a) Eager pre-split + dedicated Section components (captain, 2026-04-16, interactive)
 
 ## Open Questions
 
@@ -216,6 +254,8 @@ Suggested options:
 - (b) Output-first -- explore writes an empty scaffold; plan tasks include "walk detail.js + populate audit" as the first task; execute fills rows
 - (c) Hybrid -- explore writes audit scaffold + a coarse top-level row list (Stage Report / brainstorming spec / Open Questions / gate derivation / markdown fidelity / interactive handlers); plan tasks decompose each top-level row further
 
+→ Answer: (c) Hybrid -- explore writes scaffold + coarse top-level row list; plan tasks decompose each row further (captain, 2026-04-16, interactive)
+
 Q-2: 089 vs 119 scope boundary for suggestion rendering UI
 
 Domain: User-facing Visual (render slot ownership)
@@ -226,6 +266,8 @@ Suggested options:
 - (a) 119 owns the slot; 089 plugs in logic (119 ships placeholder `<SuggestionCard>` reading suggestion data from 089's API contract)
 - (b) 089 owns slot + logic; 119 leaves a comment marker in entity-body.tsx pointing to 089
 - (c) Slot ownership deferred to joint 089+119 planning session; neither ships suggestion UI this cycle
+
+→ Answer: (a) 119 owns the slot; 089 plugs in logic -- 119 ships `<SuggestionCard>` placeholder reading 089's API contract; 089 subsequently wires logic. 119 plan task explicitly cites 089 clarify decisions as API source to mitigate drift. (captain, 2026-04-16, interactive; SO recommendation accepted after captain asked 哪一個比較好)
 
 Q-3: Gate flow citation correction -- is `detail.js:685` reference in brainstorm materially wrong or just imprecise?
 
@@ -238,6 +280,8 @@ Suggested options:
 - (b) Clarify silently rewrites the APPROACH line to cite :685-1160 range; remove the ⚠ marker
 - Open-ended -- captain decides
 
+→ Answer: (a) Keep the ⚠ marker; parity audit doc includes an explicit row noting "legacy detail.js line-ranges per-handler matter -- Stage Report split at :62-64, renderStageReports at :86-138, suggestion accept/reject at :619-683 is 089 territory, initGateReview IIFE at :685-1160" so plan + execute inherit the correction. (captain, 2026-04-16, interactive)
+
 Q-4: Scale revision -- keep Medium or revise?
 
 Domain: Organizational (plan-stage task budget)
@@ -248,6 +292,12 @@ Suggested options:
 - (a) Keep Medium -- current scope fits 5-15
 - (b) Revise to Large if O-1 option (a) selected (WS bridge extension pushes over 15 files when counting the bridge)
 - (c) Defer to plan-stage task breakdown -- let actual file count drive scale
+
+→ Answer: (a) Keep Medium -- current scope fits 5-15 upper edge. Plan-stage may revisit if WS bridge extension actually crosses 15 files. (captain, 2026-04-16, interactive)
+
+## Canonical References
+
+*(No captain-cited external docs during clarify -- all references resolved to sibling entity files already tracked in `## Lens Evidence` and frontmatter `depends-on`.)*
 
 ## Stage Report: brainstorm
 
@@ -281,3 +331,26 @@ Suggested options:
 - [x] Research dispatched: 0 researchers (skipped -- all technology claims codebase-validated via brainstorm Lens (c) + explore reads; no external tech needing validation)
 - ⚠ ensign-mode inline fallback -- 4-angle quality not achieved this invocation
   Mode B selected (not ensign-mode -- SO-direct with >50% file surface already read in brainstorm Lens (c)+(d)); angles (i)+(ii)+(iii) covered inline via brainstorm lens data + direct reads of 060/117/120/047/GateButtons.tsx/entity-body.tsx full/detail.js:685-855. Angle (iv) negative-space seed-driven verification not run; parity-audit walk during plan stage will serve as negative-space discovery for 119 specifically.
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- entity has no `## Decomposition Recommendation`; explore noted decomposition NOT recommended despite scope flag (shared files + no sub-scope ordering)
+- [x] Re-validation: 8 assumptions checked via 1f self-verification, 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  1f Self-verification: 8 [self-verified], 0 [self-verified, refined], 0 [self-verified, corrected], 0 [needs-captain-judgment]
+  verification_ratio: 8 / 8 = 1.0
+- [x] Self-filter: 0 self-resolved, 4 captain-escalated
+  clarify_self_filter_ratio: 0 / 4 = 0.0 (no [primary]-tier citation directly pinned any of Q-1..Q-4; conservative threshold enforced)
+- [x] Assumptions confirmed: 10 / 10 (0 corrected)
+  A-1..A-8 auto-confirmed via 1f self-verification (direct file re-read); A-9 per-section comment placement + A-10 section-component testing strategy confirmed via Step 4.5 open exploration
+- [x] Options selected: 3 / 3
+  O-1 (a) Port WS gate_decision listener to use-gate-events hook; O-2 (a) router.refresh() on focus + 5s interval; O-3 (a) Eager pre-split + dedicated Section components
+- [x] Questions answered: 4 / 4 (0 deferred)
+  Q-1 (c) Hybrid audit scaffold + coarse top-level row list; Q-2 (a) 119 owns suggestion slot + 089 plugs in logic; Q-3 (a) Keep ⚠ marker + parity audit row for line-range clarity; Q-4 (a) Keep Medium scale
+- [x] Open exploration: 2 gray areas surfaced (0 from templates, 1 from CONTRACTS cross-entity, 1 from directive-implied via testing concern, 0 via freeform)
+  A-9 per-section comment placement (054/111 cross-entity concern) + A-10 section-component testing strategy (Spacebridge test infra precedent)
+- [x] Canonical refs added: 0 (captain did not cite external docs; all references resolved to sibling entity files already tracked in Lens Evidence + frontmatter depends-on)
+- [x] Context status: ready
+  gate passed: 10/10 assumptions confirmed, 3/3 options selected, 4/4 questions answered, 5 acceptance criteria with zero α markers, Canonical References section exists (empty is acceptable)
+- [x] Handoff mode: loose
+  no `auto_advance: true` in frontmatter; captain must say "execute 119" for FO to pick up and transition status: clarify → plan
+- [x] Clarify duration: 8 AskUserQuestion calls (0 batch -- all assumptions self-verified + 3 options + 4 questions + 2 open-exploration iterations -- actually 3 OQs + Q-2 re-ask + 2 Step 4.5 rounds = 8 interactions total), session complete
