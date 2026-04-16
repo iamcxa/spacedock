@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 8420",
+    "dev": "next dev -p 3535",
     "build": "next build && cp -r .next/static .next/standalone/ui/.next/static && cp -r public .next/standalone/ui/public",
     "start": "bun run .next/standalone/ui/server.js",
     "lint": "biome check --config-path .. .",
