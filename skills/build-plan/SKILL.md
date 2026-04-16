@@ -508,6 +508,29 @@ Only **escalate to captain** on iteration 3 fail.
 
 ---
 
+## Step 7.5: Plan Confidence Gate (Unconditional)
+
+After the plan-checker revision loop converges (Step 7 PASS), invoke the confidence-gate skill in plan_gate mode. This is an unconditional Skill() call -- every plan, every invocation, no exceptions.
+
+Skill("spacedock:confidence-gate", args={
+  mode: "plan_gate",
+  entity_path: "{current entity file path}"
+})
+
+The skill returns `{composite, verdict, iteration}`. Act on verdict:
+
+- `auto-advance` (composite > 95%): proceed to Step 8 (knowledge capture) and Step 9 (commit + advance).
+- `captain-gate` (composite <= 95%): write `feedback-to: captain` in Stage Report with composite breakdown and return. Do NOT advance to Step 8 or 9. FO routes captain interaction.
+
+**No exceptions. Never on any of these rationales:**
+- "Plan looks trivially high-confidence, skip the gate" -- unconditional means unconditional; skipping re-creates the tribal-knowledge failure mode entity 110 codifies away.
+- "Compute score inline without dispatching confidence-gate" -- defeats the codification; inline scoring is exactly the failure mode that entity 107 exposed.
+- "Force-pass at 94% because plan feels correct" -- captain has captain-gate for precisely this judgment; do not pre-empt it.
+
+See `skills/confidence-gate/SKILL.md` for the 5-factor rubric (context completeness / scope clarity / risk / precedent / AC testability, uniform 20% weights, threshold 95%) and MEMORY `fo-confidence-autoadvance.md` for the originating rule.
+
+---
+
 ## Step 8: Knowledge Capture (Optional, Capture Mode)
 
 **Conditional step.** Only run step 8 if the research (step 2) or planning (step 4) surfaced genuine new knowledge worth preserving. Examples:
@@ -649,6 +672,7 @@ The full plan-checker prompt template, including all 10 dimensions and YAML outp
 - **Use `--` (double dash)** in markers and annotations, never `—` (em dash). Matches `build-brainstorm`, `build-explore`, `build-research` conventions.
 - **The `workflow-index append` at step 9 is UNCONDITIONAL.** Not optional. Not deferrable. Not threshold-gated. Unconditional. Reread the No-Exceptions block in step 9 if tempted.
 - **NEVER skip Step 0.5 assumption re-validation.** If assumptions have file:line evidence, Step 0.5 must run. Skipping Step 0.5 permits plan generation on stale premises -- the exact failure mode parent 077 exists to prevent.
+- **NEVER skip Step 7.5 plan confidence gate.** Every plan, every invocation -- Skill("spacedock:confidence-gate", mode=plan_gate) is unconditional. Skipping re-introduces the tribal-MEMORY-only enforcement that entity 110 codifies.
 
 ---
 

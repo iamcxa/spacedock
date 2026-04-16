@@ -267,6 +267,7 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | pre-ship-confidence-gate | execute | New reference doc: 5-factor pre-ship confidence scoring specification | 🟡 in-flight | 2026-04-13 |
 | alignment-gate-promote-to-stage | plan | Task 7 -- correct alignment_confidence sourcing reference (no new factors) | 🔵 planned | 2026-04-16 |
+| gate-enforcement-codification | plan | Retire to 5-line stub-redirect per D-110-4; authoritative spec moves to skills/confidence-gate/SKILL.md | 🔵 planned | 2026-04-16 |
 
 ### references/first-officer-shared-core.md
 
@@ -277,6 +278,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | pre-ship-confidence-gate | execute | Add Pre-Ship Confidence Gate subsection to Completion and Gates + Merge steps | 🟡 in-flight | 2026-04-13 |
 | flatten-dispatch-troops-architecture | plan | Add troops-dispatch subsection to Dispatch Modes | 🔵 planned | 2026-04-14 |
 | graft-runtime-overlay-redesign | plan | Add Step 2.4 Plugin-manifest discovery source (in-memory LOCAL.yaml apply) | ✅ final | 2026-04-15 |
+| gate-enforcement-codification | plan | Replace inline Pre-Ship Confidence Gate 24-line procedure with single Skill(spacedock:confidence-gate, pre_ship_gate) invocation | 🔵 planned | 2026-04-16 |
 
 ### skills/build-alignment-gate/SKILL.md
 
@@ -364,6 +366,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | build-flow-tdd-discipline | execute | Add test_first attribute to task schema and TDD plan intelligence in step 4a | in-flight | 2026-04-12 |
 | flatten-dispatch-troops-architecture | plan | Update troop references to troop in dispatch constraint notes | 🔵 planned | 2026-04-14 |
 | plan-checker-multi-angle-nuwa | plan | Step 6 rewrite: 6-way parallel haiku dispatch + Dim 3 synthesis | ✅ final | 2026-04-15 |
+| gate-enforcement-codification | plan | Insert Step 6.9 Plan Confidence Gate with unconditional Skill(spacedock:confidence-gate, plan_gate) call; add rule line forbidding skip | 🔵 planned | 2026-04-16 |
 
 ### skills/build-plan/references/plan-checker-prompt.md
 
@@ -435,6 +438,12 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | phase-e-plan-4-dogfood-trailofbits-integration | plan | New subroutine skill for codebase mapping symmetric to build-research | ✅ final | 2026-04-12 |
+
+### skills/confidence-gate/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | NEW skill: two-mode confidence gate (plan_gate 95% + pre_ship_gate 90%) codifying MEMORY fo-confidence-autoadvance + references/confidence-gate.md into callable skill per D-110-1..6 | 🔵 planned | 2026-04-16 |
 
 ### skills/graft/SKILL.md
 
@@ -1159,6 +1168,18 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | build-flow-tdd-discipline | execute | Pressure test: troop detects vacuous test passing before implementation | in-flight | 2026-04-12 |
 
+### tests/pressure/confidence-gate-plan-mode.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | NEW pressure fixture for plan_gate mode 5-factor scoring (uniform 20% weights, threshold 95%) per D-110-3 | 🔵 planned | 2026-04-16 |
+
+### tests/pressure/confidence-gate-pre-ship-mode.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | NEW pressure fixture for pre_ship_gate mode 5-factor composite (25/20/20/20/15 weights, threshold 90%, seeded from entity 107 retroactive 76.25%) per D-110-3 | 🔵 planned | 2026-04-16 |
+
 ### tests/pressure/graft.yaml
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -1517,6 +1538,42 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-channel-bridge-bidirectional | plan | Channel bridge infrastructure + chat/gate daemon-side CQRS aggregates + MCP stdio shim | ✅ final | 2026-04-16 |
+
+### skills/confidence-gate/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | Codify plan 95% + pre-ship 90% confidence gates into skills/confidence-gate (D-110-1..6) | 🔵 planned | 2026-04-16 |
+
+### skills/build-plan/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | Codify plan 95% + pre-ship 90% confidence gates into skills/confidence-gate (D-110-1..6) | 🔵 planned | 2026-04-16 |
+
+### references/first-officer-shared-core.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | Codify plan 95% + pre-ship 90% confidence gates into skills/confidence-gate (D-110-1..6) | 🔵 planned | 2026-04-16 |
+
+### references/confidence-gate.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | Codify plan 95% + pre-ship 90% confidence gates into skills/confidence-gate (D-110-1..6) | 🔵 planned | 2026-04-16 |
+
+### tests/pressure/confidence-gate-plan-mode.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | Codify plan 95% + pre-ship 90% confidence gates into skills/confidence-gate (D-110-1..6) | 🔵 planned | 2026-04-16 |
+
+### tests/pressure/confidence-gate-pre-ship-mode.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | Codify plan 95% + pre-ship 90% confidence gates into skills/confidence-gate (D-110-1..6) | 🔵 planned | 2026-04-16 |
 
 ## Recently Retired (last 30 days)
 

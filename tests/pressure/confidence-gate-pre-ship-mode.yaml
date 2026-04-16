@@ -1,0 +1,38 @@
+skill: spacedock:confidence-gate
+mode: pre_ship_gate
+description: "Validates pre_ship_gate 5-factor composite scoring with differential weights per references/confidence-gate.md §3. Seed data from entity 107 retroactive assessment (_archive/plan-checker-multi-angle-nuwa.md)"
+input:
+  entity_path: "fixture://entity-107-retroactive-sample.md"
+  entity_sections:
+    stage_report_execute_present: true
+    stage_report_quality_present: true
+    stage_report_review_present: true
+    stage_report_uat_present: true
+    plan_present: true
+expected_output:
+  stage: pre-ship
+  iteration: 1
+  factors:
+    - name: test_coverage
+      weight: 0.25
+      score: 0.75
+    - name: type_coverage
+      weight: 0.20
+      score: 0.80
+    - name: review_severity
+      weight: 0.20
+      score: 0.70
+    - name: ac_completeness
+      weight: 0.20
+      score: 0.85
+    - name: integration_breadth
+      weight: 0.15
+      score: 0.75
+  composite: 0.7625
+  verdict: auto-fix
+assertions:
+  - "composite < 0.90 ⇒ verdict ∈ {auto-fix, block}"
+  - "factor weights match references/confidence-gate.md §3 verbatim (25/20/20/20/15)"
+  - "factor count == 5"
+  - "stage field == 'pre-ship'"
+  - "iteration cap == 3"

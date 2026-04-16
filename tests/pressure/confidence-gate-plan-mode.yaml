@@ -1,0 +1,37 @@
+skill: spacedock:confidence-gate
+mode: plan_gate
+description: "Validates plan_gate 5-factor scoring with uniform 20% weights per MEMORY fo-confidence-autoadvance"
+input:
+  entity_path: "fixture://entity-110-plan-gate-sample.md"
+  entity_sections:
+    acceptance_criteria_count: 6
+    assumptions_confirmed: 6
+    questions_answered: 3
+    options_selected: 3
+    research_findings_existing_patterns_citations: 2
+expected_output:
+  stage: plan
+  iteration: 1
+  factors:
+    - name: context_completeness
+      weight: 0.20
+      score: 1.00
+    - name: scope_clarity
+      weight: 0.20
+      score: 0.95
+    - name: risk_level
+      weight: 0.20
+      score: 0.90
+    - name: precedent_strength
+      weight: 0.20
+      score: 1.00
+    - name: ac_testability
+      weight: 0.20
+      score: 1.00
+  composite: 0.97
+  verdict: auto-advance
+assertions:
+  - "composite > 0.95 ⇒ verdict == auto-advance"
+  - "all factor weights sum to 1.00"
+  - "factor count == 5"
+  - "stage field == 'plan'"
