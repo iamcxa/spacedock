@@ -143,6 +143,12 @@ async function cmdStart(): Promise<void> {
   const bridge = await createCoordinationClientBridge({ db, entityScanner, leaseDurationMs });
   const sessionRegistry = await createSessionRegistry({ db });
 
+  // Prune zombie sessions from prior daemon instances (PIDs no longer alive)
+  const pruned = await sessionRegistry.pruneDeadSessions();
+  if (pruned > 0) {
+    process.stderr.write(`[${ts()}] pruned ${pruned} zombie session(s) on startup\n`);
+  }
+
   let janitorTimer: ReturnType<typeof setInterval> | null = null;
 
   // ─── RPC handler registry ───────────────────────────────────────────────────

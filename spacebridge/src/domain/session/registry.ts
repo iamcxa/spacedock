@@ -26,6 +26,8 @@ export interface SessionRegistry {
     reason: "explicit" | "timeout" | "shutdown",
   ): Promise<SessionEvent[]>;
   disconnectAll(reason: "shutdown"): Promise<SessionEvent[]>;
+  /** Prune sessions whose PID is no longer alive. Call on daemon startup. */
+  pruneDeadSessions(): Promise<number>;
   getState(): SessionState;
   getActiveProjectRoots(): string[];
   discoverActiveWorkflows(): Workflow[];
@@ -139,6 +141,25 @@ export async function createSessionRegistry(
         allEvents.push(...events);
       }
       return allEvents;
+    },
+
+    async pruneDeadSessions(): Promise<number> {
+      let pruned = 0;
+      for (const [sessionId, record] of state.sessions.entries()) {
+        let alive = false;
+        try {
+          // kill(pid, 0) tests if process exists without sending a signal
+          process.kill(record.pid, 0);
+          alive = true;
+        } catch {
+          alive = false;
+        }
+        if (!alive) {
+          await registry.disconnect(sessionId, "timeout");
+          pruned++;
+        }
+      }
+      return pruned;
     },
 
     getState(): SessionState {
