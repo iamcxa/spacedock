@@ -1,7 +1,7 @@
 ---
 id: 110
 title: Gate Enforcement Codification -- Codify Plan 95% + Pre-Ship 90% Gates Into Skills
-status: review
+status: uat
 context_status: ready
 source: captain directive (2026-04-15 post-107 ship review)
 created: 2026-04-15T17:45:00+08:00
