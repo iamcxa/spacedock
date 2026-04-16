@@ -896,3 +896,111 @@ Commits on branch spacedock-ensign/gate-enforcement-codification (6 feature comm
 BLOCKED escalations: 0
 NEEDS_CONTEXT escalations: 0
 Knowledge capture: skipped -- execute was mechanical application of plan; no new patterns surfaced beyond what clarify/plan already captured.
+
+## Stage Report: quality
+
+**Verdict**: fail
+**Ran at**: 2026-04-16T03:45:00Z
+**HEAD**: 1712da3
+**feedback-to**: execute
+
+### test
+verdict: fail
+command: bun test
+evidence:
+```
+(fail) captain chat + gate — end-to-end > AC-3: gate approve POST → daemon RPC → shim receives gate_decided notification [10299.28ms]
+208 |     // Query chat_events table directly to confirm 3 rows persisted
+209 |     const { createDb } = await import("../../src/db");
+210 |     const { chatEvents } = await import("../../src/schema");
+211 |     const db = createDb(join(stateDir, "spacebridge.db"));
+212 |     const rows = await db.select().from(chatEvents);
+213 |     expect(rows.length).toBeGreaterThanOrEqual(msgCount);
+                          ^
+error: expect(received).toBeGreaterThanOrEqual(expected)
+
+Expected: >= 3
+Received: 0
+
+      at <anonymous> (/Users/kent/Project/spacedock/spacebridge/tests/integration/captain-chat-and-gate.integration.test.ts:213:25)
+(fail) captain chat + gate — end-to-end > AC-4: chat messages persist in chat_events for reconnect replay [6701.17ms]
+
+(fail) chat route — integration > 200 with delivered:false when no registered CC session for project root [162.45ms]
+error: expect(received).toBe(expected)
+
+Expected: 200
+Received: 502
+
+      at <anonymous> (/Users/kent/Project/spacedock/spacebridge/ui/app/api/entities/[slug]/chat/route.test.ts:122:25)
+
+ 816 pass
+ 7 fail
+ 1991 expect() calls
+Ran 823 tests across 89 files. [66.50s]
+```
+scope: pre-existing (failing tests in spacebridge/tests/integration and spacebridge/ui/app/api/; entity 110 modified only docs/build-pipeline/gate-enforcement-codification.md)
+
+### lint
+verdict: skipped
+command: n/a -- "lint" script not found in package.json
+evidence:
+```
+Script not found "lint"
+```
+
+### typecheck
+verdict: fail
+command: bunx tsc --noEmit -p ./spacebridge/tsconfig.json
+evidence:
+```
+spacebridge/bin/cli.ts(10,24): error TS2307: Cannot find module '@modelcontextprotocol/sdk/server/index.js' or its corresponding type declarations.
+spacebridge/bin/cli.ts(11,38): error TS2307: Cannot find module '@modelcontextprotocol/sdk/server/stdio.js' or its corresponding type declarations.
+spacebridge/bin/cli.ts(12,63): error TS2307: Cannot find module '@modelcontextprotocol/sdk/types.js' or its corresponding type declarations.
+spacebridge/bin/cli.ts(117,63): error TS7006: Parameter 'req' implicitly has an 'any' type.
+spacebridge/src/domain/lease/decider.test.ts(20,5): error TS2322: Type 'Map<string, { token: string; session_id: string; entity_slug: string; role: "SO" | "FO" | "QO"; acquired_at: number; expires_at: number; }>' is not assignable to type 'Map<`${string}::${string}`...
+```
+scope: pre-existing (failing type errors in spacebridge/bin and spacebridge/src/domain; entity 110 modified only docs/build-pipeline/gate-enforcement-codification.md)
+
+### build
+verdict: skipped
+command: bun build -- no entrypoints configured
+evidence:
+```
+bun build v1.3.9 (cf6cdbbb)
+error: Missing entrypoints. What would you like to bundle?
+
+Usage:
+  $ bun build <entrypoint> [...<entrypoints>] [...flags]  
+
+To see full documentation:
+  $ bun build --help
+```
+
+### regression
+verdict: pass
+command: n/a -- reuses Step 1 evidence
+classification: auto-pass -- all 816 passing tests include cross-entity coverage; 7 pre-existing failures (not in entity 110 diff) do not constitute cross-entity regression from this entity's changes
+evidence:
+```
+Entity 110 modified only: docs/build-pipeline/gate-enforcement-codification.md (markdown documentation)
+Failing test files: spacebridge/tests/integration/captain-chat-and-gate.integration.test.ts, spacebridge/ui/app/api/entities/[slug]/chat/route.test.ts
+No overlap between entity diff and failing files. Failures pre-exist entity 110 execute.
+```
+
+### ratchet
+verdict: skipped
+command: n/a -- composite of per-language ratchet checks
+evidence:
+```
+No ops.config.json ratchet_baselines found; first run -- baselines not initialized (entity 110 documentation-only, no code changes; ratchet evaluation deferred to next code-touching entity)
+```
+
+### coverage
+verdict: skipped
+command: n/a -- no threshold configured in workflow ops config
+evidence:
+```
+No workflow ops config found; coverage threshold not defined
+```
+
+notes: Entity 110 is documentation-only (markdown, YAML). Pre-existing test failures and type errors in spacebridge unrelated to this entity's changes. Lint script not configured; build has no entrypoints. All failures classified as pre-existing per Step 6.5 scope analysis.
