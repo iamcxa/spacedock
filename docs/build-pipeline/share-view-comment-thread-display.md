@@ -1,8 +1,8 @@
 ---
 id: 111
 title: Share View Comment Thread Display -- Restore Read-Only Comment Threads on Share Path
-status: explore
-context_status: awaiting-clarify
+status: clarify
+context_status: ready
 source: entity 097 clarify handoff (2026-04-15 SO Q-2 captain decision — O-2a regression reframe)
 created: 2026-04-15T18:00:00+08:00
 started:
@@ -159,7 +159,25 @@ A-6: Share page layout adopts 7fr/3fr grid structure matching `entity-detail-cli
 
 Confidence: Likely (0.70)
 
-Evidence: spacebridge/ui/app/share/[token]/page.tsx:157-171 -- current 3-col layout (assumed based on brainstorm Lens c finding; exact grid class pattern not directly inspected in this session) [primary]; entity-detail-client.tsx:91-114 -- 7fr/3fr reference [primary]; 119 A-9 pins right-panel placement as canonical pattern [primary].
+Evidence: spacebridge/ui/app/share/[token]/page.tsx:157-171 -- current layout `lg:grid-cols-3 lg:col-span-2` = 2:1 at lg breakpoint (directly verified in clarify 1f) [primary]; entity-detail-client.tsx:91-114 -- 7fr/3fr reference [primary]; 119 A-9 pins right-panel placement as canonical pattern [primary].
+
+### 1f Self-Verification Audit (2026-04-16, SO direct-read)
+
+All 6 assumptions self-verified via direct file re-read in session:
+
+- A-1 [self-verified]: middleware.ts:74-100 confirmed only `/share/*` and `/api/share/*` get share-token; share page.tsx:102-117 confirmed server-side RSC SQL query path
+- A-2 [self-verified]: comment-panel.tsx:24-31 interface + :135-139 AddCommentForm render site both re-read
+- A-3 [self-verified]: share page.tsx:157-164 confirms EntityBody receives flat `allComments={commentRows}`; no grouping currently done in share page -- 111 must add
+- A-4 [self-verified]: comment-panel.tsx:41-50 full mutation trace; `setCommentsBySection` only called from `handleCommentAdded`, which is only called by AddCommentForm's `onCommentAdded` prop at :138
+- A-5 [self-verified]: comment-panel.tsx:29 `onCommentAdded: (comment: CommentRow) => void` currently required -- must be made optional in 111; entity-body.tsx:174-185 precedent
+- A-6 [self-verified, refined]: current share layout at page.tsx:157 is `lg:grid-cols-3 lg:col-span-2` (2:1 = ~67:33), not 7fr/3fr. Adopting 7fr/3fr is a trivial CSS class change to `grid-cols-[7fr_3fr]` -- refined from "restructured" to "single Tailwind class substitution".
+
+Q-2 SO self-resolution finding (comment-thread.tsx:31-43 directly re-read):
+- CommentThread HAS mutation paths: `setShowReply` at :33, `setLocalResolved` at :34, `handleResolved` at :36-38, `handleReplySubmitted` at :40-43 which calls `router.refresh()`. Reply submission goes through `<ReplyForm>` child; resolve button presumably lives in `<Comment>` child. **Cascade IS required** -- Q-2 narrows from "does it need cascade?" (YES, confirmed) to "which cascade mechanism?" (captain decides between options a/b).
+
+Verification ratio: 6 / 6 = 1.0. Zero [needs-captain-judgment] items for assumptions. Q-2 partially self-resolved (cascade confirmed required); full mechanism decision still for captain.
+
+
 
 ## Option Comparisons
 
@@ -175,6 +193,8 @@ How exactly does `readOnly=true` suppress the mutation surface?
 
 Return value trace: (a) `readOnly ? null : <AddCommentForm ... onCommentAdded={handleCommentAdded} />` — if readOnly true, `handleCommentAdded` is never called, `setCommentsBySection` is never called, mutation path is dead code. (b) form stays in tree with `disabled` on all inputs; a motivated guest could DevTools-edit around it (security moot but confusing). (c) breaks 119 A-9 right-panel contract.
 
+→ Selected: (a) Conditional render of AddCommentForm (captain, 2026-04-16, interactive)
+
 ### O-2: `.comment-highlight` tokenization scope
 
 How should the hardcoded `rgba(255, 212, 0, ...)` at globals.css:66 be handled?
@@ -187,6 +207,8 @@ How should the hardcoded `rgba(255, 212, 0, ...)` at globals.css:66 be handled?
 
 Return value trace: (a) one `var(--color-highlight-...)` substitution; testable via snapshot diff. (b) 111 frontmatter `depends-on: [097, 117]` remains meaningful via tests that consume 117 tokens elsewhere; globals.css sweep becomes entity 123+. (c) leaves hardcoded style; regresses 117 consumption contract.
 
+→ Selected: (b) Defer to 117 compatibility sweep (SO self-resolved via best-practice autonomy, 2026-04-16; captain delegation "你決定最佳做法"). Rationale: SO clarify 1f confirmed 117 has NOT shipped tokens.css as separate file; globals.css contains only standard shadcn tokens (primary/secondary/accent/muted/destructive) with NO highlight or warning semantic token. Option (a) would force 111 to introduce a new token in 117's territory, which 117 will re-refactor during its own tokens.css sweep -- pre-mature tokenization creates re-work. 111 records parity-audit row "highlight token waiting on 117 sweep" and leaves globals.css:124 untouched this cycle.
+
 ### O-3: Share page layout integration strategy
 
 How does CommentPanel integrate with existing share page 3-col structure?
@@ -198,6 +220,8 @@ How does CommentPanel integrate with existing share page 3-col structure?
 | (c) Collapsible sidebar pattern (CommentPanel as drawer) | Mobile-friendly; viewport-agile | Net-new UX pattern; violates "do not introduce new UX" GUARDRAIL | High | Not recommended |
 
 Return value trace: (a) ShareLiveFeed row absorbs full width below; 097 B-3's `truncate` class on share-live-feed.tsx:81 stays intact (CSS layer untouched, only grid parent changes). (b) 4-col loses readability at 1280px. (c) net-new drawer component violates brainstorm GUARDRAIL "MUST NOT introduce new comment UX patterns".
+
+→ Selected: (a) Adopt 7fr/3fr like entity-detail-client.tsx (SO self-resolved, 2026-04-16; captain delegation "你決定最佳做法"). Rationale: 119 A-9 pins right-panel placement as canonical pattern; current share page uses `lg:grid-cols-3 lg:col-span-2` (2:1 ≈ 67:33) at page.tsx:157 -- trivial Tailwind class substitution to `grid-cols-[7fr_3fr]` achieves exact auth-path parity; ShareLiveFeed + ShareCommentForm move to a row below the main grid. 097 B-3 `truncate` fix at share-live-feed.tsx:81 is CSS-layer only, untouched by grid parent change.
 
 ## Open Questions
 
@@ -212,6 +236,8 @@ Suggested options:
 - (b) If no suitable token, defer to 117 compat sweep (O-2b) or add a new token proposal inside 111 (creates 117 cross-entity dependency)
 - (c) Open-ended -- captain decides whether 111 can propose new tokens to 117
 
+→ Answer: (b) Defer to 117 compat sweep -- SO self-resolved (2026-04-16, captain delegation "你決定最佳做法"). Evidence: globals.css lines 1-36 inspection shows only standard shadcn tokens; NO highlight semantic token exists. 117 has not shipped tokens.css as separate file. See O-2 Selected for full rationale. Parity audit records "globals.css:124 `.comment-highlight` hardcoded rgba -- waiting on 117 sweep" row.
+
 Q-2: Does CommentThread child component have its own mutation paths (reply, resolve, unresolve) that also need readOnly cascade?
 
 Domain: Behavioral/Callable (mutation path completeness)
@@ -222,6 +248,8 @@ Suggested options:
 - (a) Cascade readOnly prop through CommentThread → reply + resolve actions hidden or disabled
 - (b) Trust middleware + share-token — reply/resolve endpoints are NOT share routes, so POSTs would 401 anyway; leave UI visible but clicks fail silently
 - (c) Verify CommentThread implementation before deciding (explore partial trace; read CommentThread.tsx end-to-end)
+
+→ Answer: (a) Cascade `readOnly` prop through CommentThread to hide reply + resolve actions (SO self-resolved, 2026-04-16; captain delegation "你決定最佳做法"). Evidence: 1f self-resolution already confirmed CommentThread has mutation paths at comment-thread.tsx:31-43 (setShowReply, setLocalResolved, handleResolved, handleReplySubmitted + `<ReplyForm>` + `<Comment>` children). Rationale: belt-and-suspenders -- middleware would 401 the POST request but UI should not render controls destined to fail; cascade is a 3-line prop addition (CommentPanel → CommentThread → Comment/ReplyForm). Matches 119 A-9 general "readOnly means readOnly" discipline.
 
 Q-3: Is there a risk that share page's server-side comment fetch exposes authorization-sensitive fields (e.g. `author`, `resolvedReason`) that legitimate guests should NOT see?
 
@@ -234,6 +262,12 @@ Suggested options:
 - (b) Send all fields; guests seeing author name is acceptable (internal/trusted collaborators only)
 - (c) Defer to 060 US-6 "External Consumer" scope -- captain's model may already accept full visibility
 - Open-ended -- captain decides
+
+→ Answer: (b) Send all fields; document in Honest Boundaries so 060 can revisit if needed (SO self-resolved, 2026-04-16; captain delegation "你決定最佳做法"). Rationale: Spacebridge share URLs are bearer-secret tokens (share-token middleware gates access); they are NOT public links. 060 US-6 "External Consumer (collaborator)" framing implies trusted role with read-visibility parity. Field-level scrubbing is a security-posture shift that deserves its own entity (propose if captain later wants to tighten guest visibility). 111 records guest-visibility caveat in Honest Boundaries.
+
+## Canonical References
+
+*(No captain-cited external docs during clarify; all references resolved to sibling entity files and directly-read codebase files already tracked in `## Lens Evidence` and frontmatter `depends-on`.)*
 
 ## Stage Report: brainstorm
 
@@ -268,3 +302,26 @@ Suggested options:
 - [x] Research dispatched: 0 researchers (skipped -- no external tech claims; all assumptions consume internal Spacebridge / 117 token surface)
 - ⚠ ensign-mode inline fallback -- 4-angle quality not achieved this invocation
   Mode B selected (SO-direct with >50% file surface covered in brainstorm Lens (c)+(d)); angles (i)+(ii)+(iii) covered inline via brainstorm lens data + direct reads of middleware.ts, comment-panel.tsx full, 097 archive for Q-2 decision. Angle (iv) negative-space seed-driven verification not run; Q-2/Q-3 captain escalation substitutes.
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable -- no `## Decomposition Recommendation` section; explore confirmed single scope area
+- [x] Re-validation: 6 assumptions checked via 1f self-verification; 0 stale, 0 contradicted, 0 options deduped, 0 coverage gaps, 0 research re-validated
+  1f Self-verification: 5 [self-verified], 1 [self-verified, refined] (A-6 grid class correction -- 2:1 not already 7fr/3fr, trivial class substitution), 0 [self-verified, corrected], 0 [needs-captain-judgment]
+  verification_ratio: 6 / 6 = 1.0
+- [x] Self-filter: 0 self-resolved, 3 captain-escalated -- ALL 3 Q were then SO-self-resolved per captain delegation
+  Captain response "你決定最佳做法" at 2026-04-16 delegated all granular decisions (O-2, O-3, Q-1, Q-2, Q-3) to SO best-practice autonomy. Clarify pivot: captain effectively confirmed directionally on O-1 only; remaining decisions recorded as `→ Selected/Answer: ... (SO self-resolved via best-practice autonomy)` with rationale.
+  clarify_self_filter_ratio: adjusted 3 / 3 = 1.0 under delegation
+- [x] Assumptions confirmed: 6 / 6 (0 corrected; 1 refined)
+  A-1..A-6 auto-confirmed via 1f self-verification (direct file re-read). A-6 refined: current grid is `lg:grid-cols-3 lg:col-span-2` (2:1), adoption of 7fr/3fr is trivial Tailwind class swap.
+- [x] Options selected: 3 / 3
+  O-1 (a) Conditional render AddCommentForm (captain direct); O-2 (b) Defer to 117 compat sweep (SO self-resolved); O-3 (a) 7fr/3fr layout (SO self-resolved)
+- [x] Questions answered: 3 / 3 (0 deferred)
+  Q-1 (b) 117 tokens.css not yet shipped + no semantic highlight token (SO self-resolved via globals.css inspection); Q-2 (a) Cascade readOnly through CommentThread for reply+resolve (SO self-resolved); Q-3 (b) Ship all fields + Honest Boundary (SO self-resolved per 060 US-6 trust model)
+- [x] Open exploration: 0 gray areas surfaced -- skipped per captain delegation "你決定最佳做法" (SO judged no additional gray-area prompt would yield captain information gain above delegation baseline)
+- [x] Canonical refs added: 0 (captain did not cite external docs; all references resolved to sibling entity files + directly-read codebase files already tracked)
+- [x] Context status: ready
+  gate passed: 6/6 assumptions confirmed, 3/3 options selected, 3/3 questions answered, 5 acceptance criteria with zero α markers (α-1 globals.css scope resolved via O-2/Q-1 defer decision), Canonical References section exists
+- [x] Handoff mode: loose
+  no `auto_advance: true` in frontmatter; captain must say "execute 111" for FO to pick up and transition status: clarify → plan
+- [x] Clarify duration: 1 AskUserQuestion call (O-1 only) + captain delegation redirect + 5 SO self-resolutions documented inline; session complete
