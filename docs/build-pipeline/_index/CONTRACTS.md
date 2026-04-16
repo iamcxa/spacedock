@@ -1539,6 +1539,42 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-channel-bridge-bidirectional | plan | Channel bridge infrastructure + chat/gate daemon-side CQRS aggregates + MCP stdio shim | ✅ final | 2026-04-16 |
 
+### skills/confidence-gate/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | Codify plan 95% + pre-ship 90% confidence gates into skills/confidence-gate (D-110-1..6) | 🔵 planned | 2026-04-16 |
+
+### skills/build-plan/SKILL.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | Codify plan 95% + pre-ship 90% confidence gates into skills/confidence-gate (D-110-1..6) | 🔵 planned | 2026-04-16 |
+
+### references/first-officer-shared-core.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | Codify plan 95% + pre-ship 90% confidence gates into skills/confidence-gate (D-110-1..6) | 🔵 planned | 2026-04-16 |
+
+### references/confidence-gate.md
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | Codify plan 95% + pre-ship 90% confidence gates into skills/confidence-gate (D-110-1..6) | 🔵 planned | 2026-04-16 |
+
+### tests/pressure/confidence-gate-plan-mode.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | Codify plan 95% + pre-ship 90% confidence gates into skills/confidence-gate (D-110-1..6) | 🔵 planned | 2026-04-16 |
+
+### tests/pressure/confidence-gate-pre-ship-mode.yaml
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| gate-enforcement-codification | plan | Codify plan 95% + pre-ship 90% confidence gates into skills/confidence-gate (D-110-1..6) | 🔵 planned | 2026-04-16 |
+
 ## Recently Retired (last 30 days)
 
 <!-- Empty until entities ship and their contracts age out. -->
