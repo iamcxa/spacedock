@@ -1004,3 +1004,68 @@ No workflow ops config found; coverage threshold not defined
 ```
 
 notes: Entity 110 is documentation-only (markdown, YAML). Pre-existing test failures and type errors in spacebridge unrelated to this entity's changes. Lint script not configured; build has no entrypoints. All failures classified as pre-existing per Step 6.5 scope analysis.
+
+## Stage Report: review
+
+**Verdict**: PASS with 1 MEDIUM finding (naming inconsistency; non-blocking)
+**Ran at**: 2026-04-16T04:30:00Z
+**HEAD**: (current worktree HEAD)
+**feedback-to**: execute (if MEDIUM finding warrants fix) or advance
+
+### Checklist
+
+| # | Item | Status |
+|---|------|--------|
+| 1 | Read full diff (git diff main...HEAD) | DONE |
+| 2 | Review skill correctness (factor specs, weights, thresholds) | DONE |
+| 3 | Review cross-reference integrity | DONE |
+| 4 | Review schema consistency | DONE |
+| 5 | Review no-exceptions blocks | DONE |
+| 6 | Check completeness against 6 ACs | DONE |
+| 7 | Classify findings (severity: HIGH/MEDIUM/LOW/NIT) | DONE |
+| 8 | Write ## Stage Report: review | DONE |
+
+### Findings
+
+| Severity | Root | File:Line | Description | Source |
+|----------|------|-----------|-------------|--------|
+| MEDIUM | Logic | skills/build-plan/SKILL.md:460-483 | Step 6.9 is placed BEFORE Step 7 in the file, but its description says "After the plan-checker revision loop converges (Step 7 PASS)". Execution order is Step 6 → Step 7 (Revision Loop) → Step 6.9. A future FO reading the file in order will encounter Step 6.9 description before Step 7 is defined, and the numbering implies it runs before Step 7. Should be renumbered to Step 7.5 or Step 8 (shifting subsequent steps) and repositioned after Step 7. | inline review |
+| LOW | Cross-ref | skills/build-plan/SKILL.md:526 | Footer rule says "MEMORY `fo-confidence-autoadvance.md`" as if the file is still authoritative. The MEMORY file has been annotated as superseded (AC-6 confirmed), so the reference is technically stale. Should read "MEMORY `fo-confidence-autoadvance.md` (superseded by this skill)". | inline review |
+| NIT | Consistency | tests/pressure/confidence-gate-plan-mode.yaml | Fixture uses `fixture://entity-110-plan-gate-sample.md` as `entity_path`. This virtual URI is not resolved by any known fixture loader -- consistent with other pressure-test conventions but the fixture file does not exist in the repo. This is expected for the recipe-as-reference-artifact pattern (MEMORY), but worth flagging for clarity. | inline review |
+
+### AC Completeness Check
+
+| AC | Description | Status |
+|----|-------------|--------|
+| AC-1 | `skills/confidence-gate/SKILL.md` exists with two `mode:` paths, `Stage: plan\|pre-ship` field | PASS -- file exists at 411 lines; both modes defined; `Stage:` literal in Output Contract schema |
+| AC-2 | `skills/build-plan/SKILL.md` contains unconditional Skill() call in "No exceptions" block | PASS -- Step 6.9 has `**No exceptions.**` block with `Skill("spacedock:confidence-gate", args={mode: "plan_gate",...})` + footer rule line |
+| AC-3 | `references/first-officer-shared-core.md:319-343` replaced with single Skill() invocation | PASS -- diff shows 24-line inline procedure replaced by ~8-line `Skill("spacedock:confidence-gate", args={mode: "pre_ship_gate",...})` block |
+| AC-4 | Pressure-test fixtures exist: `confidence-gate-plan-mode.yaml` + `confidence-gate-pre-ship-mode.yaml` | PASS -- both files present with valid YAML structure, correct factor weights (plan: 5×0.20; pre-ship: 0.25/0.20/0.20/0.20/0.15), correct composite (0.97 / 0.7625) |
+| AC-5 | `CONTRACTS.md` contains row for `skills/confidence-gate/SKILL.md` referencing entity 110 | PASS -- 13 grep matches on `skills/confidence-gate` + 12 on `gate-enforcement-codification`; both the "per-file" and "per-unconditional-call" contract sections present |
+| AC-6 | MEMORY `fo-confidence-autoadvance.md` carries "Superseded by" annotation | PASS -- file confirmed: `## Superseded by (2026-04-16)` heading with pointer to `skills/confidence-gate/SKILL.md` |
+
+### Factor Weights Verification
+
+- **plan_gate**: uniform 20% × 5 (context_completeness, scope_clarity, risk_level, precedent_strength, ac_testability) -- matches MEMORY `fo-confidence-autoadvance.md` + D-110-6. VERIFIED.
+- **pre_ship_gate**: 25/20/20/20/15 (test_coverage, type_coverage, review_severity, ac_completeness, integration_breadth) -- matches `references/confidence-gate.md` §3 verbatim + D-110-5. VERIFIED.
+- Threshold plan_gate: composite > 95% → auto-advance; ≤ 95% → captain-gate. VERIFIED.
+- Threshold pre_ship_gate: composite >= 90% → advance; < 90% → auto-fix (cap 3). VERIFIED.
+
+### Cross-Reference Integrity
+
+- `skills/confidence-gate/SKILL.md` → `references/confidence-gate.md` (Step 3 "port verbatim"): references valid stub-redirect. OK.
+- `skills/build-plan/SKILL.md` Step 6.9 → `Skill("spacedock:confidence-gate")`: path resolves. OK.
+- `references/first-officer-shared-core.md` → `Skill("spacedock:confidence-gate", args={mode: "pre_ship_gate"})`: path resolves. OK.
+- `references/confidence-gate.md` stub → `skills/confidence-gate/SKILL.md`: pointer correct. OK.
+- CONTRACTS.md rows for all 6 modified/new files: present. OK.
+
+### No-Exceptions Blocks
+
+- `skills/build-plan/SKILL.md` Step 6.9: `**No exceptions.**` block with 3 verbatim rationale bullets. PRESENT.
+- `skills/confidence-gate/SKILL.md` Rules section: `**No Exceptions. 3-Iteration Cap (pre_ship_gate):**` and `**No Exceptions. No Silent Force-Pass at plan_gate:**` both present with rationale bullets. PRESENT.
+
+### Summary
+
+All 6 ACs pass. The skill correctly ports the 5-factor specs with accurate weights and thresholds for both modes. Cross-references resolve. Schema is uniform between modes (Stage field distinguishes). No-exceptions blocks are present in both the caller (build-plan) and the skill (confidence-gate Rules section).
+
+The one MEDIUM finding (Step 6.9 step-number/position mismatch) creates a readability risk where FO encounters "After Step 7 PASS" before reading Step 7. This should be fixed before advance -- suggested resolution: renumber Step 6.9 to Step 7.5 and relocate the block to after Step 7 in the file. All other findings are LOW/NIT and non-blocking.
