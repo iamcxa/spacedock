@@ -1,15 +1,15 @@
 ---
 id: 110
 title: Gate Enforcement Codification -- Codify Plan 95% + Pre-Ship 90% Gates Into Skills
-status: clarify
+status: plan
 context_status: ready
 source: captain directive (2026-04-15 post-107 ship review)
 created: 2026-04-15T17:45:00+08:00
-started:
+started: 2026-04-16T00:00:00+08:00
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-gate-enforcement-codification
 issue:
 pr:
 intent: feature
