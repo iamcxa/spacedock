@@ -55,6 +55,11 @@ export function evolve(state: CommentState, event: CommentEvent): CommentState {
       }
       return newState;
     }
+
+    default:
+      // Tolerate events from co-located sub-aggregates (e.g. suggestion_*)
+      // that share the comment_events table.
+      return state;
   }
 }
 
