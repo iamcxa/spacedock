@@ -157,6 +157,39 @@ async function cmdStart(): Promise<void> {
     },
   }));
 
+  rpcHandlers.set("connection_status", async (_args, ctx) => {
+    const state = ctx.sessionRegistry.getState();
+    const connectedIds = ctx.server.getConnectedSessions();
+    const connectedSet = new Set(connectedIds);
+    const activeSessions: Array<{
+      sessionId: string;
+      projectRoot: string;
+      pid: number;
+      connected: boolean;
+    }> = [];
+    for (const [id, record] of state.sessions.entries()) {
+      activeSessions.push({
+        sessionId: id,
+        projectRoot: record.projectRoot,
+        pid: record.pid,
+        connected: connectedSet.has(id),
+      });
+    }
+    return {
+      result: {
+        pid: process.pid,
+        uptimeMs: Date.now() - startedAt,
+        totalSessions: activeSessions.length,
+        connectedSessions: connectedIds.length,
+        sessions: activeSessions,
+        tunnel: {
+          active: !!ctx.getTunnelProvider() && !!ctx.getTunnelUrl(),
+          url: ctx.getTunnelUrl() ?? null,
+        },
+      },
+    };
+  });
+
   rpcHandlers.set("share_create", async (args, ctx) => {
     const [entitySlug, ttlMs, tunnelBackend] = args as [string, number, string?];
     if (!entitySlug) return { error: "share_create requires entitySlug" };

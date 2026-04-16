@@ -8,6 +8,7 @@ import { SSEProvider } from "@/lib/sse-context";
 import { LiveFeed } from "./live-feed";
 import { PipelineGraph } from "./pipeline-graph";
 import { RepoSection } from "./repo-section";
+import { ConnectionIndicator } from "./connection-indicator";
 import { TunnelButton } from "./tunnel-button";
 
 export interface RepoData {
@@ -59,7 +60,10 @@ export function WarRoom({ repos, leaseMap, stages, entityCountByStage, modHooks 
               <div className="font-bold text-sm">build-pipeline</div>
               <div className="text-xs text-muted-foreground">features · {totalEntityCount} total</div>
             </div>
-            <TunnelButton />
+            <div className="flex items-center gap-3">
+              <ConnectionIndicator />
+              <TunnelButton />
+            </div>
           </div>
 
           {/* Pipeline graph */}
