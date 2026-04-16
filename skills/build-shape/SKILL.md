@@ -9,9 +9,11 @@ argument-hint: "[raw directive | --from {existing-slug}]"
 
 You are running the `/shape` skill. A captain has a Medium+ feature directive and wants to confirm product-level intent (problem framing, user stories, scope boundary) BEFORE entering the technical brainstorming flow of `/build`.
 
+Captain's directive is *initial hypothesis*, not *final requirement*. SO's job throughout this skill -- and especially at the Step 5.5 gap-to-goal pressure test -- is to challenge whether what captain asked for is actually the shortest path to the goal captain stated. Do not merely elaborate the directive; pressure-test the framing. A successful shape session often ends with a different scope than captain initially proposed, and that is the point.
+
 This skill produces five locked body sections on a pipeline entity (`## Problem Statement`, `## User Stories`, `## Scope: In`, `## Scope: Out`, `## References`) that downstream `/build --from {slug}` consumes as Lens (a) captain-stated-intent input.
 
-**Nine steps, in strict order. Steps 3-6 interact with the captain via AskUserQuestion; Steps 0, 1, 2, 7, 8 are internal.**
+**Ten steps, in strict order. Steps 3-6 (including 5.5) interact with the captain via AskUserQuestion; Steps 0, 1, 2, 7, 8 are internal.**
 
 The output contract is canonical in `skills/build-shape/references/output-format.md` -- read that file before any edit to this skill.
 
@@ -141,10 +143,14 @@ Dispatch the framer wrapper subagent:
 Agent(subagent_type="spacedock:build-shape-framer", prompt="Directive: {raw directive}\n\nProduce 2-3 candidate problem statements per output-format.md section ## Problem Statement. Each candidate is a 3-6 sentence cohesive paragraph describing the gap, who experiences it, and why it matters now. Do NOT include solution language.")
 ```
 
-Receive 2-3 candidates. Present to captain via AskUserQuestion:
+Receive 2-3 candidates.
+
+**Presentation rule**: list the full candidate text (each 3-6 sentence problem statement) in the conversation thread BEFORE the AskUserQuestion call. AskUserQuestion options should carry only short labels + 1-sentence descriptions; do NOT put multi-sentence content in preview fields (the preview panel is ~40-60 chars wide and truncates long prose).
+
+Present to captain via AskUserQuestion:
 
 - question: "Which problem statement frames this best?"
-- options: each candidate (truncated to fit 80-char label) plus a "revise inline" option.
+- options: each candidate as a short label (<=80 chars, e.g. "Candidate A: {one-line gloss}") plus a "revise inline" option. No preview field for prose; captain reads full text from the thread above.
 
 If captain selects "revise inline", loop with framer using captain's edit notes until captain accepts. When captain commits, write the accepted problem statement to entity body section `## Problem Statement` (immediately after `## Captain Context Snapshot`).
 
@@ -158,7 +164,11 @@ Dispatch the story-gen wrapper subagent:
 Agent(subagent_type="spacedock:build-shape-story-gen", prompt="Accepted problem statement:\n{accepted statement}\n\nProduce 3-5 user stories in the literal 'As a {role}, I want {action}, so that {value}' format, numbered US-1 through US-n. No paragraph rewrites. No 'The system should' format. Reference output-format.md for the contract.")
 ```
 
-Receive 3-5 stories. For each story, present via AskUserQuestion:
+Receive 3-5 stories.
+
+**Presentation rule**: list the full text of all candidate user stories in the conversation thread BEFORE any AskUserQuestion call. AskUserQuestion options should carry only short labels + 1-sentence descriptions; do NOT put multi-sentence story content in preview fields. Captain reads full story text from the thread, then answers Accept/Edit/Drop via the short-label selector.
+
+For each story, present via AskUserQuestion:
 
 - question: "Accept user story US-{n}?"
 - options: "Accept", "Edit", "Drop".
@@ -169,18 +179,40 @@ Loop until captain has confirmed/edited/dropped each candidate. Final accepted s
 
 ## Step 5: Align -- Draft Scope Boundary (scope-drafter subagent + AskUserQuestion)
 
-Dispatch the scope-drafter wrapper subagent:
+Dispatch the scope-drafter wrapper subagent with three explicit directives that bias toward minimal-viable scope:
 
 ```
-Agent(subagent_type="spacedock:build-shape-scope-drafter", prompt="Accepted frame:\n{problem statement}\n\nAccepted user stories:\n{user stories}\n\nProduce two bulleted lists: ## Scope: In (concrete deliverables / behavioral guarantees, each bullet specific enough to verify) and ## Scope: Out (explicit exclusions, optional WHY in parenthetical). Reference output-format.md sections.")
+Agent(subagent_type="spacedock:build-shape-scope-drafter", prompt="Accepted frame:\n{problem statement}\n\nAccepted user stories:\n{user stories}\n\nProduce two bulleted lists: ## Scope: In (concrete deliverables / behavioral guarantees, each bullet specific enough to verify) and ## Scope: Out (explicit exclusions, optional WHY in parenthetical). Reference output-format.md sections.\n\nThree mandatory directives:\n\n1. MINIMAL VIABLE SCOPE -- Produce the SMALLEST In list that plausibly satisfies the accepted problem statement + user stories. Do NOT expand toward 'new architecture / new schema / new format / new plugin type / new manifest' unless the problem statement literally demands it. Prefer reuse / hook points / discovery patterns over greenfield design.\n\n2. EXPLICIT OUT-OF-SCOPE CEILINGS -- List at least 3 items in Out of the form 'this could expand to X but we're not doing X because Y'. These serve as anti-framings against scope creep during downstream brainstorm/plan. Example: 'Composition contract / manifest schema redesign (could expand here, but deferred -- discovery + hook points close the gap without schema churn).'\n\n3. SELF-CHECK -- After drafting, answer in a trailing '## Scope: Self-Check' block: 'If I had to cut this In list in half, what would I drop first? Are those drops things that actually belong in Out?' If the answer reveals items that belong in Out, move them before returning. The Self-Check block is read-only for captain (SO strips it before writing to entity body).")
 ```
 
-Receive proposed In/Out lists. Present each list via AskUserQuestion:
+Receive proposed In/Out lists (plus Self-Check block, which SO consumes but does NOT write to the entity body).
+
+**Presentation rule**: list the full In/Out bullet text in the conversation thread BEFORE the AskUserQuestion call. Scope bullets can exceed ~150 chars when they carry specificity; do NOT stuff them into preview fields. AskUserQuestion options carry only short labels ("Accept all", "Edit", "Prune") with 1-sentence descriptions; captain reads full bullets from the thread.
+
+Present each list via AskUserQuestion:
 
 - question: "Confirm Scope: In bullets? (Accept all / Edit / Prune)"
 - question: "Confirm Scope: Out bullets? (Accept all / Edit / Prune)"
 
 Loop until captain commits. Write accepted lists to entity body sections `## Scope: In` and `## Scope: Out` respectively. Accumulate any reference URLs / file paths / entity slugs cited during the align dialog into a running references list (used in Step 7).
+
+---
+
+## Step 5.5: Challenge -- Gap-to-Goal Pressure Test
+
+After Scope In/Out is accepted, SO MUST pressure-test the scope against the captain's actual goal before finalizing. Captain's directive is *initial hypothesis*, not final requirement -- SO's job is to challenge whether the accepted scope is the shortest path to the goal stated in the problem statement.
+
+Ask the captain via AskUserQuestion (three questions, sequential):
+
+1. **Goal restatement**: "Based on the accepted problem statement + user stories, state in one sentence what goal you're trying to reach. Is that goal still what you want?"
+2. **Current gap**: "Given the current codebase state, what is the *specific* gap between now and that goal?"
+3. **Fastest path?**: "Does the current Scope: In list close that gap the fastest way, or is there a simpler path we haven't considered? Examples of simpler paths to check: (a) reuse an existing primitive instead of building new, (b) push work upstream instead of fork-local, (c) defer scope to a later entity, (d) pick a subset of scope that unblocks 80% of the goal."
+
+If captain identifies a simpler path, loop back to Step 5 with reframed constraints and re-draft scope. If captain confirms current scope is minimal viable for the goal, proceed to Step 6.
+
+This step is MANDATORY for Medium+ scope. Small directives that passed the Step 1 escape hatch have already skipped to `/build`; this step does not apply to them.
+
+**No-exceptions**: This step exists because "elaborate what captain asked for" is not SO's job -- "pressure-test whether what captain asked for is actually the fastest path" is SO's job. Skipping this step re-introduces the pattern that produced entity 123's v1 over-scoped scope-drafter output.
 
 ---
 
@@ -239,6 +271,8 @@ These four rules are non-negotiable. Each maps to a P-* discipline or Q-* answer
 3. **NEVER skip the escape-hatch on small directives.** If the heuristic in Step 1 fires AND `--force-shape` is not set, exit with the `shape unnecessary` block. Routing small/bugfix directives through the full 9-step shape flow wastes captain time and pollutes the entity backlog with thin shape artifacts.
 
 4. **NEVER accept extra directive text alongside `--from {slug}`.** Refuse per Step 0. The shape is anchored to the entity at creation time; reshaping is via `supersedes:`, not via re-invocation. (P-4 / Q-5 enforcement.)
+
+5. **NEVER skip the Step 5.5 gap-to-goal pressure test on Medium+ scope.** Captain's directive is initial hypothesis, not final requirement. Elaborating the directive without challenging whether it is the shortest path to the stated goal re-introduces the entity-123-v1 over-scope failure mode. The pressure test is the single mechanical gate that prevents "correct-but-oversized" shape output.
 
 ---
 
