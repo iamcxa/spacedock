@@ -70,6 +70,14 @@ stages:
       # AskUserQuestion loop with captain.
       # Resolves: Open Questions, Assumptions, Option Comparisons from explore.
       # Produces: confirmed context, canonical references.
+      #
+      # SELF-VERIFICATION DISCIPLINE (1f, 2026-04-16):
+      # Before Step 2 batch presentation, SO MUST directly Read every file:line
+      # cited in Assumptions/APPROACH/GUARDRAILS. Brainstorm/explore Lens
+      # summaries are secondhand and can fabricate precedents (entity 120 A-4).
+      # Captain's KPI is information gain per question, not question count --
+      # only [needs-captain-judgment] items reach captain; [self-verified] items
+      # are auto-confirmed unless captain objects.
       # manual: true -- Science Officer invocation is captain-initiated,
       # not auto-dispatched by FO.
       # gate: true -- captain must approve context completeness before advancing.

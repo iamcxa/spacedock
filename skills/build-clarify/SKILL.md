@@ -138,7 +138,31 @@ Apply gray-area-templates.md skip rules: already decided, clear precedent (2+ co
 - **Stale**: source changed but finding is plausible. Append `(⚠ stale-research: {detail})` after the research annotation.
 - **Contradicted**: source now refutes the research finding. Add a new `Q-{next_n}` to `## Open Questions` and append `(⚠ research-contradicted: {detail} -- see Q-{next_n})` after the research annotation.
 
-**After all sub-checks complete**, write all annotations and new entries to the entity body before proceeding to Step 2. Record a summary for the Stage Report (Step 6): count of assumptions checked, stale annotations added, contradictions found (new Q-n entries), options deduped, coverage gaps filled, research findings re-validated.
+**1f -- Assumption Self-Verification (MANDATORY before Step 2).** This sub-check is the foundation of the "captain answers only what captain must answer" discipline. It is NOT optional and applies even when 1a Evidence Freshness reports "Hold" -- 1a checks whether the file still says what was claimed; 1f checks whether the *interpretation* of secondhand evidence holds up under direct inspection.
+
+For each Track A assumption (and each APPROACH/ALTERNATIVE/GUARDRAIL claim that asserts a codebase fact), perform direct evidence inspection BEFORE batch presentation:
+
+1. **Identify all factual claims**: every assumption that asserts "X file does Y" or "library/API Z behaves W" is a factual claim. Skip pure design preferences (e.g., "we should choose option A").
+2. **Read the cited evidence directly**: use `Read` / `Grep` on the cited `file:line` ranges. Do NOT rely solely on brainstorm/explore Lens summaries -- those are secondhand and can fabricate precedents (proven by entity 120 A-4: brainstorm Lens (d) referenced `/api/entities` precedent that does not exist).
+3. **Reconcile and reclassify**:
+   - **Holds**: evidence directly supports the claim → tag assumption `[self-verified]` in the Step 2 batch presentation
+   - **Refines**: evidence supports a slightly modified claim → rewrite the assumption text, upgrade confidence, tag `[self-verified, refined]`
+   - **Refutes**: evidence contradicts the claim → fix the assumption inline (do NOT just escalate to captain), tag `[self-verified, corrected]` with a 1-line reason
+   - **Cannot verify**: evidence file missing or claim is genuinely captain-judgment-only → tag `[needs-captain-judgment]` with explicit reason (e.g., "design preference", "external constraint not in codebase")
+
+4. **Captain presentation rule**: in Step 2's batch confirmation, ONLY present assumptions tagged `[needs-captain-judgment]` as questions. Assumptions tagged `[self-verified]` / `[self-verified, refined]` / `[self-verified, corrected]` are listed for transparency (so captain can audit) but the captain's affirmative answer is NOT required -- they are auto-confirmed unless captain explicitly objects.
+
+**Why this is mandatory**: presenting unverified assumptions to the captain shifts verification burden onto the captain. The captain's KPI is per-question information gain, not question count (MEMORY.md: SO Self-Investigation First). If the SO can verify a claim by reading a file, the SO must verify it -- escalating verification of grep-able facts to the captain is a discipline violation.
+
+**Empirical baseline** (entity 120 self-test, 2026-04-16): SO presented 5 assumptions to captain. Captain asked "self-verified?" and SO discovered 1 of 5 (A-4) had a fabricated precedent that direct grep would have caught. Pre-1f: 0% self-verification rate. Post-1f target: ≥80% of factual claims marked `[self-verified]`.
+
+**Stage Report addition**: record self-verification ratio:
+```
+- 1f Self-verification: {N} self-verified ({M} refined, {P} corrected), {Q} needs-captain-judgment
+verification_ratio: {N / (N + Q)}
+```
+
+**After all sub-checks complete**, write all annotations and new entries to the entity body before proceeding to Step 2. Record a summary for the Stage Report (Step 6): count of assumptions checked, stale annotations added, contradictions found (new Q-n entries), options deduped, coverage gaps filled, research findings re-validated, **and 1f self-verification counts**.
 
 ---
 
@@ -193,22 +217,37 @@ clarify_self_filter_ratio: {N / (N + M)}
 ```
 Where N = questions self-resolved, M = questions presented to captain.
 
-Present ALL unconfirmed assumptions in a single formatted block:
+Present assumptions in TWO sections — pre-verified (auto-confirm unless captain objects) and needs-captain-judgment (genuine captain decisions):
 
-    Based on build-explore's codebase analysis, here are the assumptions:
+    Self-verification complete. {N} of {total} assumptions self-verified by direct evidence inspection (1f).
 
-    ✅ A-1: [Confident] {statement}
-       Evidence: {file:line -- description}
+    **Pre-verified (auto-confirm unless you object):**
 
-    ✅ A-2: [Likely] {statement}
-       Evidence: {file:line -- description}
+    ✅ A-1 [self-verified]: {statement}
+       Evidence: {file:line -- description} (direct read confirmed claim)
 
-    ⚠️  A-3: [Unclear] {statement}
-       Evidence: {file:line -- description}
+    ✅ A-2 [self-verified, refined]: {statement (rewritten)}
+       Evidence: {file:line -- description}; refined from "{original claim}" because {reason}
 
-    Are these correct? Reply with:
-    - "all correct" to confirm everything as-is
-    - Freeform corrections for any that are wrong (e.g., "A-3 is wrong because...")
+    ✅ A-4 [self-verified, corrected]: {statement (corrected)}
+       Evidence: {file:line -- description}; brainstorm Lens (d) referenced {wrong precedent} which does not exist; actual canonical pattern is {file:line}
+
+    **Needs your judgment:**
+
+    ⚠️  A-3 [needs-captain-judgment]: {statement}
+       Reason: {design preference | external constraint not in codebase | conflicting precedents}
+       Evidence available: {what SO found, but cannot decide alone}
+
+    Reply with:
+    - "all correct" to confirm everything as-is (pre-verified ones auto-confirm; you only need to address the needs-captain-judgment items)
+    - Per-item corrections for any pre-verified item where SO got the verification wrong
+    - Decisions on each needs-captain-judgment item
+
+When ALL assumptions are `[self-verified]` (no captain-judgment items remain), present a one-line summary instead of a batch:
+
+    All {N} assumptions self-verified -- proceeding to options. Audit log in entity body.
+
+This collapses the captain interaction to zero rounds when the SO has done its job.
 
 **Parse the captain's response:**
 - If "all correct" (or similar confirmation) → mark every assumption `→ Confirmed: captain, {ISO-date} (batch)`
@@ -503,6 +542,26 @@ correctly.
   append in the order captain cited them.
 - **Decomposition gate EXITS the skill** on accept. Do not continue to Step 1. The epic is
   frozen and child entities take over.
+- **Self-verify before asking (Step 1f Iron Law).** Every factual claim in Assumptions / APPROACH / GUARDRAILS that cites `file:line` evidence MUST be directly read by SO before Step 2 batch presentation. Captain's KPI is information gain per question, not question count -- escalating grep-able facts to captain is a discipline violation.
+
+## Rationalization Table -- Self-Verification Shortcuts (1f)
+
+| Excuse | Reality |
+|--------|---------|
+| "Brainstorm Lens already verified this" | Lens summaries are secondhand and can fabricate precedents (entity 120 A-4 case: Lens (d) cited /api/entities precedent that does not exist). Direct read is mandatory. |
+| "Same-session evidence is fresh" | Freshness ≠ correctness. The original capture may have misread the file. Re-read. |
+| "Captain will catch errors in batch" | That makes captain do SO's job. Captain's confirmation should ratify SO's verified work, not perform first-pass verification. |
+| "It's faster to just ask captain" | False economy. Two captain rounds (verify + decide) cost more than one direct file read + one decision round. |
+| "Confidence is already 0.95" | Confidence is SO's self-rating. Self-rating without independent check is circular. |
+| "The claim seems obvious" | Obvious claims still get misread or fabricated by upstream lenses. Verify anyway. |
+
+## Red Flags -- STOP and run 1f
+
+- About to present "Are these correct?" without 1f self-verification log
+- Citing brainstorm/explore Lens summaries as primary evidence in Step 2 batch
+- Skipping 1f because "Step 1.5 1a already ran" (1a checks freshness, 1f checks interpretation -- different gates)
+- Marking an assumption `[needs-captain-judgment]` without first reading the cited file
+- Captain asks "did you verify?" -- this means 1f was skipped; STOP and run it now
 
 ## Stage Report: clarify (Format Addition)
 

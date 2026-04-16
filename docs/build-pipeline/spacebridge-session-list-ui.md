@@ -1,7 +1,7 @@
 ---
 id: 120
 title: "Spacebridge Session List UI -- Connected Sessions + Repo Visibility"
-status: explore
+status: clarify
 context_status: awaiting-clarify
 source: entity 060 shape + captain directive (2026-04-16 "要可以看到連上去的 session 是誰，repo 有哪些")
 created: 2026-04-16T20:03:00+08:00
@@ -111,23 +111,28 @@ You are asking for a UI that shows captain which Claude Code sessions are connec
 
 A-1: The `sessions` snapshot table read pattern via `openReadOnlyDb()` is the canonical UI read path. New `/api/sessions` route follows the same pattern as `app/page.tsx:17-20` for consistency.
 Confidence: Confident (0.95)
-Evidence: spacebridge/ui/app/page.tsx:17-20 -- direct openReadOnlyDb read works in production [primary]; spacebridge/src/domain/session/registry.ts:103 -- registry calls upsertSnapshot on every register/heartbeat (snapshot is authoritative) [primary]; brainstorm Lens (c) confirmed no /api/sessions route exists [primary].
+Evidence: spacebridge/ui/app/page.tsx:14-22 -- self-verified openReadOnlyDb + drizzle .select().from(sessions).all() pattern in production [primary]; spacebridge/src/domain/session/registry.ts:103 -- registry calls upsertSnapshot on every register/heartbeat (snapshot is authoritative) [primary]; brainstorm Lens (c) confirmed no /api/sessions route exists [primary].
+→ Confirmed: captain, 2026-04-16 (batch, post self-verification)
 
 A-2: SessionRecord fields (sessionId, projectRoot, pid, connectedAt, lastHeartbeat) are sufficient for the UI; no schema changes needed.
 Confidence: Confident (0.95)
-Evidence: spacebridge/src/domain/session/types.ts:7-13 -- complete SessionRecord shape [primary]; brainstorm Lens (c) verified all needed fields persisted [primary].
+Evidence: spacebridge/src/domain/session/types.ts:7-13 -- self-verified SessionRecord interface { sessionId, projectRoot, pid, connectedAt, lastHeartbeat } [primary]; brainstorm Lens (c) verified all needed fields persisted [primary].
+→ Confirmed: captain, 2026-04-16 (batch, post self-verification)
 
 A-3: Entity 117 must ship before 120 executes -- 120 consumes 117's shared header + design tokens. Frontmatter `depends-on` should be updated to `[057, 117]`.
 Confidence: Confident (0.90)
 Evidence: docs/build-pipeline/spacebridge-design-system.md -- Q-3 captain answer "extract a shared header component used by both war room and entity detail; place ThemeToggle in the shared header" [primary]; 117 GUARDRAIL prevents siblings from shipping ad-hoc styles [primary]; current frontmatter only declares `depends-on: [057]` [primary].
+→ Confirmed: captain, 2026-04-16 (batch, post self-verification) -- frontmatter update to depends-on:[057, 117] deferred to plan stage
 
-A-4: API route response shape follows existing /api/entities precedent — returns `{ sessions: SessionRecord[] }` with computed `liveness` field added per session.
-Confidence: Likely (0.75)
-Evidence: brainstorm Lens (d) noted /api/entities + /api/leases as closest precedents [secondary]; computed liveness field is required by AC #3 (stale badge) [primary]. Lens (d) did not directly inspect the response shape of /api/entities; plan stage should confirm.
+A-4: `/api/sessions/route.ts` follows the `events/route.ts` pattern: `export const dynamic = "force-dynamic"` + lazy `await import("@/lib/db")` + drizzle `.select().from(sessions).all()` + server-computed `liveness` field added to response. Response shape: `{ sessions: SessionRecord[] }` (no /api/entities list-route exists to copy).
+Confidence: Confident (0.90)
+Evidence: spacebridge/ui/app/api/events/route.ts:1-15 -- canonical Next.js route pattern with force-dynamic + lazy db import + drizzle .select().all() [primary]; self-verified during clarify Step 2 -- /api/entities is [slug] sub-routes only, no list endpoint exists, brainstorm Lens (d) precedent reference was incorrect [primary].
+→ Confirmed: captain, 2026-04-16 (batch, post self-verification) -- A-4 corrected during self-verification: brainstorm Lens (d) had incorrect /api/entities precedent reference; events/route.ts is the actual canonical pattern
 
 A-5: The `events` SSE stream gap (no projectRoot column on events table) is OUT of 120 scope. 120 only changes the entity detail's projectRoot resolution; event filtering remains as-is.
 Confidence: Confident (0.95)
 Evidence: brainstorm Lens (c) noted "Events table has NO projectRoot column ... potential bug surfaced by Lens c, out of 120 scope" [primary]; Honest Boundary in brainstorm explicitly defers this [primary].
+→ Confirmed: captain, 2026-04-16 (batch, post self-verification)
 
 ## Option Comparisons
 
