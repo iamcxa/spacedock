@@ -75,7 +75,9 @@ export default async function EntityDetailPage({ params }: PageProps) {
 
     // Query stage transition events for this entity
     if (projectRoot) {
-      const entityPath = join(projectRoot, "docs", "build-pipeline", `${slug}.md`);
+      // NOTE: comments.entity_path is project-root-relative (matches POST convention at
+      // comments/route.ts:108). Do NOT use the absolute path here — strict eq() would never match.
+      const entityPath = `/docs/build-pipeline/${slug}.md`;
       stageTransitions = handle.db
         .select({
           id: events.id,
