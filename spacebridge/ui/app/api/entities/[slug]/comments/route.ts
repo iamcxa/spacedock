@@ -16,6 +16,40 @@ function defaultDbPath(): string {
 
 const SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/;
 
+/** Fire-and-forget IPC to daemon → MCP → Claude channel notification */
+async function notifyClaude(
+  entity: string,
+  commentId: string,
+  content: string,
+  selectedText: string,
+  sectionHeading: string,
+): Promise<void> {
+  const { join } = await import("node:path");
+  const { createSocketClient } = await import("../../../../../../src/ipc/socket-client");
+
+  const stateDir = process.env.SPACEBRIDGE_STATE_DIR ?? join(homedir(), ".spacedock");
+  const socketPath = join(stateDir, "spacebridge.sock");
+  const projectRoot = process.env.SPACEBRIDGE_PROJECT_ROOT ?? process.cwd();
+
+  const client = createSocketClient({
+    socketPath,
+    sessionId: `ui-comment-${randomUUID()}`,
+    projectRoot: `ui-ephemeral-comment-${randomUUID()}`,
+    pid: process.pid,
+  });
+
+  await client.connect();
+  await client.request({
+    id: randomUUID(),
+    type: "rpc-request",
+    payload: {
+      method: "captain_comment",
+      args: [{ projectRoot, entity, commentId, content, selectedText, sectionHeading }],
+    },
+  });
+  client.close();
+}
+
 function normalizeHeading(h: unknown): string {
   return String(h ?? "")
     .replace(/^##\s*/, "")
@@ -174,6 +208,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       detail: `New comment on ${cmd.sectionHeading} by ${cmd.author}`,
       workflowDir: "",
     });
+
+    // Fire-and-forget: notify Claude via daemon IPC so FO perceives the comment
+    if (cmd.author === "captain") {
+      notifyClaude(slug, cmd.commentId, cmd.content, cmd.selectedText, cmd.sectionHeading).catch(
+        () => {},
+      );
+    }
 
     return Response.json({ commentId: cmd.commentId, ok: true }, { status: 201 });
   } catch (err) {

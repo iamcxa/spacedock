@@ -223,6 +223,37 @@ async function cmdStart(): Promise<void> {
     return { result: { messageId: cmd.messageId, delivered } };
   });
 
+  rpcHandlers.set("captain_comment", async (args, ctx) => {
+    const arg = args[0] as {
+      projectRoot?: string;
+      entity?: string;
+      commentId?: string;
+      content?: string;
+      selectedText?: string;
+      sectionHeading?: string;
+    };
+    const projectRoot = arg.projectRoot ?? "";
+    const targetSessionId = ctx.sessionRegistry.getActiveSessionByProjectRoot(projectRoot);
+    if (!targetSessionId) {
+      return { error: `No active CC session for project root: ${projectRoot}` };
+    }
+
+    const delivered = ctx.server.pushToSession(targetSessionId, {
+      id: randomUUID(),
+      type: "action-push",
+      payload: {
+        action: "captain_comment",
+        entity: arg.entity ?? "",
+        commentId: arg.commentId ?? "",
+        content: arg.content ?? "",
+        selectedText: arg.selectedText ?? "",
+        sectionHeading: arg.sectionHeading ?? "",
+      },
+    });
+
+    return { result: { delivered } };
+  });
+
   rpcHandlers.set("gate_decide", async (args, ctx) => {
     let cmd: ReturnType<typeof parseGateCommand>;
     try {
@@ -400,7 +431,13 @@ async function cmdStart(): Promise<void> {
       const serverScript = resolveNextjsServerScript(pluginRoot);
       const dbPath = join(stateDir, "spacebridge.db");
       const uiPort = resolvePort();
-      nextjsChild = spawnNextjsChild({ serverScript, port: uiPort, dbPath, stateDir });
+      nextjsChild = spawnNextjsChild({
+        serverScript,
+        port: uiPort,
+        dbPath,
+        stateDir,
+        projectRoot: process.cwd(),
+      });
       process.stderr.write(
         `[${ts()}] spawned Next.js UI (pid: ${nextjsChild.pid}, port: ${uiPort})\n`,
       );
