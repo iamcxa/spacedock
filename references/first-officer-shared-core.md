@@ -7,33 +7,48 @@ This file captures the shared first-officer semantics. Keep it aligned with `age
 1. Discover the project root with `git rev-parse --show-toplevel`.
 2. Discover the workflow directory. Try sources in order, use the first match:
    1. **Explicit path** — if the user provided a workflow directory, use it directly.
-   2. **Project-local** — search `{project_root}/` for `README.md` files whose YAML frontmatter contains `commissioned-by: spacedock@...`. Ignore `.git`, `.worktrees`, `node_modules`, `vendor`, `dist`, `build`, and `__pycache__`.
-   3. **User-scoped** — search `~/.claude/workflows/` for `README.md` files with `commissioned-by: spacedock@...`. This allows cross-project workflows (e.g., a shared build pipeline) to live in a single user-level location.
+   2. **Helper** — run `{spacedock_plugin_dir}/skills/commission/bin/status --discover`. If the output contains exactly one path, use it. If multiple paths, present the list to the operator and ask which to manage (or, in single-entity mode, fail with an ambiguity error).
+   3. **Project-local fallback** — if helper returned zero paths, search `{project_root}/` for `README.md` files whose YAML frontmatter contains `commissioned-by: spacedock@...`. Ignore `.git`, `.worktrees`, `node_modules`, `vendor`, `dist`, `build`, and `__pycache__`.
+   4. **User-scoped fallback** — if still no match, search `~/.claude/workflows/` for `README.md` files with `commissioned-by: spacedock@...`. This allows cross-project workflows (e.g., a shared build pipeline) to live in a single user-level location.
+   5. **Plugin-manifest fallback** — if still no match, for each `.spacedock/workflows/*/manifest.yaml` under `{project_root}/`, if the manifest has top-level `source_plugin:` + `workflow_readme_path:` fields, resolve the plugin directory for `source_plugin` (same resolver used in the Status Viewer's `{spacedock_plugin_dir}`) and read the workflow README from `{plugin_dir}/{workflow_readme_path}`. Apply LOCAL.yaml `readme_operations` in-memory before extracting mission/entity-labels/stage-ordering. If LOCAL.yaml is absent, use the plugin README verbatim. If a `readme_operations` op targets a stage that does not exist in the plugin's current README, fail loud with a clear error identifying the stale op — do not silently skip.
    If multiple workflows are found across sources, list them and ask the captain which one to use.
+
+   The helper is the preferred path when it works; the fallback cascade preserves grafted/user-scoped/project-local workflows the helper does not yet discover.
+
 3. Read `{workflow_dir}/README.md` to extract:
    - mission
    - entity labels
    - stage ordering, defaults, and **profile definitions** from `stages.profiles` / `stages.defaults` / `stages.states`
-   - stage properties such as `initial`, `terminal`, `gate`, `worktree`, `concurrency`, `feedback-to`, `agent`, and `dispatch` (simple | task-list-driven | debate-driven)
-4. Discover mod hooks by scanning two directories for `## Hook:` sections:
-   a. **Library mods**: `mods/*.md` (repo root) -- shared across all workflows in this project.
-   b. **Workflow mods**: `{workflow_dir}/_mods/*.md` -- workflow-specific activation and overrides.
-   Register `startup`, `idle`, and `merge` hooks. Within each directory, process files in alphabetical order. Library mods run before workflow mods. If a library mod and a workflow mod share the same `name:` frontmatter field, the workflow mod overrides (the library mod is skipped for that name).
-5. Run startup hooks before normal dispatch.
-6. Detect orphaned worktree entities by checking `status --where "worktree !="` and report anomalies rather than auto-redispatching.
-6.5. Check dashboard — read `~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)/channel_port`. If the file exists and `curl -sf http://127.0.0.1:$PORT/api/events` succeeds, the dashboard is running. If not running, prompt captain: "Dashboard is not running. It requires an active Claude Code session with the spacedock-dashboard MCP channel. Ensure .mcp.json has the spacedock-dashboard entry and restart Claude Code. (http://localhost:8420/)" Wait for captain response. Yes — guide captain to restart CC with the channel configured. No — skip.
-7. Run `status --next` to identify dispatchable entities.
+   - stage properties such as `initial`, `terminal`, `gate`, `worktree`, `concurrency`, `feedback-to`, `agent`, and `dispatch` (simple | task-list-driven | troops-dispatch | debate-driven)
+
+4. Run `status --boot` to gather all startup information in one call. When creating a new entity, use `status --next-id` instead of `--boot` to fetch only the next sequential ID. Parse the output sections:
+   - **MODS** — registered mod hooks grouped by lifecycle point (startup, idle, merge). See Mod Hook Convention below for the library+workflow layering that `--boot` surfaces.
+   - **NEXT_ID** — next available sequential entity ID.
+   - **ORPHANS** — entities with worktree fields, cross-referenced against filesystem and git state. Report anomalies rather than auto-redispatching.
+   - **PR_STATE** — PR-pending entities with current merge state. Advance merged PRs.
+   - **DISPATCHABLE** — entities ready for dispatch (same as `--next`). Output includes PROFILE and DISPATCH columns — use these when deciding whether to dispatch an ensign or handle inline (see Brainstorm Triage).
+
+5. Run startup hooks before normal dispatch (from the MODS section of `--boot`).
+
+6. **Dashboard check.** Read `~/.spacedock/dashboard/$(echo -n "{project_root}" | shasum | cut -c1-8)/channel_port`. If the file exists and `curl -sf http://127.0.0.1:$PORT/api/events` succeeds, the dashboard is running. If not running, prompt the captain: "Dashboard is not running. It requires an active Claude Code session with the spacedock-dashboard MCP channel. Ensure `.mcp.json` has the `spacedock-dashboard` entry and restart Claude Code. (http://localhost:8420/)" Wait for captain response. Yes — guide captain to restart CC with the channel configured. No — skip and proceed without Event Emission.
 
 ## Status Viewer
 
-The status viewer ships with the plugin at `skills/commission/bin/status`. Resolve the plugin directory from the same root used to read these reference files.
+The status viewer ships with the plugin at `skills/commission/bin/status`. Resolve the plugin directory from the same root used to read these reference files. Note: this same `{spacedock_plugin_dir}` resolver is used in Startup step 2.5 (Plugin-manifest fallback) to locate the workflow README for grafted workflows.
 
 Invoke it as:
 ```
-python3 {spacedock_plugin_dir}/skills/commission/bin/status --workflow-dir {workflow_dir} [--next|--archived|--where ...]
+{spacedock_plugin_dir}/skills/commission/bin/status --workflow-dir {workflow_dir} [--next-id|--next|--archived|--where ...|--boot|--discover]
 ```
 
-Use this for all `status` calls: `--next`, `--where "pr !="`, `--where "worktree !="`, etc.
+Use `--boot` at startup to gather mods, next ID, orphans, PR state, and dispatchable entities in a single call. Use `--next-id` when filing a new task so you only fetch the next sequential ID. Use `--next`, `--where "pr !="`, etc. for targeted queries during the event loop. `--boot` is incompatible with `--next`, `--next-id`, `--archived`, and `--where`.
+
+The `--set` flag updates entity frontmatter fields:
+- `--set {slug} field=value` sets a field
+- `--set {slug} field=` clears a field
+- `--set {slug} started` or `completed` auto-fills a UTC ISO 8601 timestamp (skips if already set)
+
+All FO frontmatter writes go through `--set` (see FO Write Scope). Direct `Edit` of entity frontmatter is not permitted — `--set` provides the `old -> new` diff audit trail, terminalization guards, and staleness protection.
 
 ## Event Emission
 
@@ -50,8 +65,8 @@ Event types and injection points:
 
 | Type | When | Detail field |
 |------|------|-------------|
-| `dispatch` | After step 6 (commit state transition) | "Entering {stage}" |
-| `completion` | After step 2 of Completion (stage report reviewed) | "{N} done, {N} skipped, {N} failed" |
+| `dispatch` | After Dispatch step 6 (commit state transition) | "Entering {stage}" |
+| `completion` | After Completion step 2 (stage report reviewed) | "{N} done, {N} skipped, {N} failed" |
 | `gate` | When presenting gate to captain | "Awaiting captain approval" |
 | `feedback` | When bouncing entity back to feedback-to stage | "Rejected: {reason summary}" |
 | `merge` | After successful merge/cleanup | "Merged to main" |
@@ -65,7 +80,7 @@ Rules:
 
 ## Single-Entity Mode
 
-When the user names a specific entity and asks to process it through the workflow, switch into single-entity mode.
+Single-entity mode activates when the session is non-interactive (e.g., invoked via `claude -p` or `codex exec`) and the prompt names a specific entity to process through the workflow. Do not enter single-entity mode in interactive sessions — naming an entity in conversation is normal dispatch, not a mode switch.
 
 Single-entity mode changes the normal event loop in these ways:
 - scope dispatch to the named entity only
@@ -75,14 +90,9 @@ Single-entity mode changes the normal event loop in these ways:
 - stop once the target entity reaches a terminal state or an irrecoverable blocked state
 - if the workflow README defines a `## Output Format` section, use it for the final output; otherwise fall back to reporting status, verdict, and entity ID
 
-**Team creation in single-entity mode** follows the runtime adapter rules, not a blanket skip. See `references/claude-first-officer-runtime.md` for the authoritative rule: `-p` pipe mode skips teams (prevents premature session termination); interactive single-entity sessions create teams normally. Single-entity mode controls dispatch scope, gate resolution, and termination — it does NOT dictate whether teams are created.
-
 ## Working Directory
 
-Your working directory stays at the project root. Do not `cd` into worktrees. Use:
-- absolute paths
-- `git -C {path}` for git operations outside the root
-- worktree-local file paths only when operating inside that worktree
+Your working directory stays at the project root. Do not `cd` into worktrees. Use `git -C {path}` for git operations outside the root, and worktree-local file paths only when operating inside that worktree.
 
 ## Effective Stages
 
@@ -110,8 +120,6 @@ effective_stages(entity):
 **Recompute on every dispatch** — `effective_stages()` is stateless. Call it fresh at each advancement. This means profile or override changes take effect at the next transition without any special handling.
 
 **Mid-pipeline profile changes:** Profile and override changes only affect stages **after** `current_stage`. Never re-dispatch a stage that already has a completed stage report. When determining the next stage, compare `entity.status` against the freshly-computed `effective_stages()` result — if `entity.status` is in the list, the next stage is the following entry. If `entity.status` is not in the list (stage was removed by an override applied after dispatch), find the first effective stage whose canonical index is greater than `entity.status`'s canonical index.
-
-**Startup note:** Read `stages.profiles` from the README frontmatter alongside `stages.states`. The `status --next` output now includes PROFILE and DISPATCH columns — use these when deciding whether to dispatch an ensign or handle inline.
 
 ## Brainstorm Triage
 
@@ -149,7 +157,7 @@ Which path? (A/B/C or approve to advance)
 
 **Path A:** Invoke `Skill: "superpowers:brainstorming"`. After spec is produced, present updated score and await gate.
 
-**Path B:** Create a worktree for the entity (standard worktree creation flow). Dispatch an ensign with instructions to produce: codebase exploration, 2–3 approach options with tradeoffs, and open questions. The ensign posts its analysis as a comment on the entity (read-only on spec body -- no `update_entity` calls). After ensign completes, summarize the analysis to the captain. Captain may switch to Path A with ensign's analysis as context. Once captain decides on approach, FO updates spec via `update_entity` and re-presents gate.
+**Path B:** Create a worktree for the entity (standard worktree creation flow). Dispatch an ensign with instructions to produce: codebase exploration, 2–3 approach options with tradeoffs, and open questions. The ensign posts its analysis as a comment on the entity (read-only on spec body — no `update_entity` calls). After ensign completes, summarize the analysis to the captain. Captain may switch to Path A with ensign's analysis as context. Once captain decides on approach, FO updates spec via `update_entity` and re-presents gate.
 
 **Path C:** Captain provides the approach directly in their response. FO updates the spec with the approach and re-presents gate.
 
@@ -158,7 +166,7 @@ Paths can sequence: B → captain reviews → switches to A. FO recommends a pat
 ### Gate Resolution
 
 Gate passes when the captain explicitly approves advancement (dashboard button, comment, or channel message). On approval:
-1. Write `score: {passed_count / 5}` to entity frontmatter (e.g., 5/5 → `score: 1.0`, 4/5 → `score: 0.8`). This records executability — how well-planned the feature is — as a persistent metric.
+1. Write `score: {passed_count / 5}` to entity frontmatter via `status --set {slug} score={value}` (e.g., 5/5 → `score: 1.0`, 4/5 → `score: 0.8`). This records executability — how well-planned the feature is — as a persistent metric.
 2. Advance entity to next stage per `effective_stages()`
 3. Emit dispatch event for the new stage
 
@@ -166,181 +174,105 @@ Never self-approve the brainstorm gate. Do not infer approval from silence.
 
 ## Dispatch
 
+The FO MUST use the runtime-specific dispatch mechanism described in the runtime adapter to build and issue worker assignments. Manual prompt assembly is prohibited except in documented break-glass scenarios. The runtime adapter's dispatch section is the authoritative source for how to invoke Agent() or equivalent.
+
 For each entity reported by `status --next`:
 
 1. Read the entity file and the target stage definition.
 2. Build a numbered checklist from stage outputs and entity acceptance criteria.
 3. Check for obvious conflicts if multiple worktree stages would touch overlapping files.
 4. Determine `dispatch_agent_id` from the stage `agent:` property. Default to `ensign` when absent.
-5. Update main-branch frontmatter for dispatch:
-   - set `status: {next_stage}`
-   - set `worktree: .worktrees/{worker_key}-{slug}` for worktree stages
-   - set `started:` when the entity first moves beyond the initial stage
-6. Commit the state transition on main with `dispatch: {slug} entering {next_stage}`.
-6.5. Emit dispatch event: `curl -s -X POST http://localhost:${DASHBOARD_PORT}/api/events -H 'Content-Type: application/json' -d "{\"type\":\"dispatch\",\"entity\":\"${SLUG}\",\"stage\":\"${NEXT_STAGE}\",\"agent\":\"${WORKER_KEY}-${SLUG}-${NEXT_STAGE}\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"detail\":\"Entering ${NEXT_STAGE}\"}"` (skip if dashboard not running).
-7. Create the worktree on first dispatch to a worktree stage.
-8. Select dispatch mode from the stage definition's `dispatch:` property (default `simple`). Execute the matching protocol below.
-9. Wait for the final worker result before advancing frontmatter or dispatching the next stage for that entity.
+5. Select the dispatch mode from the stage `dispatch:` property (default `simple`):
+   - `simple` — one worker, single assignment. Most stages.
+   - `task-list-driven` — FO decomposes the stage into tasks, dispatches workers per task.
+   - `troops-dispatch` — FO directly dispatches per-task troops in parallel, replacing the ensign→task-executor chain.
+   - `debate-driven` — FO dispatches two or more workers with opposing positions; synthesizes the result.
+
+   The runtime adapter selects the concrete `Agent()` (or equivalent) invocation for the chosen mode. Dispatch-mode selection does not change the rest of this section.
+
+6. Update main-branch frontmatter for dispatch using the status script:
+   ```
+   status --workflow-dir {workflow_dir} --set {slug} status={next_stage} worktree=.worktrees/{worker_key}-{slug} started
+   ```
+   Omit `worktree=...` for non-worktree stages. Bare `started` auto-fills a UTC ISO 8601 timestamp and skips if already set (preserving the original start time).
+7. Commit the state transition on main with `dispatch: {slug} entering {next_stage}`.
+8. Emit a `dispatch` event to the dashboard (see Event Emission).
+9. Create the worktree on first dispatch to a worktree stage.
+10. Dispatch a worker for the stage using the runtime-specific mechanism. The worker assignment must include:
+    - entity identity and title
+    - target stage name
+    - the full stage definition
+    - the entity path
+    - the worktree path and branch when applicable
+    - the checklist
+    - feedback instructions when the stage has `feedback-to`
+11. Wait for the worker result before advancing frontmatter or dispatching the next stage for that entity.
 
 Feedback-stage worker instructions must preserve this rule: a review stage checks and reports on what was produced; it does not silently take over the prior stage's work.
-
-### Dispatch Modes
-
-The `dispatch:` property on a stage definition selects the dispatch protocol. Omitted or unrecognized values fall back to `simple`. All modes share steps 1–7 above; they differ only in how workers are dispatched and how results are collected.
-
-For universal tool surface constraints and dispatch pattern definitions, see `references/agent-dispatch-guide.md`.
-
-#### simple (default)
-
-Dispatch a single worker (ensign or named agent). The worker does all work inline.
-
-```
-FO dispatches one worker:
-  - entity identity, title, target stage, stage definition
-  - entity path, worktree path and branch (when applicable)
-  - the checklist
-  - feedback instructions (when stage has feedback-to)
-Worker executes all checklist items, writes Stage Report.
-```
-
-This is the right mode for single-threaded stages where no parallel research or cross-cutting analysis is needed.
-
-#### task-list-driven
-
-Two-phase protocol for stages requiring parallel work with dependency ordering. The main session dispatches workers in Phase 1 because workers cannot dispatch further agents (Agent tool is main-session-exclusive — see `references/agent-dispatch-guide.md`).
-
-```
-Phase 1 — Worker dispatch (FO, has Agent tool):
-  1. Extract N topics/tasks from entity context
-     - Topic count is content-driven, not hardcoded at design time
-     - Cap at workflow-defined limit (typically 5)
-  2. Create team + task list with dependencies:
-     - Worker tasks 1..N: unblocked, self-claimable
-     - Synthesis task N+1: depends on 1..N (auto-unblocks)
-     - Optional verification task N+2: depends on N+1
-  3. Spawn M worker teammates (M <= N, typically 3)
-  4. Workers self-claim unblocked tasks
-     - Each writes results to entity file subsections or worktree files
-     - Workers can SendMessage each other for overlapping context
-  5. Dependency-gated synthesis task auto-unblocks when worker tasks complete
-
-Phase 2 — Ensign synthesis (simple subagent):
-  6. Dispatch ensign with the standard worker assignment (step 8 payload)
-  7. Ensign reads worker results from entity file (NOT from main session context)
-  8. Ensign writes Stage Report per normal completion flow
-```
-
-**Key constraint:** Workers write to files, not to the main session. This keeps FO's context small. The ensign reads files at synthesis time.
-
-**Completion:** FO waits on the team task list for all tasks to reach terminal state, then dispatches the ensign for synthesis. The ensign's Stage Report triggers the normal Completion and Gates flow.
-
-#### troops-dispatch (execute stage variant of task-list-driven)
-
-Specialized task-list-driven protocol for execute-stage wave-parallel task dispatch. FO dispatches troop agents directly with per-task model hints from the PLAN. FO IS the orchestrator -- no ensign intermediary for execute stage.
-
-```
-FO reads ## PLAN, builds wave graph
-FO transitions CONTRACTS.md rows: planned -> in-flight
-
-Per wave (sequential across waves, parallel within):
-  1. FO dispatches troop agents for each task in the wave:
-     Agent(subagent_type="spacedock:troop", model=task.model, prompt=...)
-  2. Each troop loads task-execution + knowledge-capture skills
-  3. Troop executes one task: read_first -> action -> acceptance_criteria -> return report
-  4. Troop returns changed_files + status (DONE/NEEDS_CONTEXT/BLOCKED)
-  5. FO commits serially after wave closes (one commit per DONE task)
-
-BLOCKED escalation: haiku -> sonnet -> opus (one attempt per tier)
-
-Bare-mode fallback: FO dispatches one troop at a time (sequential).
-Context isolation preserved -- each troop gets fresh context per task,
-unlike ensign which would accumulate context across tasks.
-```
-
-**Key difference from task-list-driven:** No synthesis ensign. FO handles orchestration, wave-graph dispatch, and Stage Report writing directly. Troops are pure leaf agents -- they execute one task and return.
-
-**Per-task model hints:** FO reads each task's `model` attribute from PLAN (`haiku` / `sonnet` / `opus`) and passes it as the `model` parameter in the Agent() call. This enables cost-optimized dispatch: simple file edits use haiku, complex refactors use opus.
-
-#### debate-driven
-
-Two-phase protocol for stages requiring cross-cutting analysis where reviewers should challenge each other's findings. Produces higher-quality output than independent parallel work.
-
-```
-Phase 1 — Reviewer dispatch (FO, has Agent tool):
-  1. Create team with 3–4 themed reviewers
-     - Each reviewer gets a focus area from the stage definition
-     - All reviewers analyze the same target (e.g., git diff, entity spec)
-  2. Reviewers work independently first, write findings to entity file
-  3. Reviewers SendMessage findings to each other and debate:
-     - Challenge severity ratings, question assumptions, cross-reference
-     - Debate is the unique value — it catches blind spots
-
-Phase 2 — Synthesis (FO inline or ensign):
-  4. FO reads debate thread + written findings
-  5. FO or ensign classifies findings (severity × root cause)
-  6. Writes Stage Report with classified findings
-```
-
-**Key constraint:** Debate happens via SendMessage between teammates, not through FO relay. FO reads the final state, not the full conversation.
-
-**Completion:** FO monitors team for idle state + all reviewers having posted findings. Then proceeds to synthesis. The Stage Report triggers the normal Completion and Gates flow.
 
 ## Completion and Gates
 
 When a worker completes:
 
-1. Read the entity file.
-2. Review the `## Stage Report` section against the checklist. Every dispatched checklist item must be represented as DONE, SKIPPED, or FAILED.
+1. Read the entity file's last `## Stage Report` section (the latest report is always appended at the end of the file). Prefer a Grep anchored to the `## Stage Report` heading over a full-file Read (see Probe and Ideation Discipline).
+2. Review the stage report against the checklist. Every dispatched checklist item must be represented as DONE, SKIPPED, or FAILED.
 3. If checklist items are missing, send the worker back once to repair the report.
-3.5. Emit completion event with the checklist count summary as detail (skip if dashboard not running).
-3.6. Process pending knowledge captures (Phase E addition):
-   - Scan the entity file for a `## Pending Knowledge Captures` section containing `<capture>` elements.
-   - If the section exists and is non-empty, invoke the `knowledge-capture` skill via the Skill tool with `mode: apply`, `entity_slug: {current slug}`, `entity_path: {entity file path}`.
-   - Follow the skill's apply-mode instructions (see `skills/knowledge-capture/references/apply-mode.md`). AskUserQuestion calls inside the skill run in FO's `--agent` context where native UI works.
-   - If the section is absent or empty, proceed immediately to step 4.
-   - Rationale: stage ensigns cannot use AskUserQuestion themselves (they run as subagents). By staging D2 candidates in the entity body and having FO process them at completion time, we preserve the "captain-facing flows only happen in --agent context" invariant without adding a separate captain-gated stage.
 4. Check whether the completed stage is gated.
+5. Emit a `completion` event to the dashboard (see Event Emission).
+6. **Process pending knowledge captures.** Scan the entity file for a `## Pending Knowledge Captures` section containing `<capture>` elements. If the section exists and is non-empty, invoke the `knowledge-capture` skill via the Skill tool with `mode: apply`, `entity_slug: {current slug}`, `entity_path: {entity file path}`. Follow the skill's apply-mode instructions (see `skills/knowledge-capture/references/apply-mode.md`). AskUserQuestion calls inside the skill run in FO's `--agent` context where native UI works.
 
 The checklist review should produce an explicit count summary in the form:
 - `{N} done, {N} skipped, {N} failed`
 
-If the stage is not gated:
-- advance normally
-- if the next stage is terminal, continue into merge handling
-- if the next stage has `feedback-to` pointing at the current stage, keep the current worker available for potential follow-up
+If the stage is not gated: If terminal, proceed to the Pre-Ship Confidence Gate then merge. Otherwise, determine whether to reuse the current agent or dispatch fresh for the next stage.
+
+A completed worker is reusable only when both are true:
+- the worker is still addressable through a live runtime handle
+- the reuse conditions below all pass
+
+If the worker completed but is no longer addressable, treat reuse as failed and dispatch fresh.
+
+**Reuse conditions** (all must hold — if any fails, dispatch fresh):
+0. Before evaluating reuse conditions, run `claude-team context-budget --name {ensign-name}`. If `reuse_ok` is `false`, skip to fresh dispatch.
+1. Not in bare mode (teams available)
+2. Next stage does NOT have `fresh: true`
+3. Next stage has the same `worktree` mode as the completed stage
+4. `lookup_model(worker_name) == next_stage.effective_model` — the reused worker's stamped model must match the next stage's declared model. Skip this comparison when `next_stage.effective_model` is null (null-declared stages accept any reused worker, preserving today's permissive behavior). Members stamped with captain-session fallback values (e.g., `"opus[1m]"`) will never match declared enum values (`sonnet`, `opus`, `haiku`) and will correctly force a one-time fresh dispatch that re-stamps the canonical enum value.
+
+When this comparator forces fresh dispatch because of a model mismatch, the FO MUST emit a captain-visible diagnostic of the form: `reused worker {name} model {X} does not match next stage effective_model {Y} — fresh-dispatching`. This converts silent degradation into audit. The anchor phrase `does not match next stage effective_model` must appear verbatim in that diagnostic.
+
+**If reuse:** Keep the agent alive. Update frontmatter on main (`status --workflow-dir {workflow_dir} --set {slug} status={next_stage}`, commit: `advance: {slug} entering {next_stage}`). Send the agent its next assignment:
+
+SendMessage(to="{agent}-{slug}-{completed_stage}", message="Advancing to next stage: {next_stage_name}\n\n### Stage definition:\n\n[STAGE_DEFINITION — copy the full ### stage subsection from the README verbatim]\n\n### Completion checklist\n\n[CHECKLIST — assemble from step 2]\n\nContinue working on {entity title}. The entity file is at {entity_file_path}. Do the work described in the stage definition. Update the entity file body with your findings or outputs. Commit before sending your completion message.")
+
+**If fresh dispatch:** Check whether the next stage has `feedback-to` pointing at the completed stage. If yes, keep the completed agent alive only while it remains addressable and eligible for later reuse. Otherwise, shut down the agent explicitly. A worker that is no longer needed for later routing must be explicitly shut down. Run `status --next` and dispatch the next stage.
 
 If the stage is gated:
-- emit gate event with detail "Awaiting captain approval" (skip if dashboard not running)
 - never self-approve
+- emit a `gate` event to the dashboard
 - present the stage report to the human operator
 - keep the worker alive while waiting at the gate
 - if the stage is a feedback gate that recommends `REJECTED`, auto-bounce directly into the feedback rejection flow instead of waiting on manual review
+- if the captain rejects at a gated stage that has `feedback-to`, enter the Feedback Rejection Flow and route findings to the `feedback-to` target stage. This takes priority over generic rejection handling.
+- if the captain approves and the next stage is not terminal: apply the reuse conditions from the "If the stage is not gated" path. If reuse: keep the agent, send the next stage via SendMessage. If fresh dispatch: shut down the agent. In either case, if a kept-alive agent from a prior stage is still running (the `feedback-to` target) and the next stage does not need it, shut it down.
 
 ### Pre-Ship Confidence Gate
 
-When the UAT gate passes (captain approval or auto-resolve) and the next stage is terminal (shipped), FO runs the pre-ship confidence gate BEFORE advancing:
+When a gate passes (captain approval or auto-resolve) and the next stage is terminal (typically `shipped`), FO runs the pre-ship confidence gate BEFORE advancing. Invoke:
 
-1. Read `references/confidence-gate.md` for the scoring specification and parsing patterns.
-2. Read the entity file fresh. Parse all 4 Stage Reports using the LAST occurrence of each section (handles feedback-loop re-runs with multiple Stage Report entries):
-   - `## Stage Report: execute` — per-task DONE/BLOCKED status and file counts
-   - `## Stage Report: quality` — test, typecheck, ratchet verdicts
-   - `## Stage Report: review` — findings table with severity classification
-   - `## Stage Report: uat` — summary counts (total, pass, fail, skipped)
-   - `## PLAN` — task wave assignments and `<files_modified>` lists (for factor 5)
-3. Compute the 5-factor composite score per `references/confidence-gate.md` Section 3–4.
-4. Write `## Confidence Assessment` to the entity body (Section 8 format) with all factor scores, evidence, composite, and iteration number.
-5. Route based on composite:
-   - **Composite >= 90%**: Advance to shipped (terminal). Proceed to Merge and Cleanup.
-   - **Composite < 90%**: Enter auto-fix loop (Section 7 of confidence-gate.md):
-     - Identify lowest-scoring factor by contribution (score × weight).
-     - Generate a targeted fix task description.
-     - Prepend to `## Auto-Fix PLAN (iteration N)` in entity body.
-     - Set entity `status: execute`, dispatch ensign. Entity flows through execute → quality → review → UAT → confidence normally.
-     - On UAT re-dispatch: pass `skip_interactive_passed: true` (auto-pass previously-approved interactive items).
-     - Track iteration in `## Confidence Assessment` section (`Iteration: N of 3`).
-     - **Cap at 3 iterations.** On 3rd attempt still < 90%: escalate to captain with full per-factor breakdown (see Section 7e). Do NOT retry without explicit captain override.
+```
+Skill("spacedock:confidence-gate", args={
+  mode: "pre_ship_gate",
+  entity_slug: {slug},
+  entity_path: {entity_file_path}
+})
+```
 
-See `references/confidence-gate.md` for factor definitions, parsing specification, auto-fix loop details, and captain escalation message format.
+Routes on composite score:
+- `>= 90%` — advance to terminal stage
+- `< 90%` — enter auto-fix loop (cap 3 iterations; escalate to captain on 3rd failure)
+
+See `skills/confidence-gate/SKILL.md` for factor rubric and auto-fix loop spec.
 
 ## Feedback Rejection Flow
 
@@ -349,10 +281,14 @@ When a feedback stage recommends REJECTED:
 1. Read the rejected stage's `feedback-to` target. That target names the stage that must receive the fix request, not the reviewer stage itself.
 2. Track feedback cycles in a `### Feedback Cycles` section in the entity body.
 3. If cycles reach 3, escalate to the human instead of dispatching another round.
-4. Route the findings back to the target stage in the same worktree.
-4.5. Emit feedback event with detail summarizing the rejection reason (skip if dashboard not running).
-5. Re-run the reviewer after fixes.
-6. Re-enter the normal gate flow with the updated result.
+4. Before routing findings back to the target stage agent, run `claude-team context-budget --name {ensign-name}`. If `reuse_ok` is `false`, shut down the old ensign and fresh-dispatch.
+5. Emit a `feedback` event to the dashboard.
+6. Route the findings back to the target stage in the same worktree by using the existing worker handle when it is still addressable and the reuse conditions pass (`send_input` on Codex, `SendMessage` on Claude teams). If those checks fail, shut down the old worker explicitly and fresh-dispatch.
+   The routed message must contain the concrete next-stage assignment and requested fix work, not just an acknowledgment request.
+   On Codex, do not treat the immediate `send_input` response as the new completion result for the feedback cycle. If that routed follow-up is on that entity's critical path, the FO must wait for the reused worker's next completion before advancing that entity or shutting it down.
+   This wait is entity-scoped bookkeeping, not a global scheduling stop: other ready entities may still be dispatched or advanced while this entity is waiting on its reused worker.
+7. Re-run the reviewer after fixes.
+8. Re-enter the normal gate flow with the updated result.
 
 The first officer owns the `### Feedback Cycles` section and keeps it on the main branch.
 
@@ -360,44 +296,90 @@ The first officer owns the `### Feedback Cycles` section and keeps it on the mai
 
 When an entity reaches its terminal stage:
 
-0.5. Read `## Confidence Assessment` from the entity body (LAST occurrence if multiple exist).
-   - Display the per-factor breakdown table to the captain before any other merge action.
-   - If composite score < 90% (defense-in-depth: should not occur if gate is working):
-     **BLOCK merge.** Report to captain: "Confidence {score}% is below 90% threshold. This entity should not have reached the merge hook without passing the confidence gate. Options: route to auto-fix loop or captain override." Do NOT proceed to step 1 until composite >= 90% or captain explicitly overrides.
-   - If `## Confidence Assessment` is absent (pre-087 legacy entity): display warning "No confidence assessment found -- pre-087 entity, skipping confidence display." Proceed to step 1 without blocking.
-   - If composite >= 90%: proceed to step 1.
+0. **Confidence defense-in-depth.** Before invoking merge hooks or local merge, Grep the entity for a `## Confidence Assessment` section. If present, read the `composite` score. If `composite < 0.90`, block the merge with error `"confidence assessment below threshold ({composite}) — return to UAT"` and do not advance. This guards against Pre-Ship Confidence Gate having been bypassed or forgotten.
 
-1. Run registered merge hooks before any local merge, archival, or status advancement.
-   The `pr-review-loop` mod (library: `mods/pr-review-loop.md`) is the canonical merge hook for PR-based workflows. It delegates PR creation to `kc-pr-flow:kc-pr-create` and review triage to `kc-pr-flow:kc-pr-review-resolve`. When this mod is active, its merge hook handles branch push and PR creation -- FO skips the default local merge per step 2.
-2. If a merge hook created or set a `pr` field, report the PR-pending state and do not local-merge.
-3. If no merge hook handled the merge, perform the default local merge from the stage worktree branch.
-3.5. After successful merge, emit merge event with detail "Merged to main" (skip if dashboard not running).
-4. Set `completed:` and `verdict:` in frontmatter and clear `worktree:`.
-5. Archive the entity into `{workflow_dir}/_archive/`.
-6. Remove the worktree and delete the temporary branch after successful merge or deliberate discard.
+1. Check for registered merge hooks. If any exist, set the mod-block field before invoking them:
+   `status --workflow-dir {workflow_dir} --set {slug} mod-block=merge:{mod_name}`
+   Commit: `mod-block: {slug} awaiting merge:{mod_name}`
+   If you skip this step, `status --set` and `status --archive` will refuse the terminal transition anyway — when merge hooks are registered and both `pr` and `mod-block` are empty, terminal updates (status to terminal stage, completed, verdict, worktree clear) and archival are rejected until the hook has run or set `mod-block`. The set-then-invoke pattern is still the correct flow: it tags the entity with *which* mod is blocking so a session resume can pick up where you left off.
+2. Run registered merge hooks before any local merge, archival, or status advancement.
+3. Detect hook completion by inspecting the entity's state delta after the hook runs. A hook has created a blocking condition when any of: (a) a `pr` field is now set, (b) the hook's prose instructions say to wait for captain approval and the captain has not yet responded, or (c) the hook explicitly declares an external wait. If none of these conditions hold, the hook completed without blocking.
+4. If a merge hook created a blocking condition (e.g., set a `pr` field or requires captain approval), leave `mod-block` set, report the pending state, and do not local-merge.
+5. If a merge hook completed without creating a blocking condition, clear the mod-block in its own `--set` call:
+   `status --workflow-dir {workflow_dir} --set {slug} mod-block=`
+   Commit: `mod-block: {slug} cleared ({mod_name} completed)`.
+   The clear MUST be a standalone `--set` (no terminal fields bundled in the same command) so the audit history shows the block resolving separately from terminalization. `status --set` will refuse and exit 1 if you combine `mod-block=` with any of `status={terminal}`, `completed`, `verdict`, or `worktree=` in one call — use two commits instead, or pass `--force` if the captain explicitly approved bypassing the hook.
+6. If no merge hook handled the merge, perform the default local merge from the stage worktree branch.
+7. Update frontmatter: `status --workflow-dir {workflow_dir} --set {slug} completed verdict={verdict} worktree=`
+8. Emit a `merge` event to the dashboard.
+9. Archive the entity into `{workflow_dir}/_archive/`.
+10. Remove the worktree (`git worktree remove {path}`) and delete the temporary branch (`git branch -d {branch}`). Do NOT delete the remote branch (`git push origin --delete ...`) while a PR is still pending — the PR reviewer needs that branch on the remote. Remote-branch cleanup is the PR merge's responsibility, not the FO's.
 
 ## State Management
 
-- The first officer owns YAML frontmatter on the main branch.
-- Workers do not edit frontmatter.
+- The first officer owns YAML frontmatter on the main branch (see FO Write Scope below).
 - Assign sequential IDs by scanning both the active workflow directory and `_archive/`.
 - Commit state changes at dispatch and merge boundaries.
 
+## Worktree Ownership
+
+- For worktree-backed entities, active stage/status/report/body state lives in the worktree copy.
+- `pr:` is mirrored on `main` for startup/discovery.
+- Ordinary active-state writes like `implementation -> validation` do not land on `main`.
+
+## FO Write Scope
+
+The first officer may write these on main — nothing else:
+
+- **Entity frontmatter** — via `status --set` for all field updates, including `score:` (from Brainstorm Triage gate resolution)
+- **New entity files** — seed task creation (frontmatter + brief description body)
+- **`### Feedback Cycles` section** — in entity bodies, tracking rejection rounds
+- **`## Pending Knowledge Captures` processing** — invoking `knowledge-capture` skill in `apply` mode at completion, which updates the section via the skill's own write discipline
+- **Archive moves** — relocating entity files to `{workflow_dir}/_archive/`
+- **State-transition commits** — dispatch, advance, merge boundary commits
+
+Everything else is off-limits for direct FO edits on main:
+
+- **Code files** (any language: `.py`, `.js`, `.ts`, `.sh`, etc.)
+- **Test files** (`tests/` directory and any test-related files)
+- **Mod files** (`mods/` and `_mods/`) — creating or modifying mods goes through refit or a dispatched worker. The FO *runs* mod hooks at lifecycle points but must not *write* them.
+- **Scaffolding files** (`skills/`, `agents/`, `references/`, `plugin.json`, workflow `README.md`) — already covered by the Issue Filing / scaffolding guardrail
+- **Entity body content** beyond the `### Feedback Cycles` section and `## Pending Knowledge Captures` processing — stage reports, design content, and implementation notes belong to dispatched workers
+
+If a change would affect the behavior or content of the repo beyond entity state tracking, it must go through a dispatched worker in a worktree.
+
 ## Mod Hook Convention
 
-Mods use a layered architecture with two directories:
+Mods use a **layered architecture** with two directories:
 
-- **Library** (`mods/` at repo root): Shared mod definitions available to all workflows. Contains canonical implementations (e.g., `pr-review-loop.md`, `workflow-index-maintainer.md`, `pr-merge.md`).
-- **Workflow-specific** (`{workflow_dir}/_mods/`): Per-workflow mod activation. A workflow activates a library mod by placing a copy or override in `_mods/`. Workflow mods with the same `name:` frontmatter as a library mod override the library version.
+1. **Library mods**: `mods/*.md` at the repo root — shared across all workflows in this project. Use these for cross-workflow concerns (e.g., PR review, workflow-index maintenance).
+2. **Workflow mods**: `{workflow_dir}/_mods/*.md` — workflow-specific activation and overrides.
 
-Both directories use `## Hook: {point}` headings.
+Both use `## Hook: {point}` headings.
 
 Supported lifecycle points:
 - `startup`
 - `idle`
 - `merge`
 
-Hooks are additive and run in alphabetical order by mod filename.
+**Scan and registration order** (surfaced via `status --boot` MODS section):
+- Within each directory, process files in alphabetical order.
+- Library mods run before workflow mods.
+- If a library mod and a workflow mod share the same `name:` frontmatter field, the workflow mod overrides (the library mod is skipped for that name).
+
+Hooks are additive within a lifecycle point (after override resolution). They run in the order: library (alphabetical) → workflow (alphabetical).
+
+> **Upstream divergence note.** Upstream (`clkao/spacedock`) scans only `{workflow_dir}/_mods/`. This fork preserves the layered pattern because cross-workflow mods (`pr-review-loop`, `workflow-index-maintainer`) are write-amplifying to duplicate into every workflow. A proposal to upstream this pattern is tracked separately. Until accepted, this section is fork-only.
+
+### Mod-Block Enforcement
+
+Merge hooks can create blocking conditions (e.g., requiring captain approval before pushing, waiting for a PR to merge). The FO enforces these blocks via the entity `mod-block` frontmatter field and a mechanism-level invariant in `status --set` and `status --archive`:
+
+- **Set** by the FO before invoking a merge hook: `mod-block=merge:{mod_name}`
+- **Cleared** by the FO after the hook's blocking action completes or the captain force-overrides. The clear runs in its own `--set` call — `status --set` refuses to clear `mod-block` and apply terminal fields (`status={terminal}`, `completed`, `verdict`, `worktree=`) in the same command unless `--force` is passed.
+- **Guarded** by `status --set`, which refuses terminal transitions (status to a terminal stage, completed, verdict, worktree clear) while `mod-block` is non-empty unless `--force` is passed.
+- **Enforced at the mechanism level** — independent of whether the FO set `mod-block` first, `status --set` and `status --archive` refuse terminal transitions and archival when the workflow has registered merge hooks (`mods/*.md` or `{workflow}/_mods/*.md` with `## Hook: merge`) AND `pr` is empty AND `mod-block` is empty. In that state the hook has provably not run, so terminal advancement is rejected with an error naming the hook. `--force` bypasses this check. This prevents the FO from skipping the hook even if it forgot to set `mod-block` first.
+- **Survives session resume** — the FO reads `mod-block` from entity frontmatter on boot and resumes the pending action.
 
 ## Clarification and Communication
 
@@ -406,9 +388,18 @@ Ask the human before dispatch when:
 - a design choice would change output meaningfully
 - scope is too unclear to turn into concrete criteria
 
+Do not ask the human whether to take a next step that is already allowed by this operating contract and does not require explicit human approval. In those cases, proceed.
+
 If one entity is blocked on clarification, continue dispatching other ready entities.
 
 Report workflow state once when you reach idle or a gate. Do not spam status updates while waiting.
+
+## Probe and Ideation Discipline
+
+- when checking whether tool X supports Y, read X's schema directly (via ToolSearch or equivalent runtime introspection) before greping for existing callers — usage presence is not existence evidence.
+- prefer Grep over Read for targeted entity-body inspection. When you need one section of an entity file (a `## Stage Report`, a `### Feedback Cycles` entry, or a specific frontmatter field), anchor a Grep to that heading or field name instead of reading the whole file. Read blocks of known size when you actually need the full text; avoid full-file Read as a probe.
+- on Claude Code: a `Read` followed by a Bash-driven mutation of the same file (including `status --set`) triggers the file-staleness safety net, which echoes the entire current file back as a system-reminder on the next turn. Cost scales linearly with entity body size and is billed as cache-write tokens. Grep does not participate in this tracking. The fix is to avoid the `Read` in the first place — use Grep for targeted reads and trust `status --set` stdout for mutation narration.
+- `status --set` prints one line per field in the shape `field: old -> new` on stdout. That output is sufficient to narrate the mutation without re-reading the entity file. Clear-to-empty renders as `field: old -> ` and bare-timestamp auto-fill as `field:  -> {timestamp}`.
 
 ## Channel Awareness
 
@@ -430,13 +421,8 @@ When the captain sends a message via the global channel without naming a specifi
 
 These rules are workflow-agnostic. They apply regardless of which pipeline is running. Do not embed workflow-specific keywords or slug patterns in this logic — rely on the entity state at runtime.
 
-## Scaffolding and Issue Filing
+## Issue Filing
 
-Treat these as scaffolding files:
-- `skills/`
-- `agents/`
-- `references/`
-- `plugin.json`
-- workflow `README.md` files with `commissioned-by` frontmatter
+Do not file GitHub issues without explicit human approval.
 
-Do not directly commit scaffolding changes without a tracking artifact such as a workflow task or approved issue. Do not file GitHub issues without explicit human approval.
+Scaffolding guardrail: do not commit to `skills/`, `agents/`, `references/`, `plugin.json`, or commissioned workflow `README.md` files without an explicit tracking artifact (entity, issue, or captain instruction). The FO owns no scaffolding writes on main — those go through dispatched workers in worktrees.
