@@ -869,3 +869,30 @@ issues: []
 - chore(plan): gate-enforcement-codification (110) -- research + plan + UAT spec + validation map
 - chore(index): append contracts for entity-110 entering plan (6 files via workflow-index)
 
+
+## Stage Report: execute
+
+status: passed
+waves executed: 4 (wave 0 → 1 → 2 → 3)
+tasks completed: 6 / 6 DONE
+dispatch mode: troops-dispatch (FO-direct, per-task model hints)
+
+- [x] task-0 (sonnet, wave 0): environment verify -- 8/8 AC PASS (greenfield confirmed, all target files present)
+- [x] task-1 (opus, wave 1): create skills/confidence-gate/SKILL.md -- 8/8 AC PASS (411 lines, user-invocable:false, 6 Steps, 2 Modes, iteration cap preserved, no em dash)
+- [x] task-2 (sonnet, wave 2): insert Step 6.9 in skills/build-plan/SKILL.md -- 5/5 AC PASS (unconditional Skill call, NEVER-skip rule added, step order preserved)
+- [x] task-3 (sonnet, wave 2): replace inline pre-ship gate in references/first-officer-shared-core.md -- 4/4 AC PASS (-15 lines, Skill() invocation, header preserved, inline procedure removed)
+- [x] task-4 (sonnet, wave 2): retire references/confidence-gate.md to stub -- 4/4 AC PASS (360→7 lines, stub markers present, file not deleted per D-110-4)
+- [x] task-5 (sonnet, wave 2): create pressure fixtures -- 7/7 AC PASS (both parse as YAML, weights verified, stage fields correct)
+- [x] task-6 (sonnet, wave 3): CONTRACTS.md append + MEMORY annotation -- 4/5 AC PASS (AC-4 literal mismatch: 2 occurrences instead of 1 due to plan-internal inconsistency between action block and AC; intent fully satisfied, reference present)
+
+Commits on branch spacedock-ensign/gate-enforcement-codification (6 feature commits on top of plan commits):
+- a418860 feat(confidence-gate): task-1 -- create skills/confidence-gate/SKILL.md
+- 576bec3 feat(build-plan): task-2 -- insert Step 6.9 plan confidence gate
+- b701ac6 refactor(fo-shared-core): task-3 -- replace inline pre-ship gate with skill invocation
+- 1c287d5 refactor(confidence-gate): task-4 -- retire 360-line spec to 7-line stub-redirect
+- 7d7966b test(pressure): task-5 -- add confidence-gate plan/pre-ship mode fixtures
+- (task-6 commit) chore(index): task-6 -- append contracts for 6 files + MEMORY superseded annotation
+
+BLOCKED escalations: 0
+NEEDS_CONTEXT escalations: 0
+Knowledge capture: skipped -- execute was mechanical application of plan; no new patterns surfaced beyond what clarify/plan already captured.
