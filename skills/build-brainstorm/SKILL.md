@@ -7,6 +7,8 @@ description: "Non-interactive spec distiller for /build. Takes a captain's direc
 
 You are a Mode-A/B dual-mode skill invoked by `/build`. In Mode A (Agent tool available) you dispatch 4 parallel lens subagents per invocation; in Mode B (ensign-wrapped, no Agent) you inline-fallback to single-pass. You are non-interactive to the captain in both modes. You receive a captain's directive (feature description, bugfix request, or Linear issue reference) and produce a structured brainstorming spec. You do NOT ask questions -- unclear areas get α markers that build-explore resolves later.
 
+Captain's directive + shape artifacts are *input hypothesis* for the technical approach. Build-brainstorm's job is not just to produce an APPROACH that satisfies the scope -- it is to pressure-test whether the proposed APPROACH is actually the shortest technical path to the scope's goals. A correct shape does not guarantee a correct brainstorm. If the first APPROACH candidate over-engineers (new architecture when a small refactor would do) or picks the wrong axis (solving X when the scope's real blocker is Y), emit α markers on the doubtful parts and surface ALTERNATIVES that reframe the axis. Since this skill is non-interactive, α markers + a `### Scope Expansion Detected` block are the mechanical means by which captain-facing doubts propagate to the next gate (alignment-gate / clarify).
+
 **Seven steps, in strict order. No interaction with the user at any point.**
 
 ---
@@ -243,6 +245,20 @@ Until Step 1f exists, treat this as a forward-compatibility note and always emit
 
 Produce four sections. Follow `references/alpha-marker-protocol.md` for unclear areas.
 
+### APPROACH Pressure-Test Discipline (run BEFORE finalizing APPROACH)
+
+Before committing the APPROACH paragraph to output, internally ask the following four pressure-test questions. Each question has an "uncomfortable answer" criterion; if an uncomfortable answer surfaces, α-mark the corresponding part of APPROACH / ALTERNATIVE / RATIONALE so the next gate sees the doubt. This step is the technical-axis analogue of build-shape's Step 5.5 gap-to-goal pressure test — shape pressure-tested the product axis; brainstorm pressure-tests the technical axis.
+
+1. **Minimum-change test**: Is this APPROACH the minimum technical change that satisfies `## Scope: In` (if shape present) or the directive's literal ask (if no shape)? If the APPROACH introduces new files / new skills / new abstractions / new schemas that are not explicitly demanded by Scope: In, α-mark the APPROACH: `(α: minimum-change doubt -- introduces {new abstraction} beyond Scope: In; deferred to explore/clarify)`.
+
+2. **Half-scope test**: "If I had to cut this APPROACH in half, what would I drop first? Are those drops actually Scope: Out items in disguise?" Answer the question internally. If the drops overlap with Scope: Out (or with natural scope-boundary items when no shape exists), those drops should be excluded from APPROACH now, not later. Rewrite APPROACH to exclude them before emitting.
+
+3. **Axis test**: Does ALTERNATIVE explore a genuinely different axis, or is it just a minor variation of APPROACH (same files, same layer, different parameters)? Genuinely different axes include: (a) reuse-existing-primitive vs build-new, (b) push-upstream vs fork-local, (c) defer-to-later-entity vs ship-now, (d) data-model-change vs UI-only-change. If ALTERNATIVE is a minor variation, α-mark ALTERNATIVE: `(α: axis-doubt -- ALTERNATIVE not axis-distinct from APPROACH; deferred to explore/clarify)` and attempt to surface a truly different axis ALTERNATIVE before emitting.
+
+4. **Rationale-vs-alternative test**: Does RATIONALE explain *why this over ALTERNATIVE*, not just *why this*? A RATIONALE that argues only for APPROACH without referencing ALTERNATIVE's rejection reason is a weak rationale. Per the existing rule, NEVER α-mark RATIONALE — instead, rewrite it to explicitly contrast with D-01's rejection reason. If you cannot, the ALTERNATIVE is not actually distinct (see test 3).
+
+Use α markers liberally for "this might be over-scoped" doubts. The cost of an α marker is one clarify-stage question; the cost of a silently-clever over-engineered APPROACH is a full execute-stage cycle.
+
 ### APPROACH
 
 1 paragraph. The most likely interpretation of the directive and how to implement it.
@@ -250,6 +266,7 @@ Produce four sections. Follow `references/alpha-marker-protocol.md` for unclear 
 - If the directive describes *what* but not *how*: commit to an approach anyway, then α-mark it: `(needs clarification -- deferred to explore)`
 - If 2+ viable approaches exist but one is clearly better: pick it, record alternatives in ALTERNATIVE
 - If truly ambiguous with no clear winner: α-mark
+- If the pressure-test discipline above surfaced uncomfortable answers, carry forward the α markers emitted there.
 
 ### ALTERNATIVE
 
@@ -272,6 +289,28 @@ If genuinely no constraints found: `Checked -- no notable constraints identified
 1 paragraph. Why APPROACH was chosen over ALTERNATIVE.
 
 **NEVER α-mark RATIONALE.** If the rationale is weak, improve the approach or alternatives -- do not defer.
+
+### Scope Expansion Detection
+
+After APPROACH / ALTERNATIVE / GUARDRAILS / RATIONALE are drafted, scan APPROACH (and GUARDRAILS) for work that exceeds the captain's stated scope. Since this skill is non-interactive, the mechanism is a structured subsection that forces captain attention at the next gate (alignment-gate or clarify), plus α markers on affected sections.
+
+**Expansion signals** (any one triggers):
+
+- APPROACH references **new files** not mentioned in directive or Scope: In (greenfield creation rather than edit-existing).
+- APPROACH references **new skills / new agents / new abstractions** not mentioned in directive or Scope: In.
+- APPROACH references **new schema fields / new manifest entries / new config keys** not mentioned in directive or Scope: In.
+- APPROACH spans a **layer or subsystem** not referenced in Scope: In (e.g., scope mentions UI, APPROACH touches backend contracts).
+- GUARDRAILS include constraints that only matter because APPROACH expanded beyond scope (self-inflicted guardrails).
+
+**Action when ≥1 signal fires**:
+
+1. Emit a `### Scope Expansion Detected` subsection inside `## Brainstorming Spec`, immediately after RATIONALE, listing each expansion as a bullet in the form `- {expansion item} -- rationale: {why APPROACH needed it}`.
+2. α-mark the affected APPROACH sentences / GUARDRAILS bullets with `(α: scope-expansion -- {item}; captain review at next gate)`.
+3. Do NOT self-trim the expansion. The expansion may be genuinely necessary; captain (or alignment-gate) decides whether to approve or trim. Brainstorm's job is to surface, not decide.
+
+**Action when zero signals fire**: omit the `### Scope Expansion Detected` subsection entirely (do not emit an empty header).
+
+Captain reviewing the brainstorm output at alignment-gate or clarify sees the subsection and either (a) approves the expansion (shape was under-scoped; update scope), (b) trims APPROACH back to Scope: In, or (c) decomposes the expansion into a sibling entity.
 
 ---
 
@@ -341,12 +380,14 @@ Scan the directive for large-scope signals. This is O(1) -- pure text analysis, 
 
 Before returning output, verify quality:
 
-1. **α marker count**: Count all `(needs clarification -- deferred to explore)` markers. If >3, prepend warning: `⚠️ High uncertainty: {n} α markers. Consider providing more detail in the directive.`
+1. **α marker count**: Count all `(needs clarification -- deferred to explore)` AND `(α: ...)` markers. If >3, prepend warning: `⚠️ High uncertainty: {n} α markers. Consider providing more detail in the directive.`
 2. **Goal Check present and well-formed**: Verify the `## Goal Check` block (a) exists, (b) ≤150 words, (c) one-sentence restatement is NOT α-marked, (d) contains all three bullets (problem / expected outcome / non-goals), (e) reads as product-level plain language (no file paths, no library names).
 3. **Goal Check vs APPROACH alignment**: Verify APPROACH serves the "expected outcome" stated in Goal Check. If APPROACH drifts outside Goal Check's problem framing or touches declared non-goals, rewrite APPROACH (not Goal Check — directive is source of truth).
-4. **APPROACH vs ALTERNATIVE**: Verify they are genuinely different approaches, not rephrased versions of the same idea
+4. **APPROACH vs ALTERNATIVE axis-distinctness**: Verify they explore genuinely different axes (not rephrased versions of the same idea). If not axis-distinct, per Step 3 pressure-test question 3, α-mark ALTERNATIVE.
 5. **Acceptance Criteria**: Verify each criterion is testable (has a concrete verification method, not vague language)
 6. **GUARDRAILS vs APPROACH**: Verify guardrails don't contradict the chosen approach
+7. **Scope Expansion Detection ran**: Verify Step 3's Scope Expansion Detection scan was performed. If ≥1 expansion signal fired, verify a `### Scope Expansion Detected` subsection exists inside `## Brainstorming Spec`, listing each expansion with rationale, AND that affected APPROACH/GUARDRAILS items carry `(α: scope-expansion -- ...)` markers. If zero signals fired, verify the subsection is omitted entirely (not emitted empty).
+8. **Pressure-test discipline applied**: Verify the four Step 3 pressure-test questions were internally answered. If any surfaced uncomfortable answers, verify corresponding α markers landed on APPROACH / ALTERNATIVE (RATIONALE is never α-marked — rewrite instead).
 
 If any check fails, fix inline before returning. Do not flag to the user -- fix it yourself.
 
@@ -459,6 +500,13 @@ You are asking for {one-sentence plain-language restatement of the directive's c
 
 **RATIONALE**: {paragraph}
 
+### Scope Expansion Detected
+
+(Emit this subsection ONLY if ≥1 expansion signal fired in Step 3's detection scan. Omit entirely otherwise — do not emit an empty header.)
+
+- {expansion item} -- rationale: {why APPROACH needed it}
+- ...
+
 ## Acceptance Criteria
 
 - {criterion} (how to verify: {method})
@@ -476,6 +524,8 @@ You are asking for {one-sentence plain-language restatement of the directive's c
 - **File-read cap: 9.** Raised from 5 to accommodate 4 lenses × up to 2 files each + 1 INDEX/CONTRACTS lookup per invocation. Every other read-budget assumption identical to v1.
 - **Preserve the directive verbatim** in the `## Directive` section. Do not rephrase, summarize, or "improve" it.
 - **Use `--` (double dash)** in α markers for grep compatibility: `(needs clarification -- deferred to explore)`. Never use `—` (em dash).
+- **NEVER skip the Step 3 APPROACH pressure-test discipline.** Captain's directive + shape are initial hypothesis. Producing an APPROACH that merely satisfies the scope without pressure-testing whether it is the shortest technical path re-introduces the over-engineering failure mode that shape's Step 5.5 guards against on the product axis. The four pressure-test questions are mandatory; emit α markers liberally on uncomfortable answers.
+- **NEVER suppress Scope Expansion Detected.** If ≥1 expansion signal fires per Step 3's detection scan, the `### Scope Expansion Detected` subsection MUST appear and affected items MUST carry `(α: scope-expansion -- ...)` markers. Self-trimming the expansion silently is forbidden — captain decides at the next gate whether to approve, trim, or decompose.
 
 ---
 
