@@ -35,7 +35,7 @@ interface CommentPanelProps {
   repliesByParent: Record<string, CommentRow[]>;
   sectionHeadings: string[];
   entitySlug: string;
-  onCommentAdded: () => void;
+  onCommentAdded: (comment: CommentRow) => void;
   onScrollToHighlight?: (commentId: string) => void;
   suggestionsByComment?: Record<string, SuggestionRow[]>;
 }
@@ -49,8 +49,8 @@ export function CommentPanel({
   onScrollToHighlight,
   suggestionsByComment = {},
 }: CommentPanelProps) {
-  function handleCommentAdded() {
-    onCommentAdded();
+  function handleCommentAdded(newComment: CommentRow) {
+    onCommentAdded(newComment);
   }
 
   const totalCount = Object.values(commentsBySection).reduce((sum, arr) => sum + arr.length, 0);

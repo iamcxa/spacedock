@@ -5,7 +5,7 @@
 // state, renders two-column grid layout with EntityBody (left) and CommentPanel (right).
 
 import { useRouter } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CommentPanel } from "@/components/comment-panel";
 import { EntityBody } from "@/components/entity-body";
 
@@ -53,11 +53,27 @@ export function EntityDetailClient({
   autoAdvance,
 }: EntityDetailClientProps) {
   const router = useRouter();
-  const commentsBySection = buildCommentsBySection(commentRows);
+  const [optimisticComments, setOptimisticComments] = useState<CommentRow[]>([]);
 
-  const handleCommentAdded = useCallback(() => {
-    router.refresh();
-  }, [router]);
+  // Prune optimistic entries already present in server data
+  useEffect(() => {
+    const serverIds = new Set(commentRows.map((c) => c.commentId));
+    setOptimisticComments((prev) => prev.filter((c) => !serverIds.has(c.commentId)));
+  }, [commentRows]);
+
+  // Merge server data + optimistic additions (not yet in server)
+  const allComments = [...commentRows, ...optimisticComments];
+  const commentsBySection = buildCommentsBySection(allComments);
+
+  const handleCommentAdded = useCallback(
+    (newComment: CommentRow) => {
+      // Optimistic: instant UI update
+      setOptimisticComments((prev) => [...prev, newComment]);
+      // Background sync: server catches up, optimistic entries deduplicate on next nav
+      router.refresh();
+    },
+    [router],
+  );
 
   const scrollToHighlight = useCallback((commentId: string) => {
     const marks = document.querySelectorAll(".comment-highlight");

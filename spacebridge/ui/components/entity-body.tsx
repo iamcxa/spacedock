@@ -28,7 +28,7 @@ interface EntityBodyProps {
   sectionHeadings: string[];
   allComments: CommentRow[];
   entitySlug: string;
-  onCommentAdded?: () => void;
+  onCommentAdded?: (comment: CommentRow) => void;
   /** Frontmatter status — used to conditionally show gate buttons */
   status?: string;
   /** Frontmatter auto_advance — when true, gate buttons are hidden (FO auto-advances) */
