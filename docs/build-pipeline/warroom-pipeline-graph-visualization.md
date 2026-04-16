@@ -1,7 +1,7 @@
 ---
 id: 094
 title: "War room pipeline graph — stage visualization + mod hooks"
-status: plan
+status: execute
 context_status: ready
 source: /build
 created: 2026-04-14T12:00:00+08:00
