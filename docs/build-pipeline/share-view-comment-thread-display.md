@@ -2,9 +2,8 @@
 id: 111
 title: Share View Comment Thread Display -- Restore Read-Only Comment Threads on Share Path
 status: draft
-context_status: blocked
-blocked-until: spacebridge-cutover-shape-resolved
-park-reason: "Captain 2026-04-16 — defer to entity 060 cutover shape work. 111 may be folded into 060's children list as a parity item rather than standalone, depending on shape's UX/parity matrix output. Don't continue SO until shape decides ownership."
+context_status: pending
+parent: 060
 source: entity 097 clarify handoff (2026-04-15 SO Q-2 captain decision — O-2a regression reframe)
 created: 2026-04-15T18:00:00+08:00
 started:
