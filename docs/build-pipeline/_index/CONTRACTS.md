@@ -932,6 +932,13 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | War room Server Component -- fetches entities + leases, passes to WarRoom | 🔵 planned | 2026-04-13 |
+| warroom-pipeline-graph-visualization | plan | Add pipeline stage parsing, entity count grouping, mod hook parsing | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/app/entity/[slug]/page.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| warroom-pipeline-graph-visualization | plan | Fix multi-session entity routing -- scan all projectRoots | 🔵 planned | 2026-04-16 |
 
 ### spacebridge/ui/bun.lock
 
@@ -962,6 +969,13 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | Live feed Client Component -- EventSource consumer, newest-first, auto-scroll to top | 🔵 planned | 2026-04-13 |
+| warroom-pipeline-graph-visualization | plan | Refactor to consume shared SSE context instead of own EventSource | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/components/pipeline-graph.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| warroom-pipeline-graph-visualization | plan | Pipeline graph SVG Client Component -- stage nodes, edges, badges, click-to-filter | 🔵 planned | 2026-04-16 |
 
 ### spacebridge/ui/components/repo-section.tsx
 
@@ -1028,6 +1042,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | War room Client Component -- Tabs (All + per-repo), two-column layout w/ LiveFeed | 🔵 planned | 2026-04-13 |
+| warroom-pipeline-graph-visualization | plan | Add PipelineGraph + SSEProvider + stage filter via useSearchParams | 🔵 planned | 2026-04-16 |
 
 ### spacebridge/ui/lib/db.test.ts
 
@@ -1064,6 +1079,30 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | Scan docs/build-pipeline/*.md per projectRoot, return EntityCard[] | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/lib/pipeline-parse.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| warroom-pipeline-graph-visualization | plan | Tests for parsePipelineStages and parseModHooks | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/lib/pipeline-parse.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| warroom-pipeline-graph-visualization | plan | Port parseStagesBlock + parseModHooks for pipeline graph | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/lib/sse-context.test.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| warroom-pipeline-graph-visualization | plan | Tests for SSEProvider and useSSE hook | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/lib/sse-context.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| warroom-pipeline-graph-visualization | plan | Shared SSE context provider -- single EventSource for LiveFeed + PipelineGraph | 🔵 planned | 2026-04-16 |
 
 ### spacebridge/ui/lib/utils.ts
 
