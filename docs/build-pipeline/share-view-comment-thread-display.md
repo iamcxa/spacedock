@@ -1,8 +1,8 @@
 ---
 id: 111
 title: Share View Comment Thread Display -- Restore Read-Only Comment Threads on Share Path
-status: brainstorm
-context_status: pending
+status: explore
+context_status: awaiting-clarify
 source: entity 097 clarify handoff (2026-04-15 SO Q-2 captain decision — O-2a regression reframe)
 created: 2026-04-15T18:00:00+08:00
 started:
@@ -102,6 +102,8 @@ You are asking for guest users visiting the share URL to see comment threads rea
 
 **ALTERNATIVE**: Create a new dedicated `<ShareCommentPanel>` component duplicating CommentPanel's rendering logic minus AddCommentForm -- D-01 rejected: code duplication; drift risk when CommentPanel evolves (119 A-9 sets CommentPanel ownership in auth path; a separate Share variant forks maintenance); `readOnly` prop reuses proven implementation and keeps the auth vs guest separation as a boolean flag rather than a forked component tree. 093's "design separation" is preserved because the flag prop is explicit.
 
+(⚠ contradicted by explore: APPROACH line "MUST consume 054's `GET /api/entities/[slug]/comments`" is imprecise -- middleware.ts:74-100 shows that endpoint is NOT a share route, so guests cannot hit it via share-token. Actual fetch path is server-side RSC SQL query in share page.tsx:102-117, which already works. Correction recorded in A-1.)
+
 **GUARDRAILS**:
 - MUST NOT touch `ShareCommentForm` (guest submit ships today; 097 constraint)
 - MUST NOT regress 097 B-3 CSS fix at `share-live-feed.tsx:81` Tailwind `truncate`
@@ -121,6 +123,118 @@ You are asking for guest users visiting the share URL to see comment threads rea
 - Given CommentPanel's new `readOnly` prop, when `readOnly=true`, then AddCommentForm is not rendered; when `readOnly=false` or undefined, existing authenticated behavior is unchanged (how to verify: bun test on `comment-panel.test.tsx` asserting conditional render; snapshot-diff for auth path unchanged).
 - Given 119 A-9's right-panel placement contract, when 111 mounts CommentPanel on share page, then the grid layout mirrors `entity-detail-client.tsx:91-114` 7fr/3fr structure (how to verify: grep share page.tsx for `grid-cols-[7fr_3fr]` or equivalent Tailwind class matching entity-detail-client pattern).
 
+## Assumptions
+
+A-1: Comment data fetch for share view stays server-side in `spacebridge/ui/app/share/[token]/page.tsx` via the existing `entityPath`-filtered SQL query (page.tsx:102-117); CommentPanel receives already-fetched `commentRows` as props. The share-token middleware does NOT need to pass through to `/api/entities/[slug]/comments` because fetch is RSC-server-side, bypassing middleware entirely.
+
+Confidence: Confident (0.95)
+
+Evidence: spacebridge/ui/app/share/[token]/page.tsx:102-117 -- existing server-side query [primary]; spacebridge/ui/middleware.ts:74-100 -- middleware only injects x-share-token on `/share/*` and `/api/share/*` routes; `/api/entities/[slug]/comments` is NOT a share route [primary]; brainstorm APPROACH mis-cited `GET /api/entities/[slug]/comments` as the fetch path -- corrected to server-side RSC query [primary].
+
+A-2: CommentPanel's prop type gains `readOnly?: boolean` (optional, default `false` preserves auth-path backward compatibility). When `readOnly=true`, the AddCommentForm at comment-panel.tsx:135-139 is conditionally not rendered.
+
+Confidence: Confident (0.95)
+
+Evidence: spacebridge/ui/components/comment-panel.tsx:24-31 -- current CommentPanelProps interface [primary]; spacebridge/ui/components/comment-panel.tsx:135-139 -- AddCommentForm render site [primary]; 119 A-9 contract "CommentPanel stays on right" [primary].
+
+A-3: Grouping logic -- `commentsBySection` + `repliesByParent` + `sectionHeadings` -- runs in share page.tsx before passing to CommentPanel, mirroring `entity-detail-client.tsx:91-114`. Either inlined or extracted as a shared util.
+
+Confidence: Likely (0.75)
+
+Evidence: spacebridge/ui/components/entity-detail-client.tsx:91-114 -- existing grouping pattern in auth path [primary]; share page.tsx:157-171 -- current share layout with commentRows flat array but no grouping step [primary]; grouping util extraction candidate not yet verified [tertiary].
+
+A-4: CommentPanel's internal `useState(initialCommentsBySection)` at comment-panel.tsx:41 + `handleCommentAdded` wrapper at :43-50 is the SOLE mutation path at panel level; disabling AddCommentForm via `readOnly` prop implicitly renders `handleCommentAdded` dead code in read-only mode. No additional guard needed at panel level.
+
+Confidence: Confident (0.92)
+
+Evidence: spacebridge/ui/components/comment-panel.tsx:41-50 -- full mutation path traced [primary]; comment-panel.tsx:135-139 -- AddCommentForm is the only caller of handleCommentAdded via onCommentAdded prop [primary]; note: CommentThread child may have its own mutation paths (reply/resolve) requiring separate readOnly cascade -- see Q-2 [secondary].
+
+A-5: `onCommentAdded` callback stays optional at the CommentPanelProps interface level; read-only share page omits it safely. In readOnly mode, panel's internal `handleCommentAdded` wrapper is also unused (Lens c cross-check: AddCommentForm is the only caller).
+
+Confidence: Confident (0.95)
+
+Evidence: spacebridge/ui/components/comment-panel.tsx:29 -- `onCommentAdded: (comment: CommentRow) => void` currently required [primary] (must be made optional or default no-op); spacebridge/ui/components/entity-body.tsx:174-185 -- EntityBody precedent of omitting onCommentAdded in share context [primary].
+
+A-6: Share page layout adopts 7fr/3fr grid structure matching `entity-detail-client.tsx:91-114` for CommentPanel right-column placement; existing 3-col grid containing `ShareLiveFeed` + `ShareCommentForm` is restructured to accommodate, either by repositioning ShareLiveFeed/ShareCommentForm below CommentPanel or by moving them to a different column.
+
+Confidence: Likely (0.70)
+
+Evidence: spacebridge/ui/app/share/[token]/page.tsx:157-171 -- current 3-col layout (assumed based on brainstorm Lens c finding; exact grid class pattern not directly inspected in this session) [primary]; entity-detail-client.tsx:91-114 -- 7fr/3fr reference [primary]; 119 A-9 pins right-panel placement as canonical pattern [primary].
+
+## Option Comparisons
+
+### O-1: `readOnly` implementation mechanism inside CommentPanel
+
+How exactly does `readOnly=true` suppress the mutation surface?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|--------|------|------|------------|----------------|
+| (a) Conditional render: `{!readOnly && <AddCommentForm .../>}` at line 135 | Simplest; eliminates entire mutation surface AND hides UI; no form state to manage | CommentThread child reply/resolve actions need their own readOnly cascade (Q-2) | Low | ✅ Recommended |
+| (b) Render AddCommentForm always; disable inputs + submit button when readOnly | Keeps DOM consistent between auth/share paths for snapshot testing | Visual clutter (disabled form); wasted DOM; still requires CommentThread cascade; user sees grey-out which looks broken | Low | Viable |
+| (c) Extract AddCommentForm out of CommentPanel; share page mounts CommentPanel without AddCommentForm alongside | Cleanest separation; no flag prop; leaves CommentPanel mutation-free | Breaking change to CommentPanel API; forces auth path to also restructure; largest diff surface; drifts from 119 A-9 "right-panel single component" model | Medium | Not recommended |
+
+Return value trace: (a) `readOnly ? null : <AddCommentForm ... onCommentAdded={handleCommentAdded} />` — if readOnly true, `handleCommentAdded` is never called, `setCommentsBySection` is never called, mutation path is dead code. (b) form stays in tree with `disabled` on all inputs; a motivated guest could DevTools-edit around it (security moot but confusing). (c) breaks 119 A-9 right-panel contract.
+
+### O-2: `.comment-highlight` tokenization scope
+
+How should the hardcoded `rgba(255, 212, 0, ...)` at globals.css:66 be handled?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|--------|------|------|------------|----------------|
+| (a) Token-ify inside 111 (single-line change) | Closes 117-compat gap in-scope; minimal diff; consistent with 119 A-7 guardrail "consume 117 tokens" | Requires confirming 117's tokens.css defines a matching semantic token name (Q-1) | Low | ✅ Recommended (pending Q-1) |
+| (b) Defer to a 117 compatibility sweep as separate entity | Keeps 111 scope razor-tight; 117 owns its own cleanup | globals.css:66 stays as tech-debt; another cycle before 060 cutover is unblocked | None | Viable |
+| (c) Keep hardcoded rgba, annotate as known 117 gap | No scope creep | Violates 119 A-7 precedent / 117 depends-on just added to frontmatter | None | Not recommended |
+
+Return value trace: (a) one `var(--color-highlight-...)` substitution; testable via snapshot diff. (b) 111 frontmatter `depends-on: [097, 117]` remains meaningful via tests that consume 117 tokens elsewhere; globals.css sweep becomes entity 123+. (c) leaves hardcoded style; regresses 117 consumption contract.
+
+### O-3: Share page layout integration strategy
+
+How does CommentPanel integrate with existing share page 3-col structure?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|--------|------|------|------------|----------------|
+| (a) Adopt 7fr/3fr like entity-detail-client.tsx; ShareLiveFeed + ShareCommentForm stack below or alongside | Matches 119 A-9 pattern exactly; reuses auth-path muscle memory | ShareLiveFeed and ShareCommentForm need repositioning; CSS merge risk with 097 B-3 truncate fix at share-live-feed.tsx:81 | Medium | ✅ Recommended |
+| (b) Add CommentPanel as 4th column in existing grid | Minimal disruption to existing layout; 097 B-3 fix untouched | 4-col grid at viewport widths below 1400px is cramped; mobile regresses | Low | Viable |
+| (c) Collapsible sidebar pattern (CommentPanel as drawer) | Mobile-friendly; viewport-agile | Net-new UX pattern; violates "do not introduce new UX" GUARDRAIL | High | Not recommended |
+
+Return value trace: (a) ShareLiveFeed row absorbs full width below; 097 B-3's `truncate` class on share-live-feed.tsx:81 stays intact (CSS layer untouched, only grid parent changes). (b) 4-col loses readability at 1280px. (c) net-new drawer component violates brainstorm GUARDRAIL "MUST NOT introduce new comment UX patterns".
+
+## Open Questions
+
+Q-1: Does 117's `tokens.css` already define a semantic highlight-background token suitable for `.comment-highlight`?
+
+Domain: Readable/Textual (design token inventory)
+
+Why it matters: O-2 recommendation (a) depends on this. If 117 has a matching token (e.g. `--color-highlight-bg` or `--color-warning-soft`), the fix is a single-line `var()` substitution. If not, 111 must propose a new token to 117 OR downgrade O-2 to option (b).
+
+Suggested options:
+- (a) Check 117's current `tokens.css` file contents; if a suitable token exists, land token-ification in 111 per O-2a
+- (b) If no suitable token, defer to 117 compat sweep (O-2b) or add a new token proposal inside 111 (creates 117 cross-entity dependency)
+- (c) Open-ended -- captain decides whether 111 can propose new tokens to 117
+
+Q-2: Does CommentThread child component have its own mutation paths (reply, resolve, unresolve) that also need readOnly cascade?
+
+Domain: Behavioral/Callable (mutation path completeness)
+
+Why it matters: A-4 traced CommentPanel-level mutation to AddCommentForm only. But CommentThread at comment-panel.tsx:92, :123 may POST to `/api/entities/[slug]/comments/[id]/reply` or `/resolve` — those routes exist per `find` output. If CommentThread has submit controls, readOnly=true must cascade `readOnly` prop through CommentThread to hide/disable reply and resolve buttons.
+
+Suggested options:
+- (a) Cascade readOnly prop through CommentThread → reply + resolve actions hidden or disabled
+- (b) Trust middleware + share-token — reply/resolve endpoints are NOT share routes, so POSTs would 401 anyway; leave UI visible but clicks fail silently
+- (c) Verify CommentThread implementation before deciding (explore partial trace; read CommentThread.tsx end-to-end)
+
+Q-3: Is there a risk that share page's server-side comment fetch exposes authorization-sensitive fields (e.g. `author`, `resolvedReason`) that legitimate guests should NOT see?
+
+Domain: Behavioral/Callable (authorization boundary)
+
+Why it matters: share page.tsx:102-117 uses a direct SQL query filtered by `entityPath`; there's no column-level filtering or PII scrubbing. If a comment's `author` is the captain's full name or `resolvedReason` contains sensitive text, external guests see them. May require field-level filtering before passing to CommentPanel.
+
+Suggested options:
+- (a) Add a guest-facing projection: only send `commentId, selectedText, sectionHeading, content, parentId, createdAt, resolved` (omit `author` + `resolvedReason`)
+- (b) Send all fields; guests seeing author name is acceptable (internal/trusted collaborators only)
+- (c) Defer to 060 US-6 "External Consumer" scope -- captain's model may already accept full visibility
+- Open-ended -- captain decides
+
 ## Stage Report: brainstorm
 
 - [x] Lens (a) captain-stated-intent dispatched (Mode A) -- 6 directive:verbatim claims, all [primary]/[secondary]
@@ -136,3 +250,21 @@ You are asking for guest users visiting the share URL to see comment threads rea
 - [x] Alignment gate: continue (0 retries) -- APPROACH serves Goal Check expected outcome; no drift
 - [x] α marker count: 1 (well under warning threshold of 3) -- globals.css tokenization scope deferred to explore
 - alignment_confidence: 1.0
+
+## Stage Report: explore
+
+- [x] Files mapped: 6 across view + contract + style layers
+  view: 4 (share/[token]/page.tsx, components/comment-panel.tsx, components/add-comment-form.tsx, components/comment-thread.tsx referenced); contract: 1 (middleware.ts — share-token routing); style: 1 (globals.css:66 highlight color)
+- [x] Assumptions formed: 6 (Confident: 4, Likely: 2, Unclear: 0)
+  A-1 server-side fetch + middleware bypass (Confident); A-2 readOnly prop shape (Confident); A-3 grouping location (Likely); A-4 single mutation path traced (Confident); A-5 onCommentAdded optional (Confident); A-6 7fr/3fr layout adoption (Likely)
+- [x] Options surfaced: 3
+  O-1 readOnly mechanism (conditional render recommended); O-2 globals.css token-ify scope (in-111 recommended pending Q-1); O-3 layout integration (7fr/3fr recommended)
+- [x] Questions generated: 3
+  Q-1 117 tokens.css highlight-bg semantic token availability (determines O-2 viability); Q-2 CommentThread reply/resolve readOnly cascade; Q-3 guest PII exposure in comment fields (author / resolvedReason)
+- [x] α markers resolved: 0 / 1
+  α-1 "globals.css tokenization scope" remains open -- promoted to O-2 as Option Comparison (and Q-1 as its gate) rather than auto-resolved, per hybrid heuristic
+- [x] Scale assessment: keep Medium (6 files; upper edge of Small, frontmatter Medium stays)
+  Brainstorm APPROACH was contradicted on fetch path; corrected in A-1 -- no scale impact. Decomposition NOT recommended: no scope flag, single scope area.
+- [x] Research dispatched: 0 researchers (skipped -- no external tech claims; all assumptions consume internal Spacebridge / 117 token surface)
+- ⚠ ensign-mode inline fallback -- 4-angle quality not achieved this invocation
+  Mode B selected (SO-direct with >50% file surface covered in brainstorm Lens (c)+(d)); angles (i)+(ii)+(iii) covered inline via brainstorm lens data + direct reads of middleware.ts, comment-panel.tsx full, 097 archive for Q-2 decision. Angle (iv) negative-space seed-driven verification not run; Q-2/Q-3 captain escalation substitutes.
