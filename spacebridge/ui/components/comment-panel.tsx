@@ -3,7 +3,6 @@
 // Shows all comments grouped by section with independent ScrollArea scrolling.
 // Each comment card has id="comment-{commentId}" for scroll-to-comment from highlights.
 
-import { useState } from "react";
 import { AddCommentForm } from "@/components/add-comment-form";
 import { CommentThread } from "@/components/comment-thread";
 import { Badge } from "@/components/ui/badge";
@@ -36,13 +35,13 @@ interface CommentPanelProps {
   repliesByParent: Record<string, CommentRow[]>;
   sectionHeadings: string[];
   entitySlug: string;
-  onCommentAdded: (comment: CommentRow) => void;
+  onCommentAdded: () => void;
   onScrollToHighlight?: (commentId: string) => void;
   suggestionsByComment?: Record<string, SuggestionRow[]>;
 }
 
 export function CommentPanel({
-  commentsBySection: initialCommentsBySection,
+  commentsBySection,
   repliesByParent,
   sectionHeadings,
   entitySlug,
@@ -50,15 +49,8 @@ export function CommentPanel({
   onScrollToHighlight,
   suggestionsByComment = {},
 }: CommentPanelProps) {
-  const [commentsBySection, setCommentsBySection] = useState(initialCommentsBySection);
-
-  function handleCommentAdded(newComment: CommentRow) {
-    const section = newComment.sectionHeading;
-    setCommentsBySection((prev) => ({
-      ...prev,
-      [section]: [...(prev[section] ?? []), newComment],
-    }));
-    onCommentAdded(newComment);
+  function handleCommentAdded() {
+    onCommentAdded();
   }
 
   const totalCount = Object.values(commentsBySection).reduce((sum, arr) => sum + arr.length, 0);

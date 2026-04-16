@@ -8,22 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 
-interface CommentRow {
-  commentId: string;
-  selectedText: string;
-  sectionHeading: string;
-  content: string;
-  author: string;
-  parentId: string | null;
-  createdAt: number;
-  resolved: number;
-  resolvedReason: string | null;
-}
-
 interface AddCommentFormProps {
   entitySlug: string;
   sectionHeadings: string[];
-  onCommentAdded?: (comment: CommentRow) => void;
+  onCommentAdded?: () => void;
 }
 
 export function AddCommentForm({
@@ -43,7 +31,6 @@ export function AddCommentForm({
     setError(null);
 
     const trimmedContent = content.trim();
-    const now = Date.now();
 
     try {
       const res = await fetch(`/api/entities/${entitySlug}/comments`, {
@@ -61,19 +48,8 @@ export function AddCommentForm({
         const data = await res.json().catch(() => ({}));
         setError((data as { error?: string }).error ?? "Failed to submit comment");
       } else {
-        const data = await res.json().catch(() => ({}));
         setContent("");
-        onCommentAdded?.({
-          commentId: (data as { commentId?: string }).commentId ?? crypto.randomUUID(),
-          selectedText: "",
-          sectionHeading: section,
-          content: trimmedContent,
-          author: "captain",
-          parentId: null,
-          createdAt: now,
-          resolved: 0,
-          resolvedReason: null,
-        });
+        onCommentAdded?.();
       }
     } catch {
       setError("Network error — please try again");

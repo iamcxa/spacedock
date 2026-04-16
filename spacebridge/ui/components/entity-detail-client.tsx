@@ -5,7 +5,7 @@
 // state, renders two-column grid layout with EntityBody (left) and CommentPanel (right).
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { CommentPanel } from "@/components/comment-panel";
 import { EntityBody } from "@/components/entity-body";
 
@@ -53,21 +53,11 @@ export function EntityDetailClient({
   autoAdvance,
 }: EntityDetailClientProps) {
   const router = useRouter();
-  const [commentsBySection, setCommentsBySection] = useState(() =>
-    buildCommentsBySection(commentRows),
-  );
+  const commentsBySection = buildCommentsBySection(commentRows);
 
-  const handleCommentAdded = useCallback(
-    (newComment: CommentRow) => {
-      const key = newComment.sectionHeading;
-      setCommentsBySection((prev) => ({
-        ...prev,
-        [key]: [...(prev[key] ?? []), newComment],
-      }));
-      router.refresh();
-    },
-    [router],
-  );
+  const handleCommentAdded = useCallback(() => {
+    router.refresh();
+  }, [router]);
 
   const scrollToHighlight = useCallback((commentId: string) => {
     const marks = document.querySelectorAll(".comment-highlight");
