@@ -1,0 +1,40 @@
+upgrade_session: 2026-04-16-clkao-sync
+upstream_sha: clkao/main
+fork_sha: origin/main
+merge_base: 2325264fefac21cebd43cd7b255cdc7a5ac1c8e5
+
+drifted_artifacts:
+  - consumer_skill: skills/first-officer
+    drift_files:
+      - references/first-officer-shared-core.md  # NOTE: upstream moved to skills/first-officer/references/
+      - skills/first-officer/SKILL.md
+    structural_changes:
+      upstream_added_sections:
+        - Worktree Ownership
+        - FO Write Scope
+        - Probe and Ideation Discipline
+      fork_added_sections:
+        - Event Emission
+        - Effective Stages
+        - Brainstorm Triage
+        - Channel Awareness
+      path_reorg:
+        from: references/first-officer-shared-core.md
+        to: skills/first-officer/references/first-officer-shared-core.md
+    patch_intent: feature_add  # captain to confirm; each fork section is a load-bearing feature
+    characterize_priority: high
+    merge_strategy: overlay  # do NOT textual merge; characterize upstream, re-apply fork sections as overlays
+
+pending_characterization:
+  - skill: skills/first-officer
+    scenarios: [startup, dispatch, feedback-rejection]
+    goldens_dir: goldens/first-officer/
+
+workflow_validation_findings:
+  - path_reorg_hazard: |
+      Upstream moved root references/ into skill-local references/. Triage classifier
+      MUST detect file moves, not just content diff. Add to Gray Area 7 scope.
+  - textual_merge_infeasible: |
+      Structural diff shows 7 sections disjoint (3 upstream-only, 4 fork-only).
+      Three-way merge would produce section-order noise + behavioral incoherence.
+      Confirms characterize-then-overlay strategy is correct.
