@@ -1,15 +1,15 @@
 ---
 id: 094
 title: "War room pipeline graph — stage visualization + mod hooks"
-status: clarify
+status: plan
 context_status: ready
 source: /build
 created: 2026-04-14T12:00:00+08:00
-started:
+started: 2026-04-16T00:00:00+08:00
 completed:
 verdict:
 score:
-worktree:
+worktree: .worktrees/spacedock-ensign-warroom-pipeline-graph-visualization
 issue:
 pr:
 intent: feature

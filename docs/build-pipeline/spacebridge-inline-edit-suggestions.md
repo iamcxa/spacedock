@@ -1,14 +1,14 @@
 ---
 id: 089
 title: "Inline edit suggestions (comments parity part 2)"
-status: clarify
+status: plan
 context_status: ready
 source: entity 054 O-2 deferral (2026-04-13)
-started:
+started: 2026-04-16T00:00:00+08:00
 completed:
 verdict:
 score: 0.0
-worktree:
+worktree: .worktrees/spacedock-ensign-spacebridge-inline-edit-suggestions
 issue:
 pr:
 intent: feature
