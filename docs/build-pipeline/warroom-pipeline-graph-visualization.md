@@ -200,3 +200,458 @@ Entity detail page (`/entity/[slug]`) currently uses `limit(1)` to pick the firs
   captain must say "execute 094" or FO picks up in separate session
 - [x] Clarify duration: 7 questions asked, session complete
   1 batch confirmation + 3 options (O-1, O-2, O-3) + 1 question (Q-1) + 2 exploration iterations
+
+## Research Findings
+
+### Upstream Constraints
+
+- `spacebridge/ui/tsconfig.json` uses `@/*` path alias mapping to project root, strict mode enabled, `bun-types` for test runner (tsconfig.json:9,28)
+- `spacebridge/ui/package.json` has no YAML parsing library -- confirms O-1 decision to port `parseStagesBlock()` rather than add `js-yaml` (package.json:16-36)
+- No existing React Context providers in `spacebridge/ui/` -- the SSE context (O-2) will be the first context provider in the codebase (grep `createContext|useContext` returns zero matches)
+- `spacebridge/ui/app/layout.tsx` is a minimal Server Component wrapper with no client providers -- SSE context must be added as a Client Component wrapper inside the layout or page
+
+### Existing Patterns
+
+- **Server-to-Client data flow**: `page.tsx` (Server Component) fetches data via DB queries and filesystem scans, passes typed props to `<WarRoom repos={nonEmpty} leaseMap={leaseMap} />` Client Component (page.tsx:72). PipelineGraph will follow the same pattern: server parses README stages + computes entity counts, passes as props.
+- **Inline-duplicate pattern**: `entity-parse.ts` is an inline duplicate of `tools/dashboard/src/frontmatter-io.ts` with ABOUTME comment (entity-parse.ts:1-3). The `parseStagesBlock` port follows this established pattern -- new file `lib/pipeline-parse.ts` as inline duplicate of `tools/dashboard/src/parsing.ts:30-129`.
+- **Component structure**: All Client Components use `"use client"` directive, shadcn/UI primitives (`Badge`, `Card`, `Tabs`, `ScrollArea`, `Tooltip`), and Tailwind classes. No inline styles, no CSS modules.
+- **Entity card grid**: `RepoSection` renders entities in a responsive grid `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` (repo-section.tsx:16). Entity list filtering will modify this existing component.
+- **SSE pattern**: `LiveFeed` opens `EventSource("/api/events")`, parses JSON `FeedEntry` objects with `type/entity/stage/agent/timestamp/detail` fields, maintains entries in state (live-feed.tsx:28-41). The SSE route polls DB every 500ms (route.ts:43).
+
+### Library/API Surface
+
+- **SVG in React**: Standard `<svg>` JSX with namespace attributes. React handles SVG elements natively -- no need for `createElementNS`. The visualizer.js reference uses `document.createElementNS` (IIFE pattern); React port uses JSX `<svg>`, `<rect>`, `<polygon>`, `<path>`, `<text>`, `<circle>` directly.
+- **Next.js App Router**: `useSearchParams()` from `next/navigation` for reading URL params in Client Components. `useRouter().push()` or `<Link>` for updating URL params. `searchParams` prop available in Server Components via page props.
+- **Drizzle ORM**: Used for DB queries in Server Components (page.tsx:16-22, entity detail page). Entity counts are filesystem-derived (A-1 confirmed), not DB queries.
+
+### Known Gotchas
+
+- **Entity detail page multi-session bug**: `entity/[slug]/page.tsx:59-63` uses `sessions` table with `limit(1)` to get `projectRoot`. With multiple CC sessions connected to different repos, the first session's root may not contain the requested entity. Fix (O-3 confirmed): scan all `projectRoot` values and find the one containing `docs/build-pipeline/{slug}.md`.
+- **`manual` stage property not in Stage type**: `tools/dashboard/src/types.ts:5-15` `Stage` interface does not include `manual` property, but README stages use `manual: true` for draft/clarify. The `parseStagesBlock` parser in `parsing.ts:101-103` captures any `key: value` pairs into the state record, but only maps known fields to the typed `Stage` return (parsing.ts:118-128). The port must add `manual: boolean` to the new `PipelineStage` type and map it in the parser output.
+- **`dispatch` and `skill` stage properties**: README stages include `dispatch:` and `skill:` fields not in the old `Stage` type. These are not needed for graph rendering (no visual distinction), so the port can safely ignore them.
+- **Tailwind CSS v4 color variables**: Entity card and other components use Tailwind class names (`text-muted-foreground`, `bg-primary`, etc.) not CSS variable references. For SVG `fill`/`stroke` attributes that can't use Tailwind classes, use `currentColor` or CSS custom properties via `hsl(var(--primary))` pattern per A-7.
+- **Multiple feedback-to edges to same target**: README shows quality->execute, review->execute, uat->execute (3 edges to execute). The visualizer.js `renderFeedbackEdge` function spaces arcs by `FEEDBACK_ARC_HEIGHT` but doesn't offset multiple arcs to the same target. The React port must stagger arc heights to prevent visual overlap.
+
+### Reference Examples
+
+- **visualizer.js** (tools/dashboard/static/visualizer.js): 310 LOC reference implementation. Key patterns to port: `buildLayout()` for node positioning (line 48-103), `renderNode()` for shape rendering with gate/terminal/initial/conditional distinctions (line 107-153), `renderBadge()` for count badges (line 157-172), `renderForwardEdge()` with arrowheads (line 176-212), `renderFeedbackEdge()` with curved dashed paths (line 216-256), `renderPipelineGraph()` main orchestrator (line 267-304).
+- **parseStagesBlock** (tools/dashboard/src/parsing.ts:30-129): 100 LOC battle-tested parser. Handles `stages:` -> `defaults:` -> `states:` nested structure. Returns `Stage[]` with name, worktree, concurrency, gate, terminal, initial, feedback_to, conditional, model fields.
+- **entityCountByStage** (tools/dashboard/src/discovery.ts:73-79): Simple grouping pattern `for (const e of entities) { entityCountByStage[e.status] = (entityCountByStage[e.status] ?? 0) + 1; }`.
+
+## PLAN
+
+Goal: Add interactive pipeline graph to war room home page with stage visualization, entity count badges, click-to-filter, mod hook annotations, SSE real-time updates, and fix multi-session entity routing.
+
+<task id="task-0" model="sonnet" wave="0">
+  <read_first>
+    - spacebridge/ui/app/page.tsx
+    - spacebridge/ui/lib/entity-scan.ts
+    - spacebridge/ui/lib/entity-parse.ts
+    - spacebridge/ui/components/war-room.tsx
+    - spacebridge/ui/components/live-feed.tsx
+    - spacebridge/ui/app/entity/[slug]/page.tsx
+    - spacebridge/ui/app/api/events/route.ts
+    - tools/dashboard/src/parsing.ts
+    - tools/dashboard/src/types.ts
+    - tools/dashboard/static/visualizer.js
+    - docs/build-pipeline/README.md
+  </read_first>
+
+  <action>
+  Environment verification. Confirm all files exist and contain expected content:
+  1. `spacebridge/ui/app/page.tsx` exists and renders `<WarRoom>` component
+  2. `spacebridge/ui/lib/entity-scan.ts` exports `scanEntitiesForRepo` and `EntityCard` interface with `status` field
+  3. `spacebridge/ui/components/war-room.tsx` exports `WarRoom` and `RepoData` interface
+  4. `spacebridge/ui/components/live-feed.tsx` exports `LiveFeed` with `EventSource("/api/events")`
+  5. `spacebridge/ui/app/entity/[slug]/page.tsx` has `limit(1)` on sessions query (multi-session bug)
+  6. `tools/dashboard/src/parsing.ts` exports `parseStagesBlock` at line 30
+  7. `tools/dashboard/src/types.ts` exports `Stage` interface with `gate`, `terminal`, `initial`, `feedback_to` fields
+  8. `tools/dashboard/static/visualizer.js` exists (reference implementation)
+  9. `docs/build-pipeline/README.md` has `stages:` block with `states:` containing stage definitions
+  10. No existing `spacebridge/ui/lib/pipeline-parse.ts` file (will be created)
+  11. No existing `spacebridge/ui/components/pipeline-graph.tsx` file (will be created)
+  12. No existing `spacebridge/ui/lib/sse-context.tsx` file (will be created)
+  </action>
+
+  <acceptance_criteria>
+    - All 12 checks pass. If any fail, STOP and revise the plan.
+  </acceptance_criteria>
+
+  <files_modified>
+  </files_modified>
+</task>
+
+<task id="task-1" model="sonnet" wave="1" test_first="true" skills="superpowers:test-driven-development">
+  <read_first>
+    - tools/dashboard/src/parsing.ts
+    - tools/dashboard/src/types.ts
+    - spacebridge/ui/lib/entity-parse.ts
+    - docs/build-pipeline/README.md
+  </read_first>
+
+  <action>
+  Port `parseStagesBlock()` from `tools/dashboard/src/parsing.ts:30-129` to `spacebridge/ui/lib/pipeline-parse.ts` as an inline duplicate following the entity-parse.ts ABOUTME pattern. Define a `PipelineStage` interface extending the old `Stage` type with `manual: boolean` field. The parser reads a README.md file path, extracts frontmatter `stages:` block, parses `defaults:` and `states:` sections, and returns `PipelineStage[]`.
+
+  Specific implementation:
+  - Add ABOUTME comment: `// ABOUTME: Inline-duplicate of tools/dashboard/src/parsing.ts parseStagesBlock.`
+  - `PipelineStage` interface: `{ name: string; gate: boolean; terminal: boolean; initial: boolean; manual: boolean; conditional: boolean; feedback_to: string; model: string; worktree: boolean; concurrency: number }`
+  - `parsePipelineStages(readmePath: string): PipelineStage[]` -- reads file, extracts frontmatter, finds `stages:` block, parses `defaults:` and `states:`, maps state records to typed `PipelineStage` objects. Returns `[]` on missing file or missing `stages:` block.
+  - Add `manual` field mapping: `(state.manual ?? "false").toLowerCase() === "true"`
+
+  Also add a helper function `parseModHooks(modsDir: string): Map<string, string[]>` that scans `*.md` files in the given directory, extracts `## Hook: {type}` headings from each file, and returns a map of `{modName -> hookTypes[]}`. This is used to display mod hook pills on graph nodes.
+
+  Write tests in `spacebridge/ui/lib/pipeline-parse.test.ts`:
+  - Test `parsePipelineStages` with the actual `docs/build-pipeline/README.md` -- assert it returns 11 stages with correct names in order (draft, brainstorm, alignment-gate, explore, clarify, plan, execute, quality, review, uat, shipped)
+  - Test gate stages: brainstorm, alignment-gate, clarify, plan, uat are gates
+  - Test terminal: shipped is terminal
+  - Test initial: draft is initial
+  - Test manual: draft and clarify are manual
+  - Test feedback_to: alignment-gate->brainstorm, quality->execute, review->execute, uat->execute
+  - Test `parsePipelineStages` with non-existent path returns `[]`
+  - Test `parseModHooks` with `docs/build-pipeline/_mods/` directory -- assert pr-review-loop has hooks [startup, idle, merge]
+  - Test `parseModHooks` with non-existent directory returns empty Map
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/ui/lib/pipeline-parse.test.ts` passes
+    - `grep "parsePipelineStages" spacebridge/ui/lib/pipeline-parse.ts` returns >= 1 match
+    - `grep "parseModHooks" spacebridge/ui/lib/pipeline-parse.ts` returns >= 1 match
+    - `grep "PipelineStage" spacebridge/ui/lib/pipeline-parse.ts` returns >= 1 match
+    - `grep "manual" spacebridge/ui/lib/pipeline-parse.ts` returns >= 1 match
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/lib/pipeline-parse.ts
+    - spacebridge/ui/lib/pipeline-parse.test.ts
+  </files_modified>
+</task>
+
+<task id="task-2" model="sonnet" wave="1" test_first="true" skills="superpowers:test-driven-development">
+  <read_first>
+    - spacebridge/ui/components/live-feed.tsx
+    - spacebridge/ui/app/api/events/route.ts
+  </read_first>
+
+  <action>
+  Create a shared SSE context provider at `spacebridge/ui/lib/sse-context.tsx` (O-2 decision). This extracts the EventSource logic from LiveFeed into a React Context so both LiveFeed and PipelineGraph can share a single SSE connection.
+
+  Implementation:
+  - `"use client"` directive
+  - Define `SSEEvent` interface matching the existing `FeedEntry` type in live-feed.tsx: `{ id: number; type: string; entity: string; stage: string; agent: string; timestamp: number; detail?: string | null }`
+  - `SSEContext` created via `createContext` with value `{ events: SSEEvent[]; status: "connecting" | "connected" | "reconnecting" }`
+  - `SSEProvider` component: wraps children, opens single `EventSource("/api/events")`, maintains events array (newest first, capped at 200), exposes via context
+  - `useSSE()` custom hook: returns context value, throws if used outside provider
+  - Export `SSEProvider`, `useSSE`, and `SSEEvent` type
+
+  Write tests in `spacebridge/ui/lib/sse-context.test.tsx`:
+  - Test that `useSSE()` throws outside provider
+  - Test that `SSEProvider` renders children
+  </action>
+
+  <acceptance_criteria>
+    - `bun test spacebridge/ui/lib/sse-context.test.tsx` passes
+    - `grep "SSEProvider" spacebridge/ui/lib/sse-context.tsx` returns >= 1 match
+    - `grep "useSSE" spacebridge/ui/lib/sse-context.tsx` returns >= 1 match
+    - `grep "createContext" spacebridge/ui/lib/sse-context.tsx` returns >= 1 match
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/lib/sse-context.tsx
+    - spacebridge/ui/lib/sse-context.test.tsx
+  </files_modified>
+</task>
+
+<task id="task-3" model="sonnet" wave="2">
+  <read_first>
+    - spacebridge/ui/components/live-feed.tsx
+    - spacebridge/ui/lib/sse-context.tsx
+  </read_first>
+
+  <action>
+  Refactor LiveFeed to consume the shared SSE context instead of managing its own EventSource.
+
+  Changes to `spacebridge/ui/components/live-feed.tsx`:
+  - Remove the internal `useState` for `entries` and `status`
+  - Remove the `useEffect` that creates `EventSource`
+  - Import `useSSE` from `@/lib/sse-context`
+  - Call `const { events, status } = useSSE()` at component top
+  - Replace `entries` references with `events`
+  - Keep the auto-scroll `useEffect` and all rendering logic unchanged
+  - Remove the `FeedEntry` interface (now `SSEEvent` from sse-context)
+  </action>
+
+  <acceptance_criteria>
+    - `grep "useSSE" spacebridge/ui/components/live-feed.tsx` returns >= 1 match
+    - `grep "EventSource" spacebridge/ui/components/live-feed.tsx` returns 0 matches (removed)
+    - `grep "FeedEntry" spacebridge/ui/components/live-feed.tsx` returns 0 matches (removed)
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/components/live-feed.tsx
+  </files_modified>
+</task>
+
+<task id="task-4" model="sonnet" wave="2">
+  <read_first>
+    - tools/dashboard/static/visualizer.js
+    - spacebridge/ui/lib/pipeline-parse.ts
+    - spacebridge/ui/components/entity-card.tsx
+    - spacebridge/ui/lib/sse-context.tsx
+  </read_first>
+
+  <action>
+  Create the PipelineGraph React Client Component at `spacebridge/ui/components/pipeline-graph.tsx`. Port the SVG rendering logic from `tools/dashboard/static/visualizer.js` to React/JSX with Tailwind CSS variable colors per A-7.
+
+  Component interface:
+  ```typescript
+  interface PipelineGraphProps {
+    stages: PipelineStage[];
+    entityCountByStage: Record<string, number>;
+    modHooks: { merge: string[]; lifecycle: string[] };
+    activeStage?: string;
+    onStageClick: (stageName: string) => void;
+  }
+  ```
+
+  Implementation details:
+  - `"use client"` directive
+  - Import `useSSE` from `@/lib/sse-context` for real-time badge updates
+  - Constants ported from visualizer.js: NODE_W=120, NODE_H=40, NODE_GAP_X=60, DIAMOND_SIZE=50, BADGE_R=10, ARROW_SIZE=6, FEEDBACK_ARC_HEIGHT=40, PADDING=30
+  - `buildLayout(stages)` function: same logic as visualizer.js -- nodes positioned in horizontal row, forward edges between sequential nodes, feedback edges from feedback_to to named target
+  - Node rendering: `<rect>` for normal stages (rx=4), `<polygon>` diamond for gate stages, rx=12 for terminal/initial, `stroke-dasharray="4,3"` for manual stages (not conditional -- the directive says "dashed border for manual")
+  - Color mapping per A-7: blue (`hsl(var(--primary))`) for active/badges, border color (`hsl(var(--border))`) for edges/inactive strokes, orange (`rgb(245 158 11)` amber-500) for feedback edges and gate strokes, green (`rgb(34 197 94)` green-500) for terminal, purple (`rgb(192 132 252)` purple-400) for initial, foreground (`hsl(var(--foreground))`) for text, card (`hsl(var(--card))`) for node fills
+  - Badge rendering: circle with count at top-right of node, only shown when count > 0
+  - Forward edge rendering: solid lines with arrowhead polygons, accounting for diamond vs rect node widths
+  - Feedback edge rendering: curved dashed orange paths above nodes using cubic bezier. **Stagger multiple arcs to same target**: when multiple feedback edges target the same node, offset each arc's height by `FEEDBACK_ARC_HEIGHT * (1 + 0.4 * index)` to prevent overlap (quality->execute at base height, review->execute at 1.4x, uat->execute at 1.8x)
+  - Mod hook pills: on the `shipped` node, render a small "merge" pill below the node (per Q-1 answer: merge is stage-specific to shipped). Lifecycle hooks (startup, idle) rendered as a small annotation text above the graph: "FO hooks: startup, idle"
+  - Click handler: `onStageClick(node.name)` on node group click, cursor pointer
+  - Active stage highlight: thicker border (stroke-width 2), primary color fill tint
+  - SSE real-time updates: `useSSE()` to get events, maintain local `countsOverride` state. On `stage_transition` events, increment target stage count and decrement source stage count. Merge with initial `entityCountByStage` props.
+  - Wrap SVG in a horizontally scrollable container with `overflow-x-auto` for narrow viewports
+  </action>
+
+  <acceptance_criteria>
+    - `grep "PipelineGraph" spacebridge/ui/components/pipeline-graph.tsx` returns >= 1 match
+    - `grep "useSSE" spacebridge/ui/components/pipeline-graph.tsx` returns >= 1 match
+    - `grep "buildLayout" spacebridge/ui/components/pipeline-graph.tsx` returns >= 1 match
+    - `grep "feedback" spacebridge/ui/components/pipeline-graph.tsx` returns >= 1 match
+    - `grep "onStageClick" spacebridge/ui/components/pipeline-graph.tsx` returns >= 1 match
+    - `grep "diamond\|DIAMOND\|polygon" spacebridge/ui/components/pipeline-graph.tsx` returns >= 1 match
+    - `grep "stroke-dasharray\|dasharray" spacebridge/ui/components/pipeline-graph.tsx` returns >= 1 match
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/components/pipeline-graph.tsx
+  </files_modified>
+</task>
+
+<task id="task-5" model="sonnet" wave="3">
+  <read_first>
+    - spacebridge/ui/app/page.tsx
+    - spacebridge/ui/lib/pipeline-parse.ts
+    - spacebridge/ui/lib/entity-scan.ts
+    - spacebridge/ui/components/pipeline-graph.tsx
+    - spacebridge/ui/components/war-room.tsx
+    - spacebridge/ui/lib/sse-context.tsx
+    - docs/build-pipeline/README.md
+  </read_first>
+
+  <action>
+  Integrate PipelineGraph into the war room home page. Modify `page.tsx` (Server Component) to parse pipeline stages and compute entity counts, then pass them to the WarRoom Client Component which renders PipelineGraph above the Tabs.
+
+  Changes to `spacebridge/ui/app/page.tsx`:
+  - Import `parsePipelineStages` and `parseModHooks` from `@/lib/pipeline-parse`
+  - After `scanEntitiesForRepo` calls, compute:
+    1. For each unique projectRoot, call `parsePipelineStages(join(projectRoot, "docs", "build-pipeline", "README.md"))` -- use first non-empty result (all repos share the same pipeline definition)
+    2. Compute `entityCountByStage` by grouping all entities across repos by `status` field: `const entityCountByStage: Record<string, number> = {}; for (const repo of nonEmpty) for (const e of repo.entities) entityCountByStage[e.status] = (entityCountByStage[e.status] ?? 0) + 1;`
+    3. Parse mod hooks: scan `_mods/` directories in each workflow dir. For the build-pipeline, call `parseModHooks(join(projectRoot, "docs", "build-pipeline", "_mods"))`. Also scan library mods `parseModHooks(join(projectRoot, "mods"))`. Merge results. Classify: `merge` hooks go on shipped node, `startup`/`idle` are lifecycle.
+  - Pass `stages`, `entityCountByStage`, and `modHooks` as new props to `<WarRoom>`
+
+  Changes to `spacebridge/ui/components/war-room.tsx`:
+  - Add `PipelineStage` import from `@/lib/pipeline-parse`
+  - Add `SSEProvider` import from `@/lib/sse-context`
+  - Extend `WarRoomProps` with `stages: PipelineStage[]`, `entityCountByStage: Record<string, number>`, `modHooks: { merge: string[]; lifecycle: string[] }`
+  - Add `useSearchParams` and `useRouter` from `next/navigation` for stage filter URL param
+  - Read `?stage=` param, use as active filter. Clicking a stage toggles the filter (click same stage again to clear).
+  - Wrap entire component content in `<SSEProvider>`
+  - Render `<PipelineGraph>` above the Tabs div, passing stages, entityCountByStage, modHooks, activeStage, and onStageClick handler
+  - When `activeStage` is set, filter entities across all repos: only show entities whose `status` matches `activeStage`. Pass filtered entities to RepoSection. Show a clear-filter chip/badge next to the graph.
+  - Update URL with `router.push(\`?stage=\${name}\`, { scroll: false })` on stage click, or `router.push("/", { scroll: false })` on clear
+  </action>
+
+  <acceptance_criteria>
+    - `grep "PipelineGraph" spacebridge/ui/components/war-room.tsx` returns >= 1 match
+    - `grep "SSEProvider" spacebridge/ui/components/war-room.tsx` returns >= 1 match
+    - `grep "parsePipelineStages" spacebridge/ui/app/page.tsx` returns >= 1 match
+    - `grep "entityCountByStage" spacebridge/ui/app/page.tsx` returns >= 1 match
+    - `grep "parseModHooks" spacebridge/ui/app/page.tsx` returns >= 1 match
+    - `grep "useSearchParams" spacebridge/ui/components/war-room.tsx` returns >= 1 match
+    - `grep "stage=" spacebridge/ui/components/war-room.tsx` returns >= 1 match
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/app/page.tsx
+    - spacebridge/ui/components/war-room.tsx
+  </files_modified>
+</task>
+
+<task id="task-6" model="sonnet" wave="3">
+  <read_first>
+    - spacebridge/ui/app/entity/[slug]/page.tsx
+  </read_first>
+
+  <action>
+  Fix the multi-session entity routing bug in the entity detail page (O-3 decision: scan all projectRoots).
+
+  Changes to `spacebridge/ui/app/entity/[slug]/page.tsx`:
+  - Replace the `limit(1)` session query (lines 59-63) with a query that fetches ALL connected sessions' projectRoots: `const sessionRows = handle.db.select({ projectRoot: sessions.projectRoot }).from(sessions).all();`
+  - Extract unique projectRoots: `const roots = [...new Set(sessionRows.map(r => r.projectRoot))];`
+  - For each root, attempt to read `join(root, "docs", "build-pipeline", \`\${slug}.md\`)`. Use the first root where the file exists as `projectRoot`.
+  - Keep the rest of the page logic (events query, comments query, entity rendering) unchanged -- they already use `projectRoot` variable.
+  </action>
+
+  <acceptance_criteria>
+    - `grep "limit(1)" spacebridge/ui/app/entity/[slug]/page.tsx` returns 0 matches (removed)
+    - `grep "new Set" spacebridge/ui/app/entity/[slug]/page.tsx` returns >= 1 match
+    - `grep "projectRoot" spacebridge/ui/app/entity/[slug]/page.tsx` returns >= 3 matches
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/app/entity/[slug]/page.tsx
+  </files_modified>
+</task>
+
+<task id="task-7" model="sonnet" wave="4">
+  <read_first>
+    - spacebridge/ui/app/page.tsx
+    - spacebridge/ui/components/war-room.tsx
+    - spacebridge/ui/components/pipeline-graph.tsx
+    - spacebridge/ui/components/live-feed.tsx
+    - spacebridge/ui/app/entity/[slug]/page.tsx
+    - spacebridge/ui/lib/pipeline-parse.ts
+    - spacebridge/ui/lib/sse-context.tsx
+  </read_first>
+
+  <action>
+  Integration verification. Run type checker and linter across the full spacebridge/ui project to catch any integration issues from the previous tasks.
+
+  Commands:
+  1. `cd spacebridge/ui && bunx tsc --noEmit` -- type check all files
+  2. `cd spacebridge && bun run lint` -- biome lint
+  3. `cd spacebridge/ui && bun test` -- run all tests (pipeline-parse, sse-context, existing tests)
+
+  Fix any type errors, lint issues, or test failures found. Common expected fixes:
+  - Import path adjustments if any module resolution issues
+  - Missing type exports between new modules
+  - Biome lint auto-fixable issues (unused imports, formatting)
+  </action>
+
+  <acceptance_criteria>
+    - `cd /Users/kent/Project/spacedock/spacebridge/ui && bunx tsc --noEmit` exits 0
+    - `cd /Users/kent/Project/spacedock/spacebridge && bun run lint` exits 0
+    - `cd /Users/kent/Project/spacedock/spacebridge/ui && bun test` exits 0 with all tests passing
+  </acceptance_criteria>
+
+  <files_modified>
+    - spacebridge/ui/app/page.tsx
+    - spacebridge/ui/components/war-room.tsx
+    - spacebridge/ui/components/pipeline-graph.tsx
+    - spacebridge/ui/components/live-feed.tsx
+    - spacebridge/ui/lib/pipeline-parse.ts
+    - spacebridge/ui/lib/sse-context.tsx
+    - spacebridge/ui/app/entity/[slug]/page.tsx
+  </files_modified>
+</task>
+
+## UAT Spec
+
+### Browser
+- [ ] War room home page loads and displays pipeline graph above entity cards
+- [ ] Pipeline graph shows all 11 stages (draft through shipped) with correct node shapes: diamonds for gate stages (brainstorm, alignment-gate, clarify, plan, uat), rounded rect for terminal (shipped) and initial (draft), dashed border for manual (draft, clarify), plain rect for others
+- [ ] Forward edges (solid arrows) connect sequential stages left to right
+- [ ] Feedback edges (dashed orange arcs above nodes) connect alignment-gate->brainstorm, quality->execute, review->execute, uat->execute without overlapping
+- [ ] Entity count badges appear on stages that have entities, showing correct counts
+- [ ] Clicking a stage node filters the entity list below to that stage and updates URL to `?stage={name}`
+- [ ] Navigating directly to `/?stage=execute` pre-filters entity list and highlights the execute node
+- [ ] Clicking the active stage again (or a clear button) removes the filter
+- [ ] "merge" mod hook pill appears on the shipped node
+- [ ] "FO hooks: startup, idle" annotation appears near the graph
+- [ ] Graph is horizontally scrollable on narrow viewports
+- [ ] When an entity transitions stage (SSE event), count badges update within 2 seconds without page reload
+- [ ] LiveFeed continues to work correctly after SSE context refactor
+- [ ] Entity detail page (`/entity/{slug}`) loads correctly with multiple CC sessions connected
+
+### CLI
+- None
+
+### API
+- None
+
+### Interactive
+- None
+
+## Validation Map
+
+| Requirement | Task | Command | Status | Last Run |
+|-------------|------|---------|--------|----------|
+| AC-1: All stages appear as nodes with correct shapes | task-4, task-5 | Browser: inspect SVG node shapes against README.md | pending | -- |
+| AC-2: Feedback-to dashed orange arrows above node row | task-4 | `grep "stroke-dasharray" spacebridge/ui/components/pipeline-graph.tsx` | pending | -- |
+| AC-3: Mod hook labeled pills on relevant nodes | task-4, task-5 | Browser: check shipped node has "merge" pill | pending | -- |
+| AC-4: Entity count badge on each stage node | task-4, task-5 | `bun test spacebridge/ui/lib/pipeline-parse.test.ts` + browser verify | pending | -- |
+| AC-5: Click node filters entity list, URL updates to ?stage={name} | task-5 | Browser: click node, verify URL + filtered list | pending | -- |
+| AC-6: ?stage=execute pre-filters and highlights | task-5 | Browser: navigate to /?stage=execute, verify | pending | -- |
+| AC-7: SSE live feed updates badges within 2s | task-4 | Browser: trigger transition, observe badge update | pending | -- |
+
+## Stage Report: plan
+
+status: passed
+plan-checker verdict: PASS (after 1 revision iteration)
+iteration count: 1
+knowledge capture: skipped -- no findings met D1/D2 threshold
+workflow-index append: 9 append calls, covering 8 tasks and 9 files, all successful
+
+### Plan-checker final output
+
+```yaml
+issues:
+  - dimension: task_completeness
+    task: task-0
+    severity: warning
+    description: "task-0 has empty files_modified (verification-only task)"
+    fix_hint: "Acceptable for Wave 0 environment verification tasks that only read files"
+  - dimension: cross_entity_coherence
+    severity: warning
+    description: "Skill tool unavailable in dispatched plan-checker context; Dim 7 not evaluated at check time"
+    fix_hint: "Captain: verify Dim 7 out-of-band via workflow-index read from main session"
+  - dimension: type_test_coverage
+    task: task-4
+    severity: warning
+    description: "pipeline-graph.tsx has no test file pairing"
+    fix_hint: "SVG rendering component is primarily browser-verified; unit testing SVG output has low ROI. Browser UAT covers this."
+  - dimension: type_test_coverage
+    task: task-3
+    severity: warning
+    description: "live-feed.tsx refactor has no dedicated test"
+    fix_hint: "Existing live-feed behavior is covered by integration; SSE context has its own tests"
+```
+
+### Dispatch Gaps
+
+- Plan-checker ran inline (all 10 dimensions) -- Agent tool unavailable in ensign context, per-dim haiku subagent dispatch not possible
+- Monolithic parallel-run diff skipped -- Agent tool unavailable for monolithic sonnet dispatch (parallel-run window count: 1/3)
+
+### Checklist
+
+- [x] 1. Invoke spacedock:build-plan skill and execute all its steps
+- [x] 2. Produce ## Research Findings section (5 subsections with citations, inline fallback mode)
+- [x] 3. Produce ## PLAN section with 8 tasks (wave 0-4), per-task model hints, files_modified, acceptance_criteria
+- [x] 4. Produce ## UAT Spec section (4 categories: Browser 14 items, CLI/API/Interactive none)
+- [x] 5. Produce ## Validation Map section (7 rows mapping ACs to tasks and commands)
+- [x] 6. Run self-review + plan-checker (1 iteration, 0 blockers, 4 warnings)
+- [x] 7. Append CONTRACTS.md rows -- 9 file sections (4 new, 5 appended), commit chore(index): 61a8fef
+- [x] 8. Write ## Stage Report: plan with verdict and iteration count
+
+### Commits
+
+- 61a8fef chore(index): add contracts for entity-warroom-pipeline-graph-visualization entering plan (9 files)
+- (next) chore(plan): warroom-pipeline-graph-visualization pipeline graph + stage viz + mod hooks + SSE context + multi-session fix
