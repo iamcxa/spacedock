@@ -148,6 +148,8 @@ How does the captain's "active session" choice persist across page reloads and n
 
 Return value trace: URL query param flows through Next.js searchParams in Server Component, deterministic per-request. Cookie requires a Client Component or middleware to read. URL is simpler.
 
+→ Selected: URL query param `?session={sessionId}` (captain, 2026-04-16, interactive)
+
 ### O-2: Session picker placement
 
 Where should the picker live in the UI?
@@ -158,6 +160,8 @@ Where should the picker live in the UI?
 | In war room only (extend existing Tabs) | Keeps entity detail simple. Reuses 053's Tabs architecture. | Captain on entity detail page can't see/switch session without going back to war room. | Low | Viable |
 | Both: war room Tabs + entity detail dropdown | Maximum flexibility. | Duplicate UI surface. Two source-of-truths for the selection. | Medium | Not recommended |
 
+→ Self-resolved by SO 1f cross-reference (no captain question needed): entity 117 Q-3 captain answer pinned "extract a shared header used by both war room and entity detail; place ThemeToggle in the shared header." That decision implies the session picker also lives in 117's shared header — placing it elsewhere would split UI control surfaces. Selection: 117 shared header (auto-resolved 2026-04-16).
+
 ### O-3: Multi-session-per-projectRoot handling
 
 Two CC sessions can connect with the same projectRoot (e.g., captain runs CC twice in same repo). How does the picker render this?
@@ -167,6 +171,8 @@ Two CC sessions can connect with the same projectRoot (e.g., captain runs CC twi
 | Show each session as distinct row (sessionId visible) | No data hidden. Captain can pick exact session. | UI clutter when most sessions share roots. SessionId is opaque. | Low | Viable |
 | Group by projectRoot, expand to show sessions on click | Cleaner default view. Power users can drill down. | More complex Component. Hides info by default. | Medium | Viable |
 | Use `getActiveSessionByProjectRoot()` -- show one row per root, picker selects root not session | Matches existing app/page.tsx dedup pattern. Simplest UX. | Loses sessionId visibility. If 2 sessions share root, picker can't distinguish. | Low | ✅ Recommended |
+
+→ Selected: Dedup by projectRoot, use getActiveSessionByProjectRoot() for tie-break (captain, 2026-04-16, interactive)
 
 ## Open Questions
 

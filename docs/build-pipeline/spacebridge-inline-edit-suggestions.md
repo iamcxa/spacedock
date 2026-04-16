@@ -1,7 +1,7 @@
 ---
 id: 089
 title: "Inline edit suggestions (comments parity part 2)"
-status: execute
+status: review
 context_status: ready
 source: entity 054 O-2 deferral (2026-04-13)
 started: 2026-04-16T00:00:00+08:00
