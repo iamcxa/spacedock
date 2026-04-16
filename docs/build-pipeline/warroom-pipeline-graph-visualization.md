@@ -658,3 +658,26 @@ issues:
 
 - 61a8fef chore(index): add contracts for entity-warroom-pipeline-graph-visualization entering plan (9 files)
 - (next) chore(plan): warroom-pipeline-graph-visualization pipeline graph + stage viz + mod hooks + SSE context + multi-session fix
+
+## Stage Report: execute
+
+status: passed
+waves executed: 5 (wave 0 → 1 → 2 → 3 → 4)
+tasks completed: 7 / 7 DONE
+dispatch mode: troops-dispatch (parallel with entity 089)
+
+- [x] task-0 (sonnet, wave 0): environment verify -- 12/12 PASS
+- [x] task-1 (sonnet, wave 1, TDD): parsePipelineStages + parseModHooks -- 9 tests PASS, 5/5 AC
+- [x] task-2 (sonnet, wave 1, TDD): SSE context provider with graceful disconnect -- 13 tests PASS
+- [x] task-3 (sonnet, wave 2): refactor LiveFeed to useSSE -- adapter pattern preserved, 3/3 AC
+- [x] task-4 (sonnet, wave 2): PipelineGraph SVG component -- 313 lines, full legacy parity, 7/7 AC
+- [x] task-5 (sonnet, wave 3): integrate into war-room.tsx with workflow header -- captain guardrail satisfied, 7/7 AC
+- [x] task-6 (sonnet, wave 3): multi-session entity routing fix -- scan all projectRoots, 3/3 AC
+- [x] task-7 (sonnet, wave 4): integration verify -- tsc 0 errors, lint 0 errors, 77 tests PASS
+
+Legacy parity guardrail (captain 2026-04-16): SATISFIED -- all visual capabilities from visualizer.js ported; "Edit Pipeline" button excluded per captain.
+Workflow header guardrail: SATISFIED -- rendered in war-room.tsx above PipelineGraph.
+
+BLOCKED escalations: 0
+NEEDS_CONTEXT escalations: 0
+Knowledge capture: skipped -- mechanical port from legacy visualizer.js, no new patterns.
