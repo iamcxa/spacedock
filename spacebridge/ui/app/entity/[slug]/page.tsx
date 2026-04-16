@@ -3,7 +3,7 @@
 // queries events + comments from DB, renders header/timeline/body/comments.
 // Dynamic route: /entity/[slug] — slug maps to docs/build-pipeline/<slug>.md
 
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { and, asc, eq } from "drizzle-orm";
 import Link from "next/link";
@@ -55,20 +55,29 @@ export default async function EntityDetailPage({ params }: PageProps) {
     const handle = openReadOnlyDb();
     const { sessions, events, comments } = await import("@/lib/schema");
 
-    // Get first connected session's projectRoot
+    // Get all connected sessions' projectRoots and find the one containing this entity
     const sessionRows = handle.db
       .select({ projectRoot: sessions.projectRoot })
       .from(sessions)
-      .limit(1)
       .all();
 
-    if (sessionRows.length > 0) {
-      projectRoot = sessionRows[0].projectRoot;
+    const roots = [...new Set(sessionRows.map((r) => r.projectRoot))];
+    for (const root of roots) {
+      const candidatePath = join(root, "docs", "build-pipeline", `${slug}.md`);
+      try {
+        await access(candidatePath);
+        projectRoot = root;
+        break;
+      } catch {
+        // File not found in this root, try next
+      }
     }
 
     // Query stage transition events for this entity
     if (projectRoot) {
-      const entityPath = join(projectRoot, "docs", "build-pipeline", `${slug}.md`);
+      // NOTE: comments.entity_path is project-root-relative (matches POST convention at
+      // comments/route.ts:108). Do NOT use the absolute path here — strict eq() would never match.
+      const entityPath = `/docs/build-pipeline/${slug}.md`;
       stageTransitions = handle.db
         .select({
           id: events.id,

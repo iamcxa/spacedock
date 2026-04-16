@@ -565,6 +565,18 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-standalone-dir-distribution | plan | Next.js standalone build pipeline script | 🔵 planned | 2026-04-14 |
 
+### spacebridge/src/application/suggestion-applier.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | SuggestionApplier unit tests -- frontmatter-safe body edit, conflict throw | 🔵 planned | 2026-04-16 |
+
+### spacebridge/src/application/suggestion-applier.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Application-layer module for entity body file writes (applyBodyEdit port) | 🔵 planned | 2026-04-16 |
+
 ### spacebridge/src/daemon/auto-fork.test.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -864,6 +876,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-multi-root-session-registry | plan | Add session_events Drizzle table (append-only event log, dual-table with sessions) | 🔵 planned | 2026-04-14 |
+| spacebridge-inline-edit-suggestions | plan | Add suggestions snapshot table (LCD schema, fmodel-compatible) | 🔵 planned | 2026-04-16 |
 
 ### spacebridge/src/db.ts
 
@@ -932,6 +945,13 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | War room Server Component -- fetches entities + leases, passes to WarRoom | 🔵 planned | 2026-04-13 |
+| warroom-pipeline-graph-visualization | plan | Add pipeline stage parsing, entity count grouping, mod hook parsing | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/app/entity/[slug]/page.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| warroom-pipeline-graph-visualization | plan | Fix multi-session entity routing -- scan all projectRoots | 🔵 planned | 2026-04-16 |
 
 ### spacebridge/ui/bun.lock
 
@@ -962,6 +982,13 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | Live feed Client Component -- EventSource consumer, newest-first, auto-scroll to top | 🔵 planned | 2026-04-13 |
+| warroom-pipeline-graph-visualization | plan | Refactor to consume shared SSE context instead of own EventSource | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/components/pipeline-graph.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| warroom-pipeline-graph-visualization | plan | Pipeline graph SVG Client Component -- stage nodes, edges, badges, click-to-filter | 🔵 planned | 2026-04-16 |
 
 ### spacebridge/ui/components/repo-section.tsx
 
@@ -1028,6 +1055,7 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | War room Client Component -- Tabs (All + per-repo), two-column layout w/ LiveFeed | 🔵 planned | 2026-04-13 |
+| warroom-pipeline-graph-visualization | plan | Add PipelineGraph + SSEProvider + stage filter via useSearchParams | 🔵 planned | 2026-04-16 |
 
 ### spacebridge/ui/lib/db.test.ts
 
@@ -1064,6 +1092,30 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-nextjs-warroom-sse-feed | plan | Scan docs/build-pipeline/*.md per projectRoot, return EntityCard[] | 🔵 planned | 2026-04-13 |
+
+### spacebridge/ui/lib/pipeline-parse.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| warroom-pipeline-graph-visualization | plan | Tests for parsePipelineStages and parseModHooks | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/lib/pipeline-parse.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| warroom-pipeline-graph-visualization | plan | Port parseStagesBlock + parseModHooks for pipeline graph | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/lib/sse-context.test.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| warroom-pipeline-graph-visualization | plan | Tests for SSEProvider and useSSE hook | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/lib/sse-context.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| warroom-pipeline-graph-visualization | plan | Shared SSE context provider -- single EventSource for LiveFeed + PipelineGraph | 🔵 planned | 2026-04-16 |
 
 ### spacebridge/ui/lib/utils.ts
 
@@ -1407,6 +1459,72 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-channel-bridge-bidirectional | plan | Channel bridge infrastructure + chat/gate daemon-side CQRS aggregates + MCP stdio shim | ✅ final | 2026-04-16 |
 
+### spacebridge/src/domain/comment/suggestion-decider.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Pure suggestion decider unit tests (add/accept/reject state machine) | 🔵 planned | 2026-04-16 |
+
+### spacebridge/src/domain/comment/suggestion-decider.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Pure fmodel decider for suggestion aggregate (zero I/O) | 🔵 planned | 2026-04-16 |
+
+### spacebridge/src/domain/comment/suggestion-errors.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Named error classes for suggestion domain | 🔵 planned | 2026-04-16 |
+
+### spacebridge/src/domain/comment/suggestion-evolve.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Pure suggestion evolve unit tests (state transitions) | 🔵 planned | 2026-04-16 |
+
+### spacebridge/src/domain/comment/suggestion-evolve.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Pure fmodel evolve for suggestion aggregate (zero I/O) | 🔵 planned | 2026-04-16 |
+
+### spacebridge/src/domain/comment/suggestion-persistence.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Suggestion persistence tests -- shared comment_events table, snapshot CRUD | 🔵 planned | 2026-04-16 |
+
+### spacebridge/src/domain/comment/suggestion-persistence.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Impure persistence layer for suggestion events + snapshots (Drizzle) | 🔵 planned | 2026-04-16 |
+
+### spacebridge/src/domain/comment/suggestion-schemas.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Zod schema validation tests for suggestion commands/events | 🔵 planned | 2026-04-16 |
+
+### spacebridge/src/domain/comment/suggestion-schemas.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Zod schemas for suggestion commands/events with .passthrough() | 🔵 planned | 2026-04-16 |
+
+### spacebridge/src/domain/comment/suggestion-types.test.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Suggestion domain type smoke tests | 🔵 planned | 2026-04-16 |
+
+### spacebridge/src/domain/comment/suggestion-types.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Domain types for suggestion CQRS aggregate (commands, events, state) | 🔵 planned | 2026-04-16 |
+
 ### spacebridge/src/domain/gate/decider.test.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -1491,6 +1609,18 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-channel-bridge-bidirectional | plan | Channel bridge infrastructure + chat/gate daemon-side CQRS aggregates + MCP stdio shim | ✅ final | 2026-04-16 |
 
+### spacebridge/ui/app/api/entities/[slug]/comments/[id]/suggest/route.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | POST route handler for adding suggestions to comments | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/app/api/entities/[slug]/comments/route.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Extend GET to include suggestions data alongside comments | 🔵 planned | 2026-04-16 |
+
 ### spacebridge/ui/app/api/entities/[slug]/gate/route.test.ts
 
 | Entity | Stage | Intent | Status | Last Updated |
@@ -1502,6 +1632,18 @@ Each section lists a file path with entities that have modified it, their stage,
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-channel-bridge-bidirectional | plan | Channel bridge infrastructure + chat/gate daemon-side CQRS aggregates + MCP stdio shim | ✅ final | 2026-04-16 |
+
+### spacebridge/ui/app/api/entities/[slug]/suggestions/[id]/accept/route.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | POST route handler for accepting suggestions (CQRS + file write) | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/app/api/entities/[slug]/suggestions/[id]/reject/route.ts
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | POST route handler for rejecting suggestions (CQRS, no file write) | 🔵 planned | 2026-04-16 |
 
 ### spacebridge/ui/components/chat-input.test.tsx
 
@@ -1515,11 +1657,35 @@ Each section lists a file path with entities that have modified it, their stage,
 |--------|-------|--------|--------|--------------|
 | spacebridge-channel-bridge-bidirectional | plan | Channel bridge infrastructure + chat/gate daemon-side CQRS aggregates + MCP stdio shim | ✅ final | 2026-04-16 |
 
+### spacebridge/ui/components/comment-panel.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Add suggestionsByComment prop passing to CommentThread | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/components/comment-thread.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Add suggestions prop, inline diff view, suggest edit button | 🔵 planned | 2026-04-16 |
+
 ### spacebridge/ui/components/entity-body.tsx
 
 | Entity | Stage | Intent | Status | Last Updated |
 |--------|-------|--------|--------|--------------|
 | spacebridge-channel-bridge-bidirectional | plan | Channel bridge infrastructure + chat/gate daemon-side CQRS aggregates + MCP stdio shim | ✅ final | 2026-04-16 |
+
+### spacebridge/ui/components/suggest-form.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Suggest edit form component (diff_from/diff_to inputs) | 🔵 planned | 2026-04-16 |
+
+### spacebridge/ui/components/suggestion-diff.tsx
+
+| Entity | Stage | Intent | Status | Last Updated |
+|--------|-------|--------|--------|--------------|
+| spacebridge-inline-edit-suggestions | plan | Inline diff view component (red/green before/after blocks, accept/reject buttons) | 🔵 planned | 2026-04-16 |
 
 ### spacebridge/ui/components/gate-buttons.test.tsx
 
