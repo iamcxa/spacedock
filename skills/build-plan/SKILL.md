@@ -7,6 +7,8 @@ description: "Opus plan-stage orchestrator dispatched by FO on clarified entitie
 
 You are the plan-stage orchestrator invoked by FO (via the `skill:` field on the plan stage) after the clarify stage completes. You read a clarified entity, dispatch parallel researchers, write the `## PLAN` / `## UAT Spec` / `## Validation Map` sections, self-review, dispatch a plan-checker subagent, loop through a capped revision cycle, optionally capture knowledge, and finally write `workflow-index append` rows before advancing the entity to `execute`.
 
+The clarified entity + CONTRACTS are *input constraints* for the plan. Build-plan's job is not just to produce tasks that cover the scope -- it is to produce the MINIMUM task decomposition that can ship the scope with verifiable acceptance. If a plan could be cut to fewer tasks (merging, eliminating setup-as-own-task, dropping scaffolding) without losing ship-worthiness, the plan is over-engineered. Over-engineered plans waste execute-stage tokens and create surface area for bugs that a leaner plan would not have. The existing 6-dimensional plan-checker catches under-coverage well; Dim 10 (Step 6a) exists specifically because nobody else asks "could this plan have fewer tasks?"
+
 **Nine steps, in strict order. Never skip, never reorder, never combine.**
 
 **Namespace note.** This skill lives at `skills/build-plan/`; namespace migration to `spacebridge:build-plan` happens when spacebridge plugin skeleton is created (entity 050). When FO dispatches the plan stage, the ensign loads this skill via its flat `skills/build-plan/` path. References in this file use the flat path consistently.
@@ -193,6 +195,34 @@ Beyond contradictions, synthesis is straightforward: deduplicate redundant findi
 
 ---
 
+## Step 3.5: Scope Anchoring
+
+Before drafting tasks in Step 4, re-read the entity's `## Scope: In` section (produced by `build-shape`; may also appear as scope bullets inside `## Brainstorming Spec` if the entity skipped shape). Each task that Step 4 produces MUST map back to at least one `Scope: In` bullet. Tasks that do not map to any scope bullet are a red flag -- either the scope is missing something (fix via a `supersedes:` entity, do NOT silently expand scope inside plan) or the task is out-of-scope (drop it).
+
+Produce an explicit mapping table and write it into the entity body immediately ABOVE the `## PLAN` section (Step 4a will then write `## PLAN` directly below). Table format:
+
+```markdown
+## Scope Anchoring
+
+| Task | Files modified | Maps to Scope: In bullet |
+|------|----------------|--------------------------|
+| Task 1 | src/foo.ts, tests/foo.test.ts | #1 FO fork-additions 盤點 |
+| Task 2 | docs/proposal.md | #2 Upstream hook point PR 提案 |
+| ...  | ...            | ...                      |
+```
+
+**Halt condition**: if any task has no mapping entry, STOP plan-draft. Do not proceed to Step 4 until resolved. Resolution paths:
+
+1. **Drop the task** -- if the task is out of scope, remove it.
+2. **Open a supersedes: entity** -- if the task reveals scope was under-drawn at shape time, do NOT silently expand scope inside plan. Write the gap into `## Stage Report: plan` with `feedback-to: captain` and return to FO; captain will open a supersedes entity and re-shape.
+3. **Refine scope citation** -- if the task legitimately implements a Scope: In bullet but the mapping wasn't obvious, update the table with the correct citation.
+
+The mapping table is durable output -- it stays in the entity body through execute/quality/review and gives downstream stages a task-to-scope audit trail.
+
+**No exceptions**: scope anchoring is NOT optional for any plan. Plans that silently expand scope past `## Scope: In` are the #1 source of plan-vs-captain-intent drift.
+
+---
+
 ## Step 4: Plan Writing
 
 Write three sections into the entity body:
@@ -357,9 +387,26 @@ Agent(
   model="haiku",
   prompt=<plan-checker-prompt.md Dim 9 section with {plan_text} and {entity_context} substituted>
 )
+
+Agent(
+  subagent_type="spacedock:plan-checker-dim-10-task-minimality",
+  model="haiku",
+  prompt=<plan-checker-prompt.md Dim 10 section with {plan_text}, {entity_context}, and {scope_anchoring_table} substituted>
+)
 ```
 
-Wait for all 6 to return before proceeding to 6b. Each agent returns a structured YAML `issues[]` list with fields: `dimension`, `task` (optional), `severity` (`blocker` | `warning`), `description`, `fix_hint`.
+**Dim 10 (task minimality) -- new dimension.** Dispatched in parallel with Dims 1/2/4-5/6/7/9. The agent asks four questions against the plan:
+
+1. **Per-task merge check**: for each task, could this task be merged with an adjacent task without losing ship-worthiness? (e.g., "Task 2 adds imports that Task 3 already modifies -- merge.")
+2. **Per-task scaffolding check**: is this task actual work, or is it scaffolding that doesn't produce shippable output? Examples of scaffolding-as-own-task: "set up directory", "add imports", "create empty file", "document the approach in a comment". These should collapse into the task that produces shippable output.
+3. **Wave false-dependency check**: are any waves enforcing false dependencies (tasks marked serial or placed in later waves when `files_modified` and `read_first` show no real dependency)?
+4. **Half-cut thought experiment**: if the plan had to be cut in half, which tasks would drop first? Are those drops actually nice-to-haves not present in `## Acceptance Criteria`? If yes, the plan is over-engineered -- the nice-to-haves should be deferred.
+
+Output per-task verdict (`MINIMAL` / `COULD-TRIM` / `OVER-ENGINEERED`) and an overall plan verdict. Gate: **if Dim 10 overall verdict is `OVER-ENGINEERED` and captain has not explicitly approved the expansion in `## Clarify Output`, treat as a blocker** in the Step 7 revision loop (same severity as Dims 1-9 blockers).
+
+**TODO -- agent file to be created in follow-up entity**: `spacedock:plan-checker-dim-10-task-minimality` does not yet have a dispatchable agent file. Until shipped, Step 6a MUST still run Dims 1/2/4-5/6/7/9 (the 6-way dispatch) and the plan orchestrator should inline the Dim 10 check in the main session (same location as Dim 3's inline 6b check) using the four questions above. Once the agent file lands in a follow-up entity, flip this from inline-fallback to parallel-dispatch and update the dimension table below.
+
+Wait for all 7 (6 haiku + Dim 10, or 6 haiku when Dim 10 runs inline) to return before proceeding to 6b. Each agent returns a structured YAML `issues[]` list with fields: `dimension`, `task` (optional), `severity` (`blocker` | `warning`), `description`, `fix_hint`.
 
 **Plan-checker is stateless.** Each dispatch gets a fresh context. The checker does not remember previous iterations, and you do not tell it what iteration you are on. This is deliberate -- each check is an independent judgment.
 
@@ -451,7 +498,8 @@ Per the entity 109 dim-utility-audit:
 | 7 | Cross-Entity Coherence | `spacedock:plan-checker-dim-7-cross-entity-coherence` (haiku) | Active |
 | 8 | Type/Test Coverage | -- | Deferred (no agent shipped) |
 | 9 | Stale-Line-Anchor | `spacedock:plan-checker-dim-9-stale-line-anchor` (haiku) | Active |
-| 10 | Circular-AC | -- | Retired (entity 109 audit) |
+| 10 | Task Minimality | `spacedock:plan-checker-dim-10-task-minimality` (haiku, TODO follow-up); inline fallback in main session until agent ships | Active (inline-fallback) |
+| -- | Circular-AC (former Dim 10) | -- | Retired (entity 109 audit) |
 
 Full detail lives in `skills/build-plan/references/plan-checker-prompt.md`.
 
@@ -655,7 +703,7 @@ The full plan-checker prompt template, including all 10 dimensions and YAML outp
 | 7 | Cross-Entity Coherence | `files_modified` cross-checked against `CONTRACTS.md` |
 | 8 | Type/Test Coverage | Source files have test pairing and type-check config coverage |
 | 9 | Stale-Line-Anchor | Every `file:line` citation resolves to asserted content; auto-rewrite to content anchor when unambiguous |
-| 10 | Circular-AC | grep-count ACs are not self-referential against the entity's own PLAN/UAT blocks |
+| 10 | Task Minimality | Plan decomposition is minimum-viable: no mergeable tasks, no scaffolding-as-own-task, no false wave dependencies, no nice-to-haves outside `## Acceptance Criteria` |
 
 ---
 
@@ -673,6 +721,9 @@ The full plan-checker prompt template, including all 10 dimensions and YAML outp
 - **The `workflow-index append` at step 9 is UNCONDITIONAL.** Not optional. Not deferrable. Not threshold-gated. Unconditional. Reread the No-Exceptions block in step 9 if tempted.
 - **NEVER skip Step 0.5 assumption re-validation.** If assumptions have file:line evidence, Step 0.5 must run. Skipping Step 0.5 permits plan generation on stale premises -- the exact failure mode parent 077 exists to prevent.
 - **NEVER skip Step 7.5 plan confidence gate.** Every plan, every invocation -- Skill("spacedock:confidence-gate", mode=plan_gate) is unconditional. Skipping re-introduces the tribal-MEMORY-only enforcement that entity 110 codifies.
+- **NEVER skip Step 3.5 scope anchoring.** Every task in `## PLAN` MUST map to a `## Scope: In` bullet in the Scope Anchoring table. Silent scope expansion inside plan is the #1 source of plan-vs-captain-intent drift; if scope is genuinely under-drawn, escalate for a `supersedes:` entity via `feedback-to: captain` -- do NOT widen scope inline.
+- **NEVER skip Dim 10 task minimality.** The 6-dim plan-checker catches under-coverage but nobody else asks "could this plan have fewer tasks?" Dim 10 is that question. Skipping it re-admits over-engineered plans that waste execute-stage tokens and create bug surface area that a leaner plan would not have.
+- **Long-form content UX for any captain interaction.** If the plan stage enters a clarify-style AskUserQuestion loop (e.g., via FO routing captain interaction back into this skill, or via a scope-anchoring supersedes escalation dialog), present long-form content (multi-sentence task descriptions, scope bullet rationales, research-finding excerpts) in the main chat thread BEFORE the AskUserQuestion call. AskUserQuestion options carry only short labels + 1-sentence descriptions; do NOT stuff multi-sentence prose into preview fields (the preview panel is ~40-60 chars wide and truncates). Matches build-shape Step 3/4/5 presentation rules.
 
 ---
 
