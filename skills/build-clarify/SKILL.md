@@ -12,8 +12,17 @@ now has populated Assumptions, Option Comparisons, and Open Questions (or a Deco
 Recommendation). Your job is to walk the captain through resolution, one gray area at a
 time, until the entity's context is complete and ready for planning.
 
+Captain's answers during clarify are *decisions under uncertainty*, not fiat. Build-clarify's
+job is not just to record captain's picks -- it is to ensure the picks are informed. If a
+captain answer contradicts evidence collected during explore, if it picks an option without
+engaging with its trade-offs, or if it commits to scope that contradicts the shape artifacts,
+SO MUST pressure-test by re-presenting the evidence before accepting the decision. Silent
+captures of captain answers that ignore surfaced evidence are a skill failure.
+
 **Eight steps, in strict order. Steps 2-4 interact with the captain; Steps 0, 1, 1.5, 5, 6 are
-internal.**
+internal. Steps 3, 4, and 4.5 each run an Answer Pressure-Test sub-loop (see "Answer
+Pressure-Test Discipline" below) before writing a captain decision to the entity body, and
+Step 4.7 runs a cumulative Scope Drift Check before Step 5's sufficiency gate.**
 
 This skill is loaded by:
 1. The `science-officer` agent (primary path) when captain says "/science {slug}" or invokes the persona
@@ -38,6 +47,87 @@ This skill is loaded by:
 - `references/ask-user-question-rules.md` -- read before Step 2 and re-consult before every AskUserQuestion call
 - `references/decomposition-gate.md` -- read at the start of Step 0 if a Decomposition Recommendation exists
 - `references/output-format.md` -- read before Step 2 and re-consult for every annotation
+
+---
+
+## Long-Form Content UX Rule (applies to every AskUserQuestion call)
+
+AskUserQuestion's preview panel is ~40-60 chars wide and truncates long prose. When a
+candidate option carries long-form content (description > 150 chars, multi-sentence rationale,
+pros/cons paragraphs, or full spec text), SO MUST:
+
+1. Present the full candidate text in the main conversation thread FIRST, as plain markdown
+   (numbered list or headed blocks), so the captain can read it in full.
+2. THEN call AskUserQuestion with only short labels (≤80 chars) plus 1-sentence descriptions.
+   Never stuff multi-sentence prose into the `description` / preview field.
+
+This rule applies uniformly to Step 3 option selection, Step 4 open-question resolution, and
+the Step 4.5 open exploration loop. It also applies to pressure-test re-asks (see Answer
+Pressure-Test Discipline) -- the contradiction evidence block is presented in the thread, and
+the AskUserQuestion re-ask uses short labels only.
+
+---
+
+## Answer Pressure-Test Discipline (applies to Steps 3, 4, 4.5)
+
+Captain's directive is initial hypothesis; captain's in-session answer is a decision under
+uncertainty. Before writing ANY captain decision (option pick, open-question answer, gray-area
+resolution) to the entity body, SO MUST run the following four-check pressure-test:
+
+1. **Evidence contradiction check** -- Does captain's choice contradict any evidence
+   collected by build-explore (file:line citations in `## Lens Evidence`, Assumption Evidence
+   lines, cross-entity CONTRACTS entries, or facts surfaced by Step 1f self-verification)?
+2. **Trade-off engagement check** -- For option selections with a Pros/Cons table, did
+   captain's rationale reference the trade-offs, or did they pick on shortest-label heuristics
+   alone? (Silent pick on a row labeled "(recommended)" without commentary counts as
+   un-engaged when the chosen row has material cons in the table.)
+3. **Scope boundary check** -- Does captain's answer expand the entity's scope beyond the
+   `## Scope: In` list written by `/shape`? (Skip if `shape_status` is absent / draft.)
+4. **Consistency check** -- Does captain's answer contradict a prior decision in this same
+   entity (earlier Confirmed assumption, earlier Selected option, earlier Answer)?
+
+If ALL checks pass, write the decision to the entity body as normal.
+
+If ANY check fails, do NOT write the decision yet. Loop back with a second AskUserQuestion
+that **explicitly surfaces the contradiction** before accepting the answer. The pressure-test
+re-ask MUST:
+
+- Present the contradicting evidence verbatim in the conversation thread (file:line citations,
+  upstream entity IDs, Scope: In bullets, or the prior decision's annotation) BEFORE the
+  AskUserQuestion call.
+- Re-ask with short labels following the Long-Form Content UX Rule above. Typical options:
+  `Confirm anyway`, `Revise choice`, `Expand scope (update shape)`.
+- Require captain to supply a rationale if they select `Confirm anyway`.
+
+Example (option selection pressure-test):
+
+```
+Q1 (original): "O-3: How to update status? direct Edit vs status --set?"
+A1 captain: "direct Edit"
+[SO detects: contradicts upstream entity #97 FO Write Scope guardrail; explore A-5
+ evidence shows ensign parses status --set diff output.]
+
+Thread presentation:
+> Your pick conflicts with:
+> - Entity #97 guardrail: FO must write status transitions via `status --set`
+>   (docs/build-pipeline/097-fo-write-scope.md:42)
+> - Explore A-5 evidence: `skills/ensign/handlers.ts:118` parses `status --set` stderr
+>   diff to detect transitions
+
+Q2 pressure-test: "Your direct-Edit pick conflicts with upstream #97 and explore A-5.
+                   How do you want to resolve?"
+Options:
+  - "Revise to status --set"    (align with upstream + explore)
+  - "Confirm direct Edit anyway" (requires rationale; may need to update shape)
+  - "Defer -- needs more research"
+```
+
+Only after the pressure-test resolves do you write the final annotation to the entity body.
+Record the pressure-test outcome in the Stage Report (see Step 6).
+
+**No-exceptions**: Silent capture of an answer that fails any of the four checks is a skill
+failure. This is the clarify analog of build-shape's Step 5.5 gap-to-goal pressure test: SO's
+job is to ensure captain picks are informed, not to transcribe them.
 
 ---
 
@@ -271,13 +361,23 @@ For EACH unselected option comparison in `## Option Comparisons`, in order:
    - `question`: `"O-{n}: {heading question-form}"` (e.g., "O-1: Which highlight rendering approach?")
    - `options`: 2-4 entries from the table rows. If the table marked one row `✅ Recommended`, prefix its label with `(recommended) `. Copy the description from the Pros/Cons columns (keep it ≤1 sentence).
 
-2. Call `AskUserQuestion(...)` with the payload.
+2. Before the call, present the full text of each candidate option (Pros/Cons cells, linked
+   spec blurbs, multi-sentence rationale) in the main conversation thread per the Long-Form
+   Content UX Rule. AskUserQuestion then uses short labels only.
 
-3. Record the result:
+3. Call `AskUserQuestion(...)` with the payload.
+
+4. **Run the Answer Pressure-Test** (see "Answer Pressure-Test Discipline" above) on the
+   captain's pick. If any of the four checks fails, do NOT proceed to step 5 yet -- present
+   contradiction evidence in the thread and re-ask with short-label options. Loop until
+   pressure-test passes or captain selects `Confirm anyway` with supplied rationale.
+
+5. Record the result:
    - If captain picked a canned option → `→ Selected: {option label} (captain, {ISO-date}, interactive)`
    - If captain picked "Other" → switch to plain text prompt ("What's your preferred approach?"), record `→ Selected: Other -- {verbatim response} (captain, {ISO-date}, interactive)`
+   - If pressure-test fired and captain confirmed anyway → append ` [pressure-tested: {1-line contradiction summary}; captain rationale: "{verbatim}"]` to the annotation.
 
-4. Append the annotation to the entity body directly below the option table.
+6. Append the annotation to the entity body directly below the option table.
 
 **Do NOT batch AskUserQuestion calls.** One question per message. The captain must answer
 each one before the next is presented.
@@ -308,12 +408,22 @@ they have lowest Q-numbers):
      Type your answer, or say "skip" to defer this question.
      ```
 
-4. Record the result:
+4. Before calling AskUserQuestion (or emitting the plain text prompt), if any option /
+   suggested-answer carries multi-sentence content, present the full text in the main thread
+   per the Long-Form Content UX Rule; AskUserQuestion then uses short labels only.
+
+5. **Run the Answer Pressure-Test** (see "Answer Pressure-Test Discipline" above) on the
+   captain's answer. If any of the four checks fails, surface the contradiction evidence in
+   the thread and re-ask with short-label options (`Revise answer` / `Confirm anyway` /
+   `Defer`). A `Confirm anyway` response requires captain rationale.
+
+6. Record the result:
    - Canned option pick → `→ Answer: {option label} (captain, {ISO-date}, interactive)`
    - Freeform answer → `→ Answer: {verbatim response} (captain, {ISO-date}, interactive)`
    - "skip" → `→ Answer: DEFERRED by captain, {ISO-date}` (this still counts as resolved for the Step 5 gate -- captain explicitly deferred)
+   - Pressure-tested confirm → append ` [pressure-tested: {1-line contradiction summary}; captain rationale: "{verbatim}"]` to the annotation.
 
-5. **Canonical References accumulator:** if the captain's answer mentions a file path, spec
+7. **Canonical References accumulator:** if the captain's answer mentions a file path, spec
    name, ADR reference, or similar (e.g., "check adr-001", "see detail.css", "the pattern
    in server.ts:142"):
    - Immediately resolve the reference to a full relative path
@@ -329,7 +439,7 @@ they have lowest Q-numbers):
 The accumulator ALSO runs during Step 3 option selection -- if the captain's option choice
 or freeform response cites a file path or ADR, apply the same resolve-read-append flow.
 
-6. Append the Answer annotation to the entity body directly below the Suggested options.
+8. Append the Answer annotation to the entity body directly below the Suggested options.
 
 ---
 
@@ -409,6 +519,67 @@ independently.
 - Step 4.5 inherits all Rules from the skill-level Rules section (double dash, entity body
   checkpoint, AskUserQuestion rules, Canonical References accumulator, preserve explore
   output).
+- **Long-Form Content UX Rule applies.** Multi-sentence suggestion rationale is presented in
+  thread; AskUserQuestion carries short labels only.
+- **Answer Pressure-Test applies.** Before committing a captain-resolved gray area to the
+  entity body (as new A-n / Q-n / O-n), run the four-check pressure-test. If captain's
+  resolution contradicts Lens Evidence, existing decisions, or Scope: In, surface the
+  contradiction and re-ask before writing the annotation.
+
+---
+
+## Step 4.7: Cumulative Scope Drift Check
+
+After Step 4.5 reaches the "Complete -- no more gray areas" terminal state and before Step 5's
+sufficiency gate, SO MUST run one final check on the cumulative set of clarify decisions
+(Confirmed assumptions, Selected options, Answered questions, Step 4.5 new items).
+
+**Skip condition**: If the entity frontmatter lacks `shape_status: validated` (no `/shape` was
+run), skip Step 4.7 -- there is no Scope: In to drift against.
+
+**Detection procedure**:
+
+1. Read the entity's `## Scope: In` section (shape-locked).
+2. For each clarify decision written in this session, judge (LLM) whether it implies
+   deliverables or behavioral guarantees NOT present in `## Scope: In`.
+3. Collect a list of drift items, each formatted:
+   `{A-n | O-n | Q-n}: {decision summary} -> implies {new deliverable}, not in Scope: In`.
+
+If the drift list is empty, proceed to Step 5 with no captain interaction.
+
+If the drift list is non-empty, SO MUST NOT auto-accept the expansion. Present via
+AskUserQuestion:
+
+- Thread block (Long-Form Content UX Rule) listing every drift item with its implied
+  out-of-scope deliverable and a pointer to the Scope: In bullets it exceeds.
+- AskUserQuestion: "This clarify session expanded scope beyond shape's Scope: In. How do you
+  want to resolve?"
+- Options (short labels, ≤1 sentence descriptions):
+  - `Update shape` -- open a superseding shape entity with the expanded scope.
+  - `Trim decisions` -- revise the drifting clarify decisions back within Scope: In.
+  - `Accept as minor` -- document the delta and proceed; requires captain to acknowledge the
+    delta in freeform text.
+
+**Response handling**:
+
+- `Update shape` -- STOP clarify. Emit: `scope drift detected -- open a new entity with
+  supersedes: {slug} and re-run /shape before resuming clarify on this entity.` EXIT the skill
+  without committing the session (Step 6 does not run). The captain is responsible for the
+  supersedes flow.
+- `Trim decisions` -- loop back to the relevant Step (3 / 4 / 4.5) and have captain revise the
+  drifting decisions. After revision, re-run Step 4.7. Do NOT advance to Step 5 until drift
+  list is empty or accepted.
+- `Accept as minor` -- write a `## Scope Delta` section to the entity body (after
+  `## Canonical References`, before `## Stage Report: explore`) containing:
+  - The drift list verbatim
+  - Captain's acknowledgement text
+  - A note: `Accepted as minor scope delta; shape not updated.`
+  Then proceed to Step 5.
+
+**No-exceptions**: Silent acceptance of cumulative scope drift -- where each decision looked
+reasonable in isolation but together they expanded scope -- is the clarify analog of entity
+123's v1 over-scope failure mode. The cumulative check is a single mechanical gate that
+catches drift individual pressure-tests cannot.
 
 ---
 
@@ -421,6 +592,7 @@ Re-scan the entity body and verify:
 - [ ] Every `### {name}` subsection in `## Option Comparisons` has a `→ Selected:` annotation
 - [ ] `## Acceptance Criteria` exists with ≥2 criteria and no `α` markers remain
 - [ ] `## Canonical References` section exists (may be empty if captain cited no external docs -- that is OK)
+- [ ] Step 4.7 Scope Drift Check ran (shape-locked entities only): either drift list was empty, or a `## Scope Delta` block was written with captain acknowledgement, or captain selected `Update shape` and this skill already EXITed (in which case this gate is not reached)
 
 **If any check fails** → identify the gap and loop back to the relevant step (Step 2 for
 assumptions, Step 3 for options, Step 4 for questions, Step 4.5 for open exploration). Do
@@ -492,6 +664,10 @@ correctly.
      e.g., "3 gray areas surfaced (1 from templates, 1 from CONTRACTS, 0 from directive, 1 via freeform)"
    - [x] Canonical refs added: {n}
      e.g., "entity 009 app.js:244-246; ADR-001 single-server architecture"
+   - [x] Pressure-tests fired: {n} across Steps 3/4/4.5 ({n} revised, {n} confirm-anyway with rationale)
+     e.g., "2 pressure-tests fired; 1 revised (O-2 realigned to upstream #97), 1 confirm-anyway (Q-3 rationale: captain accepts cost)"
+   - [x] Scope drift check: {skipped (no shape_status) | clean | delta accepted | trimmed | superseded}
+     e.g., "clean -- no cumulative drift against Scope: In"
    - [x] Context status: ready
      e.g., "gate passed: all assumptions confirmed, all options selected, all Qs answered"
    - [x] Handoff mode: {loose|tight}
@@ -543,6 +719,9 @@ correctly.
 - **Decomposition gate EXITS the skill** on accept. Do not continue to Step 1. The epic is
   frozen and child entities take over.
 - **Self-verify before asking (Step 1f Iron Law).** Every factual claim in Assumptions / APPROACH / GUARDRAILS that cites `file:line` evidence MUST be directly read by SO before Step 2 batch presentation. Captain's KPI is information gain per question, not question count -- escalating grep-able facts to captain is a discipline violation.
+- **Pressure-test every captain decision (Steps 3 / 4 / 4.5 Iron Law).** Run the four-check pressure-test (Evidence contradiction / Trade-off engagement / Scope boundary / Consistency) before writing any captain answer to the entity body. Silent capture of answers that ignore surfaced evidence is a skill failure.
+- **Long-Form Content UX Rule.** Multi-sentence option content belongs in the main conversation thread; AskUserQuestion carries only short labels (≤80 chars) + 1-sentence descriptions. Never stuff prose into preview fields.
+- **Never auto-accept cumulative scope drift (Step 4.7 Iron Law).** On shape-locked entities, the cumulative clarify decisions MUST be drift-checked against `## Scope: In` before Step 5. Captain chooses Update shape / Trim / Accept-as-minor. Silent acceptance is the entity-123-v1 over-scope failure mode.
 
 ## Rationalization Table -- Self-Verification Shortcuts (1f)
 
