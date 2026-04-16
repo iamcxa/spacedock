@@ -47,6 +47,8 @@ depends-on: [053]
 - SSE live feed from entity 053 drives real-time badge updates — no separate polling
 - `feedback-to` edge rendering must handle multiple edges to same target (quality→execute, review→execute, uat→execute) without visual overlap
 - Custom SVG approach — no external graph rendering libraries
+- **Legacy parity guardrail (captain 2026-04-16)**: The new PipelineGraph MUST replicate ALL visual capabilities from `tools/dashboard/static/visualizer.js` — node shapes, entity count badges, feedback arcs, stage colors, click filtering, and responsive scroll. Do NOT omit any feature the legacy graph already has. "Edit Pipeline" button is explicitly excluded (captain decision: not needed for spacebridge, will be replanned separately).
+- **Workflow title + total count header**: Pipeline graph section MUST display the workflow name (e.g., "build-pipeline") and total entity count (e.g., "features · 121 total") as a header above the SVG graph, matching the legacy dashboard header layout. This is rendered in the war-room.tsx integration, not inside the SVG.
 
 **RATIONALE**: The spacebridge Next.js app (entity 053) already provides SSE infrastructure, entity card list, Drizzle DB access, and shadcn/Tailwind stack. Adding the pipeline graph as a new component is the minimal-integration path. Custom SVG for graph layout is correct given the pipeline's known fixed topology (10 nodes, linear, 3 feedback arcs): minimal bundle, no dependencies, fully within React/Tailwind conventions. Entity counts from DB via API route keeps data consistent with entity cards. URL-param-driven filtering connects graph interaction to entity list without global state manager.
 
@@ -474,7 +476,8 @@ Goal: Add interactive pipeline graph to war room home page with stage visualizat
   - Add `useSearchParams` and `useRouter` from `next/navigation` for stage filter URL param
   - Read `?stage=` param, use as active filter. Clicking a stage toggles the filter (click same stage again to clear).
   - Wrap entire component content in `<SSEProvider>`
-  - Render `<PipelineGraph>` above the Tabs div, passing stages, entityCountByStage, modHooks, activeStage, and onStageClick handler
+  - Render a **workflow header** above the PipelineGraph: `<div>` with workflow name (from stages metadata or hardcoded "build-pipeline") in bold + "features · {totalEntityCount} total" subtitle in muted text. Match legacy dashboard header layout.
+  - Render `<PipelineGraph>` below the header, above the Tabs div, passing stages, entityCountByStage, modHooks, activeStage, and onStageClick handler
   - When `activeStage` is set, filter entities across all repos: only show entities whose `status` matches `activeStage`. Pass filtered entities to RepoSection. Show a clear-filter chip/badge next to the graph.
   - Update URL with `router.push(\`?stage=\${name}\`, { scroll: false })` on stage click, or `router.push("/", { scroll: false })` on clear
   </action>
