@@ -21,6 +21,16 @@ interface CommentRow {
   resolvedReason: string | null;
 }
 
+interface SuggestionRow {
+  suggestionId: string;
+  commentId: string;
+  diffFrom: string;
+  diffTo: string;
+  status: string;
+  author: string;
+  createdAt: number;
+}
+
 interface CommentPanelProps {
   commentsBySection: Record<string, CommentRow[]>;
   repliesByParent: Record<string, CommentRow[]>;
@@ -28,6 +38,7 @@ interface CommentPanelProps {
   entitySlug: string;
   onCommentAdded: (comment: CommentRow) => void;
   onScrollToHighlight?: (commentId: string) => void;
+  suggestionsByComment?: Record<string, SuggestionRow[]>;
 }
 
 export function CommentPanel({
@@ -37,6 +48,7 @@ export function CommentPanel({
   entitySlug,
   onCommentAdded,
   onScrollToHighlight,
+  suggestionsByComment = {},
 }: CommentPanelProps) {
   const [commentsBySection, setCommentsBySection] = useState(initialCommentsBySection);
 
@@ -93,6 +105,7 @@ export function CommentPanel({
                     comment={comment}
                     replies={repliesByParent[comment.commentId] ?? []}
                     entitySlug={entitySlug}
+                    suggestions={suggestionsByComment[comment.commentId] ?? []}
                   />
                 </div>
               ))}
@@ -124,6 +137,7 @@ export function CommentPanel({
                       comment={comment}
                       replies={repliesByParent[comment.commentId] ?? []}
                       entitySlug={entitySlug}
+                      suggestions={suggestionsByComment[comment.commentId] ?? []}
                     />
                   </div>
                 ))}

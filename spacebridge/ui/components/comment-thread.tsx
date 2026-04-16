@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Comment } from "@/components/comment";
 import { ReplyForm } from "@/components/reply-form";
+import { SuggestionDiff } from "@/components/suggestion-diff";
+import { SuggestForm } from "@/components/suggest-form";
 import { Button } from "@/components/ui/button";
 
 interface CommentRow {
@@ -22,15 +24,27 @@ interface CommentRow {
   resolvedReason: string | null;
 }
 
+interface SuggestionRow {
+  suggestionId: string;
+  commentId: string;
+  diffFrom: string;
+  diffTo: string;
+  status: string;
+  author: string;
+  createdAt: number;
+}
+
 interface CommentThreadProps {
   comment: CommentRow;
   replies: CommentRow[];
   entitySlug: string;
+  suggestions?: SuggestionRow[];
 }
 
-export function CommentThread({ comment, replies, entitySlug }: CommentThreadProps) {
+export function CommentThread({ comment, replies, entitySlug, suggestions = [] }: CommentThreadProps) {
   const router = useRouter();
   const [showReply, setShowReply] = useState(false);
+  const [showSuggest, setShowSuggest] = useState(false);
   const [localResolved, setLocalResolved] = useState(comment.resolved === 1);
 
   function handleResolved() {
@@ -41,6 +55,13 @@ export function CommentThread({ comment, replies, entitySlug }: CommentThreadPro
     setShowReply(false);
     router.refresh();
   }
+
+  function handleSuggestionSubmitted() {
+    setShowSuggest(false);
+    router.refresh();
+  }
+
+  const threadSuggestions = suggestions.filter((s) => s.commentId === comment.commentId);
 
   return (
     <div className="space-y-1">
@@ -74,24 +95,59 @@ export function CommentThread({ comment, replies, entitySlug }: CommentThreadPro
         </div>
       )}
 
-      {/* Reply action */}
+      {/* Suggestions */}
+      {threadSuggestions.length > 0 && (
+        <div className="ml-8 space-y-2">
+          {threadSuggestions.map((s) => (
+            <SuggestionDiff
+              key={s.suggestionId}
+              suggestionId={s.suggestionId}
+              diffFrom={s.diffFrom}
+              diffTo={s.diffTo}
+              status={s.status as "pending" | "accepted" | "rejected"}
+              author={s.author}
+              entitySlug={entitySlug}
+              onAccepted={() => router.refresh()}
+              onRejected={() => router.refresh()}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Reply / Suggest edit actions */}
       {!localResolved && (
-        <div className="ml-8">
+        <div className="ml-8 space-y-1">
           {showReply ? (
             <ReplyForm
               entitySlug={entitySlug}
               parentCommentId={comment.commentId}
               onSubmitted={handleReplySubmitted}
             />
+          ) : showSuggest ? (
+            <SuggestForm
+              entitySlug={entitySlug}
+              commentId={comment.commentId}
+              onSubmitted={handleSuggestionSubmitted}
+            />
           ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs text-muted-foreground h-6 px-2"
-              onClick={() => setShowReply(true)}
-            >
-              Reply
-            </Button>
+            <div className="flex gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground h-6 px-2"
+                onClick={() => setShowReply(true)}
+              >
+                Reply
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground h-6 px-2"
+                onClick={() => setShowSuggest(true)}
+              >
+                Suggest edit
+              </Button>
+            </div>
           )}
         </div>
       )}
