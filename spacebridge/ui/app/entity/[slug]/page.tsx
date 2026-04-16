@@ -3,8 +3,7 @@
 // queries events + comments from DB, renders header/timeline/body/comments.
 // Dynamic route: /entity/[slug] — slug maps to docs/build-pipeline/<slug>.md
 
-import { access } from "node:fs/promises";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { and, asc, eq } from "drizzle-orm";
 import Link from "next/link";

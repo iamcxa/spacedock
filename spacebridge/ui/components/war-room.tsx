@@ -5,8 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { EntityCard } from "@/lib/entity-scan";
 import type { PipelineStage } from "@/lib/pipeline-parse";
 import { SSEProvider } from "@/lib/sse-context";
-import { PipelineGraph } from "./pipeline-graph";
 import { LiveFeed } from "./live-feed";
+import { PipelineGraph } from "./pipeline-graph";
 import { RepoSection } from "./repo-section";
 
 export interface RepoData {
@@ -40,10 +40,12 @@ export function WarRoom({ repos, leaseMap, stages, entityCountByStage, modHooks 
 
   // Filter repos by active stage if set
   const filteredRepos = activeStage
-    ? repos.map((repo) => ({
-        ...repo,
-        entities: repo.entities.filter((e) => e.status === activeStage),
-      })).filter((repo) => repo.entities.length > 0)
+    ? repos
+        .map((repo) => ({
+          ...repo,
+          entities: repo.entities.filter((e) => e.status === activeStage),
+        }))
+        .filter((repo) => repo.entities.length > 0)
     : repos;
 
   return (
@@ -53,9 +55,7 @@ export function WarRoom({ repos, leaseMap, stages, entityCountByStage, modHooks 
           {/* Workflow header */}
           <div className="mb-3">
             <div className="font-bold text-sm">build-pipeline</div>
-            <div className="text-xs text-muted-foreground">
-              features · {totalEntityCount} total
-            </div>
+            <div className="text-xs text-muted-foreground">features · {totalEntityCount} total</div>
           </div>
 
           {/* Pipeline graph */}
@@ -113,11 +113,7 @@ export function WarRoom({ repos, leaseMap, stages, entityCountByStage, modHooks 
                 : repo.entities;
               return (
                 <TabsContent key={repo.repoLabel} value={repo.repoLabel}>
-                  <RepoSection
-                    repoLabel={repo.repoLabel}
-                    entities={filtered}
-                    leaseMap={leaseMap}
-                  />
+                  <RepoSection repoLabel={repo.repoLabel} entities={filtered} leaseMap={leaseMap} />
                 </TabsContent>
               );
             })}

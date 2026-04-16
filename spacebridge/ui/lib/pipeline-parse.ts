@@ -2,8 +2,8 @@
 // Extended with `manual` field for pipeline graph rendering (dashed border nodes).
 // Do NOT import from tools/dashboard/ — this module is standalone for UI process isolation.
 
-import { readFileSync, readdirSync } from "node:fs";
-import { join, basename } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { basename, join } from "node:path";
 
 export interface PipelineStage {
   name: string;
@@ -70,6 +70,7 @@ export function parsePipelineStages(readmePath: string): PipelineStage[] {
     }
 
     if (indent === stagesIndent) {
+      const knownIndent = stagesIndent;
       if (stripped === "defaults:") {
         i++;
         while (i < lines.length) {
@@ -80,12 +81,10 @@ export function parsePipelineStages(readmePath: string): PipelineStage[] {
             continue;
           }
           const dindent = dline.length - dstripped.length;
-          if (dindent <= stagesIndent!) break;
+          if (dindent <= knownIndent) break;
           if (dstripped.includes(":") && !dstripped.startsWith("#")) {
             const idx = dstripped.indexOf(":");
-            defaults[dstripped.slice(0, idx).trim()] = dstripped
-              .slice(idx + 1)
-              .trim();
+            defaults[dstripped.slice(0, idx).trim()] = dstripped.slice(idx + 1).trim();
           }
           i++;
         }
@@ -101,7 +100,7 @@ export function parsePipelineStages(readmePath: string): PipelineStage[] {
             continue;
           }
           const sindent = sline.length - sstripped.length;
-          if (sindent <= stagesIndent!) break;
+          if (sindent <= knownIndent) break;
           if (sstripped.startsWith("- name:")) {
             const name = sstripped.slice("- name:".length).trim();
             currentState = { name };
@@ -113,9 +112,7 @@ export function parsePipelineStages(readmePath: string): PipelineStage[] {
             !sstripped.startsWith("#")
           ) {
             const idx = sstripped.indexOf(":");
-            currentState[sstripped.slice(0, idx).trim()] = sstripped
-              .slice(idx + 1)
-              .trim();
+            currentState[sstripped.slice(0, idx).trim()] = sstripped.slice(idx + 1).trim();
           }
           i++;
         }

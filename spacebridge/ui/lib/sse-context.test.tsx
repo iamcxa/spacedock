@@ -3,7 +3,7 @@
 // available in the bun:test context outside Next.js build.
 
 import { describe, expect, test } from "bun:test";
-import { join } from "path";
+import { join } from "node:path";
 
 const SRC_PATH = join(import.meta.dir, "sse-context.tsx");
 

@@ -3,7 +3,7 @@ import { gt } from "drizzle-orm";
 import { EmptyState } from "@/components/empty-state";
 import { type RepoData, WarRoom } from "@/components/war-room";
 import { scanEntitiesForRepo } from "@/lib/entity-scan";
-import { parsePipelineStages, parseModHooks } from "@/lib/pipeline-parse";
+import { parseModHooks, parsePipelineStages } from "@/lib/pipeline-parse";
 import { entityLeases, sessions } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";

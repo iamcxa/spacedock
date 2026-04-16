@@ -118,9 +118,8 @@ function buildLayout(stages: PipelineStage[]): Layout {
   });
 
   // Extra height for staggered feedback arcs
-  const maxStackIndex = feedbackEdges.length > 0
-    ? Math.max(...feedbackEdges.map((e) => e.stackIndex))
-    : 0;
+  const maxStackIndex =
+    feedbackEdges.length > 0 ? Math.max(...feedbackEdges.map((e) => e.stackIndex)) : 0;
   const maxArcHeight = FEEDBACK_ARC_HEIGHT * (1 + 0.4 * maxStackIndex);
 
   const totalW = PADDING * 2 + nodes.length * NODE_W + (nodes.length - 1) * NODE_GAP_X;
@@ -131,13 +130,7 @@ function buildLayout(stages: PipelineStage[]): Layout {
 
 // --- Node shape components ---
 
-function NodeShape({
-  node,
-  isActive,
-}: {
-  node: LayoutNode;
-  isActive: boolean;
-}) {
+function NodeShape({ node, isActive }: { node: LayoutNode; isActive: boolean }) {
   const cx = node.x;
   const cy = node.y;
 
@@ -254,13 +247,7 @@ function FeedbackArc({
 
   return (
     <g className="pipeline-feedback-edge">
-      <path
-        d={d}
-        fill="none"
-        stroke="rgb(245 158 11)"
-        strokeWidth={1.5}
-        strokeDasharray="5,3"
-      />
+      <path d={d} fill="none" stroke="rgb(245 158 11)" strokeWidth={1.5} strokeDasharray="5,3" />
       <polygon points={arrowPoints} fill="rgb(245 158 11)" />
       <text
         x={midX}
@@ -369,7 +356,7 @@ export function PipelineGraph({
           if (detail.from) {
             next[detail.from] = Math.max(
               0,
-              (next[detail.from] ?? entityCountByStage[detail.from] ?? 1) - 1
+              (next[detail.from] ?? entityCountByStage[detail.from] ?? 1) - 1,
             );
           }
         } catch {
@@ -400,8 +387,7 @@ export function PipelineGraph({
     <div className="space-y-1">
       {modHooks.lifecycle.length > 0 && (
         <p className="text-xs text-muted-foreground font-mono">
-          FO hooks:{" "}
-          {modHooks.lifecycle.join(", ")}
+          FO hooks: {modHooks.lifecycle.join(", ")}
         </p>
       )}
       <div className="overflow-x-auto">
@@ -410,6 +396,7 @@ export function PipelineGraph({
           className="pipeline-graph-svg"
           style={{ minWidth: layout.width, height: layout.height }}
         >
+          <title>Pipeline stage graph</title>
           {/* Forward edges (behind nodes) */}
           {layout.forwardEdges.map((edge) => (
             <ForwardEdge
@@ -432,18 +419,23 @@ export function PipelineGraph({
           {/* Nodes */}
           {layout.nodes.map((node) => {
             const isActive = activeStage === node.name;
-            const count = effectiveCounts[node.name] ?? 0;
+            const _count = effectiveCounts[node.name] ?? 0;
             const hasMergePill =
-              (node.terminal || mergeHookNodes.has(node.name)) &&
-              modHooks.merge.length > 0;
+              (node.terminal || mergeHookNodes.has(node.name)) && modHooks.merge.length > 0;
 
             return (
+              // biome-ignore lint/a11y/useSemanticElements: SVG <g> cannot be replaced with <button>
               <g
                 key={node.name}
                 data-stage={node.name}
                 className="pipeline-node"
                 style={{ cursor: "pointer" }}
+                role="button"
+                tabIndex={0}
                 onClick={() => onStageClick(node.name)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") onStageClick(node.name);
+                }}
               >
                 <NodeShape node={node} isActive={isActive} />
                 <text

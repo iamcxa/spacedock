@@ -1,15 +1,9 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { parsePipelineStages, parseModHooks } from "./pipeline-parse";
+import { parseModHooks, parsePipelineStages } from "./pipeline-parse";
 
-const README_PATH = join(
-  import.meta.dir,
-  "../../../docs/build-pipeline/README.md"
-);
-const MODS_DIR = join(
-  import.meta.dir,
-  "../../../docs/build-pipeline/_mods"
-);
+const README_PATH = join(import.meta.dir, "../../../docs/build-pipeline/README.md");
+const MODS_DIR = join(import.meta.dir, "../../../docs/build-pipeline/_mods");
 
 describe("parsePipelineStages", () => {
   test("returns 11 stages in correct order from real README.md", () => {
@@ -74,9 +68,7 @@ describe("parsePipelineStages", () => {
     expect(draft?.manual).toBe(true);
     expect(clarify?.manual).toBe(true);
     // non-manual stages
-    const nonManual = stages.filter(
-      (s) => s.name !== "draft" && s.name !== "clarify"
-    );
+    const nonManual = stages.filter((s) => s.name !== "draft" && s.name !== "clarify");
     for (const s of nonManual) {
       expect(s.manual).toBe(false);
     }
@@ -86,13 +78,13 @@ describe("parsePipelineStages", () => {
     const stages = parsePipelineStages(README_PATH);
     const byName = Object.fromEntries(stages.map((s) => [s.name, s]));
     expect(byName["alignment-gate"].feedback_to).toBe("brainstorm");
-    expect(byName["quality"].feedback_to).toBe("execute");
-    expect(byName["review"].feedback_to).toBe("execute");
-    expect(byName["uat"].feedback_to).toBe("execute");
+    expect(byName.quality.feedback_to).toBe("execute");
+    expect(byName.review.feedback_to).toBe("execute");
+    expect(byName.uat.feedback_to).toBe("execute");
     // stages without feedback-to
-    expect(byName["draft"].feedback_to).toBe("");
-    expect(byName["brainstorm"].feedback_to).toBe("");
-    expect(byName["shipped"].feedback_to).toBe("");
+    expect(byName.draft.feedback_to).toBe("");
+    expect(byName.brainstorm.feedback_to).toBe("");
+    expect(byName.shipped.feedback_to).toBe("");
   });
 
   test("returns [] for non-existent path", () => {
@@ -105,7 +97,7 @@ describe("parseModHooks", () => {
   test("pr-review-loop has hooks [startup, idle, merge]", () => {
     const hookMap = parseModHooks(MODS_DIR);
     expect(hookMap.has("pr-review-loop")).toBe(true);
-    const hooks = hookMap.get("pr-review-loop")!;
+    const hooks = hookMap.get("pr-review-loop") ?? [];
     expect(hooks).toContain("startup");
     expect(hooks).toContain("idle");
     expect(hooks).toContain("merge");

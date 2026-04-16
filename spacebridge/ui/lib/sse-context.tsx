@@ -3,7 +3,7 @@
 // ABOUTME: Shared SSE context provider. Extracts EventSource logic from LiveFeed so both
 // LiveFeed and PipelineGraph share a single SSE connection (O-2 decision, entity 094).
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 
 export interface SSEEvent {
   id: number;
