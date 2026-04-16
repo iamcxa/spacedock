@@ -91,6 +91,20 @@ export const commentEvents = sqliteTable("comment_events", {
   timestamp: integer("timestamp").notNull(), // epoch-ms
 });
 
+// ─── suggestions — [full CQRS] read-model snapshot for suggestion aggregate ──────
+
+export const suggestions = sqliteTable("suggestions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  suggestionId: text("suggestion_id").notNull().unique(),
+  commentId: text("comment_id").notNull(),
+  diffFrom: text("diff_from").notNull(),
+  diffTo: text("diff_to").notNull(),
+  status: text("status").notNull(), // "pending" | "accepted" | "rejected"
+  author: text("author").notNull(), // "captain" | "fo" | "guest"
+  createdAt: integer("created_at").notNull(), // epoch-ms
+  workflowDir: text("workflow_dir").notNull(),
+});
+
 // ─── lease_events — [full CQRS] fmodel event log for lease aggregate (design doc §5.3) ──
 
 export const leaseEvents = sqliteTable("lease_events", {

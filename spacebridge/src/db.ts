@@ -150,6 +150,19 @@ function applySchema(sqlite: Database): void {
     )
   `);
   sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS suggestions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      suggestion_id TEXT NOT NULL UNIQUE,
+      comment_id TEXT NOT NULL,
+      diff_from TEXT NOT NULL,
+      diff_to TEXT NOT NULL,
+      status TEXT NOT NULL,
+      author TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      workflow_dir TEXT NOT NULL
+    )
+  `);
+  sqlite.exec(`
     CREATE TABLE IF NOT EXISTS share_tokens (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       token TEXT NOT NULL UNIQUE,

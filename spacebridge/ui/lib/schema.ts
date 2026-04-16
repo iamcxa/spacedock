@@ -74,6 +74,18 @@ export const commentEvents = sqliteTable("comment_events", {
   timestamp: integer("timestamp").notNull(),
 });
 
+export const suggestions = sqliteTable("suggestions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  suggestionId: text("suggestion_id").notNull().unique(),
+  commentId: text("comment_id").notNull(),
+  diffFrom: text("diff_from").notNull(),
+  diffTo: text("diff_to").notNull(),
+  status: text("status").notNull(), // "pending" | "accepted" | "rejected"
+  author: text("author").notNull(),
+  createdAt: integer("created_at").notNull(),
+  workflowDir: text("workflow_dir").notNull(),
+});
+
 // ─── share_tokens — [plain drizzle] bearer-token model (mirrors spacebridge/src/schema.ts) ──
 
 export const shareTokens = sqliteTable("share_tokens", {
