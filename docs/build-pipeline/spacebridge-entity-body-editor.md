@@ -1,8 +1,8 @@
 ---
 id: 119
 title: "Spacebridge Entity Body Editor -- Full Render + Edit Parity with Legacy detail.html"
-status: brainstorm
-context_status: pending
+status: explore
+context_status: awaiting-clarify
 source: entity 060 shape (US-1 parity, 2026-04-16)
 created: 2026-04-16T20:02:00+08:00
 started:
@@ -93,7 +93,7 @@ You are asking for Spacebridge's entity detail page to render and behave the sam
 
 ## Brainstorming Spec
 
-**APPROACH**: Treat 119 as a renderer-fidelity + interaction-gap-closure entity on top of 054's existing scaffold. Deliverable 1: run a mechanical parity audit walk through `tools/dashboard/static/detail.js` (71.5K) classifying every section-render and event-handler into (a) missing in Spacebridge → close here, (b) partially present → enhance here, (c) owned by sibling (089/094/111/117/120) → link + defer, (d) explicit non-goal (legacy-only dead code). Output = `docs/spacebridge-parity-audit.md` consumed by the plan stage. Deliverable 2: add missing section-aware renderers to `spacebridge/ui/components/entity-body.tsx` — Stage Report split + checklist cards, brainstorming spec section boundaries, Open Questions blank-line-respecting format per 047's contract. Deliverable 3: extract shared types (`spacebridge/ui/types/entity.ts` or similar) so `CommentRow` stops drifting between two component files. Deliverable 4: verify GateButtons gate-review flow (WebSocket status derivation + accept/reject) against `detail.js:685`; extend where gaps exist. Consume 117 tokens once shipped; route via 120's owner/repo shape when its clarify-ready plan lands. (needs clarification -- deferred to explore: exact 089 vs 119 boundary for body text edits other than comment-suggestion applies.)
+**APPROACH**: Treat 119 as a renderer-fidelity + interaction-gap-closure entity on top of 054's existing scaffold. Deliverable 1: run a mechanical parity audit walk through `tools/dashboard/static/detail.js` (71.5K) classifying every section-render and event-handler into (a) missing in Spacebridge → close here, (b) partially present → enhance here, (c) owned by sibling (089/094/111/117/120) → link + defer, (d) explicit non-goal (legacy-only dead code). Output = `docs/spacebridge-parity-audit.md` consumed by the plan stage (✓ confirmed by explore: 060 Scope In mandates this doc at spacebridge-cutover-remove-static-ui.md:56). Deliverable 2: add missing section-aware renderers to `spacebridge/ui/components/entity-body.tsx` — pre-split body on `## Stage Report:` / `## Assumptions` / `## Options` / `## Open Questions` BEFORE react-markdown, render split sections with custom React components per 047's canonical contract (✓ confirmed by explore: legacy pattern at tools/dashboard/static/detail.js:62-64, 86-138; Spacebridge entity-body.tsx:214 currently passes raw body to ReactMarkdown with NO split). Deliverable 3: extract shared types to `spacebridge/ui/types/entity.ts` so `CommentRow` stops drifting between `entity-body.tsx:14` + `entity-detail-client.tsx:12` (✓ confirmed by explore: duplication verified). Deliverable 4: close GateButtons gaps — port legacy `isEntityAtGate(status, stages)` workflow-driven gate-visibility derivation to replace entity-body.tsx:88 hardcoded `status === "plan" || status === "uat"`; port status-poll race detection from detail.js:846; port WebSocket `gate_decision` event listener from detail.js:1148. GateButtons.tsx itself already ships full approve/reject flow via `/api/entities/[slug]/gate` (⚠ contradicted: detail.js:685 was mis-cited in brainstorm as the "gate-review flow" — actual accept/reject at :619-683 is 089's suggestion territory; true gate flow lives at detail.js:685-1160 -- see Q-3). Consume 117 tokens + shared header once shipped; route via 120's `?repo=owner/name` shape when 120's plan lands.
 
 **ALTERNATIVE**: Greenfield rewrite of `entity-body.tsx` from scratch directly porting `detail.js` semantics without consulting 054's existing scaffold -- D-01 rejected: 054 already shipped the page route, comment-highlight wrapTextRange logic, EntityDetailClient layout, and GateButtons/ChatInput slots; a greenfield rewrite would duplicate shipped infrastructure and risk divergence from 054's contract. Closing gaps incrementally preserves 054's sunk value and keeps the change surface reviewable.
 
@@ -115,6 +115,140 @@ You are asking for Spacebridge's entity detail page to render and behave the sam
 - Given two component files currently defining `CommentRow` inline, when 119 ships, then exactly one canonical `CommentRow` type lives in a shared types file and both component files import it (how to verify: `grep -l "interface CommentRow" spacebridge/ui/` returns exactly one source file outside tests).
 - Given legacy `detail.js:685` gate-review flow, when Spacebridge GateButtons is invoked on a gated entity, then the accept/reject actions produce identical server-side state transitions to legacy (how to verify: e2e test against dashboard WS feed asserting status transitions match for both codepaths; parity audit row for gate flow marked closed).
 
+## Assumptions
+
+A-1: Parity audit document lives at `docs/spacebridge-parity-audit.md` as mandated by entity 060 Scope In.
+
+Confidence: Confident (0.95)
+
+Evidence: docs/build-pipeline/spacebridge-cutover-remove-static-ui.md:56 -- "Audit document listing every legacy dashboard UI feature with per-feature status (present / degraded / missing) in Spacebridge, committed to `docs/spacebridge-parity-audit.md`." [primary]
+
+A-2: Section-aware rendering strategy: pre-split entity body on section markers (`## Stage Report:`, `## Assumptions`, `## Options`, `## Option Comparisons`, `## Open Questions`) BEFORE passing remaining markdown to `react-markdown`, then render each split section with a dedicated custom React component. Mirrors 047's canonical pattern.
+
+Confidence: Confident (0.92)
+
+Evidence: tools/dashboard/static/detail.js:62-64 -- `var parts = bodyMarkdown.split(/^## Stage Report: /m); var bodyContent = parts[0].trim()` -- legacy precedent [primary]; tools/dashboard/static/detail.js:86-138 -- `renderStageReports()` canonical checklist card renderer with done/skip/fail iconography and `.item-detail` span [primary]; docs/build-pipeline/_archive/entity-body-rendering-hotfixes.md:108-110 -- 047 A-5 "Stage Report rendering bypasses markdown soft-newline collapsing entirely because renderBody() splits the entity body at `## Stage Report:` before markdown renders the body section" [primary]; spacebridge/ui/components/entity-body.tsx:197-215 -- current Spacebridge implementation passes raw `body` to `ReactMarkdown` with zero pre-split (gap confirmed) [primary].
+
+A-3: Markdown library stays `react-markdown` (no switch to `marked` + `DOMPurify`).
+
+Confidence: Confident (0.90)
+
+Evidence: spacebridge/ui/components/entity-body.tsx:9 -- already imports `ReactMarkdown` [primary]; react-markdown sanitizes by default (no XSS regression); switching would force full DOM rewrite [secondary].
+
+A-4: `CommentRow` (and any other duplicated types) extract to `spacebridge/ui/types/entity.ts`, following Next.js app-internal types convention.
+
+Confidence: Likely (0.75)
+
+Evidence: spacebridge/ui/components/entity-body.tsx:14 + spacebridge/ui/components/entity-detail-client.tsx:12 -- identical inline interface definitions [primary]; no existing `spacebridge/ui/types/` directory yet (greenfield) [tertiary]; 117 shared-header extraction pattern establishes precedent for `spacebridge/ui/` shared reusables [secondary].
+
+A-5: Gate-visibility derivation ports legacy `isEntityAtGate(status, stages)`: fetch workflow definitions from `/api/workflows`, find matching workflow, check `stage.gate === true` for the current entity status. Replaces hardcoded `status === "plan" || status === "uat"`.
+
+Confidence: Likely (0.70)
+
+Evidence: tools/dashboard/static/detail.js:711-717 -- canonical legacy derivation [primary]; spacebridge/ui/components/entity-body.tsx:88 -- `showGateButtons = !autoAdvance && (status === "plan" || status === "uat")` hardcoded list [primary]; rationale: workflows can declare additional gate stages; hardcoded list breaks on workflow evolution [secondary].
+
+A-6: Open Questions section-aware rendering follows 047's canonical contract -- blank-line separation between Q-n fields (Domain / Why it matters / Suggested options / → Answer) so markdown soft-newline collapse does not concatenate them into a single paragraph.
+
+Confidence: Confident (0.95)
+
+Evidence: docs/build-pipeline/_archive/entity-body-rendering-hotfixes.md:61 -- "each Q-n's Domain / Why it matters / Suggested options / Answer lines render as distinct markdown paragraphs" [primary]; skills/build-explore/references/output-format.md (referenced by 047 A-3) [primary].
+
+A-7: All added/modified components consume 117's hybrid Tailwind+custom tokens (no ad-hoc hex or absolute-pixel values), and ThemeToggle is accessed via 117's extracted shared header component, not re-wired.
+
+Confidence: Confident (0.95)
+
+Evidence: docs/build-pipeline/spacebridge-design-system.md:130 -- captain-corrected token strategy [primary]; docs/build-pipeline/spacebridge-design-system.md:213 -- "extract a shared header component used by both war room (page.tsx) and entity detail (entity/[slug]/page.tsx); place ThemeToggle in the shared header" [primary]; 119 depends-on: [117] [primary].
+
+A-8: Page routing consumes 120's `?repo=owner/name` URL shape; entity 119's page.tsx modifications do NOT re-introduce `.limit(1)` session selection.
+
+Confidence: Confident (0.95)
+
+Evidence: docs/build-pipeline/spacebridge-session-list-ui.md:156 -- "→ Selected: URL query param -- but key is `?repo=owner/name`, NOT `?session={sessionId}` (captain, 2026-04-16, interactive -- corrected by Q-2 reframe per entity 100 hierarchy alignment)" [primary]; docs/build-pipeline/spacebridge-session-list-ui.md:65 -- current `.limit(1)` at entity/[slug]/page.tsx:59-66 is the targeted UX failure [primary]; 119 depends-on: [120] [primary].
+
+## Option Comparisons
+
+### O-1: Gate WebSocket `gate_decision` event parity
+
+Legacy detail.js:1148 listens for WebSocket `gate_decision` events to update the gate status badge in real time when the gate is resolved elsewhere (e.g., another browser tab, FO-triggered). Spacebridge currently has no such listener. How should parity be achieved?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|--------|------|------|------------|----------------|
+| (a) Port the WebSocket `gate_decision` listener into a new `use-gate-events` hook subscribed in GateButtons | Real-time parity; no polling overhead; matches legacy UX exactly | Requires Spacebridge WS bridge to forward `gate_decision` event type; may overlap with 053's SSE feed | Medium | ✅ Recommended |
+| (b) Defer real-time sync; rely on Next.js `router.refresh()` on focus + status-poll | Simpler; no WS surface change | Delayed UX -- captain sees stale Pending state until focus/poll; regresses vs legacy | Low | Viable |
+| (c) Emit server-sent events (SSE) from the gate-decision API endpoint; consume via EventSource in GateButtons | Re-uses 053's SSE pattern; avoids widening WS contract | Adds endpoint; duplicates the 053 SSE surface without clear gain over (a) | High | Not recommended |
+
+Return value trace: (a) flows through existing WS bridge registered at spacebridge/ui/app layout; cost is one additional event-type case in the receiver. (b) regresses real-time parity vs legacy. (c) adds a new endpoint surface — audit doc row would need "119 owns new SSE endpoint" annotation which risks boundary blur with 053.
+
+### O-2: Status-poll race detection parity
+
+Legacy detail.js:846 polls `/api/entity/detail` every 5 seconds after a local gate decision to detect race conditions (gate resolved by another actor). Without polling, the UI could stay in Pending state indefinitely if WebSocket delivery drops.
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|--------|------|------|------------|----------------|
+| (a) Next.js `router.refresh()` triggered on window focus + every 5s interval while gate is pending | Idiomatic Next.js; forces RSC re-fetch; no custom polling infrastructure | `router.refresh()` re-fetches the entire RSC tree; heavier than a single endpoint poll | Low | ✅ Recommended |
+| (b) Port legacy `setInterval` polling of `/api/entity/detail` as client-side fetch | Matches legacy cost profile; no RSC tree refetch | Requires client-side state mgmt to merge poll results; duplicates RSC responsibility | Medium | Viable |
+| (c) WebSocket-only sync (no polling) | Simplest when WS is reliable | No resilience if WS delivery drops; regresses parity guarantee | None | Not recommended |
+
+Return value trace: `router.refresh()` triggers a server roundtrip that returns new RSC payload; Next.js reconciles. Cost comparable to a 1-endpoint poll for a small RSC tree. (c) fails the parity guarantee.
+
+### O-3: Body section-aware rendering implementation strategy
+
+How exactly does `entity-body.tsx` pre-split the body and render split sections?
+
+| Option | Pros | Cons | Complexity | Recommendation |
+|--------|------|------|------------|----------------|
+| (a) Eager pre-split using regex on `## {heading}` markers in a single pass; render each split section with a dedicated `<StageReportSection>` / `<QuestionsSection>` / `<AssumptionsSection>` component; remaining body streams to `<ReactMarkdown>` | Mirrors legacy detail.js exactly; deterministic; easy to test per-section in isolation | Regex-based split is fragile if section headings contain nested `## ` subheadings; must match 047's exact grammar | Medium | ✅ Recommended |
+| (b) Use `react-markdown` `components` override for `h2` to swap rendering based on heading text | Keeps a single markdown parse pass; leverages existing library | h2 override only has access to heading node, not sibling content; would need a tree-walker to collect section bodies -- complex and fights the library | High | Not recommended |
+| (c) Two-pass: parse full markdown AST (via remark), transform nodes with matching heading IDs into custom React components via `rehype` | Most robust against nested heading edge cases | Large dependency surface; team unfamiliar with remark/rehype custom transforms; overkill for 4 known section types | High | Not recommended |
+
+Return value trace: (a) returns a small component tree (header + split sections) consumed directly by the render. (b) requires sibling-walker which `react-markdown`'s components API does not directly provide. (c) requires remark/rehype plugin authoring, a stack the codebase does not currently use.
+
+## Open Questions
+
+Q-1: `docs/spacebridge-parity-audit.md` -- input or output?
+
+Domain: Readable/Textual (scope boundary)
+
+Why it matters: Determines plan-stage task shape. If input: an explore-phase task must walk detail.js (71.5K) end-to-end NOW and pre-populate every parity row before plan, so plan tasks can break down per-row. If output: plan drafts an empty scaffold and execute fills rows as each gap closes; audit becomes a remediation tracker rather than a pre-flight gap list.
+
+Suggested options:
+- (a) Input-first -- explore (this stage) produces a complete gap inventory before plan runs; plan tasks keyed to specific audit rows
+- (b) Output-first -- explore writes an empty scaffold; plan tasks include "walk detail.js + populate audit" as the first task; execute fills rows
+- (c) Hybrid -- explore writes audit scaffold + a coarse top-level row list (Stage Report / brainstorming spec / Open Questions / gate derivation / markdown fidelity / interactive handlers); plan tasks decompose each top-level row further
+
+Q-2: 089 vs 119 scope boundary for suggestion rendering UI
+
+Domain: User-facing Visual (render slot ownership)
+
+Why it matters: Legacy detail.js:619-683 renders suggestion accept/reject buttons inline in the entity body. 089's clarify-ready design owns the LOGIC (`suggestion-decider.ts`) but the rendering slot in Spacebridge entity body is greenfield -- neither entity currently claims it. If 119 owns the slot, 119 ships a `<SuggestionCard>` component that 089 wires up later. If 089 owns the slot, 119 leaves a hole and 089's execute wave adds the component.
+
+Suggested options:
+- (a) 119 owns the slot; 089 plugs in logic (119 ships placeholder `<SuggestionCard>` reading suggestion data from 089's API contract)
+- (b) 089 owns slot + logic; 119 leaves a comment marker in entity-body.tsx pointing to 089
+- (c) Slot ownership deferred to joint 089+119 planning session; neither ships suggestion UI this cycle
+
+Q-3: Gate flow citation correction -- is `detail.js:685` reference in brainstorm materially wrong or just imprecise?
+
+Domain: Readable/Textual (brainstorm annotation)
+
+Why it matters: Brainstorm APPROACH cited `detail.js:685` as "the gate-review flow" — explore confirmed :688 is the actual init of `initGateReview` IIFE (spanning :685-1160) and that :619-683 is suggestion accept/reject (089 territory). The annotation is imprecise, not materially misleading, but the ⚠ contradiction marker added to APPROACH flags it for captain review. Is the marker appropriate, or should the APPROACH be silently corrected in clarify?
+
+Suggested options:
+- (a) Keep the ⚠ marker; clarify converts it into an explicit note in the parity audit that detail.js line-ranges per-handler matter
+- (b) Clarify silently rewrites the APPROACH line to cite :685-1160 range; remove the ⚠ marker
+- Open-ended -- captain decides
+
+Q-4: Scale revision -- keep Medium or revise?
+
+Domain: Organizational (plan-stage task budget)
+
+Why it matters: Files likely touched: `entity-body.tsx`, `entity-detail-client.tsx`, new `types/entity.ts`, new section-renderer components (~4 files: StageReport / Assumptions / Options / OpenQuestions), possibly `gate-buttons.tsx`, `use-gate-events` hook, `docs/spacebridge-parity-audit.md`, possibly `page.tsx` for gate-visibility prop flow. Count: 8-11 files in view layer + 1 doc. Currently frontmatter says Medium (5-15). Upper edge of Medium; could justify Large if WS bridge extension (O-1 option a) lands in 119.
+
+Suggested options:
+- (a) Keep Medium -- current scope fits 5-15
+- (b) Revise to Large if O-1 option (a) selected (WS bridge extension pushes over 15 files when counting the bridge)
+- (c) Defer to plan-stage task breakdown -- let actual file count drive scale
+
 ## Stage Report: brainstorm
 
 - [x] Lens (a) captain-stated-intent dispatched (Mode A) -- 6 claims, all [primary]/[secondary]
@@ -129,3 +263,21 @@ You are asking for Spacebridge's entity detail page to render and behave the sam
 - [x] Alignment gate: continue (0 retries) -- APPROACH serves Goal Check expected outcome, no drift detected
 - [x] α marker count: 2 (well under warning threshold of 3)
 - alignment_confidence: 1.0
+
+## Stage Report: explore
+
+- [x] Files mapped: 8 across view + contract + doc layers
+  view: 5 (spacebridge/ui/app/entity/[slug]/page.tsx, spacebridge/ui/components/entity-body.tsx, spacebridge/ui/components/entity-detail-client.tsx, spacebridge/ui/components/gate-buttons.tsx, tools/dashboard/static/detail.js -- legacy reference); contract: 0 (types inlined, will add types/entity.ts); doc: 3 (060 shape, 047 canonical rendering contract, 117/120 decisions)
+- [x] Assumptions formed: 8 (Confident: 6, Likely: 2, Unclear: 0)
+  A-1 parity audit path + A-2 pre-split render + A-3 react-markdown retained + A-6 Open Questions blank-line + A-7 117 tokens + A-8 120 routing all Confident; A-4 shared types location Likely (greenfield dir); A-5 gate derivation port Likely (legacy correctness reference)
+- [x] Options surfaced: 3
+  O-1 WebSocket gate_decision event parity; O-2 status-poll race detection; O-3 body section-aware rendering implementation strategy. All three have ✅ Recommended designation with return-value trace + design-doc-invariant cross-check.
+- [x] Questions generated: 4
+  Q-1 audit doc input-vs-output; Q-2 089 vs 119 suggestion-UI slot ownership; Q-3 brainstorm gate citation correction scope; Q-4 Medium-vs-Large scale revision
+- [x] α markers resolved: 2 / 2
+  α-1 and α-2 (duplicate) "089 vs 119 body-text edit boundary" resolved: no "other edit" path exists in either codebase — 089 owns suggestion accept/reject, no freeform body-text-edit mode present in Spacebridge or legacy; boundary question dissolves.
+- [x] Scale assessment: keep Medium (initial Medium stands)
+  8-11 files expected across view layer + 1 doc; upper-edge of Medium (5-15). Q-4 offers Large revision only if O-1 option (a) selected (WS bridge extension). Decomposition flag present but decomposition NOT recommended: all deliverables modify the same 2-3 component files + share one audit doc; no independent sub-scope with sensible dependency ordering.
+- [x] Research dispatched: 0 researchers (skipped -- all technology claims codebase-validated via brainstorm Lens (c) + explore reads; no external tech needing validation)
+- ⚠ ensign-mode inline fallback -- 4-angle quality not achieved this invocation
+  Mode B selected (not ensign-mode -- SO-direct with >50% file surface already read in brainstorm Lens (c)+(d)); angles (i)+(ii)+(iii) covered inline via brainstorm lens data + direct reads of 060/117/120/047/GateButtons.tsx/entity-body.tsx full/detail.js:685-855. Angle (iv) negative-space seed-driven verification not run; parity-audit walk during plan stage will serve as negative-space discovery for 119 specifically.
