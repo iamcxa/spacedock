@@ -21,10 +21,10 @@ const FEEDBACK_ARC_HEIGHT = 40;
 const PADDING = 30;
 
 // --- Color tokens (A-7: Primer hex → Tailwind CSS variables) ---
-// Active/badge blue  → hsl(var(--primary))
-// Node fill          → hsl(var(--card))
-// Inactive border    → hsl(var(--border))
-// Text               → hsl(var(--foreground))
+// Active/badge blue  → var(--primary)
+// Node fill          → var(--card)
+// Inactive border    → var(--border)
+// Text               → var(--foreground)
 // Orange (feedback)  → rgb(245 158 11)  [amber-500]
 // Green  (terminal)  → rgb(34 197 94)   [green-500]
 // Purple (initial)   → rgb(192 132 252) [purple-400]
@@ -134,10 +134,10 @@ function NodeShape({ node, isActive }: { node: LayoutNode; isActive: boolean }) 
   const cx = node.x;
   const cy = node.y;
 
-  const activeFill = "hsla(var(--primary), 0.13)";
-  const inactiveFill = "hsl(var(--card))";
+  const activeFill = "color-mix(in oklch, var(--primary) 13%, transparent)";
+  const inactiveFill = "var(--card)";
   const fill = isActive ? activeFill : inactiveFill;
-  const activeStroke = "hsl(var(--primary))";
+  const activeStroke = "var(--primary)";
   const strokeWidth = isActive ? 2 : 1;
   const dasharray = node.manual ? "4,3" : "none";
 
@@ -171,7 +171,7 @@ function NodeShape({ node, isActive }: { node: LayoutNode; isActive: boolean }) 
   } else if (node.initial) {
     stroke = "rgb(192 132 252)";
   } else {
-    stroke = "hsl(var(--border))";
+    stroke = "var(--border)";
   }
 
   return (
@@ -209,10 +209,10 @@ function ForwardEdge({ fromNode, toNode }: { fromNode: LayoutNode; toNode: Layou
         y1={y}
         x2={x2 - ARROW_SIZE}
         y2={y}
-        stroke="hsl(var(--border))"
+        stroke="var(--border)"
         strokeWidth={1.5}
       />
-      <polygon points={arrowPoints} fill="hsl(var(--border))" />
+      <polygon points={arrowPoints} fill="var(--border)" />
     </g>
   );
 }
@@ -273,7 +273,7 @@ function EntityBadge({ node, count }: { node: LayoutNode; count: number }) {
   const cy = node.y - NODE_H / 2 - 2;
   return (
     <g className="pipeline-badge">
-      <circle cx={cx} cy={cy} r={BADGE_R} fill="hsl(var(--primary))" />
+      <circle cx={cx} cy={cy} r={BADGE_R} fill="var(--primary)" />
       <text
         x={cx}
         y={cy}
@@ -282,7 +282,7 @@ function EntityBadge({ node, count }: { node: LayoutNode; count: number }) {
         fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace"
         fontSize={9}
         fontWeight={700}
-        fill="hsl(var(--card))"
+        fill="var(--card)"
       >
         {count}
       </text>
@@ -446,7 +446,7 @@ export function PipelineGraph({
                   fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace"
                   fontSize={11}
                   fontWeight={isActive ? 600 : 400}
-                  fill={isActive ? "hsl(var(--primary))" : "hsl(var(--foreground))"}
+                  fill={isActive ? "var(--primary)" : "var(--foreground)"}
                 >
                   {node.name}
                 </text>
