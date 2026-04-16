@@ -3,6 +3,7 @@ id: 060
 title: "Cutover — delete engine tools/dashboard/static"
 status: clarify
 context_status: ready
+shape_status: validated
 source: spacebridge design doc (2026-04-10-spacebridge-engine-bridge-split-design.md)
 started:
 completed:
@@ -12,9 +13,10 @@ worktree:
 issue:
 pr:
 intent: feature
-scale: Medium
+scale: Large
 project: spacedock
 depends-on: [059]
+children: [089, 094, 111]
 ---
 
 ## Directive
@@ -29,6 +31,99 @@ depends-on: [059]
 - **Scope flag**: ⚠️ likely-decomposable (2 signals: "migrate" verb in scope + 3 domains tagged — explore should verify this stays atomic)
 - **Related entities**: 059 -- Standalone directory distribution + wrapper CLI (clarify, context_status: ready); 053 -- Next.js warroom + SSE feed (plan, ready); 058 -- share tunnel rebuild (clarify, ready); 047 -- entity body rendering hotfixes (shipped)
 - **Created**: 2026-04-13T14:55:00Z
+
+## Problem Statement
+
+Spacebridge was built to replace the legacy dashboard, yet the conditions required to declare it a replacement have never been written down. Five concrete gaps block that declaration: (1) undocumented UI parity drift from the legacy dashboard; (2) absence of any UX-quality criteria against which Spacebridge can be judged; (3) a theme mismatch (light instead of the expected dark mode) with no design-system entity to resolve it; (4) a broken MCP wiring that leaves bidirectional Claude Code communication dead despite the underlying channel being implemented and tested in entity 099; and (5) no cutover progress tracker that tells the captain which deliverables remain before the legacy UI can be retired. Entity 060 assumes this readiness work is complete and sits blocked behind it, while sibling entities (111 share-view comments, 112 graft hardening) are parked waiting for the shape of the replacement to resolve. The replacement is technically present but operationally unavailable, and no one can see how far from ready it is.
+
+(Frame C — engineering-debt / readiness; captain selected 2026-04-16 over candidates A captain-experience and B product-coherence. Reframes original directive scope from "delete static dir" to "define + close the 5 readiness gaps; cutover is the terminal step.")
+
+## User Stories
+
+- **US-1**: As a Captain, I want to see which Spacebridge UI features are missing or degraded compared to the legacy dashboard, so that I know exactly what parity gaps remain before committing to cutover.
+- **US-2**: As a Captain, I want Spacebridge to ship with a coherent design system -- dark mode as default theme, consistent typography, spacing, and component library with theme switching capability -- so that the UI meets production-quality standards and I can evaluate it as a real replacement rather than a visual prototype.
+- **US-3**: As a Captain, I want the MCP wiring to point at Spacebridge's CLI entry point instead of the legacy channel, so that bidirectional Claude Code communication works in the replacement UI without manual config edits.
+- **US-4**: As a Captain, I want a single cutover progress tracker that shows which deliverables are done and which remain, so that I can tell at a glance whether entity 060 is unblocked and when it is safe to retire the legacy UI.
+- **US-5**: As a Contributor, I want explicit UX-quality criteria documented against Spacebridge, so that I know what standard the replacement must meet and can evaluate pull requests without guessing the captain's acceptance bar.
+- **US-6**: As an External Consumer (collaborator), I want to view shared entities with read-only comment threads on Spacebridge's local share view, so that I can collaborate on build-pipeline work without needing the captain's full CC session.
+- **US-7**: As an External Consumer (collaborator), I want 060's design system and share-view architecture to remain compatible with future cloud multi-tenant deployment (entity 100), so that the local cutover work is not thrown away when cloud collab mode lands.
+
+(7 stories accepted by captain 2026-04-16. US-2 expanded from dark-mode to full design system per captain directive. US-6/US-7 added for External Consumer collaborator angle per captain directive.)
+
+## Scope: In
+
+**Parity**
+- Audit document listing every legacy dashboard UI feature with per-feature status (present / degraded / missing) in Spacebridge, committed to `docs/spacebridge-parity-audit.md`. (US-1)
+- Parity gap tracker updated as each gap closes; each row cites the entity or PR that closes it. (US-1)
+- Entity 111 (share-view comments restore) folded as child; comments thread on share view functional in Spacebridge. (US-1, US-6)
+- Entity 089 (inline edit suggestions) folded as child; inline suggestion flow present in Spacebridge entity detail. (US-1)
+- Entity 094 scoped as `spacebridge-workflow-visualizer` child; pipeline graph visible in Spacebridge war-room view. (US-1)
+
+**Design System**
+- New entity `spacebridge-design-system` created; ships a CSS design-token file (`tokens.css`) with dark-mode-first palette, typography scale, and spacing scale. (US-2)
+- Dark mode is the default theme on first load (no user action required); a theme-toggle control enables light mode. (US-2)
+- All Spacebridge UI components consume design tokens (no hardcoded hex or absolute-pixel values outside the token file). (US-2, US-5)
+- Design system architecture documented in `docs/spacebridge-design-system.md` with component inventory and token reference; includes a "cloud multi-tenant compatibility" note confirming no hostname or session coupling in the token/component layer. (US-2, US-7)
+
+**MCP Wiring**
+- `.mcp.json` updated to point at Spacebridge CLI entry point (replacing legacy channel path); change verified by launching CC and confirming bidirectional MCP message round-trip. (US-3)
+- Change documented in `docs/mcp-wiring-cutover.md` with before/after diff and rollback instructions. (US-3)
+
+**Progress Tracking**
+- `docs/spacebridge-cutover-tracker.md` created; lists all deliverables from this entity (parity gaps, design system, MCP fix, UX criteria, share view, terminal cutover) with done/pending status and owner entity/PR links. (US-4)
+- Tracker updated atomically with each child entity merge; verified current before the terminal cutover step fires. (US-4)
+
+**UX Criteria**
+- `docs/spacebridge-ux-criteria.md` specifies measurable UX acceptance criteria: interaction latency thresholds, keyboard-navigation coverage, error-state display requirements, responsive breakpoints. (US-5)
+- Each criterion references the UI area it covers; criteria are verifiable (pass/fail, not subjective). (US-5)
+
+**Share / Collab**
+- Entity 111 delivers read-only comment thread on Spacebridge local share view; no auth required for read, comment submit gated by existing share token. (US-6)
+- Share-view component architecture reviewed for cloud multi-tenant compatibility: no hardcoded `localhost`, no session-scoped globals, share token passed as URL param. (US-7)
+
+**Terminal Cutover**
+- PR to `clkao/spacedock` upstream deleting `tools/dashboard/static/*` filed and linked in cutover tracker; PR is the final tracked deliverable. (US-4)
+- PR blocked from merge until all cutover-tracker rows are marked done. (US-4)
+
+## Scope: Out
+
+- Entity 100 (cloud multi-tenant deployment) -- 060 must not break compatibility, but cloud deployment itself is out of scope; addressed when entity 100 activates.
+- Entity 112 (graft hardening / install flow) -- parked by captain; no install-flow changes in this entity.
+- Performance optimization (load time, bundle size, rendering throughput) -- no benchmark exists for legacy dashboard; optimization without a baseline is premature; defer to post-cutover.
+- New features absent from legacy dashboard -- parity-first; feature additions create scope creep and delay the cutover declaration.
+- Plugin architecture v2 / entity 040 -- separate architectural track; no dependency on or modification of the plugin registry schema in this entity.
+- Automated E2E browser test suite for Spacebridge -- UX criteria defined here are human-verifiable; automated coverage is Phase F work, not a cutover blocker.
+- Multi-instance WebSocket bridge or cross-instance sync -- ADR-001 single-server architecture holds; cross-instance is out of scope.
+- Backend API changes to legacy dashboard -- frontend/config replacement; legacy backend read paths remain untouched until the terminal PR merges.
+
+## References
+
+- `docs/build-pipeline/_archive/spacebridge-cutover-remove-static-ui.md` -- original entity 060 explore/clarify output (prior brainstorming spec and assumptions)
+- `docs/build-pipeline/_archive/graft-runtime-overlay-redesign.md` -- entity 101 (parent of 112, informs graft park rationale)
+- `spacebridge/bin/cli.ts` -- Spacebridge CLI entry point with `mcp` subcommand (entity 099 ship)
+- `spacebridge/bin/cli-mcp.test.ts` -- MCP stdio bridge integration tests (push notification verification)
+- `.mcp.json` -- current legacy wiring (`tools/dashboard/src/channel.ts`)
+- `tools/dashboard/static/` -- legacy UI files targeted for deletion (14 files at bd0e83d)
+- `references/first-officer-shared-core.md:10` -- FO ignore list containing `build` (bug #20 root cause, informs parity audit)
+- Entity 089 (inline edit suggestions) -- `docs/build-pipeline/spacebridge-inline-edit-suggestions.md`
+- Entity 094 (war room pipeline graph) -- `docs/build-pipeline/warroom-pipeline-graph-visualization.md`
+- Entity 111 (share view comments restore) -- `docs/build-pipeline/share-view-comment-thread-display.md`
+- Entity 100 (cloud multi-tenant) -- `docs/build-pipeline/spacebridge-cloud-collaborative-warroom.md` (US-7 compatibility reference)
+- `/Users/kent/Project/me-company/docs/decision-thinking/workflow-install-vs-graft.md` -- pensée #11 (graft vs install, informs 112 park decision)
+
+## Stage Report: shape
+
+- [x] Directive: entity 060 reframed from "delete static dir" to "define + close 5 readiness gaps; cutover is terminal step"
+- [x] Subagent dispatches: 3 (framer / story-gen / scope-drafter)
+- [x] Problem Statement: Frame C (engineering-debt / readiness) accepted over A (captain-experience) and B (product-coherence)
+- [x] User Stories: 7 accepted (US-1 through US-7; US-2 expanded to design system; US-6/US-7 added for External Consumer)
+- [x] Scope: In: 17 bullets across 7 themes
+- [x] Scope: Out: 8 bullets
+- [x] References: 12 citations
+- [x] Shape status: draft → validated
+- [x] Scale: revised from Medium to Large (17 in-scope deliverables, 3 children folded, new entities to create)
+- [x] Decomposition: NOT triggered (single epic with children, not multi-feature split)
+- [x] Captain interaction: 4 AskUserQuestion rounds (frame selection, story accept, scope accept, plus inline story refinement)
 
 ## Brainstorming Spec
 
