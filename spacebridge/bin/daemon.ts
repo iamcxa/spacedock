@@ -10,7 +10,24 @@ import { existsSync, mkdirSync, unlinkSync } from "node:fs";
 import * as net from "node:net";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 import { releaseLock } from "../src/daemon/lock";
+
+/** Stable project root — immune to cwd drift (e.g. cd spacebridge/ui && bun run build) */
+function resolveProjectRoot(): string {
+  // 1. Explicit env override
+  if (process.env.SPACEBRIDGE_PROJECT_ROOT) return process.env.SPACEBRIDGE_PROJECT_ROOT;
+  // 2. Git root from import.meta.dir (daemon.ts lives in spacebridge/bin/)
+  try {
+    const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd: import.meta.dir,
+      encoding: "utf-8",
+    });
+    if (result.status === 0 && result.stdout.trim()) return result.stdout.trim();
+  } catch {}
+  // 3. Fallback: import.meta.dir is spacebridge/bin/, project root is ../..
+  return resolve(import.meta.dir, "..", "..");
+}
 import {
   resolveNextjsServerScript,
   shutdownNextjsChild,
@@ -288,14 +305,14 @@ async function cmdStart(): Promise<void> {
       entity: cmd.entitySlug,
       stage: cmd.stage,
       agent: "captain",
-      workflowDir: process.env.SPACEBRIDGE_PROJECT_ROOT ?? process.cwd(),
+      workflowDir: resolveProjectRoot(),
       timestamp: decidedAt,
       payload: JSON.stringify({ decision, decidedAt }),
     });
 
     // Push to active session if available
     const targetSessionId = ctx.sessionRegistry.getActiveSessionByProjectRoot(
-      process.env.SPACEBRIDGE_PROJECT_ROOT ?? process.cwd(),
+      resolveProjectRoot(),
     );
     if (targetSessionId) {
       ctx.server.pushToSession(targetSessionId, {
@@ -436,7 +453,7 @@ async function cmdStart(): Promise<void> {
         port: uiPort,
         dbPath,
         stateDir,
-        projectRoot: process.cwd(),
+        projectRoot: resolveProjectRoot(),
       });
       process.stderr.write(
         `[${ts()}] spawned Next.js UI (pid: ${nextjsChild.pid}, port: ${uiPort})\n`,
