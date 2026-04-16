@@ -2,7 +2,7 @@
 id: 120
 title: "Spacebridge Session List UI -- Connected Sessions + Repo Visibility"
 status: clarify
-context_status: awaiting-clarify
+context_status: ready
 source: entity 060 shape + captain directive (2026-04-16 "要可以看到連上去的 session 是誰，repo 有哪些")
 created: 2026-04-16T20:03:00+08:00
 started:
@@ -134,6 +134,11 @@ Confidence: Confident (0.95)
 Evidence: brainstorm Lens (c) noted "Events table has NO projectRoot column ... potential bug surfaced by Lens c, out of 120 scope" [primary]; Honest Boundary in brainstorm explicitly defers this [primary].
 → Confirmed: captain, 2026-04-16 (batch, post self-verification)
 
+A-8: Repo identity in 120 is `owner/repo` (e.g., `kentcdodds/spacedock`), derived from `.git/config` remote.origin.url at the API/UI layer — NOT from `projectRoot` filesystem path. Aligns with entity 100's `users → repos → entities` hierarchy. Multiple sessions to same owner/repo: newer session overrides older (no ambiguity). Forks naturally namespace via owner field. URL routing key is `?repo=owner/name`. SessionRecord domain layer (057) is NOT modified — derivation is UI-side.
+Confidence: Confident (0.95)
+Evidence: docs/build-pipeline/spacebridge-cloud-collaborative-warroom.md:39 -- "Multi-tenant data model: Users -> Repos -> Entities (three-layer)" [primary]; captain reframe 2026-04-16: "整體應該是 users -> repos -> entities，repo 要取 owner/repo 當作 key，session 如果與 repo 衝突，那就要覆蓋掉舊的" [primary]; spacebridge/src/domain/session/types.ts:7-13 -- self-verified SessionRecord has projectRoot only, no ownerRepo field [primary].
+→ Confirmed: captain, 2026-04-16 (interactive, Step 4 reframe — supersedes O-1's sessionId framing and resolves Q-2)
+
 ## Option Comparisons
 
 ### O-1: Session selection persistence model
@@ -148,7 +153,7 @@ How does the captain's "active session" choice persist across page reloads and n
 
 Return value trace: URL query param flows through Next.js searchParams in Server Component, deterministic per-request. Cookie requires a Client Component or middleware to read. URL is simpler.
 
-→ Selected: URL query param `?session={sessionId}` (captain, 2026-04-16, interactive)
+→ Selected: URL query param -- but key is `?repo=owner/name`, NOT `?session={sessionId}` (captain, 2026-04-16, interactive -- corrected by Q-2 reframe per entity 100 hierarchy alignment; see A-8)
 
 ### O-2: Session picker placement
 
@@ -185,6 +190,8 @@ Suggested options:
 - (b) Client-side (response includes raw `lastHeartbeat`, client computes via shared hook)
 - (c) Both (response includes both raw timestamp AND computed liveness, client can override)
 
+→ Answer: (a) Server-side -- liveness threshold is server constant (60s default); response includes both raw lastHeartbeat AND computed liveness for transparency (captain, 2026-04-16, interactive)
+
 Q-2: When the captain navigates to an entity detail page WITHOUT a `?session=` query param (e.g., direct link, bookmark from before this entity shipped), what is the fallback behavior?
 
 Domain: User-facing Visual, Behavioral / Callable
@@ -194,6 +201,27 @@ Suggested options:
 - (b) Show "Select a session" empty state, force captain to pick from list
 - (c) Auto-pick + silent (no banner) — preserves smooth UX but hides multi-session existence
 - (d) Use cookie/localStorage of last selection, fall back to most-recent-heartbeat
+
+→ Answer: REFRAMED -- Q-2's premise (sessionId-based routing) is wrong. Per captain reframe (entity 100 alignment): identity is `owner/repo`, not sessionId. URL becomes `?repo=owner/name` not `?session={id}`. Multiple sessions to same owner/repo: newer overrides older (no ambiguity ever). Bookmark fallback: read `?repo=` param → look up active session for that owner/repo via `getActiveSessionByProjectRoot()` → render. If no active session for that repo: show empty state "No active session for {owner/repo} -- start CC in this repo to load." Single-session case (most common): URL `?repo=` is set by war room link generation; no fallback needed. (captain, 2026-04-16, interactive -- supersedes O-1 sessionId framing)
+
+Q-7: How is `owner/repo` derived from the daemon's `projectRoot` (filesystem path) for the API route response?
+
+Domain: Behavioral / Callable
+Why it matters: SessionRecord stores projectRoot (e.g., `/Users/kent/Project/spacedock`), but UI/URL identity needs `owner/repo` (e.g., `kentcdodds/spacedock`). 057 schema must NOT be modified -- derivation happens in the UI/API layer.
+
+→ Answer: UI layer reads `{projectRoot}/.git/config` and parses `[remote "origin"]` URL to extract `owner/repo`. For non-git repos or missing remote, fall back to `path.basename(projectRoot)` as the label (with explicit "no-git" tag in response so UI can show a warning). Implementation: `/api/sessions/route.ts` performs the read once per session at request time; future optimization could cache in SessionRecord-derived cache. (captain, 2026-04-16, interactive)
+
+Q-8: 094 (pipeline graph) also reads sessions snapshot. Does the owner/repo reframe propagate to 094, requiring its execute stage to use owner/repo URLs?
+
+Domain: Organizational
+Why it matters: 120 establishes owner/repo as the identity in /api/sessions response. If 094 ignores this and continues using projectRoot directly, UI inconsistency emerges. But forcing 094 to adopt owner/repo before it's ready expands 094 scope.
+
+→ Answer: 120 ships /api/sessions with owner/repo derivation as the foundation; 094's plan stage cites 120 as upstream dependency and adopts owner/repo for its SVG rendering. Implementation order: 120 ships → 094 plan-checker Dim 7 cross-entity coherence detects 120 contract → 094 plan task includes "consume owner/repo from /api/sessions". 120 does NOT modify 094 code. (captain, 2026-04-16, interactive)
+
+A-9: Non-git repos (e.g., /tmp ad-hoc experiments) display in picker as `{basename} (no-git)` badge. Captain sees the repo exists and knows why identification is incomplete. Identifier in URL falls back to `local:{basename}` namespace to avoid collision with real `owner/repo` entries.
+Confidence: Confident (0.90)
+Evidence: captain selected "顯示 basename + 「no-git」 badge" 2026-04-16 [primary]; angle (i) of brainstorm noted shadcn Badge primitive available for variant rendering [secondary].
+→ Confirmed: captain, 2026-04-16 (interactive, Step 4.5 exploration)
 
 ## Core Tensions
 
@@ -222,3 +250,34 @@ Suggested options:
 - [x] Scale assessment: Small confirmed
   6 files mapped; data layer (057) shipped; UI patterns (053) shipped; only adapter + new component + targeted fix needed
 - [x] Research dispatched: 0 researchers (skipped -- all assumptions Confident≥0.90 except A-4 Likely 0.75 which only needs cross-check against existing /api/entities response, deferred to plan)
+
+## Stage Report: clarify
+
+- [x] Decomposition: not-applicable
+  Small scale, single feature
+- [x] Re-validation: 5 assumptions checked, 0 stale, 1 contradicted (A-4 fabricated precedent), 0 deduped, 2 coverage gaps filled (A-8 owner/repo, A-9 non-git), 0 research re-validated
+- [x] 1f Self-verification: 4 self-verified (A-1, A-2, A-3, A-5), 1 corrected (A-4 — brainstorm Lens (d) cited /api/entities precedent that does not exist; corrected to events/route.ts pattern via direct grep), 0 needs-captain-judgment
+  verification_ratio: 4/5 = 0.80 (target: ≥0.80 met)
+- [x] Assumptions confirmed: 9 / 9 (1 corrected during 1f, 2 added during exploration)
+  A-1..A-5 batch confirmed post-self-verification; A-6..A-7 from explore confirmed; A-8 owner/repo architecture (captain reframe via entity 100); A-9 non-git fallback UX
+- [x] Options selected: 3 / 3
+  O-1 URL query param ?repo=owner/name (corrected from sessionId framing per A-8); O-2 117 shared header (self-resolved via cross-reference, no captain question); O-3 dedup-by-projectRoot
+- [x] Questions answered: 4 / 4 (0 deferred)
+  Q-1 server-side liveness compute (60s threshold, both raw + computed in response); Q-2 REFRAMED to owner/repo identity per entity 100; Q-7 owner/repo derived from .git/config remote.origin.url at API layer; Q-8 094 cross-impact (120 ships first, 094 plan adopts via Dim 7 cross-entity coherence)
+- [x] Self-filter: 0 self-resolved pre-presentation (Q-1 + Q-2 genuinely needed captain), 1 self-resolved during step 3 (O-2 via 117 Q-3 cross-reference)
+  clarify_self_filter_ratio: 0.0 pre-presentation; 0.20 overall (1/5 of options + questions)
+- [x] Open exploration: 2 gray areas surfaced (0 from templates, 1 from CONTRACTS — 094 cross-impact, 1 via captain freeform — non-git fallback)
+- [x] Canonical refs added: 1
+  spacebridge-cloud-collaborative-warroom.md (entity 100) cited for users→repos→entities hierarchy
+- [x] Context status: ready
+- [x] Handoff mode: loose
+  No auto_advance: true; captain must invoke FO in separate session
+- [x] Clarify duration: 8 AskUserQuestion calls (1 batch + 2 options + 4 questions/exploration + 1 close)
+
+## Canonical References
+
+- `docs/build-pipeline/spacebridge-cloud-collaborative-warroom.md:39` — entity 100 establishes `users → repos → entities` hierarchy; `owner/repo` is the canonical repo identity (not `projectRoot` filesystem path). 120 aligns now to avoid retroactive migration when 100 ships.
+- `spacebridge/ui/app/api/events/route.ts:1-15` — canonical Next.js route pattern for /api/sessions to follow: `export const dynamic = "force-dynamic"` + lazy `await import("@/lib/db")` + drizzle `.select().from(table).all()`.
+- `spacebridge/src/domain/session/types.ts:7-13` — SessionRecord shape (sessionId, projectRoot, pid, connectedAt, lastHeartbeat); 057 owns this; 120 must NOT modify.
+- `spacebridge/src/domain/session/registry.ts:148-182` — getActiveProjectRoots() and getActiveSessionByProjectRoot() — daemon-internal API surface 120 cannot call directly (read snapshot table instead).
+- `spacebridge/ui/app/page.tsx:14-22` — canonical UI snapshot read pattern (openReadOnlyDb + drizzle select); /api/sessions follows this.
