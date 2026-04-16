@@ -31,7 +31,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
 
   try {
     const { openReadOnlyDb } = await import("@/lib/db");
-    const { comments } = await import("@/lib/schema");
+    const { comments, suggestions } = await import("@/lib/schema");
 
     const handle = openReadOnlyDb();
     // entityPath convention: slug → /docs/build-pipeline/<slug>.md
@@ -43,7 +43,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
       .all()
       .filter((r) => r.entityPath.endsWith(`/${slug}.md`) || r.entityPath.endsWith(`\\${slug}.md`));
 
+    // Fetch suggestions for all comments belonging to this entity
+    const commentIdSet = new Set(rows.map((r) => r.commentId));
+    const allSuggestions = handle.db.select().from(suggestions).all();
+    const entitySuggestions = allSuggestions.filter((s) => commentIdSet.has(s.commentId));
+
     handle.close();
+
+    // Group suggestions by commentId
+    const suggestionsByCommentId: Record<string, typeof entitySuggestions> = {};
+    for (const s of entitySuggestions) {
+      suggestionsByCommentId[s.commentId] = [
+        ...(suggestionsByCommentId[s.commentId] ?? []),
+        s,
+      ];
+    }
 
     // Group: top-level + nest replies
     const topLevel = rows.filter((r) => !r.parentId);
@@ -61,7 +75,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
       bySection.set(section, [...(bySection.get(section) ?? []), withReplies]);
     }
 
-    return Response.json(Object.fromEntries(bySection));
+    return Response.json({ ...Object.fromEntries(bySection), suggestions: suggestionsByCommentId });
   } catch (err) {
     console.error("[comments GET]", err);
     return Response.json({ error: "Internal server error" }, { status: 500 });
