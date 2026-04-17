@@ -59,9 +59,9 @@ The spacedock build pipeline (13 stages, 3 profiles, 45+ entity history) encodes
 
 ## Scope: Out
 
-- Build-flow diet (Idiot Index audit + delete-in-place) — prerequisite work that determines which stages survive into the plugin; this shape packages what diet produces, not the diet itself
+- Build-flow diet (Idiot Index audit + delete-in-place) — ongoing work that runs AFTER extraction, not before. Extract-first gives friction-driven diet signal (install bloated plugin in recce → feel what's unnecessary → cut). Diet in isolation is imagination-driven. Reordered per Musk feedback-loop principle 2026-04-17.
 - spacedock-ui plugin (entity 125, already shipped) — separate concern; dashboard and visualization features do not belong to the distributable flow plugin
-- New stage creation or stage redesign — this shape packages the existing post-diet stages as-is; no new pipeline stages are introduced here
+- New stage creation or stage redesign — this shape packages existing stages as-is; diet (delete-in-place) happens post-extraction as ongoing friction-driven work
 - Multi-provider orchestration extensions (Codex officer, parallel model dispatch, etc.) — mentioned as future direction but not required to satisfy any of the five user stories at MVP
 - Dashboard / visualization / UI features — belong to spacedock-ui plugin; the distributable flow plugin is headless
 - SaaS / hosted / multi-tenant deployment — solo-broadcaster scope only; no auth layer, no account system, no team provisioning
@@ -83,5 +83,6 @@ The spacedock build pipeline (13 stages, 3 profiles, 45+ entity history) encodes
 - **Subagent dispatches**: framer (3 candidates), story-gen (5 stories), scope-drafter (7 In / 9 Out bullets)
 - **Captain accepts**: Problem Statement = Candidate A (fork-or-copy tax); User Stories = all 5 accepted; Scope In = 5 bullets (original 7 pruned to 5 by Musk Step 5.5 pressure test — per-project config and test harness deferred to Phase 2 post-dogfood); Scope Out = 8 bullets accepted as-is
 - **Pressure test (Step 5.5)**: Goal confirmed (flow portability); Gap confirmed (diet + extraction + test); Musk逆向思考 pruned 2 bullets as premature optimization — config fields need dogfood evidence, test harness needs real contract surface. Captain accepted.
+- **Post-shape reorder (2026-04-17)**: Diet reordered from prerequisite → ongoing post-extraction work. Musk feedback-loop principle: extract-first gives friction-driven diet signal; diet-in-isolation is imagination-driven. Entity 126 is no longer blocked by diet.
 - **Captain meta-feedback**: build-shape skill 的 Step 5.5 應加入 Musk 逆向思考作為常態化 pressure test（recorded as follow-up, not in this entity's scope）
 - **Final story count**: 5 (US-2 and US-3 deferred to Phase 2 delivery, retained in stories as target intent)

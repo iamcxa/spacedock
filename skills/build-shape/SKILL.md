@@ -208,7 +208,26 @@ Ask the captain via AskUserQuestion (three questions, sequential):
 2. **Current gap**: "Given the current codebase state, what is the *specific* gap between now and that goal?"
 3. **Fastest path?**: "Does the current Scope: In list close that gap the fastest way, or is there a simpler path we haven't considered? Examples of simpler paths to check: (a) reuse an existing primitive instead of building new, (b) push work upstream instead of fork-local, (c) defer scope to a later entity, (d) pick a subset of scope that unblocks 80% of the goal."
 
-If captain identifies a simpler path, loop back to Step 5 with reframed constraints and re-draft scope. If captain confirms current scope is minimal viable for the goal, proceed to Step 6.
+If captain identifies a simpler path, loop back to Step 5 with reframed constraints and re-draft scope. If captain confirms current scope is minimal viable for the goal, proceed to **Step 5.5b (Musk reverse-thinking)** before Step 6.
+
+### Step 5.5b: Musk Reverse-Thinking on Scope: In
+
+After captain confirms the goal and gap are correct, SO MUST apply Musk-style reverse-thinking to each Scope: In bullet before finalizing. This is a mechanical audit, not a philosophical discussion.
+
+**Invoke `musk-perspective` skill** (light mode) with prompt:
+
+> "Review each Scope: In bullet for entity {slug}. For each bullet, answer: (1) Is this bullet delivering a real outcome, or shipping an empty framework for something not yet understood? (2) Does this bullet require evidence that doesn't exist yet (dogfood results, user feedback, real usage data)? If yes, it's premature — recommend DEFER to Phase 2. (3) If I delete this bullet, does the 80% path still work? Rate each bullet: KEEP / DEFER / DELETE with one-line rationale."
+
+Present the Musk audit results to captain in the conversation thread (full text, not compressed into AskUserQuestion labels). Then ask via AskUserQuestion:
+
+- question: "Accept Musk reverse-thinking recommendations, or keep original scope?"
+- options: "Accept recommendations" / "Keep original {N} bullets" / "Partial — specify"
+
+If captain accepts any DEFER/DELETE recommendations, update Scope: In accordingly. DEFER items move to a `## Scope: Phase 2` section with the deferral rationale. DELETE items are discarded (not moved to Out — they were never load-bearing).
+
+**Rationale**: Entity 126's shape session proved this step's value — Musk reverse-thinking pruned 7 bullets to 5, catching two premature-optimization bullets (per-project config with no dogfood evidence, test harness with no contract surface). Without this step, those bullets would have entered the plan and consumed implementation cycles on imagination-driven work. The cost of this step is ~5 minutes; the cost of implementing a premature bullet is ~days.
+
+**Skip when**: Scope: In has ≤ 3 bullets (already minimal — reverse-thinking adds no signal).
 
 This step is MANDATORY for Medium+ scope. Small directives that passed the Step 1 escape hatch have already skipped to `/build`; this step does not apply to them.
 
