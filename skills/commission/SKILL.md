@@ -269,7 +269,7 @@ Every {entity_label} file has YAML frontmatter. Fields are documented below; see
 {A sentence describing who sets this status and what it means for an {entity_label} to be in this stage.}
 
 - **Inputs:** {What the worker reads to do this stage's work — be specific to the mission}
-- **Outputs:** {What the worker produces — be specific to the mission. Keep bullets concise and verifiable — these become checklist items at dispatch time. Focus on non-obvious requirements that catch skipping, not obvious actions like "write code."}
+- **Outputs:** {What the worker produces — be specific to the mission. Keep bullets concise and verifiable — these become checklist items at dispatch time. Focus on non-obvious requirements that catch skipping, not obvious actions like "write code." Stage-output bullets become checklist items at dispatch; any entity-level end-state properties the stage produces belong under the entity body's `## Acceptance criteria` heading, not in the stage Outputs.}
 - **Good:** {Quality criteria for work done in this stage}
 - **Bad:** {Anti-patterns to avoid in this stage}
 
@@ -324,7 +324,14 @@ issue:
 pr:
 ---
 
-Description of this {entity_label} and what it aims to achieve.
+Brief description of this {entity_label} and what it aims to achieve.
+
+## Acceptance criteria
+
+Each AC names a property of the finished entity (not a stage action) and how it is verified.
+
+**AC-1 — {End-state property.}**
+Verified by: {grep / test name / file path / command a future reader can reproduce.}
 ```
 
 ## Commit Discipline
@@ -433,7 +440,17 @@ Do not spawn a subagent. Instead, the commission skill itself takes on the first
 
 Execute the first-officer startup procedure directly. You are now the first officer for the remainder of this session.
 
-### Step 3 — Monitor and Report
+### Step 3 — Team Probe
+
+Before any dispatch:
+
+1. Run `ToolSearch(query="select:TeamCreate", max_results=1)`.
+2. If the result contains a TeamCreate definition, run `TeamCreate(...)` per the Claude Code runtime adapter's Team Creation section, and record the returned `team_name`. Forward that `team_name` into every subsequent dispatch input JSON.
+3. If ToolSearch returns no match, enter bare mode explicitly (`team_name: null, bare_mode: true` on dispatch inputs) and report the mode to {captain}.
+
+This step is mandatory. Skipping it and defaulting to bare is the failure mode #201 addresses — a commissioned FO that silently omits TeamCreate loses access to team-mode primitives (spawn-standing, concurrent dispatch, SendMessage coordination).
+
+### Step 4 — Monitor and Report
 
 Process entities following the first-officer event loop. When the workflow reaches an idle state or pauses at an approval gate, report the results to {captain}:
 
@@ -441,7 +458,7 @@ Process entities following the first-officer event loop. When the workflow reach
 >
 > {Summary of what happened: which entities were processed, what stages they moved through, any approval gates hit}
 
-### Step 4 — Handle Failures
+### Step 5 — Handle Failures
 
 If the pilot run fails (agent errors, YAML gets mangled, dispatch issues):
 
@@ -451,9 +468,9 @@ If the pilot run fails (agent errors, YAML gets mangled, dispatch issues):
 
 This is v0. Either it works or we learn why it didn't.
 
-### Step 5 — Post-Completion Guidance
+### Step 6 — Post-Completion Guidance
 
-After Step 3 or Step 4 (whether the pilot run succeeded or failed), always conclude with:
+After Step 4 or Step 5 (whether the pilot run succeeded or failed), always conclude with:
 
 > **What's next?** To continue working this workflow in a future session, start Claude Code with:
 >

@@ -38,6 +38,35 @@ NAME_PATTERN = re.compile(r'^[a-z0-9][a-z0-9-]*[a-z0-9]$')
 NAME_MAX_LEN = 200
 MODEL_ENUM = ('sonnet', 'opus', 'haiku')
 MODEL_ENUM_LIST = 'must be one of: sonnet, opus, haiku'
+TEAM_EVIDENCE_WINDOW_SECS = 30 * 60
+
+
+def _recent_team_evidence():
+    """Return True if any ~/.claude/teams/*/config.json was modified within the window.
+
+    Ambient-mtime heuristic: Claude Code does not pass a session id to helpers,
+    so we cannot know whether THIS session called TeamCreate. A recent mtime on
+    any team config is the cheapest plausible proxy.
+    """
+    import time
+    home = os.path.expanduser('~')
+    teams_dir = os.path.join(home, '.claude', 'teams')
+    if not os.path.isdir(teams_dir):
+        return False
+    cutoff = time.time() - TEAM_EVIDENCE_WINDOW_SECS
+    try:
+        for entry in os.listdir(teams_dir):
+            cfg = os.path.join(teams_dir, entry, 'config.json')
+            if not os.path.isfile(cfg):
+                continue
+            try:
+                if os.path.getmtime(cfg) >= cutoff:
+                    return True
+            except OSError:
+                continue
+    except OSError:
+        return False
+    return False
 
 
 def extract_stage_subsection(readme_path, stage_name):
@@ -110,6 +139,28 @@ def cmd_build(args):
     scope_notes = inp.get('scope_notes')
     bare_mode = inp.get('bare_mode', False)
     is_feedback_reflow = inp.get('is_feedback_reflow', False)
+
+    # FO bootstrap discipline: when dispatching bare_mode AND no recent
+    # TeamCreate evidence exists on disk, warn (stderr). This converts a silent
+    # TeamCreate-skip into a visible signal. Stays advisory (exit 0) — see #201.
+    if bare_mode and not _recent_team_evidence():
+        print(
+            'WARN: bare_mode dispatch with no recent TeamCreate evidence '
+            '(no ~/.claude/teams/*/config.json modified in the last 30 minutes). '
+            'If you intend teams mode, run ToolSearch select:TeamCreate and TeamCreate first. '
+            'If bare is intentional, this warning can be ignored.',
+            file=sys.stderr,
+        )
+
+    # Rule 12: entity_path must be project-root, not worktree-absolute.
+    # The helper derives the worktree read target internally; passing a worktree
+    # path doubles the .worktrees/ prefix in the emitted prompt.
+    if '/.worktrees/' in entity_path or entity_path.startswith('.worktrees/'):
+        return _build_error(
+            f"entity_path must be a project-root absolute path; got worktree path '{entity_path}'. "
+            f"Pass the project-root location (e.g. '/repo/docs/plans/{{slug}}.md'), not the worktree copy. "
+            f"The helper derives the worktree read target internally."
+        )
 
     # Rule 9: Checklist non-empty
     if not isinstance(checklist, list) or len(checklist) == 0:
@@ -218,6 +269,21 @@ def cmd_build(args):
     # --- Prompt Assembly (10 components) ---
     prompt_parts = []
 
+    # 0. Operating-contract first-action directive
+    prompt_parts.append(
+        '## First action\n'
+        '\n'
+        'Before anything else, invoke your operating contract:\n'
+        '\n'
+        '    Skill(skill="spacedock:ensign")\n'
+        '\n'
+        'This loads the shared ensign discipline (stage-report format, BashOutput '
+        'polling, worktree ownership, completion signal protocol). The call is safe '
+        'to call more than once; if the agent-definition preload ever starts '
+        'working, calling it again is a no-op (the skill content is re-loaded but '
+        'has no behavioral effect). Do not paraphrase; call the tool.\n'
+    )
+
     # 1. Header
     prompt_parts.append(f'You are working on: {entity_title}\n\nStage: {stage}\n')
 
@@ -255,12 +321,6 @@ def cmd_build(args):
             f'Read the entity file at {entity_path} for the current spec.\n'
         )
 
-    # 5. Do-not-modify block (always)
-    prompt_parts.append(
-        'Do NOT modify YAML frontmatter in entity files.\n'
-        'Do NOT modify files under agents/ or references/ — these are plugin scaffolding.\n'
-    )
-
     # 6. Feedback context (conditional)
     if feedback_context:
         prompt_parts.append(f'### Feedback from prior review\n\n{feedback_context}\n')
@@ -273,12 +333,9 @@ def cmd_build(args):
     checklist_text = '\n'.join(checklist)
     prompt_parts.append(
         '### Completion checklist\n\n'
-        'Write a ## Stage Report section into the entity file when done.\n'
-        'Mark each: DONE, SKIPPED (with rationale), or FAILED (with details).\n\n'
         f'{checklist_text}\n\n'
         '### Summary\n'
-        '{brief description of what was accomplished}\n\n'
-        'Every checklist item must appear in your report. Do not omit items.'
+        '{brief description of what was accomplished}\n'
     )
 
     # 9. Standing teammates available (conditional: team mode, alive members found)
@@ -691,6 +748,14 @@ def cmd_spawn_standing(args: argparse.Namespace) -> int:
     mod_path = args.mod
     team_name = args.team
 
+    if team_name in (None, '', 'none', 'None'):
+        print(
+            f"error: spawn-standing requires a real team name; got {team_name!r}. "
+            f"Call TeamCreate first and pass the returned team_name via --team.",
+            file=sys.stderr,
+        )
+        return 1
+
     if not os.path.isfile(mod_path):
         print(f"error: mod file not found: {mod_path}", file=sys.stderr)
         return 1
@@ -914,7 +979,18 @@ def main():
     budget_parser = subparsers.add_parser("context-budget", help="Check agent context budget")
     budget_parser.add_argument("--name", required=True, help="Agent name to look up")
 
-    build_parser = subparsers.add_parser("build", help="Assemble structured dispatch JSON")
+    build_parser = subparsers.add_parser(
+        "build",
+        help="Assemble structured dispatch JSON",
+        description=(
+            "Assemble structured dispatch JSON from stdin.\n"
+            "\n"
+            "entity_path must be a project-root absolute path\n"
+            "(e.g. /repo/docs/plans/slug.md), not a worktree-absolute path;\n"
+            "the helper derives the worktree read target internally."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     build_parser.add_argument("--workflow-dir", required=True, help="Absolute path to workflow directory")
 
     spawn_parser = subparsers.add_parser(

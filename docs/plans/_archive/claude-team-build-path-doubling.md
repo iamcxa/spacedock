@@ -1,16 +1,17 @@
 ---
 id: 164
 title: "`claude-team build` path-doubles when entity_path is passed as a worktree-absolute path"
-status: validation
+status: done
 source: "FO observation during 2026-04-16 session while dispatching #162 implementation — initial build invocation produced entity paths with `.worktrees/` prefix duplicated twice"
 started: 2026-04-18T07:59:13Z
-completed:
-verdict:
+completed: 2026-04-19T01:23:01Z
+verdict: PASSED
 score: 0.40
-worktree: .worktrees/spacedock-ensign-claude-team-build-path-doubling
+worktree: 
 issue:
 pr: #129
-mod-block: merge:pr-merge
+mod-block: 
+archived: 2026-04-19T01:23:01Z
 ---
 
 When the FO passes `entity_path` to `claude-team build` as a worktree-absolute path (e.g. `/Users/clkao/git/spacedock/.worktrees/spacedock-ensign-{slug}/docs/plans/{slug}.md`), the helper emits a prompt whose "Read the entity file at..." references a doubled path: `/Users/clkao/git/spacedock/.worktrees/spacedock-ensign-{slug}/.worktrees/spacedock-ensign-{slug}/docs/plans/{slug}.md`. The dispatched ensign follows the instruction and fails at the first Read.
@@ -103,3 +104,40 @@ Ideation complete. Root cause confirmed by reading `cmd_build` lines 238–240 �
 1. **Acceptance criteria rewritten to `## Acceptance criteria` entity-level format** — **DONE.** Replaced `## Acceptance Criteria (draft)` with `## Acceptance criteria`. Each AC is now `**AC-N — {end-state property}**` followed by `Verified by: {concrete test name + file}`. Each names a post-merge property of the repo (new named test exists, specific error raised, specific substring present in help output), not a stage action.
 2. **Recommendation confirmed concretely** — **DONE.** Entity now pins: file `skills/commission/bin/claude-team`, function `cmd_build` (line 77), insertion point (after line 105, before line 119), detection predicate (`/.worktrees/` substring in `entity_path`), exit-code contract (existing `_build_error` helper), and a literal draft stderr message that AC-1's test asserts against verbatim.
 3. **Test plan specifies target file and three concrete test names** — **DONE.** Target file `tests/test_claude_team.py` (confirmed exists at project root, alongside existing build-rule tests). Three test names chosen so implementation can grep for them: `test_build_rejects_worktree_entity_path`, `test_build_prompt_entity_path_not_doubled`, `test_build_help_documents_entity_path_contract`. E2E-not-required confirmed.
+
+## Stage Report — implementation
+
+### Summary
+
+Surgical fix landed in `skills/commission/bin/claude-team`: a new Rule-12 boundary check in `cmd_build` rejects worktree-absolute `entity_path` inputs via `_build_error` with the literal message pinned in the entity. Build subcommand `--help` now documents the project-root contract (using `argparse.RawDescriptionHelpFormatter` so the key phrase is not line-wrapped). Three new static tests added to `tests/test_claude_team.py` under `TestBuildEntityPathContract`, all passing. Full `make test-static` green: 440 passed, 22 deselected, 10 subtests passed.
+
+### Checklist
+
+1. **`cmd_build` path-doubling fix landed** — **DONE.** Added Rule-12 check in `skills/commission/bin/claude-team` `cmd_build` immediately after the `entity_path = inp['entity_path']` extraction (line 105) and before the `os.path.isfile(entity_path)` check (line 119). Detection predicate: `'/.worktrees/' in entity_path or entity_path.startswith('.worktrees/')`. Rejection path uses the existing `_build_error` helper (non-zero exit, stderr emission). Stderr message is the literal text pinned in the `## Recommendation` section, naming the offending `entity_path` value.
+2. **Three new static tests added** — **DONE.** New `TestBuildEntityPathContract` class in `tests/test_claude_team.py` containing exactly the three names pinned in ideation: `test_build_rejects_worktree_entity_path` (AC-1: asserts non-zero returncode, asserts stderr contains `must be a project-root absolute path` and the offending path), `test_build_prompt_entity_path_not_doubled` (AC-2: asserts the "Read the entity file at" line contains exactly one `/.worktrees/` segment), `test_build_help_documents_entity_path_contract` (AC-3: asserts `claude-team build --help` stdout contains the literal substring `entity_path must be a project-root absolute path`).
+3. **`make test-static` green including the three new tests** — **DONE.** Full pass ratio: **440 passed, 22 deselected, 10 subtests passed in 20.57s**. Targeted run of `TestBuildEntityPathContract`: 3 passed, 70 deselected.
+
+## Stage Report — validation
+
+### Summary
+
+PASSED. All three named static tests pass on the worktree tip. Full `make test-static` green (440 passed / 22 deselected / 10 subtests). Live reproduction against a worktree-absolute `entity_path` exits non-zero and emits the pinned stderr string naming the offending path — matches the literal contract in the entity's Recommendation section.
+
+### Checklist
+
+1. **All 3 named static tests re-run green under `make test-static`** — **DONE.**
+   - AC-1: `tests/test_claude_team.py::TestBuildEntityPathContract::test_build_rejects_worktree_entity_path` — **PASSED** (targeted verbose run, 0.13s).
+   - AC-2: `tests/test_claude_team.py::TestBuildEntityPathContract::test_build_prompt_entity_path_not_doubled` — **PASSED** (targeted verbose run).
+   - AC-3: `tests/test_claude_team.py::TestBuildEntityPathContract::test_build_help_documents_entity_path_contract` — **PASSED** (targeted verbose run).
+   - Full suite: `make test-static` → **440 passed, 22 deselected, 10 subtests passed in 20.46s**, no failures, no stderr noise.
+2. **Live reproduction against the original bug** — **DONE.** Invoked `skills/commission/bin/claude-team build --workflow-dir docs/plans` with stdin JSON whose `entity_path` was the worktree-absolute path `/Users/clkao/git/spacedock/.worktrees/spacedock-ensign-claude-team-build-path-doubling/docs/plans/claude-team-build-path-doubling.md`.
+   - (a) Exit code: **1** (non-zero, via `_build_error`).
+   - (b) Captured stderr verbatim:
+     ```
+     error: entity_path must be a project-root absolute path; got worktree path '/Users/clkao/git/spacedock/.worktrees/spacedock-ensign-claude-team-build-path-doubling/docs/plans/claude-team-build-path-doubling.md'. Pass the project-root location (e.g. '/repo/docs/plans/{slug}.md'), not the worktree copy. The helper derives the worktree read target internally.
+     ```
+   - Both required substrings present: `must be a project-root absolute path` ✓ and the offending path ✓. Stdout empty (no prompt emitted, correctly suppressed by early rejection).
+
+### Verdict
+
+**PASSED** — implementation meets all three acceptance criteria (AC-1 error-path, AC-2 output-shape, AC-3 help-text) with evidence from both the static suite and a direct live reproduction of the original bug condition.
