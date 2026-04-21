@@ -168,7 +168,10 @@ When an entity reaches its terminal stage:
    `status --workflow-dir {workflow_dir} --set {slug} mod-block=`
    Commit: `mod-block: {slug} cleared ({mod_name} completed)`.
    The clear MUST be a standalone `--set` — the audit history must show the block resolving separately from terminalization. `status --set` refuses and exits 1 if `mod-block=` is combined with `status={terminal}`, `completed`, `verdict`, or `worktree=` in one call. Use two commits, or pass `--force` if the captain explicitly approved bypassing the hook.
-6. If no merge hook handled the merge, perform the default local merge from the stage worktree branch.
+6. If no merge hook handled the merge, run `git fetch origin main` then attempt `git rebase main` in the worktree before the default local merge:
+   - **Up-to-date**: if the worktree branch is already level with main, the rebase is a no-op; proceed to `git merge --no-ff {branch}`.
+   - **Behind but clean**: if the rebase succeeds after replaying commits, proceed to `git merge --no-ff {branch}`.
+   - **Conflict**: if the rebase reports conflicts, run `git rebase --abort`, surface the per-file conflict list to the captain (from `git status --short` or the rebase conflict output), and pause the merge flow. Do not proceed to `git merge --no-ff` until the captain resolves (either by merging upstream into the worktree branch manually and re-running, or by explicitly opting to skip the rebase via `--force` to fall back to legacy behaviour).
 7. Update frontmatter: `status --workflow-dir {workflow_dir} --set {slug} completed verdict={verdict} worktree=`
 8. Archive the entity into `{workflow_dir}/_archive/`.
 9. Remove the worktree (`git worktree remove {path}`) and delete the local branch (`git branch -d {branch}`). Do NOT delete the remote branch while a PR is still pending — the PR reviewer needs it on the remote. Remote-branch cleanup belongs to the PR merge, not the FO.
