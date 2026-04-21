@@ -195,6 +195,13 @@ class TestModelMapping:
         ("claude-haiku-4-5-20251001", 200000),
         ("unknown-model-xyz", 200000),
         ("unknown-model-xyz[1m]", 1000000),  # heuristic works on unknown models too
+        ("claude-opus-4-7", 1000000),  # empirically verified 1M-native, no bracket needed
+        ("claude-opus-4-7[1m]", 1000000),
+        # Future models default to 200k until empirically verified. Locks in the
+        # no-speculation discipline: when a new opus ships, someone re-runs the
+        # check and adds the exact string to NATIVE_1M_MODELS.
+        ("claude-opus-4-8", 200000),
+        ("claude-opus-4-8[1m]", 1000000),  # bracket opt-in still works for any future model
     ])
     def test_model_context_limits(self, tmp_path, model, expected_limit):
         usage = {
@@ -497,6 +504,25 @@ class TestRuntimeModelDetection:
         assert data["model"] == "opus[1m]"
         assert data["context_limit"] == 1000000
         assert "config_fallback_warning" in data
+
+    def test_opus_4_7_bare_runtime_gets_1m(self, tmp_path):
+        """Runtime reports bare claude-opus-4-7 → native-1M family, 1M limit, no drift warning."""
+        usage = {
+            "input_tokens": 285000,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+        }
+        make_jsonl_fixture(tmp_path, "spacedock-ensign-foo-impl", usage, model="claude-opus-4-7")
+        make_team_config(tmp_path, "test-team", "spacedock-ensign-foo-impl", "opus[1m]")
+
+        result = run_context_budget(tmp_path, "spacedock-ensign-foo-impl")
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        data = json.loads(result.stdout)
+        assert data["model"] == "claude-opus-4-7"
+        assert data["context_limit"] == 1000000
+        assert data["usage_pct"] == pytest.approx(28.5)
+        assert data["reuse_ok"] is True
+        assert "config_drift_warning" not in data
 
 
 # --- Build subcommand tests ---
@@ -1803,6 +1829,174 @@ class TestBuildStandingTeammateEnumeration:
         assert result.returncode == 0, f"stderr: {result.stderr}"
         out = json.loads(result.stdout)
         assert self._SECTION_HEADING not in out["prompt"]
+
+
+def _load_claude_team_lib():
+    """Load the claude-team script as a module for direct function testing."""
+    import importlib.machinery
+    loader = importlib.machinery.SourceFileLoader("_claude_team_lib", str(SCRIPT))
+    spec = importlib.util.spec_from_file_location("_claude_team_lib", str(SCRIPT), loader=loader)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class TestExtractStageSubsection:
+    """#138/#212: stage-heading regex tolerates backticks + trailing parentheticals."""
+
+    _README_BODY = (
+        "# Workflow\n"
+        "\n"
+        "## Stages\n"
+        "\n"
+        "### `work`\n"
+        "\n"
+        "Backtick-quoted bare heading.\n"
+        "\n"
+        "### ideation\n"
+        "\n"
+        "Bare heading without backticks.\n"
+        "\n"
+        "### `triaged` (terminal)\n"
+        "\n"
+        "Backtick-quoted heading with parenthetical annotation.\n"
+        "\n"
+        "### implementation (middle)\n"
+        "\n"
+        "Bare heading with parenthetical annotation.\n"
+        "\n"
+        "### `validation` (gate)\n"
+        "\n"
+        "Another backtick + parenthetical form.\n"
+        "\n"
+        "## Other section\n"
+    )
+
+    def _write_readme(self, tmp_path):
+        readme = tmp_path / "README.md"
+        readme.write_text(self._README_BODY)
+        return readme
+
+    def test_matches_backtick_bare_heading(self, tmp_path):
+        mod = _load_claude_team_lib()
+        readme = self._write_readme(tmp_path)
+        result = mod.extract_stage_subsection(str(readme), "work")
+        assert result is not None
+        assert result.startswith("### `work`")
+        assert "Backtick-quoted bare heading." in result
+        assert "### ideation" not in result
+
+    def test_matches_bare_heading(self, tmp_path):
+        mod = _load_claude_team_lib()
+        readme = self._write_readme(tmp_path)
+        result = mod.extract_stage_subsection(str(readme), "ideation")
+        assert result is not None
+        assert result.startswith("### ideation")
+        assert "Bare heading without backticks." in result
+        assert "### `triaged`" not in result
+
+    def test_matches_backtick_heading_with_parenthetical(self, tmp_path):
+        mod = _load_claude_team_lib()
+        readme = self._write_readme(tmp_path)
+        result = mod.extract_stage_subsection(str(readme), "triaged")
+        assert result is not None
+        assert result.startswith("### `triaged` (terminal)")
+        assert "Backtick-quoted heading with parenthetical annotation." in result
+        assert "### implementation" not in result
+
+    def test_matches_bare_heading_with_parenthetical(self, tmp_path):
+        mod = _load_claude_team_lib()
+        readme = self._write_readme(tmp_path)
+        result = mod.extract_stage_subsection(str(readme), "implementation")
+        assert result is not None
+        assert result.startswith("### implementation (middle)")
+        assert "Bare heading with parenthetical annotation." in result
+        assert "### `validation`" not in result
+
+    def test_matches_backtick_heading_with_arbitrary_parenthetical(self, tmp_path):
+        mod = _load_claude_team_lib()
+        readme = self._write_readme(tmp_path)
+        result = mod.extract_stage_subsection(str(readme), "validation")
+        assert result is not None
+        assert result.startswith("### `validation` (gate)")
+        assert "Another backtick + parenthetical form." in result
+        assert "## Other section" not in result
+
+    def test_rejects_nonexistent_stage(self, tmp_path):
+        mod = _load_claude_team_lib()
+        readme = self._write_readme(tmp_path)
+        assert mod.extract_stage_subsection(str(readme), "nonexistent") is None
+
+    def test_rejects_partial_match(self, tmp_path):
+        mod = _load_claude_team_lib()
+        readme = self._write_readme(tmp_path)
+        # "wor" is a prefix of "work" — must NOT match.
+        assert mod.extract_stage_subsection(str(readme), "wor") is None
+
+
+class TestBuildStageHeadingParentheticalE2E:
+    """#138/#212 AC-4: end-to-end subprocess repro of the issue body."""
+
+    def test_build_accepts_triaged_terminal_heading(self, tmp_path):
+        wf_dir = tmp_path / "workflow"
+        wf_dir.mkdir()
+        readme = wf_dir / "README.md"
+        readme.write_text(
+            "---\n"
+            "commissioned-by: spacedock@test\n"
+            "entity-label: task\n"
+            "stages:\n"
+            "  defaults:\n"
+            "    worktree: false\n"
+            "    concurrency: 2\n"
+            "  states:\n"
+            "    - name: new\n"
+            "      initial: true\n"
+            "    - name: triaged\n"
+            "      terminal: true\n"
+            "---\n"
+            "\n"
+            "# Two-stage workflow\n"
+            "\n"
+            "## Stages\n"
+            "\n"
+            "### `new`\n"
+            "\n"
+            "Seed holding stage.\n"
+            "\n"
+            "### `triaged` (terminal)\n"
+            "\n"
+            "Triage complete, entity is done.\n"
+            "\n"
+            "- **Inputs:** A new idea\n"
+            "- **Outputs:** Triage verdict\n"
+        )
+        entity = wf_dir / "sample.md"
+        entity.write_text(
+            "---\n"
+            "id: 001\n"
+            "title: Sample entity\n"
+            "status: triaged\n"
+            "---\n"
+            "\n"
+            "Body.\n"
+        )
+        inp = {
+            "schema_version": 1,
+            "entity_path": str(entity),
+            "workflow_dir": str(wf_dir),
+            "stage": "triaged",
+            "checklist": ["x"],
+            "team_name": None,
+            "feedback_context": None,
+            "scope_notes": None,
+            "bare_mode": True,
+            "is_feedback_reflow": False,
+        }
+        result = run_build(wf_dir, inp)
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        out = json.loads(result.stdout)
+        assert "Triage complete, entity is done." in out["prompt"]
 
 
 if __name__ == "__main__":
